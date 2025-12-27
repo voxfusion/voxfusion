@@ -1,0 +1,201 @@
+---
+---
+
+<section id="download" class="cta">
+	<div class="container">
+		<div class="cta-card">
+			<div class="cta-glow"></div>
+			<div class="cta-content">
+				<h2 class="cta-title">Ready to transform your voice?</h2>
+				<p class="cta-subtitle">
+					Join thousands of users who are already experiencing the future of voice technology.
+				</p>
+				<div class="cta-actions">
+					<a href="#" class="btn btn-primary btn-lg">
+						<span>Download for macOS</span>
+						<span class="arrow">→</span>
+					</a>
+					<div class="platforms">
+						<span class="platform-label">Also available for</span>
+						<span class="platform-icons">Windows • Linux</span>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<footer class="footer">
+			<div class="footer-brand">
+				<span class="logo-icon">◆</span>
+				<span>VoxFusion</span>
+			</div>
+			<div class="footer-links">
+				<a href="#">Privacy</a>
+				<a href="#">Terms</a>
+				<a href="#">Contact</a>
+			</div>
+			<div class="footer-copy">© 2024 VoxFusion. All rights reserved.</div>
+		</footer>
+	</div>
+</section>
+
+<style>
+	.cta {
+		padding: 4rem 2rem 2rem;
+	}
+
+	.container {
+		max-width: 1000px;
+		margin: 0 auto;
+	}
+
+	.cta-card {
+		position: relative;
+		background: var(--color-bg-elevated);
+		border: 1px solid rgba(124, 58, 237, 0.3);
+		border-radius: 32px;
+		padding: 4rem;
+		text-align: center;
+		overflow: hidden;
+	}
+
+	.cta-glow {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 600px;
+		height: 600px;
+		transform: translate(-50%, -50%);
+		background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, transparent 70%);
+		pointer-events: none;
+	}
+
+	.cta-content {
+		position: relative;
+		z-index: 1;
+	}
+
+	.cta-title {
+		font-size: clamp(1.75rem, 4vw, 2.5rem);
+		font-weight: 800;
+		margin-bottom: 1rem;
+	}
+
+	.cta-subtitle {
+		font-size: 1.125rem;
+		color: var(--color-text-muted);
+		max-width: 500px;
+		margin: 0 auto 2rem;
+	}
+
+	.cta-actions {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1.5rem;
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem 1.5rem;
+		border-radius: 12px;
+		font-weight: 600;
+		transition: all 0.2s;
+		border: none;
+		cursor: pointer;
+	}
+
+	.btn-primary {
+		background: var(--gradient-primary);
+		color: white;
+	}
+
+	.btn-primary:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 8px 30px rgba(124, 58, 237, 0.4);
+	}
+
+	.btn-lg {
+		padding: 1rem 2rem;
+		font-size: 1.1rem;
+	}
+
+	.arrow {
+		transition: transform 0.2s;
+	}
+
+	.btn:hover .arrow {
+		transform: translateX(4px);
+	}
+
+	.platforms {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		color: var(--color-text-muted);
+		font-size: 0.875rem;
+	}
+
+	.platform-icons {
+		color: var(--color-text);
+		font-weight: 500;
+	}
+
+	.footer {
+		margin-top: 6rem;
+		padding-top: 2rem;
+		border-top: 1px solid rgba(255, 255, 255, 0.06);
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 1.5rem;
+	}
+
+	.footer-brand {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-weight: 700;
+	}
+
+	.logo-icon {
+		background: var(--gradient-primary);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+	}
+
+	.footer-links {
+		display: flex;
+		gap: 2rem;
+	}
+
+	.footer-links a {
+		color: var(--color-text-muted);
+		font-size: 0.875rem;
+		transition: color 0.2s;
+	}
+
+	.footer-links a:hover {
+		color: var(--color-text);
+	}
+
+	.footer-copy {
+		color: var(--color-text-muted);
+		font-size: 0.875rem;
+	}
+
+	@media (max-width: 768px) {
+		.cta-card {
+			padding: 2.5rem 1.5rem;
+		}
+
+		.footer {
+			flex-direction: column;
+			text-align: center;
+		}
+	}
+</style>
+

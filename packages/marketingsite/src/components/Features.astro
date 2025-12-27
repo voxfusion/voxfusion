@@ -1,0 +1,143 @@
+---
+const features = [
+	{
+		icon: "🎙️",
+		title: "Voice Processing",
+		description:
+			"Advanced real-time voice processing with crystal-clear quality and minimal latency.",
+	},
+	{
+		icon: "🧠",
+		title: "AI Analysis",
+		description: "Intelligent voice analysis powered by cutting-edge machine learning algorithms.",
+	},
+	{
+		icon: "🔒",
+		title: "Privacy First",
+		description:
+			"Your voice data stays on your device. We never store or transmit your recordings.",
+	},
+	{
+		icon: "⚡",
+		title: "Lightning Fast",
+		description: "Native desktop performance with sub-millisecond processing times.",
+	},
+	{
+		icon: "🎨",
+		title: "Customizable",
+		description: "Fully customizable voice profiles and processing pipelines to match your needs.",
+	},
+	{
+		icon: "🔗",
+		title: "Integrations",
+		description: "Seamlessly integrate with your favorite apps and workflows.",
+	},
+];
+---
+
+<section id="features" class="features">
+	<div class="container">
+		<div class="section-header">
+			<span class="section-label">Features</span>
+			<h2 class="section-title">Everything you need for <span class="gradient-text">voice excellence</span></h2>
+			<p class="section-subtitle">Powerful tools designed for professionals and enthusiasts alike.</p>
+		</div>
+
+		<div class="features-grid">
+			{features.map((feature) => (
+				<div class="feature-card">
+					<div class="feature-icon">{feature.icon}</div>
+					<h3 class="feature-title">{feature.title}</h3>
+					<p class="feature-description">{feature.description}</p>
+				</div>
+			))}
+		</div>
+	</div>
+</section>
+
+<style>
+	.features {
+		padding: 8rem 2rem;
+	}
+
+	.container {
+		max-width: 1200px;
+		margin: 0 auto;
+	}
+
+	.section-header {
+		text-align: center;
+		margin-bottom: 4rem;
+	}
+
+	.section-label {
+		display: inline-block;
+		background: var(--gradient-primary);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+		font-weight: 600;
+		font-size: 0.875rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		margin-bottom: 1rem;
+	}
+
+	.section-title {
+		font-size: clamp(2rem, 5vw, 3rem);
+		font-weight: 800;
+		line-height: 1.2;
+		margin-bottom: 1rem;
+	}
+
+	.gradient-text {
+		background: var(--gradient-primary);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		background-clip: text;
+	}
+
+	.section-subtitle {
+		font-size: 1.125rem;
+		color: var(--color-text-muted);
+		max-width: 500px;
+		margin: 0 auto;
+	}
+
+	.features-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+		gap: 1.5rem;
+	}
+
+	.feature-card {
+		background: var(--color-bg-elevated);
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		border-radius: 20px;
+		padding: 2rem;
+		transition: all 0.3s ease;
+	}
+
+	.feature-card:hover {
+		transform: translateY(-4px);
+		border-color: rgba(124, 58, 237, 0.3);
+		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+	}
+
+	.feature-icon {
+		font-size: 2.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.feature-title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		margin-bottom: 0.75rem;
+	}
+
+	.feature-description {
+		color: var(--color-text-muted);
+		line-height: 1.6;
+	}
+</style>
+
