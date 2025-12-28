@@ -8,6 +8,13 @@
       "when": 1766829304346,
       "tag": "0000_premium_satana",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1766910467647,
+      "tag": "0001_sparkling_blonde_phantom",
+      "breakpoints": true
     }
   ]
 }
