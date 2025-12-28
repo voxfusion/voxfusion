@@ -12,5 +12,9 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" }).post("/", 
         file: new File([fileBuffer], "recording.webm", { type: "audio/webm" }),
     })
 
-    return transcription;
+    const fileName = `${crypto.randomUUID()}.webm`;
+    const s3Path = `uploads/recordings/${fileName}`;
+    Bun.s3.write(s3Path, new Blob([fileBuffer], { type: "audio/webm" }));
+
+    return transcription
 })

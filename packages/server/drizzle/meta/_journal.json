@@ -15,6 +15,13 @@
       "when": 1766910467647,
       "tag": "0001_sparkling_blonde_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1766932200621,
+      "tag": "0002_pale_prodigy",
+      "breakpoints": true
     }
   ]
 }
