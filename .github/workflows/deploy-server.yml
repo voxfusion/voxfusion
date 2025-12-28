@@ -20,14 +20,13 @@ on:
       - 'bun.lock'
       - '.github/workflows/deploy-server.yml'
   workflow_dispatch:
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/server
 
 jobs:
   build-and-push:
-    runs-on: 10key-cloud
+    runs-on: tenki-standard-medium-4c-8g
     permissions:
       contents: read
       packages: write
@@ -116,4 +115,3 @@ jobs:
       - name: Skip build message
         if: steps.turbo-check.outputs.build_needed == 'false'
         run: echo "Skipping Docker build - no changes detected for server package"
-
