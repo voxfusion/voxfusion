@@ -9,11 +9,12 @@
       "bun install"
     ],
     "scripts": {
-      "dev": "bun run dev",
+      "dev:server": "bun run dev -- --filter=@voxfusion/server",
       "db:init": "initdb && devbox services start postgresql",
       "db:start": "devbox services start postgresql",
       "db:stop": "devbox services stop postgresql",
-      "db:migrate": "cd packages/server && bun run db:migrate"
+      "db:migrate": "cd packages/server && bun run db:migrate",
+      "db:studio": "cd packages/server && bun run db:studio"
     },
     "env": {
       "PGDATABASE": "voxfusion",
