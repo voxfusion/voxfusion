@@ -1,9 +1,13 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { authRoutes } from "./routes/auth";
+import { Groq } from "groq-sdk";
+import { transcribeRoutes } from "./routes/transcribe";
 
-const app = new Elysia()
+const app = new Elysia({ prefix: "/api" })
 	.use(cors())
+	.decorate("groq", new Groq({ apiKey: process.env.GROQ_API_KEY! }))
+	.use(transcribeRoutes)
 	.get("/", () => ({
 		name: "VoxFusion API",
 		version: "0.1.0",

@@ -18,5 +18,10 @@
 		"@types/bun": "latest",
 		"turbo": "^2.7.2",
 		"typescript": "^5.7.2"
+	},
+	"dependencies": {
+		"groq-sdk": "^0.37.0",
+		"neverthrow": "^8.2.0",
+		"zod": "^4.2.1"
 	}
 }

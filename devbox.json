@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.14.0/.schema/devbox.schema.json",
+  "packages": {
+    "postgresql": "latest",
+    "bun":        "latest"
+  },
+  "shell": {
+    "init_hook": [
+      "bun install"
+    ],
+    "scripts": {
+      "dev": "bun run dev",
+      "db:init": "initdb && devbox services start postgresql",
+      "db:start": "devbox services start postgresql",
+      "db:stop": "devbox services stop postgresql",
+      "db:migrate": "cd packages/server && bun run db:migrate"
+    },
+    "env": {
+      "PGDATABASE": "voxfusion",
+      "DATABASE_URL": "postgresql://localhost:5432/voxfusion",
+      "GOOGLE_CLIENT_ID": "",
+      "GOOGLE_CLIENT_SECRET": ""
+    }
+  }
+}

@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+out
+*.tgz
+
+# Development files
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# CI/CD
+.github
+
+# Other packages (monorepo)
+packages/app
+packages/marketingsite
+
+# Logs
+logs
+*.log
+
+# Cache
+.turbo
+.cache
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+*.lcov
+
+# Misc
+*.webm
+recording.webm
+
