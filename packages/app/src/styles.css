@@ -8,10 +8,15 @@
 	font-weight: 400;
 	color: #f8fafc;
 	background-color: #0f172a;
+	user-select: none;
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+}
+
+::-webkit-scrollbar {
+	display: none;
 }
 
 * {
