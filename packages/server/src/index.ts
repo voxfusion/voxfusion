@@ -3,8 +3,9 @@ import { Elysia } from "elysia";
 import { authRoutes } from "./routes/auth";
 import { Groq } from "groq-sdk";
 import { transcribeRoutes } from "./routes/transcribe";
+import { BunAdapter } from "elysia/adapter/bun";
 
-const app = new Elysia({ prefix: "/api" })
+const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 	.use(cors())
 	.decorate("groq", new Groq({ apiKey: process.env.GROQ_API_KEY! }))
 	.use(transcribeRoutes)
