@@ -2,42 +2,32 @@ FROM oven/bun:1 AS turbo-pruner
 
 WORKDIR /app
 
-# Install Turbo Repo
 RUN bun add -g turbo@^2.7.2
 
-# Copy root package files needed for turbo prune
 COPY package.json bun.lock* turbo.json ./
 COPY packages/server/package.json ./packages/server/
 COPY packages/server/tsconfig.json ./packages/server/
 COPY packages/server/drizzle.config.ts ./packages/server/
-# Copy source files so turbo prune can include them in the pruned output
 COPY packages/server/src ./packages/server/src/
 COPY packages/server/drizzle ./packages/server/drizzle/
 
-# Use Turbo Repo to prune the monorepo and fetch only server dependencies
 RUN turbo prune --scope=@voxfusion/server --docker
 
 FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
-# Install Turbo Repo
 RUN bun add -g turbo@^2.7.2
 
-# Copy the pruned JSON files (package.json files)
 COPY --from=turbo-pruner /app/out/json/ ./
 
-# Copy the pruned full source code
 COPY --from=turbo-pruner /app/out/full/ ./
 
-# Install dependencies using bun (Turbo prune ensures only server deps are included)
 RUN bun install --frozen-lockfile
 
-# Build using Turbo Repo (will only build if changes detected via cache)
 WORKDIR /app
 RUN turbo run build --filter=@voxfusion/server
 
-# Compile the server binary
 WORKDIR /app/packages/server
 RUN bun build --compile src/index.ts --outfile server --target bun
 
