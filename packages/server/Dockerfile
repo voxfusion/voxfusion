@@ -18,9 +18,7 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 RUN bun add -g turbo@^2.7.2
-
 COPY --from=turbo-pruner /app/out/json/ ./
-
 COPY --from=turbo-pruner /app/out/full/ ./
 
 RUN bun install --frozen-lockfile
@@ -36,7 +34,6 @@ FROM oven/bun:1 AS healthcheck-builder
 WORKDIR /app
 
 RUN echo 'fetch("http://localhost:3000/api/health").then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))' > healthcheck.ts
-
 RUN bun build --compile healthcheck.ts --outfile healthcheck --target bun
 
 FROM gcr.io/distroless/base-debian12:nonroot
