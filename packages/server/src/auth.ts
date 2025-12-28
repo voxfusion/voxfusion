@@ -1,5 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { bearer } from "better-auth/plugins/bearer";
+import { jwt } from "better-auth/plugins/jwt";
 import { db } from "./providers/db";
 import * as schema from "./providers/db/schema";
 
@@ -8,6 +10,7 @@ const betterAuthSchema = {
 	session: schema.sessions,
 	account: schema.accounts,
 	verification: schema.verifications,
+	jwks: schema.jwks,
 };
 
 export const auth = betterAuth({
@@ -32,11 +35,17 @@ export const auth = betterAuth({
 	account: {
 		skipStateCookieCheck: true,
 	},
+	plugins: [
+		bearer(),
+		jwt({
+			jwt: {
+				issuer: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+				audience: "voxfusion",
+				expirationTime: "7d",
+			},
+		}),
+	],
 	advanced: {
-		useSecureCookies: true,
-		defaultCookieAttributes: {
-			sameSite: "none",
-			secure: true,
-		}
-	}
+		disableCSRFCheck: true,
+	},
 });

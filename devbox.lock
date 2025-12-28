@@ -269,6 +269,54 @@
           "store_path": "/nix/store/hkhbalgmx1669niw8jg648vbqs3mdxkv-postgresql-17.7"
         }
       }
+    },
+    "railway@latest": {
+      "last_modified": "2025-12-09T08:49:39Z",
+      "resolved": "github:NixOS/nixpkgs/677fbe97984e7af3175b6c121f3c39ee5c8d62c9#railway",
+      "source": "devbox-search",
+      "version": "4.12.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/jh74kjzq6nygim9by09n2ghwddrkyxd1-railway-4.12.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/jh74kjzq6nygim9by09n2ghwddrkyxd1-railway-4.12.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/6635i52ac2fc2hl1v1wwyf1778d9m3jq-railway-4.12.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/6635i52ac2fc2hl1v1wwyf1778d9m3jq-railway-4.12.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/jz07crdf1hh14zga7wx31d5awachw5l0-railway-4.12.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/jz07crdf1hh14zga7wx31d5awachw5l0-railway-4.12.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/pg5399p30jz3yqxaxvdryayqynmw2vv4-railway-4.12.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/pg5399p30jz3yqxaxvdryayqynmw2vv4-railway-4.12.0"
+        }
+      }
     }
   }
 }

@@ -23,6 +23,7 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 		const data = await authClient.signIn.social({
 			provider: "google",
 		})
+		
 		return data
 	})
 	.get("/health", () => ({ status: "ok" }))

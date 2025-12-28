@@ -49,3 +49,12 @@ export const verifications = pgTable("verifications", {
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 	updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// JWKS table for JWT plugin - stores key pairs for signing JWTs
+export const jwks = pgTable("jwks", {
+	id: text("id").primaryKey(),
+	publicKey: text("public_key").notNull(),
+	privateKey: text("private_key").notNull(),
+	createdAt: timestamp("created_at").notNull().defaultNow(),
+	expiresAt: timestamp("expires_at"),
+});

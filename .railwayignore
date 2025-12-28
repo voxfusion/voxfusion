@@ -1,0 +1,25 @@
+# IDE and editor files
+.cursor/
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+out/
+*.tgz
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.*.local
+
+# Cache directories
+.cache/
+.turbo/
+.eslintcache
+*.tsbuildinfo
+
