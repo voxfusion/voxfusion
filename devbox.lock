@@ -50,8 +50,36 @@
       }
     },
     "github:NixOS/nixpkgs/nixpkgs-unstable": {
-      "last_modified": "2025-12-26T11:10:58Z",
-      "resolved": "github:NixOS/nixpkgs/c633f572eded8c4f3c75b8010129854ed404a6ce?lastModified=1766747458&narHash=sha256-m63jjuo%2Fygo8ztkCziYh5OOIbTSXUDkKbqw3Vuqu4a4%3D"
+      "last_modified": "2025-12-27T12:56:01Z",
+      "resolved": "github:NixOS/nixpkgs/3edc4a30ed3903fdf6f90c837f961fa6b49582d1?lastModified=1766840161&narHash=sha256-Ss%2FLHpJJsng8vz1Pe33RSGIWUOcqM1fjrehjUkdrWio%3D"
+    },
+    "glibcLocales@latest": {
+      "last_modified": "2025-11-23T21:50:36Z",
+      "resolved": "github:NixOS/nixpkgs/ee09932cedcef15aaf476f9343d1dea2cb77e261#glibcLocales",
+      "source": "devbox-search",
+      "version": "2.40-66",
+      "systems": {
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/lhf8phvkgmlqr5ys1bgfr4g38b3l95kd-glibc-locales-2.40-66",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/lhf8phvkgmlqr5ys1bgfr4g38b3l95kd-glibc-locales-2.40-66"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/hjlkypp9lpxwzsjycpy7nqg2mnl7qhzv-glibc-locales-2.40-66",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/hjlkypp9lpxwzsjycpy7nqg2mnl7qhzv-glibc-locales-2.40-66"
+        }
+      }
     },
     "postgresql@latest": {
       "last_modified": "2025-12-21T10:48:17Z",
