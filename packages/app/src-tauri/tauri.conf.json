@@ -10,13 +10,15 @@
 		"frontendDist": "../dist"
 	},
 	"app": {
+		"macOSPrivateApi": true,
 		"withGlobalTauri": false,
 		"windows": [
 			{
-				"title": "VoxFusion",
-				"width": 1200,
-				"height": 800,
-				"resizable": true,
+				"width": 1360,
+				"height": 850,
+				"resizable": false,
+				"titleBarStyle": "Overlay",
+				"hiddenTitle": true,
 				"fullscreen": false,
 				"center": true
 			}
@@ -26,10 +28,6 @@
 		}
 	},
 	"plugins": {
-		"opener": {
-			"openUrl": {
-				"enabled": true
-			}
-		}
+		"opener": {}
 	}
 }
