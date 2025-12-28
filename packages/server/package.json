@@ -4,9 +4,9 @@
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
-		"dev": "bun run --hot src/index.ts",
-		"build": "bun build src/index.ts --outdir dist --target bun",
-		"start": "bun run dist/index.js",
+		"dev": "bun run --bun --hot src/index.ts",
+		"build": "bun build --bun src/index.ts --outdir dist --target bun",
+		"start": "bun run --bun dist/index.js",
 		"lint": "biome lint ./src",
 		"lint:fix": "biome lint --write ./src",
 		"typecheck": "tsc --noEmit",
