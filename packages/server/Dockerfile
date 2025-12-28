@@ -10,6 +10,9 @@ COPY package.json bun.lock* turbo.json ./
 COPY packages/server/package.json ./packages/server/
 COPY packages/server/tsconfig.json ./packages/server/
 COPY packages/server/drizzle.config.ts ./packages/server/
+# Copy source files so turbo prune can include them in the pruned output
+COPY packages/server/src ./packages/server/src/
+COPY packages/server/drizzle ./packages/server/drizzle/
 
 # Use Turbo Repo to prune the monorepo and fetch only server dependencies
 RUN turbo prune --scope=@voxfusion/server --docker
