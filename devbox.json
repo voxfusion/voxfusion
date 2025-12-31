@@ -11,6 +11,8 @@
     ],
     "scripts": {
       "dev:server": "bun run dev -- --filter=@voxfusion/server",
+      "dev:app": "cd packages/app && bun run tauri:dev",
+
       "db:init":    "initdb && devbox services start postgresql",
       "db:start":   "devbox services start postgresql",
       "db:stop":    "devbox services stop postgresql",

@@ -4,11 +4,10 @@
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite",
+		"dev": "bun run tauri:dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"tauri": "tauri",
-		"tauri:dev": "tauri dev",
 		"tauri:build": "tauri build",
 		"lint": "biome lint ./src",
 		"lint:fix": "biome lint --write ./src",
