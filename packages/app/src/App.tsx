@@ -1,40 +1,108 @@
-import { createSignal } from "solid-js";
+import type { ParentProps } from "solid-js";
+import { Show, onMount, onCleanup, createSignal, createMemo } from "solid-js";
+import { useStore } from "@nanostores/solid";
+import { useLocation } from "@solidjs/router";
+import { listen } from "@tauri-apps/api/event";
+import { onOpenUrl, getCurrent } from "@tauri-apps/plugin-deep-link";
+import { authClient } from "./lib/authClient";
+import Auth from "./components/Auth";
 
-function App() {
-	const [count, setCount] = createSignal(0);
+// Debug signal to show deep link status
+const [debugInfo, setDebugInfo] = createSignal<string[]>([]);
+
+function App(props: ParentProps) {
+	const session = useStore(authClient.useSession)();
+	const location = useLocation();
+
+	// Check if this is the voice control window
+	const isVoiceControl = createMemo(() => location.pathname === "/voice-control");
+
+	onMount(async () => {
+		const addDebug = (msg: string) => {
+			console.log("[DeepLink]", msg);
+			setDebugInfo((prev) => [...prev.slice(-4), msg]);
+		};
+
+		addDebug("App mounted, setting up deep link handlers...");
+
+		// Handle deep link URLs
+		const handleDeepLink = async (url: string) => {
+			addDebug(`Received: ${url.substring(0, 50)}...`);
+			try {
+				const urlObj = new URL(url);
+				const token = urlObj.searchParams.get("token");
+				if (token) {
+					addDebug("Token found, authenticating...");
+					console.log("Token found, authenticating...", token);
+					// Set the auth token/cookie
+					document.cookie = `better-auth.session_token=${token}; path=/`;
+					// Refetch session to update auth state
+					const session = await authClient.getSession();
+					console.log("Session:", session);
+					addDebug("Authentication complete!");
+				} else {
+					addDebug("No token in URL");
+				}
+			} catch (e) {
+				addDebug(`Error: ${e}`);
+			}
+		};
+
+		// Check if app was opened with a deep link (handles cold start)
+		try {
+			addDebug("Checking for pending URLs...");
+			const urls = await getCurrent();
+			if (urls && urls.length > 0) {
+				addDebug(`Found ${urls.length} pending URL(s)`);
+				for (const url of urls) {
+					await handleDeepLink(url);
+				}
+			} else {
+				addDebug("No pending URLs");
+			}
+		} catch (e) {
+			addDebug(`getCurrent error: ${e}`);
+		}
+
+		// Listen for deep links via plugin (handles when app is already running)
+		addDebug("Setting up onOpenUrl listener...");
+		const unlistenPlugin = await onOpenUrl((urls) => {
+			addDebug(`onOpenUrl triggered with ${urls.length} URL(s)`);
+			for (const url of urls) {
+				handleDeepLink(url);
+			}
+		});
+
+		// Also listen for deep links via custom event (from single-instance)
+		const unlistenEvent = await listen<string>("deep-link", (event) => {
+			addDebug("deep-link event received");
+			handleDeepLink(event.payload);
+		});
+
+		addDebug("Deep link setup complete");
+
+		onCleanup(() => {
+			unlistenPlugin();
+			unlistenEvent();
+		});
+	});
+
+	// Voice control window has a minimal transparent layout
+	if (isVoiceControl()) {
+		return <div class="bg-transparent">{props.children}</div>;
+	}
 
 	return (
-		<>
-			<div class="h-10" data-tauri-drag-region />
-			<div class="min-h-screen flex items-center justify-center">
-				<div class="text-center space-y-8">
-					<h1 class="text-5xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-						VoxFusion
-					</h1>
-					<p class="text-slate-300 text-lg">Desktop Application</p>
-
-					<div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 space-y-6">
-						<p class="text-white text-2xl font-semibold">Count: {count()}</p>
-						<div class="flex gap-4 justify-center">
-							<button
-								type="button"
-								onClick={() => setCount((c) => c - 1)}
-								class="px-6 py-3 bg-pink-500 hover:bg-pink-600 text-white font-medium rounded-xl transition-colors"
-							>
-								Decrement
-							</button>
-							<button
-								type="button"
-								onClick={() => setCount((c) => c + 1)}
-								class="px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-xl transition-colors"
-							>
-								Increment
-							</button>
-						</div>
-					</div>
-				</div>
+		<div class="flex flex-col min-h-screen h-full w-full bg-slate-100">
+			<div class="h-6" data-tauri-drag-region />
+			<div class="grow">
+				{/* <Show when={!session.isPending}> */}
+				{/* <Show when={session.data?.user} fallback={<Auth />}> */}
+				{props.children}
+				{/* </Show>
+				</Show> */}
 			</div>
-		</>
+		</div>
 	);
 }
 
