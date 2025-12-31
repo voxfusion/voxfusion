@@ -19,7 +19,6 @@
 	"dependencies": {
 		"@elysiajs/bearer": "^1.1.0",
 		"@elysiajs/cors": "^1.1.1",
-		"better-auth": "^1.4.9",
 		"drizzle-orm": "^0.38.3",
 		"elysia": "^1.2.10",
 		"postgres": "^3.4.5"

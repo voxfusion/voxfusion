@@ -3,6 +3,11 @@
 	"productName": "VoxFusion",
 	"version": "0.1.0",
 	"identifier": "io.voxfusion.app",
+	"bundle": {
+		"macOS": {
+			"entitlements": "entitlements.plist"
+		}
+	},
 	"build": {
 		"beforeDevCommand": "vite",
 		"devUrl": "http://localhost:1420",
@@ -14,6 +19,8 @@
 		"withGlobalTauri": false,
 		"windows": [
 			{
+				"label": "main",
+				"title": "VoxFusion",
 				"width": 1360,
 				"height": 850,
 				"resizable": true,
@@ -21,6 +28,19 @@
 				"hiddenTitle": true,
 				"fullscreen": false,
 				"center": true
+			},
+			{
+				"label": "voice-control",
+				"title": "Voice Control",
+				"url": "/voice-control",
+				"width": 280,
+				"height": 64,
+				"resizable": false,
+				"decorations": true,
+				"transparent": true,
+				"alwaysOnTop": true,
+				"skipTaskbar": true,
+				"visible": false
 			}
 		],
 		"security": {
@@ -28,6 +48,12 @@
 		}
 	},
 	"plugins": {
-		"opener": {}
+		"opener": {},
+		"deep-link": {
+			"mobile": [],
+			"desktop": {
+				"schemes": ["voxfusion"]
+			}
+		}
 	}
 }

@@ -48,4 +48,5 @@ export const auth = betterAuth({
 	advanced: {
 		disableCSRFCheck: true,
 	},
+	trustedOrigins: ["voxfusion://"],
 });

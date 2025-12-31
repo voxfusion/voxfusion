@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "voice-control",
+  "description": "Capability for the voice control window",
+  "windows": [
+    "voice-control"
+  ],
+  "permissions": [
+    "core:window:default",
+    "core:window:allow-start-dragging",
+    "core:event:allow-listen",
+    "core:event:default",
+    "macos-permissions:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-write-text"
+  ]
+}

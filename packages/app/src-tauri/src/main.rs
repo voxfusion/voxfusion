@@ -4,4 +4,3 @@
 fn main() {
     voxfusion_app_lib::run()
 }
-
