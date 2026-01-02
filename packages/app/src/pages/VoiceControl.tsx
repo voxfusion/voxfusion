@@ -126,7 +126,7 @@ export default function VoiceControl() {
 					audioContext = null;
 				}
 				analyser = null;
-				setAudioLevels([4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
+				setAudioLevels([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
 
 				mediaRecorder = null;
 				isStopping = false;
@@ -176,11 +176,11 @@ export default function VoiceControl() {
 	};
 
 	return (
-		<div class="h-[100vh] bg-black">
-			<div class="flex items-center justify-center gap-[2px] ">
+		<div class="h-[100vh] bg-black rounded-xl flex align-center justify-center">
+			<div class="flex items-center justify-center gap-[3px]">
 				<For each={audioLevels()}>
 					{(level) => (
-						<div class="w-[6px] h-10 rounded bg-slate-500" style={{ height: `${level}px` }} />
+						<div class="w-[5px] h-10 rounded bg-slate-500" style={{ height: `${level}px` }} />
 					)}
 				</For>
 			</div>

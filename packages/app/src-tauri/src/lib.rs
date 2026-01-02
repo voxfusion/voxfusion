@@ -12,7 +12,7 @@ fn type_text(text: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![trigger_paste, type_text])
+        .invoke_handler(tauri::generate_handler![type_text])
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
