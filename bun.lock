@@ -63,6 +63,7 @@
       "dependencies": {
         "@elysiajs/bearer": "^1.1.0",
         "@elysiajs/cors": "^1.1.1",
+        "@gladiaio/sdk": "^0.6.1",
         "drizzle-orm": "^0.38.3",
         "elysia": "^1.2.10",
         "postgres": "^3.4.5",
@@ -241,6 +242,8 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.25.12", "", { "os": "win32", "cpu": "ia32" }, "sha512-HkqnmmBoCbCwxUKKNPBixiWDGCpQGVsrQfJoVGYLPT41XWF8lHuE5N6WhVia2n4o5QK5M4tYr21827fNhi4byQ=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
+
+    "@gladiaio/sdk": ["@gladiaio/sdk@0.6.1", "", { "peerDependencies": { "eventemitter3": ">=5", "undici": ">=5", "ws": "5.2.4 || 6.2.3 || 7.5.10 || >=8.8" }, "optionalPeers": ["undici", "ws"] }, "sha512-cvUFZRhuup0j275iXnYysUPSE7SbRDvWAcUAjSDsTXa13MPHmzBepi8sZZApGgVNZO2+9kIpE4SIsNAaabAgdg=="],
 
     "@img/colour": ["@img/colour@1.0.0", "", {}, "sha512-A5P/LfWGFSl6nsckYtjw9da+19jB8hkJ6ACTGcDfEJ0aE+l2n2El7dsVM7UVHZQ9s2lmYMWlrS21YLy2IR1LUw=="],
 

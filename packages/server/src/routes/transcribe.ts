@@ -1,30 +1,30 @@
-import { Elysia, t } from "elysia";
+import { Elysia, status, t } from "elysia";
 import { groq } from "../providers/groq";
 
-export const transcribeRoutes = new Elysia({ prefix: "/transcribe" }).post("/", async ({ body }) => {
-    console.log("Transcribing...");
-    const file = body.file;
-    console.log(file);
+type TranscriptionResult = {
+    text: string;
+}
 
+export const transcribeRoutes = new Elysia({ prefix: "/transcribe" }).post("/", async ({ body }) => {
+    const file = body.file;
     try {
         const fileBuffer = await file.arrayBuffer();
 
+
         const transcription = await groq.audio.transcriptions.create({
-            model: "whisper-large-v3-turbo",
+            model: "whisper-large-v3",
             file: new File([fileBuffer], "recording.webm", { type: "audio/webm" }),
         });
 
         const fileName = `${crypto.randomUUID()}.webm`;
         const s3Path = `uploads/recordings/${fileName}`;
-        await Bun.s3.write(s3Path, new Blob([fileBuffer], { type: "audio/webm" }));
+        Bun.s3.write(s3Path, new Blob([fileBuffer], { type: "audio/webm" }));
 
-        return transcription;
+        return {
+            text: transcription.text,
+        } satisfies TranscriptionResult;
     } catch (error) {
-        console.error("Error in /transcribe:", error);
-        return new Response(
-            JSON.stringify({ error: "Transcription failed", details: error instanceof Error ? error.message : error }),
-            { status: 500, headers: { "Content-Type": "application/json" } }
-        );
+        return status(500, { error: "Transcription failed", details: error instanceof Error ? error.message : error });
     }
 }, {
     body: t.Object({
