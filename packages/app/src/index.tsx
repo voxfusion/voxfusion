@@ -4,7 +4,6 @@ import "./styles.css";
 import Home from "./pages/Home";
 import About from "./pages/About";
 import Settings from "./pages/Settings";
-import VoiceControl from "./pages/VoiceControl";
 import App from "./App";
 
 const root = document.getElementById("root");
@@ -19,7 +18,6 @@ render(
 			<Route path="/" component={Home} />
 			<Route path="/about" component={About} />
 			<Route path="/settings" component={Settings} />
-			<Route path="/voice-control" component={VoiceControl} />
 		</Router>
 	),
 	root
