@@ -10,7 +10,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" }).post("/", 
     try {
         const fileBuffer = await file.arrayBuffer();
 
-
         const transcription = await groq.audio.transcriptions.create({
             model: "whisper-large-v3",
             file: new File([fileBuffer], "recording.webm", { type: "audio/webm" }),
@@ -21,7 +20,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" }).post("/", 
         Bun.s3.write(s3Path, new Blob([fileBuffer], { type: "audio/webm" }));
 
         return {
-            text: transcription.text,
+            text: transcription.text.trim(),
         } satisfies TranscriptionResult;
     } catch (error) {
         return status(500, { error: "Transcription failed", details: error instanceof Error ? error.message : error });
