@@ -60,7 +60,7 @@ function App(props: ParentProps) {
 	onMount(async () => {
 		const windowWidth = 140;
 		const windowHeight = 40;
-		const bottomPadding = 10;
+		const bottomPadding = 0;
 
 		const monitor = await primaryMonitor();
 		if (!monitor) {
@@ -77,7 +77,7 @@ function App(props: ParentProps) {
 		}
 
 		const position = monitor.position.toLogical(monitor.scaleFactor);
-		const size = monitor.workArea.size.toLogical(monitor.scaleFactor);
+		const size = monitor.size.toLogical(monitor.scaleFactor);
 
 		const x = position.x + (size.width - windowWidth) / 2;
 		const y = position.y + size.height - windowHeight - bottomPadding;
