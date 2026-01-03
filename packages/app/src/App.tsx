@@ -5,6 +5,7 @@ import { onOpenUrl, getCurrent } from "@tauri-apps/plugin-deep-link";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { authClient } from "./lib/authClient";
+import { tokenManager } from "./lib/tokenManager";
 
 function App(props: ParentProps) {
 	onMount(async () => {
@@ -14,7 +15,9 @@ function App(props: ParentProps) {
 				const urlObj = new URL(url);
 				const token = urlObj.searchParams.get("token");
 				if (token) {
-					console.log("Token found, authenticating...", token);
+					console.log("Token found, storing and authenticating...", token);
+					// Store token in keychain
+					await tokenManager.storeToken(token);
 					// Set the auth token/cookie
 					document.cookie = `better-auth.session_token=${token}; path=/`;
 					// Refetch session to update auth state
