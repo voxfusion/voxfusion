@@ -4048,6 +4048,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-keychain"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f23e3f77ea4c7218b7268090b76f822efe729463570d39396c8f80dfc49d6cb6"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "tauri-plugin-macos-permissions"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4715,6 +4727,7 @@ dependencies = [
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-deep-link",
  "tauri-plugin-global-shortcut",
+ "tauri-plugin-keychain",
  "tauri-plugin-macos-permissions",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
