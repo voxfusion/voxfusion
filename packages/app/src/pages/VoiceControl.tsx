@@ -1,12 +1,14 @@
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { invoke } from "@tauri-apps/api/core";
-import { createSignal, For, onMount, onCleanup } from "solid-js";
+import { Loader } from "lucide-solid";
+import { createSignal, For, onMount, onCleanup, Show } from "solid-js";
 import eden from "../lib/eden";
 
 export default function VoiceControl() {
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [audioLevels, setAudioLevels] = createSignal<number[]>([4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
+
+	const [loading, setLoading] = createSignal(false);
 
 	let mediaRecorder: MediaRecorder | null = null;
 	let audioChunks: Blob[] = [];
@@ -45,7 +47,6 @@ export default function VoiceControl() {
 		await register(shortcut, (evt) => {
 			if (evt.state !== "Pressed") return;
 
-			console.log("Shortcut pressed");
 			if (isStarting || isStopping) return;
 			if (isRecording()) {
 				stopRecording();
@@ -126,7 +127,7 @@ export default function VoiceControl() {
 					audioContext = null;
 				}
 				analyser = null;
-				setAudioLevels([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
+				setAudioLevels([4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
 
 				mediaRecorder = null;
 				isStopping = false;
@@ -135,12 +136,15 @@ export default function VoiceControl() {
 					try {
 						const audioBlob = new Blob(chunks, { type: mimeType });
 						const audioFile = new File([audioBlob], "recording.webm", { type: mimeType });
+
+						setLoading(true);
 						const response = await eden.api.transcribe.post({ file: audioFile });
 
-						await writeText(response.data?.text ?? "");
 						await invoke("type_text", { text: response.data?.text ?? "" });
 					} catch (err) {
 						console.error("Transcription failed:", err);
+					} finally {
+						setLoading(false);
 					}
 				})();
 			};
@@ -176,14 +180,19 @@ export default function VoiceControl() {
 	};
 
 	return (
-		<div class="h-[100vh] bg-black rounded-xl flex align-center justify-center">
-			<div class="flex items-center justify-center gap-[3px]">
-				<For each={audioLevels()}>
-					{(level) => (
-						<div class="w-[5px] h-10 rounded bg-slate-500" style={{ height: `${level}px` }} />
-					)}
-				</For>
-			</div>
+		<div class="min-h-2 bg-black rounded-xl flex align-center justify-center">
+			<Show when={loading()}>
+				<Loader class="w-4 h-4 animate-spin text-white" />
+			</Show>
+			<Show when={!loading() && isRecording()}>
+				<div class="flex items-center justify-center gap-[3px]">
+					<For each={audioLevels()}>
+						{(level) => (
+							<div class="w-[5px] h-10 rounded bg-slate-500" style={{ height: `${level}px` }} />
+						)}
+					</For>
+				</div>
+			</Show>
 		</div>
 	);
 }
