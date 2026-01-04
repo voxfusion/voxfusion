@@ -42,25 +42,6 @@ function Auth() {
 		}
 	};
 
-	onMount(async () => {
-		try {
-			const storedToken = await tokenManager.getToken();
-			if (storedToken) {
-				document.cookie = `better-auth.session_token=${storedToken}; path=/`;
-				const session = await authClient.getSession();
-				if (session.data) {
-					// Token is valid, we're authenticated
-					return;
-				} else {
-					// Token is invalid, remove it
-					await tokenManager.deleteToken();
-				}
-			}
-		} catch (e) {
-			console.error("Failed to restore session:", e);
-		}
-	});
-
 	return (
 		<div class="flex items-center justify-center min-h-full w-full">
 			<div class="flex flex-col items-center gap-8 p-12 bg-white rounded-2xl shadow-xl border border-slate-200">

@@ -132,21 +132,19 @@ export default function VoiceControl() {
 				mediaRecorder = null;
 				isStopping = false;
 
-				void (async () => {
-					try {
-						const audioBlob = new Blob(chunks, { type: mimeType });
-						const audioFile = new File([audioBlob], "recording.webm", { type: mimeType });
+				try {
+					const audioBlob = new Blob(chunks, { type: mimeType });
+					const audioFile = new File([audioBlob], "recording.webm", { type: mimeType });
 
-						setLoading(true);
-						const response = await eden.api.transcribe.post({ file: audioFile });
+					setLoading(true);
+					const response = await eden.api.transcribe.post({ file: audioFile });
 
-						await invoke("type_text", { text: response.data?.text ?? "" });
-					} catch (err) {
-						console.error("Transcription failed:", err);
-					} finally {
-						setLoading(false);
-					}
-				})();
+					await invoke("type_text", { text: response.data?.text ?? "" });
+				} catch (err) {
+					console.error("Transcription failed:", err);
+				} finally {
+					setLoading(false);
+				}
 			};
 
 			const updateAudioLevels = () => {

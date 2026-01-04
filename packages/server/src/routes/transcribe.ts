@@ -9,9 +9,11 @@ type TranscriptionResult = {
 export const transcribeRoutes = new Elysia({ prefix: "/transcribe" }).post(
 	"/",
 	async ({ body, request }) => {
+		console.log("request", request.headers);
 		const session = await auth.api.getSession({
 			headers: request.headers,
 		});
+		console.log("session", session);
 
 		if (!session || !session.user) {
 			return status(401, { error: "Unauthorized" });
