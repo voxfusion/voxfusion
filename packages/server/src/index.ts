@@ -11,7 +11,7 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 			credentials: true,
 		})
 	)
-	.mount("/auth", auth.handler)
+	.mount(auth.handler)
 	.use(transcribeRoutes)
 	.get("/", () => ({
 		name: "VoxFusion API",

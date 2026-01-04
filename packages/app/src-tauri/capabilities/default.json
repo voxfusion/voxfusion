@@ -12,6 +12,8 @@
 		"core:webview:allow-internal-toggle-devtools",
 		"core:event:allow-listen",
 		"core:event:default",
+		"core:path:allow-resolve-directory",
+		"core:path:default",
 		{
 			"identifier": "opener:allow-open-url",
 			"allow": [
@@ -28,6 +30,7 @@
 		},
 		"deep-link:default",
 		"clipboard-manager:allow-write-text",
-		"clipboard-manager:default"
+		"clipboard-manager:default",
+		"stronghold:default"
 	]
 }
