@@ -30,6 +30,7 @@
         "@tauri-apps/plugin-deep-link": "^2.2.0",
         "@tauri-apps/plugin-global-shortcut": "~2",
         "@tauri-apps/plugin-opener": "^2.2.4",
+        "lucide-solid": "^0.562.0",
         "solid-js": "^1.9.3",
         "tauri-plugin-macos-permissions-api": "^2.3.0",
       },
@@ -878,6 +879,8 @@
     "longest-streak": ["longest-streak@3.1.0", "", {}, "sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g=="],
 
     "lru-cache": ["lru-cache@10.4.3", "", {}, "sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ=="],
+
+    "lucide-solid": ["lucide-solid@0.562.0", "", { "peerDependencies": { "solid-js": "^1.4.7" } }, "sha512-RzxujbWUoa4KqnV+/mYPINzyf1W969bv0jukSKcGExIl96QmRuylvBQ+d0UcOeZL/ASToPOWS34p9MfdzdvS9Q=="],
 
     "magic-string": ["magic-string@0.30.21", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.5" } }, "sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ=="],
 
