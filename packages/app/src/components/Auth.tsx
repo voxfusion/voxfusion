@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { createSignal, Show } from "solid-js";
+import { createSignal, Show, onMount } from "solid-js";
 import { authClient } from "../lib/authClient";
+import { tokenManager } from "../lib/tokenManager";
 
 function Auth() {
 	const [showTokenInput, setShowTokenInput] = createSignal(false);
@@ -28,6 +29,8 @@ function Auth() {
 		}
 
 		try {
+			// Store token in keychain
+			await tokenManager.storeToken(tokenValue);
 			// Set the auth token cookie
 			document.cookie = `better-auth.session_token=${tokenValue}; path=/`;
 			// Refetch session to update auth state
@@ -38,6 +41,25 @@ function Auth() {
 			console.error("Token auth failed:", e);
 		}
 	};
+
+	onMount(async () => {
+		try {
+			const storedToken = await tokenManager.getToken();
+			if (storedToken) {
+				document.cookie = `better-auth.session_token=${storedToken}; path=/`;
+				const session = await authClient.getSession();
+				if (session.data) {
+					// Token is valid, we're authenticated
+					return;
+				} else {
+					// Token is invalid, remove it
+					await tokenManager.deleteToken();
+				}
+			}
+		} catch (e) {
+			console.error("Failed to restore session:", e);
+		}
+	});
 
 	return (
 		<div class="flex items-center justify-center min-h-full w-full">

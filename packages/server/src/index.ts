@@ -1,15 +1,17 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
-import { authRoutes } from "./routes/auth";
 import { transcribeRoutes } from "./routes/transcribe";
 import { BunAdapter } from "elysia/adapter/bun";
 import { auth } from "./auth";
 
 const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
-	.use(cors({
-		origin: true,
-		credentials: true,
-	}))
+	.use(
+		cors({
+			origin: true,
+			credentials: true,
+		})
+	)
+	.mount("/auth", auth.handler)
 	.use(transcribeRoutes)
 	.get("/", () => ({
 		name: "VoxFusion API",
@@ -23,7 +25,8 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 
 		const deepLink = `voxfusion://settings?token=${token.token}`;
 
-		return new Response(`
+		return new Response(
+			`
 			<!DOCTYPE html>
 			<html>
 			<head>
@@ -124,12 +127,13 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 				</div>
 			</body>
 			</html>
-		`, {
-			headers: { "Content-Type": "text/html" }
-		});
+		`,
+			{
+				headers: { "Content-Type": "text/html" },
+			}
+		);
 	})
 	.get("/health", () => ({ status: "ok" }))
-	.use(authRoutes)
 	.listen(3000);
 
 console.log(`🦊 VoxFusion server running at ${app.server?.hostname}:${app.server?.port}`);
