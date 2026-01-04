@@ -9,7 +9,6 @@ type TranscriptionResult = {
 export const transcribeRoutes = new Elysia({ prefix: "/transcribe" }).post(
 	"/",
 	async ({ body, request }) => {
-		// Check authentication
 		const session = await auth.api.getSession({
 			headers: request.headers,
 		});

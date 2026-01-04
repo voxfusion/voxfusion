@@ -4,23 +4,19 @@ import { listen } from "@tauri-apps/api/event";
 import { onOpenUrl, getCurrent } from "@tauri-apps/plugin-deep-link";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
-import { authClient } from "./lib/authClient";
 import { tokenManager } from "./lib/tokenManager";
+import { authClient } from "./lib/authClient";
 
 function App(props: ParentProps) {
 	onMount(async () => {
-		// Handle deep link URLs
 		const handleDeepLink = async (url: string) => {
 			try {
 				const urlObj = new URL(url);
 				const token = urlObj.searchParams.get("token");
 				if (token) {
-					console.log("Token found, storing and authenticating...", token);
-					// Store token in keychain
 					await tokenManager.storeToken(token);
-					// Set the auth token/cookie
 					document.cookie = `better-auth.session_token=${token}; path=/`;
-					// Refetch session to update auth state
+
 					const session = await authClient.getSession();
 					console.log("Session:", session);
 				}
@@ -29,7 +25,6 @@ function App(props: ParentProps) {
 			}
 		};
 
-		// Check if app was opened with a deep link (handles cold start)
 		try {
 			const urls = await getCurrent();
 			if (urls && urls.length > 0) {
@@ -42,14 +37,12 @@ function App(props: ParentProps) {
 			console.error("getCurrent error:", e);
 		}
 
-		// Listen for deep links via plugin (handles when app is already running)
 		const unlistenPlugin = await onOpenUrl((urls) => {
 			for (const url of urls) {
 				handleDeepLink(url);
 			}
 		});
 
-		// Also listen for deep links via custom event (from single-instance)
 		const unlistenEvent = await listen<string>("deep-link", (event) => {
 			handleDeepLink(event.payload);
 		});
@@ -71,7 +64,6 @@ function App(props: ParentProps) {
 			return;
 		}
 
-		// Get the existing voice-control window defined in tauri.conf.json
 		const allWindows = await getAllWebviewWindows();
 		const voiceWindow = allWindows.find((w) => w.label === "voice-control");
 		if (!voiceWindow) {
