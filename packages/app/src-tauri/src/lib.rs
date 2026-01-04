@@ -13,7 +13,6 @@ fn type_text(text: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
-        .plugin(tauri_plugin_stronghold::Builder::new(|pass| todo!()).build())
         .invoke_handler(tauri::generate_handler![type_text])
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
