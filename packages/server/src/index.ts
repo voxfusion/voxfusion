@@ -19,11 +19,20 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 		status: "healthy",
 	}))
 	.all("/deeplink", async (ctx) => {
-		const token = await auth.api.getToken({
-			headers: ctx.request.headers,
-		});
+		const cookieHeader = ctx.request.headers.get("cookie") || "";
+		const sessionToken = cookieHeader
+			.split(";")
+			.map((c) => c.trim())
+			.find((c) => c.startsWith("better-auth.session_token="))
+			?.split("=")[1];
 
-		const deepLink = `voxfusion://settings?token=${token.token}`;
+		if (!sessionToken) {
+			return new Response("No session found. Please try logging in again.", {
+				status: 401,
+			});
+		}
+
+		const deepLink = `voxfusion://settings?token=${sessionToken}`;
 
 		return new Response(
 			`
@@ -94,13 +103,12 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 					.dev-label { font-size: 12px; color: #94a3b8; margin-bottom: 8px; }
 				</style>
 				<script>
-					// Try to open the deep link automatically
 					setTimeout(() => {
 						window.location.href = "${deepLink}";
 					}, 500);
 					
 					function copyToken() {
-						const token = "${token.token}";
+						const token = "${sessionToken}";
 						navigator.clipboard.writeText(token).then(() => {
 							document.getElementById('success').style.display = 'block';
 							document.getElementById('copyBtn').textContent = 'Copied!';

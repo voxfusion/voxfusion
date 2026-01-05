@@ -2,10 +2,8 @@ import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 import { resolve } from "node:path";
 
-// https://vitejs.dev/config/
 export default defineConfig({
 	plugins: [solid()],
-	// Vite options tailored for Tauri development
 	clearScreen: false,
 	build: {
 		rollupOptions: {

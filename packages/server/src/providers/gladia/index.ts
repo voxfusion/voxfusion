@@ -1,13 +1,8 @@
 import { GladiaClient } from "@gladiaio/sdk";
 
-// Live transcription client (WebSocket-based)
 export const gladiaLive = new GladiaClient({
     apiKey: process.env.GLADIA_API_KEY!,
 });
-
-// ============================================
-// Async (Pre-recorded) Transcription SDK
-// ============================================
 
 const GLADIA_API_URL = "https://api.gladia.io";
 
@@ -124,9 +119,6 @@ class GladiaAsyncClient {
         return response.json() as Promise<T>;
     }
 
-    /**
-     * Upload an audio file and get a URL that can be used for transcription
-     */
     async upload(file: Blob | ArrayBuffer): Promise<{ audio_url: string }> {
         const formData = new FormData();
         formData.append(
@@ -151,10 +143,6 @@ class GladiaAsyncClient {
         return response.json() as Promise<{ audio_url: string }>;
     }
 
-    /**
-     * Initiate an async transcription job
-     * Returns the job ID and result URL for polling
-     */
     async transcribe(options: TranscribeOptions): Promise<TranscriptionInitResponse> {
         return this.request<TranscriptionInitResponse>("/v2/pre-recorded", {
             method: "POST",
@@ -162,16 +150,10 @@ class GladiaAsyncClient {
         });
     }
 
-    /**
-     * Get the status/result of a transcription job
-     */
     async getResult(transcriptionId: string): Promise<TranscriptionResult> {
         return this.request<TranscriptionResult>(`/v2/pre-recorded/${transcriptionId}`);
     }
 
-    /**
-     * Poll for transcription result until done or error
-     */
     async waitForResult(
         transcriptionId: string,
         options?: { pollInterval?: number; timeout?: number }
@@ -201,9 +183,6 @@ class GladiaAsyncClient {
         }
     }
 
-    /**
-     * Upload file and transcribe in one call, waiting for the result
-     */
     async transcribeFile(
         file: Blob | ArrayBuffer,
         options?: Omit<TranscribeOptions, "audio_url"> & {
@@ -211,16 +190,13 @@ class GladiaAsyncClient {
             timeout?: number;
         }
     ): Promise<TranscriptionResult> {
-        // Upload the file
         const { audio_url } = await this.upload(file);
 
-        // Start transcription
         const { id } = await this.transcribe({
             audio_url,
             ...options,
         });
 
-        // Wait for result
         return this.waitForResult(id, {
             pollInterval: options?.pollInterval,
             timeout: options?.timeout,
@@ -228,10 +204,8 @@ class GladiaAsyncClient {
     }
 }
 
-// Export singleton instance
 export const gladia = new GladiaAsyncClient({
     apiKey: process.env.GLADIA_API_KEY!,
 });
 
-// Export class for custom instances
 export { GladiaAsyncClient };

@@ -14,6 +14,7 @@
 		"typecheck": "turbo typecheck"
 	},
 	"devDependencies": {
+		"@better-fetch/fetch": "^1.1.21",
 		"@biomejs/biome": "^1.9.4",
 		"@types/bun": "latest",
 		"elysia": "^1.4.19",
