@@ -1,13 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { createSignal, Show, onMount } from "solid-js";
 import { authClient } from "../lib/authClient";
-import { tokenManager } from "../lib/tokenManager";
 
 function Auth() {
-	const [showTokenInput, setShowTokenInput] = createSignal(false);
-	const [token, setToken] = createSignal("");
-	const [error, setError] = createSignal("");
-
 	const handleGoogleLogin = async () => {
 		const data = await authClient.signIn.social({
 			provider: "google",
@@ -15,30 +9,8 @@ function Auth() {
 			disableRedirect: true,
 		});
 
-		console.log(data.data?.url);
 		if (data.data?.url) {
 			await openUrl(data.data.url);
-		}
-	};
-
-	const handleTokenSubmit = async () => {
-		const tokenValue = token().trim();
-		if (!tokenValue) {
-			setError("Please enter a token");
-			return;
-		}
-
-		try {
-			// Store token in keychain
-			await tokenManager.storeToken(tokenValue);
-			// Set the auth token cookie
-			document.cookie = `better-auth.session_token=${tokenValue}; path=/`;
-			// Refetch session to update auth state
-			await authClient.getSession();
-			setError("");
-		} catch (e) {
-			setError("Invalid token");
-			console.error("Token auth failed:", e);
 		}
 	};
 
@@ -82,36 +54,6 @@ function Auth() {
 					<span class="text-slate-700 font-medium group-hover:text-blue-600 transition-colors">
 						Continue with Google
 					</span>
-				</button>
-
-				<Show when={showTokenInput()}>
-					<div class="w-full flex flex-col gap-3">
-						<input
-							type="text"
-							value={token()}
-							onInput={(e) => setToken(e.currentTarget.value)}
-							placeholder="Paste token here..."
-							class="w-full px-4 py-2.5 border-2 border-slate-200 rounded-lg text-sm font-mono focus:border-blue-500 focus:outline-none"
-						/>
-						<Show when={error()}>
-							<p class="text-red-500 text-sm">{error()}</p>
-						</Show>
-						<button
-							type="button"
-							onClick={handleTokenSubmit}
-							class="px-4 py-2.5 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors cursor-pointer"
-						>
-							Submit Token
-						</button>
-					</div>
-				</Show>
-
-				<button
-					type="button"
-					onClick={() => setShowTokenInput(!showTokenInput())}
-					class="text-slate-400 text-xs hover:text-slate-600 transition-colors cursor-pointer"
-				>
-					{showTokenInput() ? "Hide token input" : "Dev: Paste token manually"}
 				</button>
 			</div>
 		</div>

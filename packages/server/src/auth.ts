@@ -29,8 +29,10 @@ export const auth = betterAuth({
 		},
 	},
 	session: {
-		expiresIn: 60 * 60 * 24 * 7, // 7 days
-		updateAge: 60 * 60 * 24, // 1 day
+		// Effectively non-expiring: 10 years (315,360,000 seconds)
+		expiresIn: 60 * 60 * 24 * 365 * 10,
+		// Refresh window: 30 days - session expiration extends by 30 days on each access
+		updateAge: 60 * 60 * 24 * 30,
 	},
 	account: {
 		skipStateCookieCheck: true,
@@ -41,7 +43,8 @@ export const auth = betterAuth({
 			jwt: {
 				issuer: process.env.BETTER_AUTH_URL || "http://localhost:3000",
 				audience: "voxfusion",
-				expirationTime: "7d",
+				// Match session expiration: 10 years
+				expirationTime: "3650d", // 10 years in days
 			},
 		}),
 	],

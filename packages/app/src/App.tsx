@@ -1,28 +1,13 @@
-import { onMount } from "solid-js";
-import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { onMount, type ParentProps } from "solid-js";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
-import { tokenManager } from "./lib/tokenManager";
+import { useStore } from "@nanostores/solid";
 import { authClient } from "./lib/authClient";
 import Auth from "./components/Auth";
-import { appLocalDataDir } from "@tauri-apps/api/path";
+import { Show } from "solid-js";
 
-function App() {
-	onMount(async () => {
-		console.log("mounded");
-		const token = await tokenManager.getToken();
-		console.log("path", await appLocalDataDir());
-		console.log("token", token);
-		if (token) {
-			document.cookie = `better-auth.session_token=${token}; path=/`;
-			const session = await authClient.getSession();
-			console.log("session", session);
-		}
-
-		onOpenUrl(async (url) => {
-			console.log("url", url);
-		});
-	});
+function App(props: ParentProps) {
+	const session = useStore(authClient.useSession);
 
 	onMount(async () => {
 		const windowWidth = 140;
@@ -57,12 +42,9 @@ function App() {
 		<div class="flex flex-col min-h-screen h-full w-full bg-slate-100">
 			<div class="h-6" data-tauri-drag-region />
 			<div class="grow">
-				<Auth />
-				{/* <Show when={!session.isPending}> */}
-				{/* <Show when={session.data?.user} fallback={<Auth />}> */}
-				{/* {props.children} */}
-				{/* </Show>
-				</Show> */}
+				<Show when={!session()} fallback={props.children}>
+					<Auth />
+				</Show>
 			</div>
 		</div>
 	);
