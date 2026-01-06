@@ -17,25 +17,21 @@ type Session = {
 	};
 };
 
+type TranscriptionMetadata = {
+	text: string;
+	processingTimeMs: number;
+	audioDurationMs: number | null;
+};
+
 export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 	.use(requireAuth)
+	.state("transcriptionMetadata", null as TranscriptionMetadata | null)
 	.post(
 		"/",
 		async (ctx) => {
 			const file = ctx.body.file;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const session = (ctx as any).session as Session;
 			try {
 				const fileBuffer = await file.arrayBuffer();
-
-				// Upload to S3 first (moved from afterResponse so URL is available)
-				const fileName = `${crypto.randomUUID()}.webm`;
-				const s3Path = `uploads/recordings/${fileName}`;
-				await Bun.s3.write(s3Path, new Blob([fileBuffer], { type: "audio/webm" }), {
-					acl: "public-read",
-				});
-
-				const fileUrl = `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET}/${s3Path}`;
 
 				// Measure processing time
 				const startTime = performance.now();
@@ -59,18 +55,12 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					? Math.round(groqResponse.duration * 1000)
 					: null;
 
-				// Save to database
-				const transcriptionId = crypto.randomUUID();
-				await db.insert(transcriptions).values({
-					id: transcriptionId,
-					userId: session.user.id,
-					fileUrl,
+				// Store metadata for afterResponse hook
+				ctx.store.transcriptionMetadata = {
 					text: transcription.text.trim(),
 					processingTimeMs,
 					audioDurationMs,
-					provider: "groq",
-					model: "whisper-large-v3",
-				});
+				};
 
 				return {
 					text: transcription.text.trim(),
@@ -86,6 +76,44 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			body: t.Object({
 				file: t.File(),
 			}),
+			afterResponse: async (ctx) => {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				const session = (ctx as any).session as Session | undefined;
+				const metadata = ctx.store.transcriptionMetadata;
+
+				// Only save if transcription was successful (metadata exists)
+				if (!session || !metadata) {
+					return;
+				}
+
+				try {
+					const fileBuffer = await ctx.body.file.arrayBuffer();
+
+					// Upload to S3
+					const fileName = `${crypto.randomUUID()}.webm`;
+					const s3Path = `uploads/recordings/${fileName}`;
+					await Bun.s3.write(s3Path, new Blob([fileBuffer], { type: "audio/webm" }), {
+						acl: "public-read",
+					});
+
+					const fileUrl = `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET}/${s3Path}`;
+
+					// Save to database
+					const transcriptionId = crypto.randomUUID();
+					await db.insert(transcriptions).values({
+						id: transcriptionId,
+						userId: session.user.id,
+						fileUrl,
+						text: metadata.text,
+						processingTimeMs: metadata.processingTimeMs,
+						audioDurationMs: metadata.audioDurationMs,
+						provider: "groq",
+						model: "whisper-large-v3",
+					});
+				} catch (error) {
+					console.error("Failed to save transcription:", error);
+				}
+			},
 		}
 	)
 	.get("/", async (ctx) => {
