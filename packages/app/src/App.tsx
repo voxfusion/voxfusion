@@ -8,6 +8,7 @@ import { Show } from "solid-js";
 
 function App(props: ParentProps) {
 	const session = useStore(authClient.useSession);
+	console.log("session", session());
 
 	onMount(async () => {
 		const windowWidth = 140;
@@ -41,6 +42,7 @@ function App(props: ParentProps) {
 	return (
 		<div class="flex flex-col min-h-screen h-full w-full bg-slate-100">
 			<div class="h-6" data-tauri-drag-region />
+			{JSON.stringify(session())}
 			<div class="grow">
 				<Show when={!session()} fallback={props.children}>
 					<Auth />

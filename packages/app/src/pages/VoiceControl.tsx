@@ -46,6 +46,7 @@ export default function VoiceControl() {
 
 		await register(shortcut, (evt) => {
 			if (evt.state !== "Pressed") return;
+			console.log("shortcut pressed");
 
 			if (isStarting || isStopping) return;
 			if (isRecording()) {
@@ -137,9 +138,10 @@ export default function VoiceControl() {
 					const audioFile = new File([audioBlob], "recording.webm", { type: mimeType });
 
 					setLoading(true);
-					const response = await eden.api.transcribe.post({ file: audioFile });
+					const res = await eden.api.transcribe.post({ file: audioFile });
 
-					await invoke("type_text", { text: response.data?.text ?? "" });
+					const body = await res.response.json();
+					await invoke("type_text", { text: body.text ?? "" });
 				} catch (err) {
 					console.error("Transcription failed:", err);
 				} finally {

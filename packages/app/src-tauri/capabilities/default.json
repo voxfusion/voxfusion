@@ -8,12 +8,6 @@
 		"core:window:allow-start-dragging",
 		"core:window:allow-show",
 		"opener:default",
-		"core:window:allow-set-position",
-		"core:webview:allow-internal-toggle-devtools",
-		"core:event:allow-listen",
-		"core:event:default",
-		"core:path:allow-resolve-directory",
-		"core:path:default",
 		{
 			"identifier": "opener:allow-open-url",
 			"allow": [
@@ -28,10 +22,6 @@
 				}
 			]
 		},
-		"deep-link:default",
-		"clipboard-manager:allow-write-text",
-		"clipboard-manager:default",
-		"stronghold:default",
-		"stronghold:allow-remove-store-record"
+		"deep-link:default"
 	]
 }
