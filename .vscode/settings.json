@@ -1,0 +1,39 @@
+{
+  // Rust Analyzer Configuration
+  "rust-analyzer.linkedProjects": [
+    "packages/app/src-tauri/Cargo.toml"
+  ],
+  
+  // Enable Tauri-specific features
+  "rust-analyzer.cargo.features": "all",
+  
+  // Use the correct build target directory
+  "rust-analyzer.cargo.buildScripts.overrideCommand": null,
+  
+  // Enable proc macro support for Tauri
+  "rust-analyzer.procMacro.enable": true,
+  
+  // Enable inlay hints for better code understanding
+  "rust-analyzer.inlayHints.typeHints.enable": true,
+  "rust-analyzer.inlayHints.parameterHints.enable": true,
+  "rust-analyzer.inlayHints.chainingHints.enable": true,
+  
+  // Configure diagnostics
+  "rust-analyzer.diagnostics.enable": true,
+  
+  // Files to watch for changes
+  "rust-analyzer.files.watcher": "client",
+  
+  // Workspace-specific settings
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true,
+    "editor.suggest.insertMode": "replace"
+  },
+  
+  // Tauri-specific file associations
+  "files.associations": {
+    "*.rs": "rust"
+  }
+}
+

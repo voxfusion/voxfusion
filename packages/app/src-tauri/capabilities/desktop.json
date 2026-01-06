@@ -1,18 +1,21 @@
 {
-  "identifier": "desktop-capability",
-  "platforms": [
-    "macOS",
-    "windows",
-    "linux"
-  ],
-  "windows": [
-    "main",
-    "voice-control"
-  ],
-  "permissions": [
-    "global-shortcut:allow-is-registered",
-    "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister",
-    "clipboard-manager:default"
-  ]
+	"identifier": "desktop-capability",
+	"platforms": ["macOS", "windows", "linux"],
+	"windows": ["main", "voice-control"],
+	"permissions": [
+		"global-shortcut:allow-is-registered",
+		"global-shortcut:allow-register",
+		"global-shortcut:allow-unregister",
+		"clipboard-manager:default",
+		"core:path:allow-resolve-directory",
+		"stronghold:default",
+		"stronghold:allow-remove-store-record",
+		"clipboard-manager:allow-write-text",
+		"clipboard-manager:default",
+		"core:window:allow-set-position",
+		"core:webview:allow-internal-toggle-devtools",
+		"core:event:allow-listen",
+		"core:event:default",
+		"core:path:default"
+	]
 }
