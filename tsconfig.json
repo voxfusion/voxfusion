@@ -26,6 +26,13 @@
 		// Some stricter flags (disabled by default)
 		"noUnusedLocals": false,
 		"noUnusedParameters": false,
-		"noPropertyAccessFromIndexSignature": false
+		"noPropertyAccessFromIndexSignature": false,
+
+		"baseUrl": ".",
+		"paths": {
+			"@voxfusion/server": ["./packages/server/src"],
+			"@voxfusion/app": ["./packages/app/src"],
+			"@voxfusion/marketingsite": ["./packages/marketingsite/src"]
+		}
 	}
 }
