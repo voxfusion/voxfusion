@@ -3,3 +3,4 @@ export * from "./sessions";
 export * from "./accounts";
 export * from "./verifications";
 export * from "./jwks";
+export * from "./transcriptions";
