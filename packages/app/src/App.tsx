@@ -44,7 +44,7 @@ function App(props: ParentProps) {
 			<div class="h-6" data-tauri-drag-region />
 			{JSON.stringify(session())}
 			<div class="grow">
-				<Show when={!session()} fallback={props.children}>
+				<Show when={!session() || !session().data?.user} fallback={props.children}>
 					<Auth />
 				</Show>
 			</div>

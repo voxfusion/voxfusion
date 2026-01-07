@@ -32,7 +32,14 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 			});
 		}
 
-		const deepLink = `voxfusion://settings?token=${sessionToken}`;
+		// Use dev scheme when running in development (check NODE_ENV or request hostname)
+		const requestHost = new URL(ctx.request.url).hostname;
+		const isDev =
+			process.env.NODE_ENV !== "production" ||
+			requestHost === "localhost" ||
+			requestHost === "127.0.0.1";
+		const deepLinkScheme = isDev ? "voxfusion-dev" : "voxfusion";
+		const deepLink = `${deepLinkScheme}://settings?token=${sessionToken}`;
 
 		return new Response(
 			`

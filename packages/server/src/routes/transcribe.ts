@@ -1,5 +1,5 @@
 import { Elysia, status, t } from "elysia";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { groq } from "../providers/groq";
 import { requireAuth } from "../middleware/auth";
 import { db } from "../providers/db";
@@ -116,17 +116,49 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			},
 		}
 	)
-	.get("/", async (ctx) => {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const session = (ctx as any).session as Session;
-		const userTranscriptions = await db
-			.select()
-			.from(transcriptions)
-			.where(eq(transcriptions.userId, session.user.id))
-			.orderBy(desc(transcriptions.createdAt));
+	.get(
+		"/",
+		async (ctx) => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const session = (ctx as any).session as Session;
+			const { cursor, limit } = ctx.query;
 
-		return { transcriptions: userTranscriptions };
-	})
+			const pageSize = Math.min(limit ?? 20, 50); // Cap at 50
+
+			const whereCondition = cursor
+				? and(
+						eq(transcriptions.userId, session.user.id),
+						lt(transcriptions.createdAt, new Date(cursor)),
+					)
+				: eq(transcriptions.userId, session.user.id);
+
+			const results = await db
+				.select()
+				.from(transcriptions)
+				.where(whereCondition)
+				.orderBy(desc(transcriptions.createdAt))
+				.limit(pageSize + 1); // Fetch one extra to detect hasMore
+
+			const hasMore = results.length > pageSize;
+			const items = hasMore ? results.slice(0, -1) : results;
+			const nextCursor =
+				hasMore && items.length > 0
+					? items[items.length - 1]!.createdAt.toISOString()
+					: null;
+
+			return {
+				transcriptions: items,
+				nextCursor,
+				hasMore,
+			};
+		},
+		{
+			query: t.Object({
+				cursor: t.Optional(t.String()),
+				limit: t.Optional(t.Numeric()),
+			}),
+		},
+	)
 	.get(
 		"/:id",
 		async (ctx) => {
@@ -154,5 +186,45 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			params: t.Object({
 				id: t.String(),
 			}),
-		}
+		},
+	)
+	.patch(
+		"/:id/rating",
+		async (ctx) => {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const session = (ctx as any).session as Session;
+			const { id } = ctx.params;
+			const { rating } = ctx.body;
+
+			// Verify ownership
+			const existing = await db
+				.select()
+				.from(transcriptions)
+				.where(eq(transcriptions.id, id))
+				.limit(1);
+
+			if (existing.length === 0) {
+				return status(404, { error: "Transcription not found" });
+			}
+
+			if (existing[0]!.userId !== session.user.id) {
+				return status(403, { error: "Forbidden" });
+			}
+
+			// Update rating
+			await db
+				.update(transcriptions)
+				.set({ rating })
+				.where(eq(transcriptions.id, id));
+
+			return { success: true, rating };
+		},
+		{
+			params: t.Object({
+				id: t.String(),
+			}),
+			body: t.Object({
+				rating: t.Union([t.Literal("up"), t.Literal("down"), t.Null()]),
+			}),
+		},
 	);
