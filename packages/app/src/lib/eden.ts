@@ -17,15 +17,10 @@ const client = treaty<App>("localhost:3000", {
 			options.headers = {
 				...options.headers,
 				authorization: `Bearer ${token}`,
-				// Cookie: `better-auth.session_token=${token}`,
 			};
 		}
 
 		return options;
-	},
-
-	onResponse: async (response) => {
-		return response;
 	},
 });
 

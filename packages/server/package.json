@@ -4,7 +4,7 @@
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
-		"dev": "bun run --bun --hot src/index.ts",
+		"dev": "NODE_ENV=development bun run --bun --hot src/index.ts",
 		"build": "bun build --bun src/index.ts --outdir dist --target bun",
 		"start": "bun run --bun dist/index.js",
 		"lint": "biome lint ./src",
@@ -19,6 +19,7 @@
 	"dependencies": {
 		"@elysiajs/bearer": "^1.1.0",
 		"@elysiajs/cors": "^1.1.1",
+		"@elysiajs/html": "^1.4.0",
 		"@gladiaio/sdk": "^0.6.1",
 		"drizzle-orm": "^0.38.3",
 		"elysia": "^1.2.10",

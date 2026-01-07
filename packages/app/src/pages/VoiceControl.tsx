@@ -1,5 +1,6 @@
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import { createSignal, For, onMount, onCleanup, Show } from "solid-js";
 import eden from "../lib/eden";
@@ -140,8 +141,20 @@ export default function VoiceControl() {
 					setLoading(true);
 					const res = await eden.api.transcribe.post({ file: audioFile });
 
-					const body = await res.response.json();
-					await invoke("type_text", { text: body.text ?? "" });
+					// Handle both parsed data and raw Response
+					let body: { text?: string };
+					if (res.data instanceof Response) {
+						body = await res.data.json();
+					} else {
+						body = res.data as { text?: string };
+					}
+					await invoke("type_text", { text: body?.text ?? "" });
+
+					// Notify other windows that a new transcription was created
+					// Small delay to allow afterResponse hook to save to database
+					setTimeout(() => {
+						emit("transcription-created");
+					}, 1000);
 				} catch (err) {
 					console.error("Transcription failed:", err);
 				} finally {

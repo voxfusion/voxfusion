@@ -1,6 +1,6 @@
 import { createSignal, Show } from "solid-js";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Copy, Download, ThumbsUp, ThumbsDown, Check } from "lucide-solid";
+import { Copy, ThumbsUp, ThumbsDown, Check } from "lucide-solid";
 import eden from "../lib/eden";
 
 type Transcription = {
@@ -28,10 +28,6 @@ export default function TranscriptionCard(props: Props) {
 		await writeText(props.transcription.text);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
-	};
-
-	const handleDownload = () => {
-		window.open(props.transcription.fileUrl, "_blank");
 	};
 
 	const handleRate = async (newRating: "up" | "down") => {
@@ -103,15 +99,6 @@ export default function TranscriptionCard(props: Props) {
 						<Check class="w-4 h-4 text-green-600" />
 					</Show>
 					<span>{copied() ? "Copied!" : "Copy"}</span>
-				</button>
-
-				<button
-					type="button"
-					onClick={handleDownload}
-					class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-				>
-					<Download class="w-4 h-4" />
-					<span>Download</span>
 				</button>
 
 				<div class="flex items-center gap-1 ml-auto">
