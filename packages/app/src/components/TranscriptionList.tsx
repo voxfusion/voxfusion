@@ -1,4 +1,5 @@
 import { createSignal, For, Show, onMount, onCleanup } from "solid-js";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import TranscriptionCard from "./TranscriptionCard";
 import eden from "../lib/eden";
@@ -26,6 +27,7 @@ export default function TranscriptionList() {
 
 	let sentinelRef: HTMLDivElement | undefined;
 	let observer: IntersectionObserver | null = null;
+	let unlisten: UnlistenFn | null = null;
 
 	const fetchTranscriptions = async (cursor?: string) => {
 		if (loading()) return;
@@ -42,14 +44,21 @@ export default function TranscriptionList() {
 				throw new Error("Failed to fetch transcriptions");
 			}
 
-			const data = response.data;
+			// Eden may return raw Response object - handle both cases
+			let data: { transcriptions: Transcription[]; nextCursor: string | null; hasMore: boolean };
+			if (response.data instanceof Response) {
+				data = await response.data.json();
+			} else {
+				data = response.data as typeof data;
+			}
 
-			setTranscriptions((prev) =>
-				cursor ? [...prev, ...data.transcriptions] : data.transcriptions,
-			);
-			setNextCursor(data.nextCursor);
-			setHasMore(data.hasMore);
+			const items = data.transcriptions ?? [];
+
+			setTranscriptions((prev) => (cursor ? [...prev, ...items] : items));
+			setNextCursor(data.nextCursor ?? null);
+			setHasMore(data.hasMore ?? false);
 		} catch (err) {
+			console.error("Fetch error:", err);
 			setError(err instanceof Error ? err.message : "An error occurred");
 		} finally {
 			setLoading(false);
@@ -61,8 +70,14 @@ export default function TranscriptionList() {
 		setTranscriptions((prev) => prev.map((t) => (t.id === id ? { ...t, rating } : t)));
 	};
 
-	onMount(() => {
+	onMount(async () => {
 		fetchTranscriptions();
+
+		// Listen for new transcriptions from VoiceControl window
+		unlisten = await listen("transcription-created", () => {
+			// Refetch from the beginning to get the new transcription
+			fetchTranscriptions();
+		});
 
 		observer = new IntersectionObserver(
 			(entries) => {
@@ -81,6 +96,7 @@ export default function TranscriptionList() {
 
 	onCleanup(() => {
 		observer?.disconnect();
+		unlisten?.();
 	});
 
 	return (

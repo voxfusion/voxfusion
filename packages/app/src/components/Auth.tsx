@@ -1,7 +1,11 @@
+import { createSignal } from "solid-js";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { authClient } from "../lib/authClient";
+import { tokenManager } from "../lib/tokenManager";
 
 function Auth() {
+	const [devToken, setDevToken] = createSignal("");
+
 	const handleGoogleLogin = async () => {
 		const data = await authClient.signIn.social({
 			provider: "google",
@@ -11,6 +15,14 @@ function Auth() {
 
 		if (data.data?.url) {
 			await openUrl(data.data.url);
+		}
+	};
+
+	const handleDevTokenSubmit = async () => {
+		const token = devToken().trim();
+		if (token) {
+			await tokenManager.storeToken(token);
+			window.location.reload();
 		}
 	};
 
@@ -55,6 +67,28 @@ function Auth() {
 						Continue with Google
 					</span>
 				</button>
+
+				{import.meta.env.DEV && (
+					<div class="flex flex-col gap-3 w-full mt-4 pt-6 border-t border-slate-200">
+						<p class="text-xs text-slate-500 text-center">
+							Development: Paste token to authenticate
+						</p>
+						<input
+							type="text"
+							value={devToken()}
+							onInput={(e) => setDevToken(e.currentTarget.value)}
+							placeholder="Paste token here"
+							class="px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-sm font-mono"
+						/>
+						<button
+							type="button"
+							onClick={handleDevTokenSubmit}
+							class="px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors text-sm font-medium"
+						>
+							Authenticate
+						</button>
+					</div>
+				)}
 			</div>
 		</div>
 	);
