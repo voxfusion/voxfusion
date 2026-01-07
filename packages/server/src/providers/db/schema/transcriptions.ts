@@ -12,5 +12,6 @@ export const transcriptions = pgTable("transcriptions", {
 	audioDurationMs: integer("audio_duration_ms"),
 	provider: text("provider").notNull(),
 	model: text("model").notNull(),
+	rating: text("rating"), // "up" | "down" | null
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 });
