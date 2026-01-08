@@ -25,3 +25,16 @@ body,
 	padding: 0;
 	box-sizing: border-box;
 }
+
+@keyframes voice-wave {
+	0%, 100% {
+		height: 4px;
+	}
+	50% {
+		height: 18px;
+	}
+}
+
+.animate-voice-wave {
+	animation: voice-wave 1s ease-in-out infinite;
+}

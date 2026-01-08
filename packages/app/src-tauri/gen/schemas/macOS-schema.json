@@ -2703,6 +2703,36 @@
           "markdownDescription": "Denies the request_screen_recording_permission command without any pre-configured scope."
         },
         {
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-start-recording`\n- `allow-stop-recording`",
+          "type": "string",
+          "const": "mic-recorder:default",
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-start-recording`\n- `allow-stop-recording`"
+        },
+        {
+          "description": "Enables the start_recording command without any pre-configured scope.",
+          "type": "string",
+          "const": "mic-recorder:allow-start-recording",
+          "markdownDescription": "Enables the start_recording command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the stop_recording command without any pre-configured scope.",
+          "type": "string",
+          "const": "mic-recorder:allow-stop-recording",
+          "markdownDescription": "Enables the stop_recording command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the start_recording command without any pre-configured scope.",
+          "type": "string",
+          "const": "mic-recorder:deny-start-recording",
+          "markdownDescription": "Denies the start_recording command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the stop_recording command without any pre-configured scope.",
+          "type": "string",
+          "const": "mic-recorder:deny-stop-recording",
+          "markdownDescription": "Denies the stop_recording command without any pre-configured scope."
+        },
+        {
           "description": "This permission set allows opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application\nas well as reveal file in directories using default file explorer\n#### This default permission set includes:\n\n- `allow-open-url`\n- `allow-reveal-item-in-dir`\n- `allow-default-urls`",
           "type": "string",
           "const": "opener:default",
