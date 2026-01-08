@@ -2,8 +2,10 @@ import { createSignal } from "solid-js";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { authClient } from "../lib/authClient";
 import { tokenManager } from "../lib/tokenManager";
+import { useI18n } from "../i18n";
 
 function Auth() {
+	const [t] = useI18n();
 	const [devToken, setDevToken] = createSignal("");
 
 	const handleGoogleLogin = async () => {
@@ -30,8 +32,8 @@ function Auth() {
 		<div class="flex items-center justify-center min-h-full w-full">
 			<div class="flex flex-col items-center gap-8 p-12 bg-white rounded-2xl shadow-xl border border-slate-200">
 				<div class="flex flex-col items-center gap-2">
-					<h1 class="text-3xl font-bold text-slate-800 tracking-tight">Welcome to VoxFusion</h1>
-					<p class="text-slate-500 text-sm">Sign in to continue</p>
+					<h1 class="text-3xl font-bold text-slate-800 tracking-tight">{t("auth.welcome")}</h1>
+					<p class="text-slate-500 text-sm">{t("auth.signInToContinue")}</p>
 				</div>
 
 				<button
@@ -45,7 +47,7 @@ function Auth() {
 						xmlns="http://www.w3.org/2000/svg"
 						aria-labelledby="google-icon-title"
 					>
-						<title id="google-icon-title">Google logo</title>
+						<title id="google-icon-title">{t("auth.googleLogo")}</title>
 						<path
 							d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
 							fill="#4285F4"
@@ -64,20 +66,20 @@ function Auth() {
 						/>
 					</svg>
 					<span class="text-slate-700 font-medium group-hover:text-blue-600 transition-colors">
-						Continue with Google
+						{t("auth.continueWithGoogle")}
 					</span>
 				</button>
 
 				{import.meta.env.DEV && (
 					<div class="flex flex-col gap-3 w-full mt-4 pt-6 border-t border-slate-200">
 						<p class="text-xs text-slate-500 text-center">
-							Development: Paste token to authenticate
+							{t("auth.devPasteToken")}
 						</p>
 						<input
 							type="text"
 							value={devToken()}
 							onInput={(e) => setDevToken(e.currentTarget.value)}
-							placeholder="Paste token here"
+							placeholder={t("auth.pasteTokenPlaceholder")}
 							class="px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-sm font-mono"
 						/>
 						<button
@@ -85,7 +87,7 @@ function Auth() {
 							onClick={handleDevTokenSubmit}
 							class="px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors text-sm font-medium"
 						>
-							Authenticate
+							{t("auth.authenticate")}
 						</button>
 					</div>
 				)}

@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import TranscriptionCard from "./TranscriptionCard";
 import eden from "../lib/eden";
+import { useI18n } from "../i18n";
 
 type Transcription = {
 	id: string;
@@ -18,6 +19,7 @@ type Transcription = {
 };
 
 export default function TranscriptionList() {
+	const [t] = useI18n();
 	const [transcriptions, setTranscriptions] = createSignal<Transcription[]>([]);
 	const [loading, setLoading] = createSignal(false);
 	const [initialLoading, setInitialLoading] = createSignal(true);
@@ -41,7 +43,7 @@ export default function TranscriptionList() {
 			});
 
 			if (response.error) {
-				throw new Error("Failed to fetch transcriptions");
+				throw new Error(t("transcriptionList.failedToFetch"));
 			}
 
 			// Eden may return raw Response object - handle both cases
@@ -59,7 +61,7 @@ export default function TranscriptionList() {
 			setHasMore(data.hasMore ?? false);
 		} catch (err) {
 			console.error("Fetch error:", err);
-			setError(err instanceof Error ? err.message : "An error occurred");
+			setError(err instanceof Error ? err.message : t("transcriptionList.errorOccurred"));
 		} finally {
 			setLoading(false);
 			setInitialLoading(false);
@@ -115,16 +117,16 @@ export default function TranscriptionList() {
 						onClick={() => fetchTranscriptions()}
 						class="text-sm text-blue-500 hover:underline"
 					>
-						Try again
+						{t("transcriptionList.tryAgain")}
 					</button>
 				</div>
 			</Show>
 
 			<Show when={!initialLoading() && !error() && transcriptions().length === 0}>
 				<div class="text-center py-12">
-					<p class="text-slate-500 text-lg mb-2">No transcriptions yet</p>
+					<p class="text-slate-500 text-lg mb-2">{t("transcriptionList.noTranscriptions")}</p>
 					<p class="text-slate-400 text-sm">
-						Use Command+; to start recording and create your first transcription
+						{t("transcriptionList.useCommandToRecord")}
 					</p>
 				</div>
 			</Show>
@@ -148,7 +150,7 @@ export default function TranscriptionList() {
 				</Show>
 
 				<Show when={!hasMore() && transcriptions().length > 0}>
-					<p class="text-center text-slate-400 text-sm py-4">No more transcriptions</p>
+					<p class="text-center text-slate-400 text-sm py-4">{t("transcriptionList.noMore")}</p>
 				</Show>
 			</Show>
 		</div>
