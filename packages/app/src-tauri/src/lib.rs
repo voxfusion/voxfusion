@@ -1,6 +1,7 @@
 use argon2::{Algorithm, Argon2, Params, Version};
 use enigo::{Enigo, Keyboard, Settings};
 use tauri::Manager;
+use std::fs;
 
 #[tauri::command]
 fn type_text(text: String) -> Result<(), String> {
@@ -9,6 +10,11 @@ fn type_text(text: String) -> Result<(), String> {
     enigo.text(&text).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+fn read_audio_file(path: String) -> Result<Vec<u8>, String> {
+    fs::read(&path).map_err(|e| format!("Failed to read audio file: {}", e))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -32,12 +38,13 @@ pub fn run() {
             })
             .build(),
         )
-        .invoke_handler(tauri::generate_handler![type_text])
+        .invoke_handler(tauri::generate_handler![type_text, read_audio_file])
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_keychain::init())
+        .plugin(tauri_plugin_mic_recorder::init())
         .setup(|app| {
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             {

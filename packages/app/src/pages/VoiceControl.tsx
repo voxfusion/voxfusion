@@ -3,42 +3,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import { createSignal, For, onMount, onCleanup, Show } from "solid-js";
+import { startRecording as nativeStartRecording, stopRecording as nativeStopRecording } from "tauri-plugin-mic-recorder-api";
 import eden from "../lib/eden";
 
 export default function VoiceControl() {
 	const [isRecording, setIsRecording] = createSignal(false);
-	const [audioLevels, setAudioLevels] = createSignal<number[]>([4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
-
 	const [loading, setLoading] = createSignal(false);
 
-	let mediaRecorder: MediaRecorder | null = null;
-	let audioChunks: Blob[] = [];
-
-	let audioContext: AudioContext | null = null;
-	let analyser: AnalyserNode | null = null;
-	let animationId: number | null = null;
-	let recordingMimeType = "";
 	const shortcut = "Command+;";
-	let stream: MediaStream | null = null;
 	let isStopping = false;
 	let isStarting = false;
-
-	const getMicStream = async () => {
-		const hasLiveTracks = stream?.getTracks().some((track) => track.readyState === "live") ?? false;
-		if (stream && hasLiveTracks) return stream;
-
-		for (const track of stream?.getTracks() ?? []) {
-			track.stop();
-		}
-		stream = await navigator.mediaDevices.getUserMedia({
-			audio: {
-				echoCancellation: true,
-				noiseSuppression: true,
-				sampleRate: 44100,
-			},
-		});
-		return stream;
-	};
 
 	onMount(async () => {
 		try {
@@ -56,133 +30,67 @@ export default function VoiceControl() {
 				startRecording();
 			}
 		});
-
-		void getMicStream().catch((err) => console.warn("Failed to warm mic stream:", err));
 	});
 
 	onCleanup(async () => {
-		stopRecording();
-		for (const track of stream?.getTracks() ?? []) {
-			track.stop();
+		if (isRecording()) {
+			await stopRecording();
 		}
-		stream = null;
 		await unregister(shortcut);
 	});
 
-	const stopRecording = () => {
+	const stopRecording = async () => {
 		if (isStopping) return;
-		if (!mediaRecorder) return;
-		if (mediaRecorder.state === "inactive") return;
+		if (!isRecording()) return;
 
 		isStopping = true;
-		mediaRecorder.stop();
 		setIsRecording(false);
-		if (animationId) {
-			cancelAnimationFrame(animationId);
-			animationId = null;
+
+		try {
+			// Stop native recording and get the file path
+			const filePath = await nativeStopRecording();
+			console.log("Recording saved at:", filePath);
+
+			// Read the recorded file and send to transcription API
+			setLoading(true);
+
+			// Read the file using Rust command
+			const audioBytes = await invoke<number[]>("read_audio_file", { path: filePath });
+			const audioBlob = new Blob([new Uint8Array(audioBytes)], { type: "audio/wav" });
+			const audioFile = new File([audioBlob], "recording.wav", { type: "audio/wav" });
+
+			const res = await eden.api.transcribe.post({ file: audioFile });
+
+			// Handle both parsed data and raw Response
+			let body: { text?: string };
+			if (res.data instanceof Response) {
+				body = await res.data.json();
+			} else {
+				body = res.data as { text?: string };
+			}
+			await invoke("type_text", { text: body?.text ?? "" });
+
+			// Notify other windows that a new transcription was created
+			// Small delay to allow afterResponse hook to save to database
+			setTimeout(() => {
+				emit("transcription-created");
+			}, 1000);
+		} catch (err) {
+			console.error("Transcription failed:", err);
+		} finally {
+			setLoading(false);
+			isStopping = false;
 		}
 	};
 
 	const startRecording = async () => {
 		try {
 			if (isRecording()) return;
-			audioChunks = [];
 			if (isStopping || isStarting) return;
 			isStarting = true;
 
-			const micStream = await getMicStream();
-
-			recordingMimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-				? "audio/webm;codecs=opus"
-				: MediaRecorder.isTypeSupported("audio/mp4")
-					? "audio/mp4"
-					: "audio/wav";
-
-			mediaRecorder = new MediaRecorder(
-				micStream,
-				recordingMimeType ? { mimeType: recordingMimeType } : undefined
-			);
-
-			audioContext = new AudioContext();
-			analyser = audioContext.createAnalyser();
-			analyser.fftSize = 256;
-			const source = audioContext.createMediaStreamSource(micStream);
-			source.connect(analyser);
-
-			mediaRecorder.ondataavailable = async (event) => {
-				if (event.data.size > 0) {
-					audioChunks.push(event.data);
-				}
-			};
-
-			mediaRecorder.onstop = async () => {
-				const chunks = audioChunks;
-				const mimeType = recordingMimeType;
-				audioChunks = [];
-
-				if (animationId) {
-					cancelAnimationFrame(animationId);
-					animationId = null;
-				}
-				if (audioContext) {
-					audioContext.close();
-					audioContext = null;
-				}
-				analyser = null;
-				setAudioLevels([4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
-
-				mediaRecorder = null;
-				isStopping = false;
-
-				try {
-					const audioBlob = new Blob(chunks, { type: mimeType });
-					const audioFile = new File([audioBlob], "recording.webm", { type: mimeType });
-
-					setLoading(true);
-					const res = await eden.api.transcribe.post({ file: audioFile });
-
-					// Handle both parsed data and raw Response
-					let body: { text?: string };
-					if (res.data instanceof Response) {
-						body = await res.data.json();
-					} else {
-						body = res.data as { text?: string };
-					}
-					await invoke("type_text", { text: body?.text ?? "" });
-
-					// Notify other windows that a new transcription was created
-					// Small delay to allow afterResponse hook to save to database
-					setTimeout(() => {
-						emit("transcription-created");
-					}, 1000);
-				} catch (err) {
-					console.error("Transcription failed:", err);
-				} finally {
-					setLoading(false);
-				}
-			};
-
-			const updateAudioLevels = () => {
-				if (!analyser) return;
-
-				const dataArray = new Uint8Array(analyser.frequencyBinCount);
-				analyser.getByteFrequencyData(dataArray);
-
-				const levels = [];
-				for (let i = 0; i < 10; i++) {
-					const start = i * 5;
-					const end = start + 5;
-					const slice = dataArray.slice(start, end);
-					const avg = slice.reduce((a, b) => a + b, 0) / slice.length;
-					levels.push(Math.max(4, Math.floor((avg / 255) * 20)));
-				}
-				setAudioLevels(levels);
-
-				animationId = requestAnimationFrame(updateAudioLevels);
-			};
-			updateAudioLevels();
-
-			mediaRecorder?.start(100);
+			// Start native recording
+			await nativeStartRecording();
 			setIsRecording(true);
 			isStarting = false;
 		} catch (err) {
@@ -199,9 +107,12 @@ export default function VoiceControl() {
 			</Show>
 			<Show when={!loading() && isRecording()}>
 				<div class="flex items-center justify-center gap-[3px]">
-					<For each={audioLevels()}>
-						{(level) => (
-							<div class="w-[5px] h-10 rounded bg-slate-500" style={{ height: `${level}px` }} />
+					<For each={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}>
+						{(i) => (
+							<div
+								class="w-[5px] rounded bg-slate-500 animate-voice-wave"
+								style={{ "animation-delay": `${i * 0.1}s` }}
+							/>
 						)}
 					</For>
 				</div>

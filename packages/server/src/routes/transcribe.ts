@@ -6,11 +6,9 @@ import { groq } from "../providers/groq";
 import { db } from "../providers/db";
 import { transcriptions } from "../providers/db/schema";
 import { auth } from "../auth";
-
 async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	const tempFile = join(tmpdir(), `audio-${crypto.randomUUID()}.webm`);
 	try {
-		// Write buffer to temp file
 		await Bun.write(tempFile, buffer);
 
 		// Use ffprobe to get duration
@@ -31,9 +29,7 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 		return null;
 	} finally {
 		// Clean up temp file
-		try {
-			(await Bun.file(tempFile).exists()) && (await Bun.$`rm ${tempFile}`);
-		} catch {}
+		(await Bun.file(tempFile).exists()) && (await Bun.$`rm ${tempFile}`);
 	}
 }
 
