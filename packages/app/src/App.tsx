@@ -1,10 +1,10 @@
-import { onMount, type ParentProps } from "solid-js";
+import { onMount, type ParentProps, Show } from "solid-js";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { useStore } from "@nanostores/solid";
 import { authClient } from "./lib/authClient";
 import Auth from "./components/Auth";
-import { Show } from "solid-js";
+import Sidebar from "./components/Navigation";
 
 function App(props: ParentProps) {
 	const session = useStore(authClient.useSession);
@@ -40,13 +40,21 @@ function App(props: ParentProps) {
 	});
 
 	return (
-		<div class="flex flex-col min-h-screen h-full w-full bg-slate-100">
-			<div class="h-6" data-tauri-drag-region />
-			<div class="grow">
-				<Show when={!session() || !session().data?.user} fallback={props.children}>
-					<Auth />
-				</Show>
-			</div>
+		<div class="relative min-h-screen h-full w-full bg-slate-100">
+			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
+			<Show
+				when={session()?.data?.user}
+				fallback={
+					<div class="h-full pt-6">
+						<Auth />
+					</div>
+				}
+			>
+				<div class="flex h-full">
+					<Sidebar />
+					<main class="flex-1 overflow-auto pt-6">{props.children}</main>
+				</div>
+			</Show>
 		</div>
 	);
 }

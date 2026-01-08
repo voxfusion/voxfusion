@@ -2,6 +2,7 @@ import { createSignal, Show } from "solid-js";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Copy, ThumbsUp, ThumbsDown, Check } from "lucide-solid";
 import eden from "../lib/eden";
+import { useI18n } from "../i18n";
 
 type Transcription = {
 	id: string;
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export default function TranscriptionCard(props: Props) {
+	const [t, { locale }] = useI18n();
 	const [copied, setCopied] = createSignal(false);
 	const [rating, setRating] = createSignal<"up" | "down" | null>(
 		props.transcription.rating as "up" | "down" | null,
@@ -48,7 +50,7 @@ export default function TranscriptionCard(props: Props) {
 	};
 
 	const formatDuration = (ms: number | null) => {
-		if (!ms) return "N/A";
+		if (!ms) return t("transcription.notAvailable");
 		const seconds = Math.floor(ms / 1000);
 		const minutes = Math.floor(seconds / 60);
 		const remainingSeconds = seconds % 60;
@@ -60,7 +62,7 @@ export default function TranscriptionCard(props: Props) {
 	};
 
 	const formatDate = (date: Date) => {
-		return date.toLocaleDateString(undefined, {
+		return date.toLocaleDateString(locale(), {
 			month: "short",
 			day: "numeric",
 			hour: "2-digit",
@@ -81,12 +83,12 @@ export default function TranscriptionCard(props: Props) {
 
 			<div class="flex items-center gap-4 text-xs text-slate-500 mb-3">
 				<span title="Processing time">
-					Processing: {formatProcessingTime(props.transcription.processingTimeMs)}
+					{t("transcription.processing")} {formatProcessingTime(props.transcription.processingTimeMs)}
 				</span>
 				<span title="Audio duration">
-					Duration: {formatDuration(props.transcription.audioDurationMs)}
+					{t("transcription.duration")} {formatDuration(props.transcription.audioDurationMs)}
 				</span>
-				<span class="ml-auto">{formatDate(props.transcription.createdAt)}</span>
+				<span class="ml-auto select-text">{formatDate(props.transcription.createdAt)}</span>
 			</div>
 
 			<div class="flex items-center gap-2 pt-3 border-t border-slate-100">
@@ -98,7 +100,7 @@ export default function TranscriptionCard(props: Props) {
 					<Show when={copied()} fallback={<Copy class="w-4 h-4" />}>
 						<Check class="w-4 h-4 text-green-600" />
 					</Show>
-					<span>{copied() ? "Copied!" : "Copy"}</span>
+					<span>{copied() ? t("transcription.copied") : t("transcription.copy")}</span>
 				</button>
 
 				<div class="flex items-center gap-1 ml-auto">
@@ -110,7 +112,7 @@ export default function TranscriptionCard(props: Props) {
 								? "text-green-600 bg-green-50"
 								: "text-slate-400 hover:text-green-600 hover:bg-green-50"
 						}`}
-						title="Good transcription"
+						title={t("transcription.goodTranscription")}
 					>
 						<ThumbsUp class="w-4 h-4" />
 					</button>
@@ -122,7 +124,7 @@ export default function TranscriptionCard(props: Props) {
 								? "text-red-600 bg-red-50"
 								: "text-slate-400 hover:text-red-600 hover:bg-red-50"
 						}`}
-						title="Poor transcription"
+						title={t("transcription.poorTranscription")}
 					>
 						<ThumbsDown class="w-4 h-4" />
 					</button>
