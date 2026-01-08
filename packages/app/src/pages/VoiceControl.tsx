@@ -3,7 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import { createSignal, For, onMount, onCleanup, Show } from "solid-js";
-import { startRecording as nativeStartRecording, stopRecording as nativeStopRecording } from "tauri-plugin-mic-recorder-api";
+import {
+	startRecording as nativeStartRecording,
+	stopRecording as nativeStopRecording,
+} from "tauri-plugin-mic-recorder-api";
 import eden from "../lib/eden";
 
 export default function VoiceControl() {
@@ -47,21 +50,16 @@ export default function VoiceControl() {
 		setIsRecording(false);
 
 		try {
-			// Stop native recording and get the file path
 			const filePath = await nativeStopRecording();
-			console.log("Recording saved at:", filePath);
 
-			// Read the recorded file and send to transcription API
 			setLoading(true);
 
-			// Read the file using Rust command
 			const audioBytes = await invoke<number[]>("read_audio_file", { path: filePath });
 			const audioBlob = new Blob([new Uint8Array(audioBytes)], { type: "audio/wav" });
 			const audioFile = new File([audioBlob], "recording.wav", { type: "audio/wav" });
 
 			const res = await eden.api.transcribe.post({ file: audioFile });
 
-			// Handle both parsed data and raw Response
 			let body: { text?: string };
 			if (res.data instanceof Response) {
 				body = await res.data.json();
@@ -70,8 +68,6 @@ export default function VoiceControl() {
 			}
 			await invoke("type_text", { text: body?.text ?? "" });
 
-			// Notify other windows that a new transcription was created
-			// Small delay to allow afterResponse hook to save to database
 			setTimeout(() => {
 				emit("transcription-created");
 			}, 1000);
@@ -89,7 +85,6 @@ export default function VoiceControl() {
 			if (isStopping || isStarting) return;
 			isStarting = true;
 
-			// Start native recording
 			await nativeStartRecording();
 			setIsRecording(true);
 			isStarting = false;

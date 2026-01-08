@@ -46,7 +46,6 @@ export default function TranscriptionList() {
 				throw new Error(t("transcriptionList.failedToFetch"));
 			}
 
-			// Eden may return raw Response object - handle both cases
 			let data: { transcriptions: Transcription[]; nextCursor: string | null; hasMore: boolean };
 			if (response.data instanceof Response) {
 				data = await response.data.json();
@@ -75,9 +74,7 @@ export default function TranscriptionList() {
 	onMount(async () => {
 		fetchTranscriptions();
 
-		// Listen for new transcriptions from VoiceControl window
 		unlisten = await listen("transcription-created", () => {
-			// Refetch from the beginning to get the new transcription
 			fetchTranscriptions();
 		});
 
