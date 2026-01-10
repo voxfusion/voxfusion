@@ -30,16 +30,16 @@ function Auth() {
 
 	return (
 		<div class="flex items-center justify-center min-h-full w-full">
-			<div class="flex flex-col items-center gap-8 p-12 bg-white rounded-2xl shadow-xl border border-slate-200">
+			<div class="flex flex-col items-center gap-8 p-12 bg-white dark:bg-midnight-800 rounded-2xl shadow-xl border border-slate-200 dark:border-midnight-700 transition-colors">
 				<div class="flex flex-col items-center gap-2">
-					<h1 class="text-3xl font-bold text-slate-800 tracking-tight">{t("auth.welcome")}</h1>
-					<p class="text-slate-500 text-sm">{t("auth.signInToContinue")}</p>
+					<h1 class="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">{t("auth.welcome")}</h1>
+					<p class="text-slate-500 dark:text-slate-400 text-sm">{t("auth.signInToContinue")}</p>
 				</div>
 
 				<button
 					type="button"
 					onClick={handleGoogleLogin}
-					class="group flex items-center gap-3 px-6 py-3.5 bg-white border-2 border-slate-200 rounded-xl hover:border-primary-500 hover:shadow-lg hover:shadow-primary-100 transition-all duration-200 cursor-pointer"
+					class="group flex items-center gap-3 px-6 py-3.5 bg-white dark:bg-midnight-700 border-2 border-slate-200 dark:border-midnight-600 rounded-xl hover:border-primary-500 dark:hover:border-primary-500 hover:shadow-lg hover:shadow-primary-100 dark:hover:shadow-primary-900/20 transition-all duration-200 cursor-pointer"
 				>
 					<svg
 						class="w-5 h-5"
@@ -65,14 +65,14 @@ function Auth() {
 							fill="#EA4335"
 						/>
 					</svg>
-					<span class="text-slate-700 font-medium group-hover:text-primary-600 transition-colors">
+					<span class="text-slate-700 dark:text-slate-200 font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
 						{t("auth.continueWithGoogle")}
 					</span>
 				</button>
 
 				{import.meta.env.DEV && (
-					<div class="flex flex-col gap-3 w-full mt-4 pt-6 border-t border-slate-200">
-						<p class="text-xs text-slate-500 text-center">
+					<div class="flex flex-col gap-3 w-full mt-4 pt-6 border-t border-slate-200 dark:border-midnight-600">
+						<p class="text-xs text-slate-500 dark:text-slate-400 text-center">
 							{t("auth.devPasteToken")}
 						</p>
 						<input
@@ -80,7 +80,7 @@ function Auth() {
 							value={devToken()}
 							onInput={(e) => setDevToken(e.currentTarget.value)}
 							placeholder={t("auth.pasteTokenPlaceholder")}
-							class="px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-primary-500 transition-colors text-sm font-mono"
+							class="px-4 py-2.5 border-2 border-slate-200 dark:border-midnight-600 bg-white dark:bg-midnight-700 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:border-primary-500 transition-colors text-sm font-mono"
 						/>
 						<button
 							type="button"

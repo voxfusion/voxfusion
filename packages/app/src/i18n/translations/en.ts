@@ -23,10 +23,22 @@ export type Translations = {
 		dark: string;
 		light: string;
 		auto: string;
+		system: string;
 		currentTheme: string;
 		language: string;
 		english: string;
 		russian: string;
+		audio: string;
+		hotkey: string;
+		appearance: string;
+		microphone: string;
+		defaultMicrophone: string;
+		microphoneDescription: string;
+		recordingHotkey: string;
+		pressHotkey: string;
+		hotkeyDescription: string;
+		change: string;
+		cancel: string;
 	};
 	transcription: {
 		notAvailable: string;
@@ -88,10 +100,22 @@ export const en: Translations = {
 		dark: "Dark",
 		light: "Light",
 		auto: "Auto",
+		system: "System",
 		currentTheme: "Current theme:",
 		language: "Language",
 		english: "English",
 		russian: "Russian",
+		audio: "Audio",
+		hotkey: "Hotkey",
+		appearance: "Appearance",
+		microphone: "Microphone",
+		defaultMicrophone: "System Default",
+		microphoneDescription: "Select the microphone to use for voice recording.",
+		recordingHotkey: "Recording Hotkey",
+		pressHotkey: "Press a key combination...",
+		hotkeyDescription: "Press this key combination to start or stop recording.",
+		change: "Change",
+		cancel: "Cancel",
 	},
 	transcription: {
 		notAvailable: "N/A",
