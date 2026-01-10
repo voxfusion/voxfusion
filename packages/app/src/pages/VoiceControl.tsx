@@ -105,7 +105,7 @@ export default function VoiceControl() {
 					<For each={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}>
 						{(i) => (
 							<div
-								class="w-[5px] rounded bg-slate-500 animate-voice-wave"
+								class="w-[5px] rounded bg-primary-500 animate-voice-wave"
 								style={{ "animation-delay": `${i * 0.1}s` }}
 							/>
 						)}
