@@ -42,18 +42,20 @@ function App(props: ParentProps) {
 	return (
 		<div class="relative min-h-screen h-full w-full bg-slate-100">
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
-			<Show
-				when={session()?.data?.user}
-				fallback={
-					<div class="h-full pt-6">
-						<Auth />
+			<Show when={!session()?.isPending}>
+				<Show
+					when={session()?.data?.user}
+					fallback={
+						<div class="h-full pt-6">
+							<Auth />
+						</div>
+					}
+				>
+					<div class="flex h-full">
+						<Sidebar />
+						<main class="flex-1 overflow-auto pt-6">{props.children}</main>
 					</div>
-				}
-			>
-				<div class="flex h-full">
-					<Sidebar />
-					<main class="flex-1 overflow-auto pt-6">{props.children}</main>
-				</div>
+				</Show>
 			</Show>
 		</div>
 	);
