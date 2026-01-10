@@ -44,6 +44,8 @@ export type Translations = {
 		useCommandToRecord: string;
 		tryAgain: string;
 		noMore: string;
+		today: string;
+		yesterday: string;
 	};
 	sidebar: {
 		home: string;
@@ -110,6 +112,8 @@ export const en: Translations = {
 			"Use Command+; to start recording and create your first transcription",
 		tryAgain: "Try again",
 		noMore: "No more transcriptions",
+		today: "Today",
+		yesterday: "Yesterday",
 	},
 	sidebar: {
 		home: "Home",
