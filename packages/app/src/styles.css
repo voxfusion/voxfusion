@@ -8,6 +8,23 @@ body,
 	height: 100%;
 }
 
+/* Prevent white flash on load - apply background colors immediately */
+html {
+	background-color: #ffffff;
+}
+
+html.dark {
+	background-color: #0a1628;
+}
+
+body {
+	background-color: #ffffff;
+}
+
+html.dark body {
+	background-color: #0a1628;
+}
+
 :root {
 	user-select: none;
 	font-synthesis: none;
@@ -17,7 +34,7 @@ body,
 }
 
 body {
-	font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 ::-webkit-scrollbar {
@@ -31,7 +48,8 @@ body {
 }
 
 @keyframes voice-wave {
-	0%, 100% {
+	0%,
+	100% {
 		height: 4px;
 	}
 	50% {

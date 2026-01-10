@@ -8,6 +8,31 @@
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 		<title>VoxFusion</title>
+		<script>
+			// Apply theme immediately to prevent white flash on load
+			(function() {
+				try {
+					var theme = localStorage.getItem('voxfusion-theme');
+					var isDark = false;
+					if (theme === 'dark') {
+						isDark = true;
+					} else if (theme === 'light') {
+						isDark = false;
+					} else {
+						// Default to system preference
+						isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					}
+					if (isDark) {
+						document.documentElement.classList.add('dark');
+					}
+				} catch (e) {}
+			})();
+		</script>
+		<style>
+			/* Critical styles to prevent white flash */
+			html { background-color: #ffffff; }
+			html.dark { background-color: #0A1628; }
+		</style>
 	</head>
 	<body>
 		<div id="root"></div>
