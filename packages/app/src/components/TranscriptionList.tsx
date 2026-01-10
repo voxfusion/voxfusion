@@ -53,7 +53,10 @@ export default function TranscriptionList() {
 				data = response.data as typeof data;
 			}
 
-			const items = data.transcriptions ?? [];
+			const items = (data.transcriptions ?? []).map((item) => ({
+				...item,
+				createdAt: new Date(item.createdAt),
+			}));
 
 			setTranscriptions((prev) => (cursor ? [...prev, ...items] : items));
 			setNextCursor(data.nextCursor ?? null);
