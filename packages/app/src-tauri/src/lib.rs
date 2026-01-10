@@ -132,6 +132,27 @@ pub fn run() {
                                     let _ = window.set_focus();
                                     // Emit event to navigate to home
                                     let _ = window.emit("navigate", "/");
+                                } else {
+                                    // Window was closed, recreate it with same settings as tauri.conf.json
+                                    use tauri::WebviewWindowBuilder;
+                                    if let Ok(window) = WebviewWindowBuilder::new(
+                                        app,
+                                        "main",
+                                        tauri::WebviewUrl::App("/".into()),
+                                    )
+                                    .title("VoxFusion")
+                                    .inner_size(1360.0, 850.0)
+                                    .resizable(true)
+                                    .decorations(true)
+                                    .title_bar_style(tauri::TitleBarStyle::Overlay)
+                                    .hidden_title(true)
+                                    .fullscreen(false)
+                                    .center()
+                                    .build()
+                                    {
+                                        let _ = window.show();
+                                        let _ = window.set_focus();
+                                    }
                                 }
                             }
                             "quit" => {
