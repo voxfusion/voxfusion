@@ -58,8 +58,15 @@ export type Translations = {
 	dictionary: {
 		title: string;
 		description: string;
-		comingSoon: string;
-		comingSoonDescription: string;
+		addWord: string;
+		wordPlaceholder: string;
+		save: string;
+		cancel: string;
+		edit: string;
+		delete: string;
+		emptyState: string;
+		emptyStateDescription: string;
+		wordCount: string;
 	};
 };
 
@@ -126,8 +133,15 @@ export const en: Translations = {
 	dictionary: {
 		title: "Dictionary",
 		description: "Add custom words for better transcription accuracy",
-		comingSoon: "Coming Soon",
-		comingSoonDescription:
-			"The dictionary feature will allow you to add custom words and phrases that you want to be transcribed correctly.",
+		addWord: "Add",
+		wordPlaceholder: "Enter a word or phrase...",
+		save: "Save",
+		cancel: "Cancel",
+		edit: "Edit",
+		delete: "Delete",
+		emptyState: "No words yet",
+		emptyStateDescription:
+			"Add words to improve transcription accuracy for specialized terms, names, or phrases you use often.",
+		wordCount: "{count} words",
 	},
 };
