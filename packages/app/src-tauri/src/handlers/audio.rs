@@ -55,9 +55,15 @@ pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
         .input_devices()
         .map_err(|e| e.to_string())?
         .filter_map(|device| {
-            device.name().ok().map(|name| AudioDevice {
-                is_default: default_device_name.as_ref() == Some(&name),
-                name,
+            device.name().ok().and_then(|name| {
+                // Filter out inactive capture devices
+                if name.contains("Capture Inactive") {
+                    return None;
+                }
+                Some(AudioDevice {
+                    is_default: default_device_name.as_ref() == Some(&name),
+                    name,
+                })
             })
         })
         .collect();
