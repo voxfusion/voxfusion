@@ -107,5 +107,22 @@ export const ru: Translations = {
 		languageDescription: "Выберите предпочитаемый язык интерфейса.",
 		completionTitle: "Всё готово!",
 		completionDescription: "VoxFusion готов помочь вам с транскрипцией голоса.",
+		// Microphone Permission Step
+		micPermissionTitle: "Доступ к микрофону",
+		micPermissionDescription:
+			"VoxFusion нужен доступ к микрофону для записи и транскрипции голоса.",
+		micPermissionGranted: "Доступ к микрофону получен",
+		micPermissionNotGranted: "Требуется доступ к микрофону",
+		grantMicPermission: "Предоставить доступ",
+		checkingPermission: "Проверка...",
+		// Accessibility Permission Step
+		accessibilityTitle: "Универсальный доступ",
+		accessibilityDescription:
+			"VoxFusion нужен универсальный доступ для ввода текста в любое приложение.",
+		accessibilityGranted: "Универсальный доступ получен",
+		accessibilityNotGranted: "Требуется универсальный доступ",
+		openSystemPreferences: "Открыть Системные настройки",
+		accessibilityInstructions:
+			"Нажмите на замок для внесения изменений, затем отметьте VoxFusion в списке.",
 	},
 };
