@@ -3,7 +3,6 @@ import { Route, Router } from "@solidjs/router";
 import "./styles.css";
 import Home from "./pages/Home";
 import About from "./pages/About";
-import Settings from "./pages/Settings";
 import Dictionary from "./pages/Dictionary";
 import App from "./App";
 import { I18nCtx, createAppI18n, getStoredLocale } from "./i18n";
@@ -23,7 +22,6 @@ render(
 			<Router root={App}>
 				<Route path="/" component={Home} />
 				<Route path="/about" component={About} />
-				<Route path="/settings" component={Settings} />
 				<Route path="/dictionary" component={Dictionary} />
 			</Router>
 		</I18nCtx.Provider>

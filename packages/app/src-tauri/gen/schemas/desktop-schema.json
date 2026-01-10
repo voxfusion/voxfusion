@@ -2703,36 +2703,6 @@
           "markdownDescription": "Denies the request_screen_recording_permission command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-start-recording`\n- `allow-stop-recording`",
-          "type": "string",
-          "const": "mic-recorder:default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-start-recording`\n- `allow-stop-recording`"
-        },
-        {
-          "description": "Enables the start_recording command without any pre-configured scope.",
-          "type": "string",
-          "const": "mic-recorder:allow-start-recording",
-          "markdownDescription": "Enables the start_recording command without any pre-configured scope."
-        },
-        {
-          "description": "Enables the stop_recording command without any pre-configured scope.",
-          "type": "string",
-          "const": "mic-recorder:allow-stop-recording",
-          "markdownDescription": "Enables the stop_recording command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the start_recording command without any pre-configured scope.",
-          "type": "string",
-          "const": "mic-recorder:deny-start-recording",
-          "markdownDescription": "Denies the start_recording command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the stop_recording command without any pre-configured scope.",
-          "type": "string",
-          "const": "mic-recorder:deny-stop-recording",
-          "markdownDescription": "Denies the stop_recording command without any pre-configured scope."
-        },
-        {
           "description": "This permission set allows opening `mailto:`, `tel:`, `https://` and `http://` urls using their default application\nas well as reveal file in directories using default file explorer\n#### This default permission set includes:\n\n- `allow-open-url`\n- `allow-reveal-item-in-dir`\n- `allow-default-urls`",
           "type": "string",
           "const": "opener:default",
@@ -2779,6 +2749,180 @@
           "type": "string",
           "const": "opener:deny-reveal-item-in-dir",
           "markdownDescription": "Denies the reveal_item_in_dir command without any pre-configured scope."
+        },
+        {
+          "description": "This permission set configures what kind of\noperations are available from the store plugin.\n\n#### Granted Permissions\n\nAll operations are enabled by default.\n\n\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-get-store`\n- `allow-set`\n- `allow-get`\n- `allow-has`\n- `allow-delete`\n- `allow-clear`\n- `allow-reset`\n- `allow-keys`\n- `allow-values`\n- `allow-entries`\n- `allow-length`\n- `allow-reload`\n- `allow-save`",
+          "type": "string",
+          "const": "store:default",
+          "markdownDescription": "This permission set configures what kind of\noperations are available from the store plugin.\n\n#### Granted Permissions\n\nAll operations are enabled by default.\n\n\n#### This default permission set includes:\n\n- `allow-load`\n- `allow-get-store`\n- `allow-set`\n- `allow-get`\n- `allow-has`\n- `allow-delete`\n- `allow-clear`\n- `allow-reset`\n- `allow-keys`\n- `allow-values`\n- `allow-entries`\n- `allow-length`\n- `allow-reload`\n- `allow-save`"
+        },
+        {
+          "description": "Enables the clear command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-clear",
+          "markdownDescription": "Enables the clear command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-delete",
+          "markdownDescription": "Enables the delete command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the entries command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-entries",
+          "markdownDescription": "Enables the entries command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-get",
+          "markdownDescription": "Enables the get command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the get_store command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-get-store",
+          "markdownDescription": "Enables the get_store command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the has command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-has",
+          "markdownDescription": "Enables the has command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the keys command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-keys",
+          "markdownDescription": "Enables the keys command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the length command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-length",
+          "markdownDescription": "Enables the length command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the load command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-load",
+          "markdownDescription": "Enables the load command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the reload command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-reload",
+          "markdownDescription": "Enables the reload command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the reset command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-reset",
+          "markdownDescription": "Enables the reset command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the save command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-save",
+          "markdownDescription": "Enables the save command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-set",
+          "markdownDescription": "Enables the set command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the values command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:allow-values",
+          "markdownDescription": "Enables the values command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the clear command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-clear",
+          "markdownDescription": "Denies the clear command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the delete command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-delete",
+          "markdownDescription": "Denies the delete command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the entries command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-entries",
+          "markdownDescription": "Denies the entries command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-get",
+          "markdownDescription": "Denies the get command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the get_store command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-get-store",
+          "markdownDescription": "Denies the get_store command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the has command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-has",
+          "markdownDescription": "Denies the has command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the keys command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-keys",
+          "markdownDescription": "Denies the keys command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the length command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-length",
+          "markdownDescription": "Denies the length command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the load command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-load",
+          "markdownDescription": "Denies the load command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the reload command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-reload",
+          "markdownDescription": "Denies the reload command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the reset command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-reset",
+          "markdownDescription": "Denies the reset command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the save command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-save",
+          "markdownDescription": "Denies the save command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-set",
+          "markdownDescription": "Denies the set command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the values command without any pre-configured scope.",
+          "type": "string",
+          "const": "store:deny-values",
+          "markdownDescription": "Denies the values command without any pre-configured scope."
         },
         {
           "description": "This permission set configures what kind of\noperations are available from the stronghold plugin.\n\n#### Granted Permissions\n\nAll non-destructive operations are enabled by default.\n\n\n#### This default permission set includes:\n\n- `allow-create-client`\n- `allow-get-store-record`\n- `allow-initialize`\n- `allow-execute-procedure`\n- `allow-load-client`\n- `allow-save-secret`\n- `allow-save-store-record`\n- `allow-save`",

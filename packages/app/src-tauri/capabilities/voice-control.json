@@ -10,7 +10,6 @@
 		"core:event:default",
 		"macos-permissions:default",
 		"clipboard-manager:default",
-		"clipboard-manager:allow-write-text",
-		"mic-recorder:default"
+		"clipboard-manager:allow-write-text"
 	]
 }

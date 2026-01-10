@@ -76,12 +76,12 @@ export default function TranscriptionCard(props: Props) {
 	};
 
 	return (
-		<div class="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
-			<p class="text-slate-700 text-sm leading-relaxed mb-3">
+		<div class="bg-white dark:bg-midnight-800 rounded-xl border border-slate-200 dark:border-midnight-700 p-4 hover:shadow-md dark:hover:shadow-midnight-900/50 transition-all">
+			<p class="text-slate-700 dark:text-slate-200 text-sm leading-relaxed mb-3">
 				{truncateText(props.transcription.text)}
 			</p>
 
-			<div class="flex items-center gap-4 text-xs text-slate-500 mb-3">
+			<div class="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-3">
 				<span title="Processing time">
 					{t("transcription.processing")} {formatProcessingTime(props.transcription.processingTimeMs)}
 				</span>
@@ -91,14 +91,14 @@ export default function TranscriptionCard(props: Props) {
 				<span class="ml-auto select-text">{formatDate(props.transcription.createdAt)}</span>
 			</div>
 
-			<div class="flex items-center gap-2 pt-3 border-t border-slate-100">
+			<div class="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-midnight-700">
 				<button
 					type="button"
 					onClick={handleCopy}
-					class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+					class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-midnight-700 rounded-lg transition-colors"
 				>
 					<Show when={copied()} fallback={<Copy class="w-4 h-4" />}>
-						<Check class="w-4 h-4 text-green-600" />
+						<Check class="w-4 h-4 text-green-600 dark:text-green-400" />
 					</Show>
 					<span>{copied() ? t("transcription.copied") : t("transcription.copy")}</span>
 				</button>
@@ -109,8 +109,8 @@ export default function TranscriptionCard(props: Props) {
 						onClick={() => handleRate("up")}
 						class={`p-1.5 rounded-lg transition-colors ${
 							rating() === "up"
-								? "text-green-600 bg-green-50"
-								: "text-slate-400 hover:text-green-600 hover:bg-green-50"
+								? "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20"
+								: "text-slate-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
 						}`}
 						title={t("transcription.goodTranscription")}
 					>
@@ -121,8 +121,8 @@ export default function TranscriptionCard(props: Props) {
 						onClick={() => handleRate("down")}
 						class={`p-1.5 rounded-lg transition-colors ${
 							rating() === "down"
-								? "text-red-600 bg-red-50"
-								: "text-slate-400 hover:text-red-600 hover:bg-red-50"
+								? "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20"
+								: "text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
 						}`}
 						title={t("transcription.poorTranscription")}
 					>
