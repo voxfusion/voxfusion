@@ -1,140 +1,112 @@
 ---
+import { useTranslations, defaultLang, languages } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
+
+const checkIconAccent = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="10" fill="var(--color-accent)" fill-opacity="0.15"/><path d="M6 10L9 13L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const checkIconPrimary = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/><path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 ---
 
 <section id="pricing" class="pricing">
 	<div class="container">
 		<div class="section-header">
-			<span class="section-tag">Pricing</span>
-			<h2 class="section-title">Start free, upgrade when you need more</h2>
-			<p class="section-description">No credit card required. Cancel anytime.</p>
+			<span class="section-tag">{t("pricing.tag")}</span>
+			<h2 class="section-title">{t("pricing.title")}</h2>
+			<p class="section-description">{t("pricing.description")}</p>
 		</div>
 
 		<div class="pricing-grid">
 			<div class="pricing-card">
 				<div class="pricing-header">
-					<span class="plan-name">Free</span>
+					<span class="plan-name">{t("pricing.free.name")}</span>
 					<div class="plan-price">
-						<span class="price-amount">$0</span>
-						<span class="price-period">forever</span>
+						<span class="price-amount">{t("pricing.free.price")}</span>
+						<span class="price-period">{t("pricing.free.period")}</span>
 					</div>
-					<p class="plan-description">Perfect for getting started with voice notes</p>
+					<p class="plan-description">{t("pricing.free.description")}</p>
 				</div>
 
 				<ul class="plan-features">
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-accent)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>5 hours of recording per month</span>
+						<Fragment set:html={checkIconAccent} />
+						<span>{t("pricing.free.feature1")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-accent)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Basic transcription</span>
+						<Fragment set:html={checkIconAccent} />
+						<span>{t("pricing.free.feature2")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-accent)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Full-text search</span>
+						<Fragment set:html={checkIconAccent} />
+						<span>{t("pricing.free.feature3")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-accent)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Local storage</span>
+						<Fragment set:html={checkIconAccent} />
+						<span>{t("pricing.free.feature4")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-accent)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Export to text</span>
+						<Fragment set:html={checkIconAccent} />
+						<span>{t("pricing.free.feature5")}</span>
 					</li>
 				</ul>
 
 				<a href="https://app.voxfusion.com" class="pricing-cta">
-					Get Started Free
+					{t("pricing.free.cta")}
 				</a>
 			</div>
 
 			<div class="pricing-card featured">
-				<div class="featured-badge">Most Popular</div>
+				<div class="featured-badge">{t("pricing.pro.badge")}</div>
 				<div class="pricing-header">
-					<span class="plan-name">Pro</span>
+					<span class="plan-name">{t("pricing.pro.name")}</span>
 					<div class="plan-price">
-						<span class="price-amount">$8</span>
-						<span class="price-period">per month</span>
+						<span class="price-amount">{t("pricing.pro.price")}</span>
+						<span class="price-period">{t("pricing.pro.period")}</span>
 					</div>
-					<p class="plan-description">For professionals who rely on voice daily</p>
+					<p class="plan-description">{t("pricing.pro.description")}</p>
 				</div>
 
 				<ul class="plan-features">
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span><strong>Unlimited</strong> recording</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span><strong>{t("pricing.pro.feature1")}</strong>{t("pricing.pro.feature1.suffix")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Premium transcription (99% accuracy)</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span>{t("pricing.pro.feature2")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Speaker identification</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span>{t("pricing.pro.feature3")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>AI summaries & action items</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span>{t("pricing.pro.feature4")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Cloud sync across devices</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span>{t("pricing.pro.feature5")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>50+ language support</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span>{t("pricing.pro.feature6")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Export to Notion, Obsidian, etc.</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span>{t("pricing.pro.feature7")}</span>
 					</li>
 					<li>
-						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
-							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-						</svg>
-						<span>Priority support</span>
+						<Fragment set:html={checkIconPrimary} />
+						<span>{t("pricing.pro.feature8")}</span>
 					</li>
 				</ul>
 
 				<a href="https://app.voxfusion.com" class="pricing-cta featured-cta">
-					Start 14-Day Free Trial
+					{t("pricing.pro.cta")}
 				</a>
 			</div>
 		</div>
@@ -145,7 +117,7 @@
 					<circle cx="10" cy="10" r="9" stroke="var(--color-text-muted)" stroke-width="1.5"/>
 					<path d="M10 14V10M10 6H10.01" stroke="var(--color-text-muted)" stroke-width="1.5" stroke-linecap="round"/>
 				</svg>
-				<span>Questions? Email us at <a href="mailto:hello@voxfusion.com">hello@voxfusion.com</a> - we respond within 24 hours.</span>
+				<span>{t("pricing.faq")} <a href="mailto:hello@voxfusion.com">hello@voxfusion.com</a> {t("pricing.faq.suffix")}</span>
 			</p>
 		</div>
 	</div>

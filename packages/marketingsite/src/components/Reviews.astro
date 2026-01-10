@@ -1,4 +1,13 @@
 ---
+import { useTranslations, defaultLang, languages } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
+
 const reviews = [
 	{
 		name: "Sarah Chen",
@@ -60,9 +69,9 @@ const reviews = [
 <section id="reviews" class="reviews">
 	<div class="container">
 		<div class="section-header">
-			<span class="section-tag">Reviews</span>
-			<h2 class="section-title">Loved by people who talk for a living</h2>
-			<p class="section-description">Join thousands of professionals who've transformed how they capture ideas.</p>
+			<span class="section-tag">{t("reviews.tag")}</span>
+			<h2 class="section-title">{t("reviews.title")}</h2>
+			<p class="section-description">{t("reviews.description")}</p>
 		</div>
 
 		<div class="reviews-grid">

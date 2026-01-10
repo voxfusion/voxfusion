@@ -1,12 +1,20 @@
 ---
+import { useTranslations, defaultLang, languages } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
 ---
 
 <section id="demo" class="demo">
 	<div class="container">
 		<div class="section-header">
-			<span class="section-tag">Demo</span>
-			<h2 class="section-title">See VoxFusion in action</h2>
-			<p class="section-description">Watch how easy it is to record, transcribe, and search your voice notes.</p>
+			<span class="section-tag">{t("demo.tag")}</span>
+			<h2 class="section-title">{t("demo.title")}</h2>
+			<p class="section-description">{t("demo.description")}</p>
 		</div>
 
 		<div class="demo-video-container">
@@ -69,7 +77,7 @@
 				</div>
 				<div class="video-info">
 					<span class="video-duration">2:34</span>
-					<span class="video-label">Product Demo</span>
+					<span class="video-label">{t("demo.videoLabel")}</span>
 				</div>
 			</div>
 
@@ -77,22 +85,22 @@
 				<div class="demo-feature">
 					<div class="demo-feature-number">01</div>
 					<div class="demo-feature-content">
-						<h4>Start Recording</h4>
-						<p>Click once to start capturing audio from any source - your mic or system audio.</p>
+						<h4>{t("demo.step1.title")}</h4>
+						<p>{t("demo.step1.description")}</p>
 					</div>
 				</div>
 				<div class="demo-feature">
 					<div class="demo-feature-number">02</div>
 					<div class="demo-feature-content">
-						<h4>Instant Transcription</h4>
-						<p>Watch as your words appear in real-time with speaker identification.</p>
+						<h4>{t("demo.step2.title")}</h4>
+						<p>{t("demo.step2.description")}</p>
 					</div>
 				</div>
 				<div class="demo-feature">
 					<div class="demo-feature-number">03</div>
 					<div class="demo-feature-content">
-						<h4>Search Everything</h4>
-						<p>Type any phrase to jump directly to that moment in your recording.</p>
+						<h4>{t("demo.step3.title")}</h4>
+						<p>{t("demo.step3.description")}</p>
 					</div>
 				</div>
 			</div>
