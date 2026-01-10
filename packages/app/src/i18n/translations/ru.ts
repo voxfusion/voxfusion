@@ -49,6 +49,8 @@ export const ru: Translations = {
 			"Используйте Command+; чтобы начать запись и создать первую транскрипцию",
 		tryAgain: "Попробовать снова",
 		noMore: "Больше нет транскрипций",
+		today: "Сегодня",
+		yesterday: "Вчера",
 	},
 	sidebar: {
 		home: "Главная",
