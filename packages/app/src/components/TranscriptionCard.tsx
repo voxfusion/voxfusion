@@ -54,15 +54,15 @@ export default function TranscriptionCard(props: Props) {
 
 	return (
 		<div
-			class="group relative p-3 hover:bg-slate-50 transition-colors"
+			class="group relative p-3 hover:bg-slate-50 dark:hover:bg-midnight-800 transition-colors"
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
 		>
-			<p class="text-slate-700 text-sm leading-relaxed mb-2">
+			<p class="text-slate-700 dark:text-slate-200 text-sm leading-relaxed mb-2">
 				{truncateText(props.transcription.text)}
 			</p>
 
-			<div class="flex items-center gap-3 text-xs text-slate-400">
+			<div class="flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
 				<span>{formatTime(props.transcription.createdAt)}</span>
 				<span>{formatDuration(props.transcription.audioDurationMs)}</span>
 				<span>{formatProcessingTime(props.transcription.processingTimeMs)}</span>
@@ -72,11 +72,11 @@ export default function TranscriptionCard(props: Props) {
 				<button
 					type="button"
 					onClick={handleCopy}
-					class="absolute top-2 right-2 p-1.5 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors shadow-sm"
+					class="absolute top-2 right-2 p-1.5 rounded-md bg-white dark:bg-midnight-700 border border-slate-200 dark:border-midnight-600 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-midnight-600 transition-colors shadow-sm"
 					title={copied() ? t("transcription.copied") : t("transcription.copy")}
 				>
 					<Show when={copied()} fallback={<Copy class="w-3.5 h-3.5" />}>
-						<Check class="w-3.5 h-3.5 text-green-600" />
+						<Check class="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
 					</Show>
 				</button>
 			</Show>

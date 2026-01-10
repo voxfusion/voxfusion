@@ -1,16 +1,21 @@
-import { onMount, type ParentProps, Show } from "solid-js";
+import { createSignal, onMount, type ParentProps, Show } from "solid-js";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { useStore } from "@nanostores/solid";
 import { authClient } from "./lib/authClient";
+import { initSettings } from "./lib/settingsStore";
 import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
+import SettingsModal from "./components/SettingsModal";
 
 function App(props: ParentProps) {
 	const session = useStore(authClient.useSession);
+	const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
 	console.log("session", session());
 
 	onMount(async () => {
+		// Initialize settings from store
+		await initSettings();
 		const windowWidth = 140;
 		const windowHeight = 40;
 		const bottomPadding = 0;
@@ -40,7 +45,7 @@ function App(props: ParentProps) {
 	});
 
 	return (
-		<div class="relative min-h-screen h-full w-full bg-slate-100">
+		<div class="relative min-h-screen h-full w-full bg-slate-100 dark:bg-midnight-900 transition-colors">
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 			<Show when={session()?.isPending}>
 				<div class="h-full flex flex-col items-center justify-center">
@@ -60,9 +65,10 @@ function App(props: ParentProps) {
 					}
 				>
 					<div class="flex h-full">
-						<Sidebar />
+						<Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
 						<main class="flex-1 overflow-auto pt-6">{props.children}</main>
 					</div>
+					<SettingsModal isOpen={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
 				</Show>
 			</Show>
 		</div>

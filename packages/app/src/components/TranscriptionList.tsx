@@ -159,17 +159,17 @@ export default function TranscriptionList() {
 		<div class="space-y-6">
 			<Show when={initialLoading()}>
 				<div class="flex items-center justify-center py-12">
-					<Loader class="w-6 h-6 animate-spin text-slate-400" />
+					<Loader class="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
 				</div>
 			</Show>
 
 			<Show when={error()}>
 				<div class="text-center py-8">
-					<p class="text-red-500 mb-2">{error()}</p>
+					<p class="text-red-500 dark:text-red-400 mb-2">{error()}</p>
 					<button
 						type="button"
 						onClick={() => fetchTranscriptions()}
-						class="text-sm text-blue-500 hover:underline"
+						class="text-sm text-blue-500 dark:text-blue-400 hover:underline"
 					>
 						{t("transcriptionList.tryAgain")}
 					</button>
@@ -178,8 +178,8 @@ export default function TranscriptionList() {
 
 			<Show when={!initialLoading() && !error() && transcriptions().length === 0}>
 				<div class="text-center py-12">
-					<p class="text-slate-500 text-lg mb-2">{t("transcriptionList.noTranscriptions")}</p>
-					<p class="text-slate-400 text-sm">{t("transcriptionList.useCommandToRecord")}</p>
+					<p class="text-slate-500 dark:text-slate-400 text-lg mb-2">{t("transcriptionList.noTranscriptions")}</p>
+					<p class="text-slate-400 dark:text-slate-500 text-sm">{t("transcriptionList.useCommandToRecord")}</p>
 				</div>
 			</Show>
 
@@ -201,12 +201,12 @@ export default function TranscriptionList() {
 
 				<Show when={loading() && transcriptions().length > 0}>
 					<div class="flex items-center justify-center py-4">
-						<Loader class="w-5 h-5 animate-spin text-slate-400" />
+						<Loader class="w-5 h-5 animate-spin text-slate-400 dark:text-slate-500" />
 					</div>
 				</Show>
 
 				<Show when={!hasMore() && transcriptions().length > 0}>
-					<p class="text-center text-slate-400 text-sm py-4">{t("transcriptionList.noMore")}</p>
+					<p class="text-center text-slate-400 dark:text-slate-500 text-sm py-4">{t("transcriptionList.noMore")}</p>
 				</Show>
 			</Show>
 		</div>
