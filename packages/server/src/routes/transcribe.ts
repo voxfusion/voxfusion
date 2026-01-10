@@ -1,11 +1,11 @@
-import { Elysia, status, t } from "elysia";
-import { and, desc, eq, lt } from "drizzle-orm";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { groq } from "../providers/groq";
+import { and, desc, eq, lt } from "drizzle-orm";
+import { Elysia, status, t } from "elysia";
+import { auth } from "../auth";
 import { db } from "../providers/db";
 import { transcriptions } from "../providers/db/schema";
-import { auth } from "../auth";
+import { groq } from "../providers/groq";
 async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	const tempFile = join(tmpdir(), `audio-${crypto.randomUUID()}.webm`);
 	try {
@@ -157,11 +157,19 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			const { cursor, limit } = ctx.query;
 			const pageSize = Math.min(limit ?? 20, 50);
 
-			const whereCondition = cursor
-				? and(
-						eq(transcriptions.userId, session.user.id),
-						lt(transcriptions.createdAt, new Date(cursor))
-					)
+			let cursorDate: Date | null = null;
+			if (cursor) {
+				// Strip surrounding quotes if present (handles double-stringified values)
+				const cleanCursor = cursor.replace(/^"|"$/g, "");
+				cursorDate = new Date(cleanCursor);
+				if (Number.isNaN(cursorDate.getTime())) {
+					console.error("Invalid cursor received:", cursor, typeof cursor);
+					return status(400, { error: `Invalid cursor date format: ${cursor}` });
+				}
+			}
+
+			const whereCondition = cursorDate
+				? and(eq(transcriptions.userId, session.user.id), lt(transcriptions.createdAt, cursorDate))
 				: eq(transcriptions.userId, session.user.id);
 
 			const results = await db

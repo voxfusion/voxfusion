@@ -3,91 +3,272 @@
 
 <header class="hero">
 	<nav class="nav">
-		<div class="logo">
-			<span class="logo-icon">◆</span>
-			<span class="logo-text">VoxFusion</span>
+		<div class="container nav-container">
+			<a href="/" class="logo">
+				<div class="logo-icon">
+					<svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+						<rect width="32" height="32" rx="8" fill="url(#logo-gradient)"/>
+						<path d="M10 16C10 16 12 12 16 12C20 12 22 16 22 16C22 16 20 20 16 20C12 20 10 16 10 16Z" stroke="white" stroke-width="2" stroke-linecap="round"/>
+						<circle cx="16" cy="16" r="2" fill="white"/>
+						<defs>
+							<linearGradient id="logo-gradient" x1="0" y1="0" x2="32" y2="32">
+								<stop stop-color="#FF6B4A"/>
+								<stop offset="1" stop-color="#FF8C69"/>
+							</linearGradient>
+						</defs>
+					</svg>
+				</div>
+				<span class="logo-text">VoxFusion</span>
+			</a>
+
+			<div class="nav-links">
+				<a href="#features">Features</a>
+				<a href="#demo">Demo</a>
+				<a href="#pricing">Pricing</a>
+				<a href="#reviews">Reviews</a>
+			</div>
+
+			<div class="nav-actions">
+				<a href="https://app.voxfusion.com" class="btn btn-ghost">Sign In</a>
+				<a href="https://app.voxfusion.com" class="btn btn-primary">Try Free</a>
+			</div>
+
+			<button class="mobile-menu-btn" aria-label="Toggle menu">
+				<span></span>
+				<span></span>
+				<span></span>
+			</button>
 		</div>
-		<div class="nav-links">
-			<a href="#features">Features</a>
-			<a href="#pricing">Pricing</a>
-			<a href="#about">About</a>
-		</div>
-		<a href="#download" class="btn btn-primary">Download</a>
 	</nav>
 
-	<div class="hero-content">
-		<div class="badge">✨ Now in Public Beta</div>
-		<h1 class="hero-title">
-			Transform Your
-			<span class="gradient-text">Voice Experience</span>
-		</h1>
-		<p class="hero-subtitle">
-			Powerful voice processing and analysis tools that help you create, 
-			communicate, and connect like never before.
-		</p>
-		<div class="hero-actions">
-			<a href="#download" class="btn btn-primary btn-lg">
-				<span>Get Started Free</span>
-				<span class="arrow">→</span>
-			</a>
-			<a href="#demo" class="btn btn-ghost btn-lg">Watch Demo</a>
+	<div class="container hero-content">
+		<div class="hero-badge">
+			<span class="badge-dot"></span>
+			<span>Now with real-time transcription</span>
 		</div>
 
-		<div class="hero-visual">
-			<div class="wave-container">
-				<div class="wave"></div>
-				<div class="wave wave-2"></div>
-				<div class="wave wave-3"></div>
+		<h1 class="hero-title">
+			Speak it. Search it.
+			<span class="hero-title-highlight">Never lose a thought.</span>
+		</h1>
+
+		<p class="hero-subtitle">
+			VoxFusion turns your voice into searchable, organized notes in seconds.
+			Record meetings, brainstorms, and ideas - then find anything with a simple search.
+		</p>
+
+		<div class="hero-cta">
+			<a href="https://app.voxfusion.com" class="btn btn-primary btn-lg">
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+					<path d="M10 3V17M10 17L4 11M10 17L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+				<span>Download for Mac</span>
+			</a>
+			<a href="#demo" class="btn btn-outline btn-lg">
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+					<circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+					<path d="M8 7L13 10L8 13V7Z" fill="currentColor"/>
+				</svg>
+				<span>Watch Demo</span>
+			</a>
+		</div>
+
+		<div class="hero-stats">
+			<div class="stat">
+				<span class="stat-value">50K+</span>
+				<span class="stat-label">Active Users</span>
+			</div>
+			<div class="stat-divider"></div>
+			<div class="stat">
+				<span class="stat-value">2M+</span>
+				<span class="stat-label">Hours Recorded</span>
+			</div>
+			<div class="stat-divider"></div>
+			<div class="stat">
+				<span class="stat-value">4.9</span>
+				<span class="stat-label">App Store Rating</span>
 			</div>
 		</div>
+	</div>
+
+	<div class="hero-visual">
+		<svg class="waveform-svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+			<defs>
+				<linearGradient id="hero-wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+					<stop offset="0%" stop-color="#FF6B4A" stop-opacity="0"/>
+					<stop offset="20%" stop-color="#FF6B4A" stop-opacity="0.4"/>
+					<stop offset="50%" stop-color="#FF8C69" stop-opacity="0.6"/>
+					<stop offset="80%" stop-color="#FF6B4A" stop-opacity="0.4"/>
+					<stop offset="100%" stop-color="#FF6B4A" stop-opacity="0"/>
+				</linearGradient>
+			</defs>
+			<path class="wave-line wave-1" stroke="url(#hero-wave-gradient)" fill="none" stroke-width="3">
+				<animate
+					attributeName="d"
+					dur="3s"
+					repeatCount="indefinite"
+					values="
+						M0,60 Q100,30 200,60 T400,60 T600,60 T800,60 T1000,60 T1200,60;
+						M0,60 Q100,90 200,60 T400,60 T600,60 T800,60 T1000,60 T1200,60;
+						M0,60 Q100,30 200,60 T400,60 T600,60 T800,60 T1000,60 T1200,60
+					"
+				/>
+			</path>
+			<path class="wave-line wave-2" stroke="url(#hero-wave-gradient)" fill="none" stroke-width="2" opacity="0.5">
+				<animate
+					attributeName="d"
+					dur="4s"
+					repeatCount="indefinite"
+					values="
+						M0,60 Q150,40 300,60 T600,60 T900,60 T1200,60;
+						M0,60 Q150,80 300,60 T600,60 T900,60 T1200,60;
+						M0,60 Q150,40 300,60 T600,60 T900,60 T1200,60
+					"
+				/>
+			</path>
+			<path class="wave-line wave-3" stroke="url(#hero-wave-gradient)" fill="none" stroke-width="1.5" opacity="0.3">
+				<animate
+					attributeName="d"
+					dur="5s"
+					repeatCount="indefinite"
+					values="
+						M0,60 Q200,50 400,60 T800,60 T1200,60;
+						M0,60 Q200,70 400,60 T800,60 T1200,60;
+						M0,60 Q200,50 400,60 T800,60 T1200,60
+					"
+				/>
+			</path>
+		</svg>
+		<div class="hero-glow"></div>
 	</div>
 </header>
 
 <style>
 	.hero {
 		min-height: 100vh;
-		padding: 1.5rem 2rem;
+		position: relative;
 		display: flex;
 		flex-direction: column;
+		overflow: hidden;
 	}
 
 	.nav {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		z-index: 100;
+		padding: 16px 0;
+		background: rgba(10, 22, 40, 0.8);
+		backdrop-filter: blur(20px);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.nav-container {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		max-width: 1200px;
-		width: 100%;
-		margin: 0 auto;
 	}
 
 	.logo {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		font-weight: 700;
-		font-size: 1.5rem;
+		gap: 12px;
 	}
 
-	.logo-icon {
-		background: var(--gradient-primary);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
+	.logo-text {
+		font-weight: 700;
+		font-size: 20px;
+		letter-spacing: -0.02em;
 	}
 
 	.nav-links {
 		display: flex;
-		gap: 2.5rem;
+		align-items: center;
+		gap: 40px;
 	}
 
 	.nav-links a {
-		color: var(--color-text-muted);
+		font-size: 15px;
 		font-weight: 500;
-		transition: color 0.2s;
+		color: var(--color-text-secondary);
+		transition: color 0.2s ease;
 	}
 
 	.nav-links a:hover {
 		color: var(--color-text);
+	}
+
+	.nav-actions {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.mobile-menu-btn {
+		display: none;
+		flex-direction: column;
+		gap: 5px;
+		padding: 8px;
+		background: none;
+	}
+
+	.mobile-menu-btn span {
+		width: 24px;
+		height: 2px;
+		background: var(--color-text);
+		border-radius: 2px;
+		transition: all 0.2s;
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 10px 20px;
+		border-radius: 10px;
+		font-size: 15px;
+		font-weight: 600;
+		transition: all 0.2s ease;
+	}
+
+	.btn-primary {
+		background: var(--color-primary);
+		color: white;
+	}
+
+	.btn-primary:hover {
+		background: var(--color-primary-dark);
+		transform: translateY(-1px);
+		box-shadow: 0 8px 24px rgba(255, 107, 74, 0.3);
+	}
+
+	.btn-ghost {
+		background: transparent;
+		color: var(--color-text-secondary);
+	}
+
+	.btn-ghost:hover {
+		color: var(--color-text);
+		background: var(--color-bg-card);
+	}
+
+	.btn-outline {
+		background: transparent;
+		border: 1.5px solid var(--color-border-hover);
+		color: var(--color-text);
+	}
+
+	.btn-outline:hover {
+		border-color: var(--color-primary);
+		background: rgba(255, 107, 74, 0.05);
+	}
+
+	.btn-lg {
+		padding: 14px 28px;
+		font-size: 16px;
+		border-radius: 12px;
 	}
 
 	.hero-content {
@@ -97,148 +278,171 @@
 		align-items: center;
 		justify-content: center;
 		text-align: center;
-		max-width: 900px;
-		margin: 0 auto;
-		padding: 4rem 0;
+		padding: 140px 24px 100px;
+		position: relative;
+		z-index: 2;
 	}
 
-	.badge {
-		background: var(--color-bg-elevated);
-		border: 1px solid rgba(124, 58, 237, 0.3);
-		padding: 0.5rem 1.25rem;
+	.hero-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		padding: 8px 16px;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
 		border-radius: 100px;
-		font-size: 0.875rem;
+		font-size: 14px;
 		font-weight: 500;
-		color: var(--color-primary-light);
-		margin-bottom: 2rem;
+		color: var(--color-text-secondary);
+		margin-bottom: 32px;
+	}
+
+	.badge-dot {
+		width: 8px;
+		height: 8px;
+		background: var(--color-primary);
+		border-radius: 50%;
+		animation: pulse 2s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 1; transform: scale(1); }
+		50% { opacity: 0.6; transform: scale(1.2); }
 	}
 
 	.hero-title {
-		font-size: clamp(2.5rem, 8vw, 5rem);
+		font-size: clamp(40px, 7vw, 72px);
 		font-weight: 800;
 		line-height: 1.1;
-		letter-spacing: -0.02em;
-		margin-bottom: 1.5rem;
+		letter-spacing: -0.03em;
+		margin-bottom: 24px;
+		max-width: 900px;
 	}
 
-	.gradient-text {
-		background: var(--gradient-primary);
+	.hero-title-highlight {
+		display: block;
+		background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 50%, var(--color-accent-light) 100%);
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 		background-clip: text;
 	}
 
 	.hero-subtitle {
-		font-size: 1.25rem;
-		color: var(--color-text-muted);
-		max-width: 600px;
+		font-size: 18px;
 		line-height: 1.7;
-		margin-bottom: 2.5rem;
+		color: var(--color-text-secondary);
+		max-width: 600px;
+		margin-bottom: 40px;
 	}
 
-	.hero-actions {
+	.hero-cta {
 		display: flex;
-		gap: 1rem;
+		align-items: center;
+		gap: 16px;
+		margin-bottom: 64px;
 		flex-wrap: wrap;
 		justify-content: center;
 	}
 
-	.btn {
-		display: inline-flex;
+	.hero-stats {
+		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1.5rem;
-		border-radius: 12px;
-		font-weight: 600;
-		transition: all 0.2s;
-		border: none;
-		cursor: pointer;
+		gap: 40px;
 	}
 
-	.btn-primary {
-		background: var(--gradient-primary);
-		color: white;
+	.stat {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
 	}
 
-	.btn-primary:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 8px 30px rgba(124, 58, 237, 0.4);
-	}
-
-	.btn-ghost {
-		background: transparent;
-		border: 1px solid rgba(255, 255, 255, 0.15);
+	.stat-value {
+		font-size: 28px;
+		font-weight: 700;
 		color: var(--color-text);
 	}
 
-	.btn-ghost:hover {
-		background: rgba(255, 255, 255, 0.05);
-		border-color: rgba(255, 255, 255, 0.25);
+	.stat-label {
+		font-size: 14px;
+		color: var(--color-text-muted);
 	}
 
-	.btn-lg {
-		padding: 1rem 2rem;
-		font-size: 1.1rem;
-	}
-
-	.arrow {
-		transition: transform 0.2s;
-	}
-
-	.btn:hover .arrow {
-		transform: translateX(4px);
+	.stat-divider {
+		width: 1px;
+		height: 40px;
+		background: var(--color-border);
 	}
 
 	.hero-visual {
-		margin-top: 4rem;
-		width: 100%;
-		max-width: 700px;
-	}
-
-	.wave-container {
-		position: relative;
-		height: 120px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.wave {
 		position: absolute;
+		bottom: 20px;
+		left: 0;
+		right: 0;
+		height: 120px;
+		pointer-events: none;
+	}
+
+	.waveform-svg {
 		width: 100%;
-		height: 4px;
-		background: var(--gradient-primary);
-		border-radius: 100px;
-		animation: wave 2s ease-in-out infinite;
+		height: 100%;
 	}
 
-	.wave-2 {
-		opacity: 0.6;
-		animation-delay: 0.3s;
+	.hero-glow {
+		position: absolute;
+		bottom: -50px;
+		left: 50%;
+		transform: translateX(-50%);
+		width: 600px;
+		height: 200px;
+		background: radial-gradient(ellipse at center, rgba(255, 107, 74, 0.12) 0%, transparent 70%);
+		pointer-events: none;
 	}
 
-	.wave-3 {
-		opacity: 0.3;
-		animation-delay: 0.6s;
-	}
-
-	@keyframes wave {
-		0%, 100% {
-			transform: scaleY(1);
-		}
-		50% {
-			transform: scaleY(8);
-		}
-	}
-
-	@media (max-width: 768px) {
+	@media (max-width: 900px) {
 		.nav-links {
 			display: none;
 		}
-		
-		.hero {
-			padding: 1rem;
+
+		.nav-actions {
+			display: none;
+		}
+
+		.mobile-menu-btn {
+			display: flex;
+		}
+
+		.hero-stats {
+			flex-direction: column;
+			gap: 24px;
+		}
+
+		.stat-divider {
+			width: 60px;
+			height: 1px;
+		}
+	}
+
+	@media (max-width: 600px) {
+		.hero-content {
+			padding: 120px 16px 80px;
+		}
+
+		.hero-subtitle {
+			font-size: 16px;
+		}
+
+		.hero-cta {
+			flex-direction: column;
+			width: 100%;
+		}
+
+		.hero-cta .btn {
+			width: 100%;
+		}
+
+		.hero-visual {
+			height: 80px;
 		}
 	}
 </style>
-
