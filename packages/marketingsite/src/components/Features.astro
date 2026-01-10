@@ -1,82 +1,76 @@
 ---
-const features = [
-	{
-		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`,
-		title: "Instant Recording",
-		description: "One-click recording that captures your voice with studio-quality clarity. Works offline, syncs when connected."
-	},
-	{
-		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
-		title: "Smart Search",
-		description: "Find any moment by searching what was said. Our AI understands context, not just keywords."
-	},
-	{
-		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>`,
-		title: "Auto Transcription",
-		description: "Real-time transcription powered by Whisper. 99% accuracy in 50+ languages."
-	},
-	{
-		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>`,
-		title: "Local-First Privacy",
-		description: "Your recordings stay on your device. No cloud uploads unless you choose to sync."
-	},
-	{
-		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
-		title: "AI Summaries",
-		description: "Get instant summaries, action items, and key points from any recording."
-	},
-	{
-		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/></svg>`,
-		title: "Smart Organization",
-		description: "Auto-tagging and folders keep your recordings organized without any effort."
-	}
+import { useTranslations, defaultLang, languages } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
+
+const featureIcons = [
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`,
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>`,
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>`,
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/></svg>`
 ];
+
+const featureKeys = [
+	{ title: "features.instantRecording.title", description: "features.instantRecording.description" },
+	{ title: "features.smartSearch.title", description: "features.smartSearch.description" },
+	{ title: "features.autoTranscription.title", description: "features.autoTranscription.description" },
+	{ title: "features.privacy.title", description: "features.privacy.description" },
+	{ title: "features.aiSummaries.title", description: "features.aiSummaries.description" },
+	{ title: "features.organization.title", description: "features.organization.description" }
+] as const;
 ---
 
 <section id="features" class="features">
 	<div class="container">
 		<div class="section-header">
-			<span class="section-tag">Features</span>
-			<h2 class="section-title">Everything you need to capture, find, and organize your voice</h2>
-			<p class="section-description">Built for professionals who think faster than they type.</p>
+			<span class="section-tag">{t("features.tag")}</span>
+			<h2 class="section-title">{t("features.title")}</h2>
+			<p class="section-description">{t("features.description")}</p>
 		</div>
 
 		<div class="features-grid">
-			{features.map((feature) => (
+			{featureKeys.map((feature, index) => (
 				<div class="feature-card">
-					<div class="feature-icon" set:html={feature.icon}></div>
-					<h3 class="feature-title">{feature.title}</h3>
-					<p class="feature-description">{feature.description}</p>
+					<div class="feature-icon" set:html={featureIcons[index]}></div>
+					<h3 class="feature-title">{t(feature.title)}</h3>
+					<p class="feature-description">{t(feature.description)}</p>
 				</div>
 			))}
 		</div>
 
 		<div class="features-highlight">
 			<div class="highlight-content">
-				<span class="highlight-tag">Why VoxFusion?</span>
-				<h3 class="highlight-title">Record a 60-minute meeting. Find any quote in 3 seconds.</h3>
-				<p class="highlight-description">Traditional note-taking is broken. You're either writing and missing what's said, or listening and forgetting later. VoxFusion captures everything and makes it instantly searchable.</p>
+				<span class="highlight-tag">{t("features.highlight.tag")}</span>
+				<h3 class="highlight-title">{t("features.highlight.title")}</h3>
+				<p class="highlight-description">{t("features.highlight.description")}</p>
 				<ul class="highlight-list">
 					<li>
 						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
 							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 						</svg>
-						<span>Works with any meeting app - Zoom, Meet, Teams</span>
+						<span>{t("features.highlight.list1")}</span>
 					</li>
 					<li>
 						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
 							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 						</svg>
-						<span>Identifies different speakers automatically</span>
+						<span>{t("features.highlight.list2")}</span>
 					</li>
 					<li>
 						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
 							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 						</svg>
-						<span>Export to Notion, Obsidian, or plain text</span>
+						<span>{t("features.highlight.list3")}</span>
 					</li>
 				</ul>
 			</div>
