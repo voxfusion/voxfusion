@@ -1,37 +1,64 @@
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { invoke } from "@tauri-apps/api/core";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import { createSignal, For, onMount, onCleanup, Show } from "solid-js";
-import {
-	startRecording as nativeStartRecording,
-	stopRecording as nativeStopRecording,
-} from "tauri-plugin-mic-recorder-api";
 import eden from "../lib/eden";
+import { loadSettings } from "../lib/settingsStore";
 
 export default function VoiceControl() {
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [loading, setLoading] = createSignal(false);
-
-	const shortcut = "Command+;";
+	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
+	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
 	let isStopping = false;
 	let isStarting = false;
 
-	onMount(async () => {
+	const handleShortcut = (evt: { state: string }) => {
+		if (evt.state !== "Pressed") return;
+		console.log("shortcut pressed");
+
+		if (isStarting || isStopping) return;
+		if (isRecording()) {
+			stopRecording();
+		} else {
+			startRecording();
+		}
+	};
+
+	const registerShortcut = async (shortcut: string) => {
+		const current = currentShortcut();
+		if (current) {
+			try {
+				await unregister(current);
+			} catch {}
+		}
+
 		try {
 			await unregister(shortcut);
 		} catch {}
 
-		await register(shortcut, (evt) => {
-			if (evt.state !== "Pressed") return;
-			console.log("shortcut pressed");
+		await register(shortcut, handleShortcut);
+		setCurrentShortcut(shortcut);
+	};
 
-			if (isStarting || isStopping) return;
-			if (isRecording()) {
-				stopRecording();
-			} else {
-				startRecording();
+	onMount(async () => {
+		// Load settings and register the initial shortcut
+		const settings = await loadSettings();
+		await registerShortcut(settings.hotkey);
+		setSelectedMicrophone(settings.selectedMicrophoneId);
+
+		// Listen for settings changes from the main window
+		const unlisten = await listen("settings-changed", async () => {
+			const newSettings = await loadSettings();
+			if (newSettings.hotkey !== currentShortcut()) {
+				await registerShortcut(newSettings.hotkey);
 			}
+			setSelectedMicrophone(newSettings.selectedMicrophoneId);
+		});
+
+		onCleanup(() => {
+			unlisten();
 		});
 	});
 
@@ -39,7 +66,10 @@ export default function VoiceControl() {
 		if (isRecording()) {
 			await stopRecording();
 		}
-		await unregister(shortcut);
+		const current = currentShortcut();
+		if (current) {
+			await unregister(current);
+		}
 	});
 
 	const stopRecording = async () => {
@@ -50,7 +80,7 @@ export default function VoiceControl() {
 		setIsRecording(false);
 
 		try {
-			const filePath = await nativeStopRecording();
+			const filePath = await invoke<string>("stop_recording_with_device");
 
 			setLoading(true);
 
@@ -85,7 +115,10 @@ export default function VoiceControl() {
 			if (isStopping || isStarting) return;
 			isStarting = true;
 
-			await nativeStartRecording();
+			const deviceName = selectedMicrophone();
+			await invoke("start_recording_with_device", {
+				deviceName: deviceName === "default" ? null : deviceName,
+			});
 			setIsRecording(true);
 			isStarting = false;
 		} catch (err) {

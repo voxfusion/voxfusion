@@ -1,21 +1,12 @@
+mod handlers;
+
 use argon2::{Algorithm, Argon2, Params, Version};
-use enigo::{Enigo, Keyboard, Settings};
 use tauri::Manager;
-use std::fs;
 
-#[tauri::command]
-fn type_text(text: String) -> Result<(), String> {
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
-
-    enigo.text(&text).map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn read_audio_file(path: String) -> Result<Vec<u8>, String> {
-    fs::read(&path).map_err(|e| format!("Failed to read audio file: {}", e))
-}
+use handlers::{
+    list_audio_devices, read_audio_file, start_recording_with_device, stop_recording_with_device,
+    type_text,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -38,13 +29,19 @@ pub fn run() {
             })
             .build(),
         )
-        .invoke_handler(tauri::generate_handler![type_text, read_audio_file])
+        .invoke_handler(tauri::generate_handler![
+            type_text,
+            read_audio_file,
+            list_audio_devices,
+            start_recording_with_device,
+            stop_recording_with_device
+        ])
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_keychain::init())
-        .plugin(tauri_plugin_mic_recorder::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             {
@@ -71,7 +68,8 @@ pub fn run() {
         })
         .setup(|app| {
             #[cfg(desktop)]
-            app.handle()
+            let _ = app
+                .handle()
                 .plugin(tauri_plugin_global_shortcut::Builder::new().build());
             Ok(())
         })
