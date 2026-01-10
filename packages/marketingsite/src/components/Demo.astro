@@ -1,0 +1,292 @@
+---
+---
+
+<section id="demo" class="demo">
+	<div class="container">
+		<div class="section-header">
+			<span class="section-tag">Demo</span>
+			<h2 class="section-title">See VoxFusion in action</h2>
+			<p class="section-description">Watch how easy it is to record, transcribe, and search your voice notes.</p>
+		</div>
+
+		<div class="demo-video-container">
+			<div class="demo-video">
+				<div class="video-placeholder">
+					<button class="play-button" aria-label="Play demo video">
+						<svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+							<path d="M12 8L24 16L12 24V8Z" fill="currentColor"/>
+						</svg>
+					</button>
+					<div class="video-overlay">
+						<svg class="waveform-preview" viewBox="0 0 400 80" preserveAspectRatio="none">
+							<defs>
+								<linearGradient id="demo-wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+									<stop offset="0%" stop-color="#FF6B4A" stop-opacity="0"/>
+									<stop offset="20%" stop-color="#FF6B4A" stop-opacity="0.5"/>
+									<stop offset="50%" stop-color="#FF8C69" stop-opacity="0.7"/>
+									<stop offset="80%" stop-color="#FF6B4A" stop-opacity="0.5"/>
+									<stop offset="100%" stop-color="#FF6B4A" stop-opacity="0"/>
+								</linearGradient>
+							</defs>
+							<path stroke="url(#demo-wave-gradient)" fill="none" stroke-width="3">
+								<animate
+									attributeName="d"
+									dur="2s"
+									repeatCount="indefinite"
+									values="
+										M0,40 Q40,20 80,40 T160,40 T240,40 T320,40 T400,40;
+										M0,40 Q40,60 80,40 T160,40 T240,40 T320,40 T400,40;
+										M0,40 Q40,20 80,40 T160,40 T240,40 T320,40 T400,40
+									"
+								/>
+							</path>
+							<path stroke="url(#demo-wave-gradient)" fill="none" stroke-width="2" opacity="0.5">
+								<animate
+									attributeName="d"
+									dur="2.5s"
+									repeatCount="indefinite"
+									values="
+										M0,40 Q60,25 120,40 T240,40 T360,40 T400,40;
+										M0,40 Q60,55 120,40 T240,40 T360,40 T400,40;
+										M0,40 Q60,25 120,40 T240,40 T360,40 T400,40
+									"
+								/>
+							</path>
+							<path stroke="url(#demo-wave-gradient)" fill="none" stroke-width="1.5" opacity="0.3">
+								<animate
+									attributeName="d"
+									dur="3s"
+									repeatCount="indefinite"
+									values="
+										M0,40 Q80,30 160,40 T320,40 T400,40;
+										M0,40 Q80,50 160,40 T320,40 T400,40;
+										M0,40 Q80,30 160,40 T320,40 T400,40
+									"
+								/>
+							</path>
+						</svg>
+					</div>
+				</div>
+				<div class="video-info">
+					<span class="video-duration">2:34</span>
+					<span class="video-label">Product Demo</span>
+				</div>
+			</div>
+
+			<div class="demo-features">
+				<div class="demo-feature">
+					<div class="demo-feature-number">01</div>
+					<div class="demo-feature-content">
+						<h4>Start Recording</h4>
+						<p>Click once to start capturing audio from any source - your mic or system audio.</p>
+					</div>
+				</div>
+				<div class="demo-feature">
+					<div class="demo-feature-number">02</div>
+					<div class="demo-feature-content">
+						<h4>Instant Transcription</h4>
+						<p>Watch as your words appear in real-time with speaker identification.</p>
+					</div>
+				</div>
+				<div class="demo-feature">
+					<div class="demo-feature-number">03</div>
+					<div class="demo-feature-content">
+						<h4>Search Everything</h4>
+						<p>Type any phrase to jump directly to that moment in your recording.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.demo {
+		padding: 120px 0;
+		background: var(--color-bg);
+	}
+
+	.section-header {
+		text-align: center;
+		margin-bottom: 64px;
+	}
+
+	.section-tag {
+		display: inline-block;
+		padding: 6px 14px;
+		background: rgba(255, 107, 74, 0.1);
+		border: 1px solid rgba(255, 107, 74, 0.2);
+		border-radius: 100px;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--color-primary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 20px;
+	}
+
+	.section-title {
+		font-size: clamp(28px, 4vw, 44px);
+		font-weight: 800;
+		line-height: 1.2;
+		letter-spacing: -0.02em;
+		margin-bottom: 16px;
+	}
+
+	.section-description {
+		font-size: 18px;
+		color: var(--color-text-secondary);
+		max-width: 500px;
+		margin: 0 auto;
+	}
+
+	.demo-video-container {
+		display: grid;
+		grid-template-columns: 2fr 1fr;
+		gap: 48px;
+		align-items: start;
+	}
+
+	.demo-video {
+		position: relative;
+		border-radius: 20px;
+		overflow: hidden;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+	}
+
+	.video-placeholder {
+		aspect-ratio: 16 / 9;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+		background: linear-gradient(135deg, var(--color-bg-secondary) 0%, var(--color-bg-card) 100%);
+		cursor: pointer;
+	}
+
+	.video-overlay {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 40px;
+	}
+
+	.waveform-preview {
+		width: 100%;
+		height: 80px;
+	}
+
+	.play-button {
+		position: relative;
+		z-index: 2;
+		width: 80px;
+		height: 80px;
+		border-radius: 50%;
+		background: var(--color-primary);
+		color: white;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.3s ease;
+		box-shadow: 0 8px 32px rgba(255, 107, 74, 0.4);
+	}
+
+	.play-button:hover {
+		transform: scale(1.1);
+		box-shadow: 0 12px 40px rgba(255, 107, 74, 0.5);
+	}
+
+	.play-button svg {
+		margin-left: 4px;
+	}
+
+	.video-info {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 16px 20px;
+		border-top: 1px solid var(--color-border);
+	}
+
+	.video-duration {
+		font-size: 14px;
+		font-weight: 600;
+		color: var(--color-primary);
+	}
+
+	.video-label {
+		font-size: 14px;
+		color: var(--color-text-secondary);
+	}
+
+	.demo-features {
+		display: flex;
+		flex-direction: column;
+		gap: 24px;
+	}
+
+	.demo-feature {
+		display: flex;
+		gap: 20px;
+		padding: 24px;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 16px;
+		transition: all 0.3s ease;
+	}
+
+	.demo-feature:hover {
+		border-color: var(--color-border-hover);
+		transform: translateX(4px);
+	}
+
+	.demo-feature-number {
+		font-size: 14px;
+		font-weight: 700;
+		color: var(--color-primary);
+		flex-shrink: 0;
+	}
+
+	.demo-feature-content h4 {
+		font-size: 16px;
+		font-weight: 700;
+		margin-bottom: 8px;
+		letter-spacing: -0.01em;
+	}
+
+	.demo-feature-content p {
+		font-size: 14px;
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+	}
+
+	@media (max-width: 1024px) {
+		.demo-video-container {
+			grid-template-columns: 1fr;
+			gap: 40px;
+		}
+
+		.demo-features {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 16px;
+		}
+	}
+
+	@media (max-width: 768px) {
+		.demo {
+			padding: 80px 0;
+		}
+
+		.demo-features {
+			grid-template-columns: 1fr;
+		}
+
+		.section-description {
+			font-size: 16px;
+		}
+	}
+</style>
