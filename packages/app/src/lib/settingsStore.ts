@@ -56,6 +56,12 @@ export async function loadSettings(): Promise<Settings> {
 export async function saveTheme(theme: Theme): Promise<void> {
 	const store = await getStore();
 	await store.set("theme", theme);
+	// Also save to localStorage for immediate access on page load (prevents white flash)
+	try {
+		localStorage.setItem("voxfusion-theme", theme);
+	} catch (e) {
+		// Ignore localStorage errors
+	}
 }
 
 export async function saveHotkey(hotkey: string): Promise<void> {
@@ -103,6 +109,12 @@ export async function initSettings(): Promise<void> {
 	const loaded = await loadSettings();
 	setSettingsInternal(loaded);
 	applyTheme(loaded.theme);
+	// Sync theme to localStorage for immediate access on next page load
+	try {
+		localStorage.setItem("voxfusion-theme", loaded.theme);
+	} catch (e) {
+		// Ignore localStorage errors
+	}
 }
 
 export async function updateTheme(theme: Theme): Promise<void> {
@@ -125,7 +137,10 @@ export async function updateMicrophone(microphoneId: string | null): Promise<voi
 	await emit("settings-changed");
 }
 
-export async function updateLanguage(language: Locale, setLocale: (locale: Locale) => void): Promise<void> {
+export async function updateLanguage(
+	language: Locale,
+	setLocale: (locale: Locale) => void
+): Promise<void> {
 	await saveLanguage(language);
 	setSettingsInternal((prev) => ({ ...prev, language }));
 	setLocale(language);
