@@ -1,16 +1,20 @@
 ---
+import { useTranslations, defaultLang, languages } from "../i18n/utils";
+
 interface Props {
 	title: string;
+	lang?: keyof typeof languages;
 }
 
-const { title } = Astro.props;
+const { title, lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={lang}>
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="VoxFusion - Capture your voice, free your mind. The fastest way to turn speech into searchable notes." />
+		<meta name="description" content={t("meta.description")} />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />

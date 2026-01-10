@@ -1,4 +1,13 @@
 ---
+import LanguageSwitcher from "./LanguageSwitcher.astro";
+import { useTranslations, defaultLang, languages } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
 ---
 
 <header class="hero">
@@ -22,15 +31,16 @@
 			</a>
 
 			<div class="nav-links">
-				<a href="#features">Features</a>
-				<a href="#demo">Demo</a>
-				<a href="#pricing">Pricing</a>
-				<a href="#reviews">Reviews</a>
+				<a href="#features">{t("nav.features")}</a>
+				<a href="#demo">{t("nav.demo")}</a>
+				<a href="#pricing">{t("nav.pricing")}</a>
+				<a href="#reviews">{t("nav.reviews")}</a>
 			</div>
 
 			<div class="nav-actions">
-				<a href="https://app.voxfusion.com" class="btn btn-ghost">Sign In</a>
-				<a href="https://app.voxfusion.com" class="btn btn-primary">Try Free</a>
+				<LanguageSwitcher currentLang={lang} />
+				<a href="https://app.voxfusion.com" class="btn btn-ghost">{t("nav.signIn")}</a>
+				<a href="https://app.voxfusion.com" class="btn btn-primary">{t("nav.tryFree")}</a>
 			</div>
 
 			<button class="mobile-menu-btn" aria-label="Toggle menu">
@@ -44,17 +54,16 @@
 	<div class="container hero-content">
 		<div class="hero-badge">
 			<span class="badge-dot"></span>
-			<span>Now with real-time transcription</span>
+			<span>{t("hero.badge")}</span>
 		</div>
 
 		<h1 class="hero-title">
-			Speak it. Search it.
-			<span class="hero-title-highlight">Never lose a thought.</span>
+			{t("hero.title.line1")}
+			<span class="hero-title-highlight">{t("hero.title.line2")}</span>
 		</h1>
 
 		<p class="hero-subtitle">
-			VoxFusion turns your voice into searchable, organized notes in seconds.
-			Record meetings, brainstorms, and ideas - then find anything with a simple search.
+			{t("hero.subtitle")}
 		</p>
 
 		<div class="hero-cta">
@@ -62,31 +71,31 @@
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 					<path d="M10 3V17M10 17L4 11M10 17L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 				</svg>
-				<span>Download for Mac</span>
+				<span>{t("hero.cta.download")}</span>
 			</a>
 			<a href="#demo" class="btn btn-outline btn-lg">
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 					<circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
 					<path d="M8 7L13 10L8 13V7Z" fill="currentColor"/>
 				</svg>
-				<span>Watch Demo</span>
+				<span>{t("hero.cta.watchDemo")}</span>
 			</a>
 		</div>
 
 		<div class="hero-stats">
 			<div class="stat">
 				<span class="stat-value">50K+</span>
-				<span class="stat-label">Active Users</span>
+				<span class="stat-label">{t("hero.stats.users")}</span>
 			</div>
 			<div class="stat-divider"></div>
 			<div class="stat">
 				<span class="stat-value">2M+</span>
-				<span class="stat-label">Hours Recorded</span>
+				<span class="stat-label">{t("hero.stats.hours")}</span>
 			</div>
 			<div class="stat-divider"></div>
 			<div class="stat">
 				<span class="stat-value">4.9</span>
-				<span class="stat-label">App Store Rating</span>
+				<span class="stat-label">{t("hero.stats.rating")}</span>
 			</div>
 		</div>
 	</div>
