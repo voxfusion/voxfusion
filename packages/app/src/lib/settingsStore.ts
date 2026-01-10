@@ -10,6 +10,7 @@ export interface Settings {
 	hotkey: string;
 	selectedMicrophoneId: string | null;
 	language: Locale;
+	onboardingComplete: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: Settings = {
 	hotkey: "Command+;",
 	selectedMicrophoneId: null,
 	language: "en",
+	onboardingComplete: false,
 };
 
 const STORE_NAME = "settings.json";
@@ -31,6 +33,7 @@ async function getStore() {
 				hotkey: DEFAULT_SETTINGS.hotkey,
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
+				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
 			},
 			autoSave: 500,
 		});
@@ -44,12 +47,14 @@ export async function loadSettings(): Promise<Settings> {
 	const hotkey = await store.get<string>("hotkey");
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
+	const onboardingComplete = await store.get<boolean>("onboardingComplete");
 
 	return {
 		theme: theme ?? DEFAULT_SETTINGS.theme,
 		hotkey: hotkey ?? DEFAULT_SETTINGS.hotkey,
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
+		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
 	};
 }
 
@@ -165,4 +170,16 @@ if (typeof window !== "undefined") {
 			applyTheme("system");
 		}
 	});
+}
+
+export async function markOnboardingComplete(): Promise<void> {
+	const store = await getStore();
+	await store.set("onboardingComplete", true);
+	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: true }));
+}
+
+export async function resetOnboarding(): Promise<void> {
+	const store = await getStore();
+	await store.set("onboardingComplete", false);
+	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: false }));
 }

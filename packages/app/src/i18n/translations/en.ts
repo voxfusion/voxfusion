@@ -80,6 +80,26 @@ export type Translations = {
 		emptyStateDescription: string;
 		wordCount: string;
 	};
+	onboarding: {
+		step: string;
+		of: string;
+		next: string;
+		back: string;
+		getStarted: string;
+		microphoneTitle: string;
+		microphoneDescription: string;
+		selectMicrophone: string;
+		refreshDevices: string;
+		hotkeyTitle: string;
+		hotkeyDescription: string;
+		currentHotkey: string;
+		recordHotkey: string;
+		pressKeys: string;
+		languageTitle: string;
+		languageDescription: string;
+		completionTitle: string;
+		completionDescription: string;
+	};
 };
 
 export const en: Translations = {
@@ -167,5 +187,27 @@ export const en: Translations = {
 		emptyStateDescription:
 			"Add words to improve transcription accuracy for specialized terms, names, or phrases you use often.",
 		wordCount: "{count} words",
+	},
+	onboarding: {
+		step: "Step",
+		of: "of",
+		next: "Next",
+		back: "Back",
+		getStarted: "Get Started",
+		microphoneTitle: "Select Your Microphone",
+		microphoneDescription:
+			"Choose which microphone VoxFusion should use for voice recording. You can change this later in Settings.",
+		selectMicrophone: "Select microphone",
+		refreshDevices: "Refresh devices",
+		hotkeyTitle: "Set Your Hotkey",
+		hotkeyDescription:
+			"This keyboard shortcut will start and stop voice recording from anywhere on your Mac.",
+		currentHotkey: "Current hotkey",
+		recordHotkey: "Record New Hotkey",
+		pressKeys: "Press your desired key combination...",
+		languageTitle: "Choose Your Language",
+		languageDescription: "Select your preferred language for the interface.",
+		completionTitle: "You're All Set!",
+		completionDescription: "VoxFusion is ready to help you with voice transcription.",
 	},
 };
