@@ -1,143 +1,398 @@
 ---
 const features = [
 	{
-		icon: "🎙️",
-		title: "Voice Processing",
-		description:
-			"Advanced real-time voice processing with crystal-clear quality and minimal latency.",
+		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`,
+		title: "Instant Recording",
+		description: "One-click recording that captures your voice with studio-quality clarity. Works offline, syncs when connected."
 	},
 	{
-		icon: "🧠",
-		title: "AI Analysis",
-		description: "Intelligent voice analysis powered by cutting-edge machine learning algorithms.",
+		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
+		title: "Smart Search",
+		description: "Find any moment by searching what was said. Our AI understands context, not just keywords."
 	},
 	{
-		icon: "🔒",
-		title: "Privacy First",
-		description:
-			"Your voice data stays on your device. We never store or transmit your recordings.",
+		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>`,
+		title: "Auto Transcription",
+		description: "Real-time transcription powered by Whisper. 99% accuracy in 50+ languages."
 	},
 	{
-		icon: "⚡",
-		title: "Lightning Fast",
-		description: "Native desktop performance with sub-millisecond processing times.",
+		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>`,
+		title: "Local-First Privacy",
+		description: "Your recordings stay on your device. No cloud uploads unless you choose to sync."
 	},
 	{
-		icon: "🎨",
-		title: "Customizable",
-		description: "Fully customizable voice profiles and processing pipelines to match your needs.",
+		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
+		title: "AI Summaries",
+		description: "Get instant summaries, action items, and key points from any recording."
 	},
 	{
-		icon: "🔗",
-		title: "Integrations",
-		description: "Seamlessly integrate with your favorite apps and workflows.",
-	},
+		icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/></svg>`,
+		title: "Smart Organization",
+		description: "Auto-tagging and folders keep your recordings organized without any effort."
+	}
 ];
 ---
 
 <section id="features" class="features">
 	<div class="container">
 		<div class="section-header">
-			<span class="section-label">Features</span>
-			<h2 class="section-title">Everything you need for <span class="gradient-text">voice excellence</span></h2>
-			<p class="section-subtitle">Powerful tools designed for professionals and enthusiasts alike.</p>
+			<span class="section-tag">Features</span>
+			<h2 class="section-title">Everything you need to capture, find, and organize your voice</h2>
+			<p class="section-description">Built for professionals who think faster than they type.</p>
 		</div>
 
 		<div class="features-grid">
 			{features.map((feature) => (
 				<div class="feature-card">
-					<div class="feature-icon">{feature.icon}</div>
+					<div class="feature-icon" set:html={feature.icon}></div>
 					<h3 class="feature-title">{feature.title}</h3>
 					<p class="feature-description">{feature.description}</p>
 				</div>
 			))}
+		</div>
+
+		<div class="features-highlight">
+			<div class="highlight-content">
+				<span class="highlight-tag">Why VoxFusion?</span>
+				<h3 class="highlight-title">Record a 60-minute meeting. Find any quote in 3 seconds.</h3>
+				<p class="highlight-description">Traditional note-taking is broken. You're either writing and missing what's said, or listening and forgetting later. VoxFusion captures everything and makes it instantly searchable.</p>
+				<ul class="highlight-list">
+					<li>
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
+							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+						<span>Works with any meeting app - Zoom, Meet, Teams</span>
+					</li>
+					<li>
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
+							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+						<span>Identifies different speakers automatically</span>
+					</li>
+					<li>
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+							<circle cx="10" cy="10" r="10" fill="var(--color-primary)" fill-opacity="0.15"/>
+							<path d="M6 10L9 13L14 7" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+						<span>Export to Notion, Obsidian, or plain text</span>
+					</li>
+				</ul>
+			</div>
+			<div class="highlight-visual">
+				<div class="mock-window">
+					<div class="mock-header">
+						<div class="mock-dots">
+							<span></span>
+							<span></span>
+							<span></span>
+						</div>
+						<span class="mock-title">VoxFusion</span>
+					</div>
+					<div class="mock-content">
+						<div class="mock-search">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+							<span>budget discussion Q4</span>
+						</div>
+						<div class="mock-results">
+							<div class="mock-result">
+								<span class="mock-time">14:32</span>
+								<span class="mock-text">"...the Q4 budget needs to account for the new..."</span>
+							</div>
+							<div class="mock-result active">
+								<span class="mock-time">18:45</span>
+								<span class="mock-text">"...we agreed on $50K for the Q4 marketing budget..."</span>
+							</div>
+							<div class="mock-result">
+								<span class="mock-time">23:12</span>
+								<span class="mock-text">"...Sarah will finalize the budget by Friday..."</span>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
 </section>
 
 <style>
 	.features {
-		padding: 8rem 2rem;
-	}
-
-	.container {
-		max-width: 1200px;
-		margin: 0 auto;
+		padding: 120px 0;
+		background: var(--color-bg-secondary);
 	}
 
 	.section-header {
 		text-align: center;
-		margin-bottom: 4rem;
+		margin-bottom: 64px;
 	}
 
-	.section-label {
+	.section-tag {
 		display: inline-block;
-		background: var(--gradient-primary);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
+		padding: 6px 14px;
+		background: rgba(255, 107, 74, 0.1);
+		border: 1px solid rgba(255, 107, 74, 0.2);
+		border-radius: 100px;
+		font-size: 13px;
 		font-weight: 600;
-		font-size: 0.875rem;
+		color: var(--color-primary);
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		margin-bottom: 1rem;
+		letter-spacing: 0.05em;
+		margin-bottom: 20px;
 	}
 
 	.section-title {
-		font-size: clamp(2rem, 5vw, 3rem);
+		font-size: clamp(28px, 4vw, 44px);
 		font-weight: 800;
 		line-height: 1.2;
-		margin-bottom: 1rem;
+		letter-spacing: -0.02em;
+		margin-bottom: 16px;
+		max-width: 700px;
+		margin-left: auto;
+		margin-right: auto;
 	}
 
-	.gradient-text {
-		background: var(--gradient-primary);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
-	}
-
-	.section-subtitle {
-		font-size: 1.125rem;
-		color: var(--color-text-muted);
+	.section-description {
+		font-size: 18px;
+		color: var(--color-text-secondary);
 		max-width: 500px;
 		margin: 0 auto;
 	}
 
 	.features-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-		gap: 1.5rem;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 24px;
+		margin-bottom: 80px;
 	}
 
 	.feature-card {
-		background: var(--color-bg-elevated);
-		border: 1px solid rgba(255, 255, 255, 0.06);
-		border-radius: 20px;
-		padding: 2rem;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 16px;
+		padding: 32px;
 		transition: all 0.3s ease;
 	}
 
 	.feature-card:hover {
+		border-color: var(--color-border-hover);
 		transform: translateY(-4px);
-		border-color: rgba(124, 58, 237, 0.3);
-		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+		box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 	}
 
 	.feature-icon {
-		font-size: 2.5rem;
-		margin-bottom: 1rem;
+		width: 48px;
+		height: 48px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255, 107, 74, 0.1);
+		border-radius: 12px;
+		color: var(--color-primary);
+		margin-bottom: 20px;
 	}
 
 	.feature-title {
-		font-size: 1.25rem;
+		font-size: 18px;
 		font-weight: 700;
-		margin-bottom: 0.75rem;
+		margin-bottom: 12px;
+		letter-spacing: -0.01em;
 	}
 
 	.feature-description {
-		color: var(--color-text-muted);
+		font-size: 15px;
 		line-height: 1.6;
+		color: var(--color-text-secondary);
+	}
+
+	.features-highlight {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 64px;
+		align-items: center;
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 24px;
+		padding: 64px;
+	}
+
+	.highlight-tag {
+		display: inline-block;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--color-primary);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		margin-bottom: 16px;
+	}
+
+	.highlight-title {
+		font-size: clamp(24px, 3vw, 32px);
+		font-weight: 800;
+		line-height: 1.2;
+		letter-spacing: -0.02em;
+		margin-bottom: 16px;
+	}
+
+	.highlight-description {
+		font-size: 16px;
+		line-height: 1.7;
+		color: var(--color-text-secondary);
+		margin-bottom: 24px;
+	}
+
+	.highlight-list {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.highlight-list li {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		font-size: 15px;
+		color: var(--color-text-secondary);
+	}
+
+	.highlight-list svg {
+		flex-shrink: 0;
+	}
+
+	.highlight-visual {
+		display: flex;
+		justify-content: center;
+	}
+
+	.mock-window {
+		width: 100%;
+		max-width: 400px;
+		background: var(--color-bg);
+		border-radius: 12px;
+		overflow: hidden;
+		border: 1px solid var(--color-border);
+		box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+	}
+
+	.mock-header {
+		display: flex;
+		align-items: center;
+		gap: 16px;
+		padding: 12px 16px;
+		background: var(--color-bg-secondary);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.mock-dots {
+		display: flex;
+		gap: 6px;
+	}
+
+	.mock-dots span {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		background: var(--color-border-hover);
+	}
+
+	.mock-dots span:first-child {
+		background: #ff5f57;
+	}
+
+	.mock-dots span:nth-child(2) {
+		background: #ffbd2e;
+	}
+
+	.mock-dots span:last-child {
+		background: #28ca42;
+	}
+
+	.mock-title {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--color-text-muted);
+	}
+
+	.mock-content {
+		padding: 16px;
+	}
+
+	.mock-search {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 10px 14px;
+		background: var(--color-bg-secondary);
+		border-radius: 8px;
+		margin-bottom: 16px;
+		color: var(--color-text-secondary);
+		font-size: 14px;
+	}
+
+	.mock-results {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.mock-result {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		padding: 12px;
+		background: var(--color-bg-secondary);
+		border-radius: 8px;
+		font-size: 13px;
+	}
+
+	.mock-result.active {
+		background: rgba(255, 107, 74, 0.1);
+		border: 1px solid rgba(255, 107, 74, 0.2);
+	}
+
+	.mock-time {
+		font-weight: 600;
+		color: var(--color-primary);
+		flex-shrink: 0;
+	}
+
+	.mock-text {
+		color: var(--color-text-secondary);
+		line-height: 1.4;
+	}
+
+	.mock-result.active .mock-text {
+		color: var(--color-text);
+	}
+
+	@media (max-width: 1024px) {
+		.features-grid {
+			grid-template-columns: repeat(2, 1fr);
+		}
+
+		.features-highlight {
+			grid-template-columns: 1fr;
+			gap: 48px;
+			padding: 40px;
+		}
+	}
+
+	@media (max-width: 768px) {
+		.features {
+			padding: 80px 0;
+		}
+
+		.features-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.features-highlight {
+			padding: 32px;
+		}
+
+		.section-description {
+			font-size: 16px;
+		}
 	}
 </style>
-

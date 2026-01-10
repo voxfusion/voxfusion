@@ -10,12 +10,12 @@ const { title } = Astro.props;
 <html lang="en">
 	<head>
 		<meta charset="UTF-8" />
-		<meta name="description" content="VoxFusion - Transform your voice experience with cutting-edge technology" />
+		<meta name="description" content="VoxFusion - Capture your voice, free your mind. The fastest way to turn speech into searchable notes." />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 	</head>
@@ -26,14 +26,19 @@ const { title } = Astro.props;
 
 <style is:global>
 	:root {
-		--color-bg: #0a0a0f;
-		--color-bg-elevated: #12121a;
-		--color-primary: #7c3aed;
-		--color-primary-light: #a78bfa;
-		--color-accent: #f472b6;
-		--color-text: #f8fafc;
-		--color-text-muted: #94a3b8;
-		--gradient-primary: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+		--color-bg: #0A1628;
+		--color-bg-secondary: #0F1E32;
+		--color-bg-card: #142337;
+		--color-primary: #FF6B4A;
+		--color-primary-light: #FF8C69;
+		--color-primary-dark: #E55A3A;
+		--color-accent: #14919B;
+		--color-accent-light: #1DB9C3;
+		--color-text: #F8F9FA;
+		--color-text-secondary: #A3B1C6;
+		--color-text-muted: #6B7D95;
+		--color-border: rgba(163, 177, 198, 0.1);
+		--color-border-hover: rgba(163, 177, 198, 0.2);
 	}
 
 	* {
@@ -43,18 +48,18 @@ const { title } = Astro.props;
 	}
 
 	html {
-		font-family: "Outfit", system-ui, sans-serif;
+		font-family: "Inter", system-ui, -apple-system, sans-serif;
 		background: var(--color-bg);
 		color: var(--color-text);
 		scroll-behavior: smooth;
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
 	}
 
 	body {
 		min-height: 100vh;
-		background: 
-			radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 58, 237, 0.15), transparent),
-			radial-gradient(ellipse 60% 40% at 80% 60%, rgba(244, 114, 182, 0.08), transparent),
-			var(--color-bg);
+		background: var(--color-bg);
+		overflow-x: hidden;
 	}
 
 	a {
@@ -64,6 +69,19 @@ const { title } = Astro.props;
 
 	button {
 		font-family: inherit;
+		border: none;
+		cursor: pointer;
+	}
+
+	.container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	@media (max-width: 768px) {
+		.container {
+			padding: 0 16px;
+		}
 	}
 </style>
-

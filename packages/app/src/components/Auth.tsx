@@ -39,7 +39,7 @@ function Auth() {
 				<button
 					type="button"
 					onClick={handleGoogleLogin}
-					class="group flex items-center gap-3 px-6 py-3.5 bg-white border-2 border-slate-200 rounded-xl hover:border-blue-500 hover:shadow-lg hover:shadow-blue-100 transition-all duration-200 cursor-pointer"
+					class="group flex items-center gap-3 px-6 py-3.5 bg-white border-2 border-slate-200 rounded-xl hover:border-primary-500 hover:shadow-lg hover:shadow-primary-100 transition-all duration-200 cursor-pointer"
 				>
 					<svg
 						class="w-5 h-5"
@@ -65,7 +65,7 @@ function Auth() {
 							fill="#EA4335"
 						/>
 					</svg>
-					<span class="text-slate-700 font-medium group-hover:text-blue-600 transition-colors">
+					<span class="text-slate-700 font-medium group-hover:text-primary-600 transition-colors">
 						{t("auth.continueWithGoogle")}
 					</span>
 				</button>
@@ -80,12 +80,12 @@ function Auth() {
 							value={devToken()}
 							onInput={(e) => setDevToken(e.currentTarget.value)}
 							placeholder={t("auth.pasteTokenPlaceholder")}
-							class="px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-blue-500 transition-colors text-sm font-mono"
+							class="px-4 py-2.5 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-primary-500 transition-colors text-sm font-mono"
 						/>
 						<button
 							type="button"
 							onClick={handleDevTokenSubmit}
-							class="px-4 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors text-sm font-medium"
+							class="px-4 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors text-sm font-medium"
 						>
 							{t("auth.authenticate")}
 						</button>
