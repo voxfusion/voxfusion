@@ -37,10 +37,10 @@ impl RecordingState {
 static RECORDING_STATE: LazyLock<Arc<Mutex<RecordingState>>> =
     LazyLock::new(|| Arc::new(Mutex::new(RecordingState::new())));
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Default)]
 pub struct AudioDevice {
-    name: String,
-    is_default: bool,
+    pub name: String,
+    pub is_default: bool,
 }
 
 #[tauri::command]
