@@ -47,6 +47,14 @@ function App(props: ParentProps) {
 	return (
 		<div class="relative min-h-screen h-full w-full bg-slate-100 dark:bg-midnight-900 transition-colors">
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
+			<Show when={session()?.isPending}>
+				<div class="h-full flex flex-col items-center justify-center">
+					<div class="w-16 h-16 bg-slate-300 rounded-2xl mb-8" />
+					<div class="w-48 h-1 bg-slate-200 rounded-full overflow-hidden">
+						<div class="w-1/4 h-full bg-slate-400 rounded-full animate-slide" />
+					</div>
+				</div>
+			</Show>
 			<Show when={!session()?.isPending}>
 				<Show
 					when={session()?.data?.user}

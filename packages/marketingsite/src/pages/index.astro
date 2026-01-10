@@ -7,14 +7,18 @@ import Reviews from "../components/Reviews.astro";
 import Pricing from "../components/Pricing.astro";
 import CTA from "../components/CTA.astro";
 import Footer from "../components/Footer.astro";
+import { useTranslations, defaultLang } from "../i18n/utils";
+
+const lang = defaultLang;
+const t = useTranslations(lang);
 ---
 
-<Layout title="VoxFusion - Speak it. Search it. Never lose a thought.">
-	<Hero />
-	<Features />
-	<Demo />
-	<Reviews />
-	<Pricing />
-	<CTA />
-	<Footer />
+<Layout title={t("meta.title")} lang={lang}>
+	<Hero lang={lang} />
+	<Features lang={lang} />
+	<Demo lang={lang} />
+	<Reviews lang={lang} />
+	<Pricing lang={lang} />
+	<CTA lang={lang} />
+	<Footer lang={lang} />
 </Layout>

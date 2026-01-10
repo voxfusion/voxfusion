@@ -2,6 +2,7 @@ import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
 import { transcribeRoutes } from "./routes/transcribe";
 import { deeplinkRoutes } from "./routes/deeplink";
+import { dictionaryRoutes } from "./routes/dictionary";
 import { BunAdapter } from "elysia/adapter/bun";
 import { auth } from "./auth";
 
@@ -14,6 +15,7 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 	)
 	.mount(auth.handler)
 	.use(transcribeRoutes)
+	.use(dictionaryRoutes)
 	.use(deeplinkRoutes)
 	.get("/", () => ({
 		name: "VoxFusion API",
