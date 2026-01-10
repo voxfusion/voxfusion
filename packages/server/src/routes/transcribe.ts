@@ -4,7 +4,7 @@ import { and, desc, eq, lt } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import { auth } from "../auth";
 import { db } from "../providers/db";
-import { transcriptions } from "../providers/db/schema";
+import { dictionaryWords, transcriptions } from "../providers/db/schema";
 import { groq } from "../providers/groq";
 async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	const tempFile = join(tmpdir(), `audio-${crypto.randomUUID()}.webm`);
@@ -66,8 +66,25 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 		"/",
 		async (ctx) => {
 			const file = ctx.body.file;
+			const session = (ctx as any).session as Session;
 			try {
 				const fileBuffer = await file.arrayBuffer();
+
+				// Fetch user's dictionary words
+				const userWords = await db
+					.select({ word: dictionaryWords.word })
+					.from(dictionaryWords)
+					.where(eq(dictionaryWords.userId, session.user.id))
+					.orderBy(desc(dictionaryWords.updatedAt))
+					.limit(50);
+
+				// Build dynamic prompt with dictionary words
+				let prompt =
+					"The user is also speaking Russian language. You should mix up these languages in transcription.";
+				if (userWords.length > 0) {
+					const wordList = userWords.map((w) => w.word).join(", ");
+					prompt += ` Specialized terms: ${wordList}.`;
+				}
 
 				const startTime = performance.now();
 
@@ -76,8 +93,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					file: new File([fileBuffer], "recording.webm", {
 						type: "audio/webm",
 					}),
-					prompt:
-						"The user is also speaking Russian language. You should mix up these languages in transcription.",
+					prompt,
 					language: "ru",
 				});
 
