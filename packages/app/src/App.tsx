@@ -1,4 +1,4 @@
-import { createSignal, onMount, type ParentProps, Show } from "solid-js";
+import { createSignal, onCleanup, onMount, type ParentProps, Show } from "solid-js";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { useStore } from "@nanostores/solid";
@@ -16,6 +16,16 @@ function App(props: ParentProps) {
 	onMount(async () => {
 		// Initialize settings from store
 		await initSettings();
+
+		// Register Cmd+, shortcut to open settings
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.metaKey && e.key === ",") {
+				e.preventDefault();
+				setIsSettingsOpen(true);
+			}
+		};
+		window.addEventListener("keydown", handleKeyDown);
+		onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
 		const windowWidth = 140;
 		const windowHeight = 40;
 		const bottomPadding = 0;
