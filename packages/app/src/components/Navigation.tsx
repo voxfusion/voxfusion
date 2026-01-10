@@ -26,7 +26,7 @@ export default function Sidebar() {
 					href="/"
 					class={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
 						isActive("/")
-							? "bg-blue-50 text-blue-700"
+							? "bg-primary-50 text-primary-700"
 							: "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
 					}`}
 				>
@@ -37,7 +37,7 @@ export default function Sidebar() {
 					href="/dictionary"
 					class={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
 						isActive("/dictionary")
-							? "bg-blue-50 text-blue-700"
+							? "bg-primary-50 text-primary-700"
 							: "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
 					}`}
 				>
