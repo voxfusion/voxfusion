@@ -86,4 +86,26 @@ export const ru: Translations = {
 			"Добавьте слова для улучшения точности транскрипции специальных терминов, имён или часто используемых фраз.",
 		wordCount: "{count} слов",
 	},
+	onboarding: {
+		step: "Шаг",
+		of: "из",
+		next: "Далее",
+		back: "Назад",
+		getStarted: "Начать",
+		microphoneTitle: "Выберите микрофон",
+		microphoneDescription:
+			"Выберите микрофон, который VoxFusion будет использовать для записи голоса. Вы можете изменить это позже в Настройках.",
+		selectMicrophone: "Выберите микрофон",
+		refreshDevices: "Обновить устройства",
+		hotkeyTitle: "Настройте горячую клавишу",
+		hotkeyDescription:
+			"Эта комбинация клавиш будет запускать и останавливать запись голоса из любого места на вашем Mac.",
+		currentHotkey: "Текущая горячая клавиша",
+		recordHotkey: "Записать новую клавишу",
+		pressKeys: "Нажмите желаемую комбинацию клавиш...",
+		languageTitle: "Выберите язык",
+		languageDescription: "Выберите предпочитаемый язык интерфейса.",
+		completionTitle: "Всё готово!",
+		completionDescription: "VoxFusion готов помочь вам с транскрипцией голоса.",
+	},
 };

@@ -3,15 +3,25 @@ import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { useStore } from "@nanostores/solid";
 import { authClient } from "./lib/authClient";
-import { initSettings } from "./lib/settingsStore";
+import { initSettings, useSettings, markOnboardingComplete } from "./lib/settingsStore";
 import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
+import OnboardingWizard from "./components/onboarding/OnboardingWizard";
+
+const FORCE_SHOW_ONBOARDING =
+	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
 
 function App(props: ParentProps) {
 	const session = useStore(authClient.useSession);
+	const settings = useSettings();
 	const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
 	console.log("session", session());
+
+	const shouldShowOnboarding = () => {
+		if (FORCE_SHOW_ONBOARDING) return true;
+		return !settings().onboardingComplete;
+	};
 
 	onMount(async () => {
 		// Initialize settings from store
@@ -74,11 +84,16 @@ function App(props: ParentProps) {
 						</div>
 					}
 				>
-					<div class="flex h-full">
-						<Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
-						<main class="flex-1 overflow-auto pt-6">{props.children}</main>
-					</div>
-					<SettingsModal isOpen={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
+					<Show
+						when={!shouldShowOnboarding()}
+						fallback={<OnboardingWizard onComplete={() => markOnboardingComplete()} />}
+					>
+						<div class="flex h-full">
+							<Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
+							<main class="flex-1 overflow-auto pt-6">{props.children}</main>
+						</div>
+						<SettingsModal isOpen={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
+					</Show>
 				</Show>
 			</Show>
 		</div>
