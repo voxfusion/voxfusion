@@ -6,7 +6,7 @@ export default function About() {
 	return (
 		<div class="min-h-screen flex items-center justify-center">
 			<div class="text-center space-y-8 max-w-2xl px-4">
-				<h1 class="text-5xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+				<h1 class="text-5xl font-bold bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent">
 					{t("about.title")}
 				</h1>
 				<div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 space-y-4">
