@@ -1,9 +1,9 @@
-import { createSignal, For, Show, onMount, onCleanup } from "solid-js";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { type UnlistenFn, listen } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
-import TranscriptionCard from "./TranscriptionCard";
-import eden from "../lib/eden";
+import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
+import eden from "../lib/eden";
+import TranscriptionCard from "./TranscriptionCard";
 
 type Transcription = {
 	id: string;
@@ -27,7 +27,7 @@ export default function TranscriptionList() {
 	const [hasMore, setHasMore] = createSignal(true);
 	const [error, setError] = createSignal<string | null>(null);
 
-	let sentinelRef: HTMLDivElement | undefined;
+	const [sentinelRef, setSentinelRef] = createSignal<HTMLDivElement | null>(null);
 	let observer: IntersectionObserver | null = null;
 	let unlisten: UnlistenFn | null = null;
 
@@ -77,6 +77,19 @@ export default function TranscriptionList() {
 		unlisten = await listen("transcription-created", () => {
 			fetchTranscriptions();
 		});
+	});
+
+	// Use createEffect to observe sentinel when it becomes available after conditional rendering
+	createEffect(() => {
+		const sentinel = sentinelRef();
+
+		// Clean up previous observer if any
+		if (observer) {
+			observer.disconnect();
+			observer = null;
+		}
+
+		if (!sentinel) return;
 
 		observer = new IntersectionObserver(
 			(entries) => {
@@ -85,12 +98,10 @@ export default function TranscriptionList() {
 					fetchTranscriptions(nextCursor()!);
 				}
 			},
-			{ rootMargin: "100px" },
+			{ rootMargin: "100px" }
 		);
 
-		if (sentinelRef) {
-			observer.observe(sentinelRef);
-		}
+		observer.observe(sentinel);
 	});
 
 	onCleanup(() => {
@@ -122,23 +133,18 @@ export default function TranscriptionList() {
 			<Show when={!initialLoading() && !error() && transcriptions().length === 0}>
 				<div class="text-center py-12">
 					<p class="text-slate-500 text-lg mb-2">{t("transcriptionList.noTranscriptions")}</p>
-					<p class="text-slate-400 text-sm">
-						{t("transcriptionList.useCommandToRecord")}
-					</p>
+					<p class="text-slate-400 text-sm">{t("transcriptionList.useCommandToRecord")}</p>
 				</div>
 			</Show>
 
 			<Show when={!initialLoading() && transcriptions().length > 0}>
 				<For each={transcriptions()}>
 					{(transcription) => (
-						<TranscriptionCard
-							transcription={transcription}
-							onRatingChange={handleRatingChange}
-						/>
+						<TranscriptionCard transcription={transcription} onRatingChange={handleRatingChange} />
 					)}
 				</For>
 
-				<div ref={sentinelRef} class="h-4" />
+				<div ref={setSentinelRef} class="h-4" />
 
 				<Show when={loading() && transcriptions().length > 0}>
 					<div class="flex items-center justify-center py-4">
