@@ -42,3 +42,16 @@ body {
 .animate-voice-wave {
 	animation: voice-wave 1s ease-in-out infinite;
 }
+
+@keyframes slide {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(400%);
+	}
+}
+
+.animate-slide {
+	animation: slide 1.5s ease-in-out infinite;
+}
