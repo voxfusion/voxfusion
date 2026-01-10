@@ -1,9 +1,11 @@
 import { createSignal, onCleanup, onMount, type ParentProps, Show } from "solid-js";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+import { useNavigate } from "@solidjs/router";
 import { useStore } from "@nanostores/solid";
 import { authClient } from "./lib/authClient";
-import { initSettings, useSettings, markOnboardingComplete } from "./lib/settingsStore";
+import { initSettings, useSettings, markOnboardingComplete, updateMicrophone } from "./lib/settingsStore";
 import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
@@ -15,6 +17,7 @@ const FORCE_SHOW_ONBOARDING =
 function App(props: ParentProps) {
 	const session = useStore(authClient.useSession);
 	const settings = useSettings();
+	const navigate = useNavigate();
 	const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
 	console.log("session", session());
 
@@ -26,6 +29,18 @@ function App(props: ParentProps) {
 	onMount(async () => {
 		// Initialize settings from store
 		await initSettings();
+
+		// Listen for tray menu events
+		const unlistenNavigate = await listen<string>("navigate", (event) => {
+			navigate(event.payload);
+		});
+		onCleanup(() => unlistenNavigate());
+
+		const unlistenMicrophone = await listen<string>("select-microphone", async (event) => {
+			const deviceName = event.payload;
+			await updateMicrophone(deviceName || null);
+		});
+		onCleanup(() => unlistenMicrophone());
 
 		// Register Cmd+, shortcut to open settings
 		const handleKeyDown = (e: KeyboardEvent) => {
