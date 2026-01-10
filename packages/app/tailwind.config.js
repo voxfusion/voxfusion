@@ -1,8 +1,53 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-	content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+	content: ["./index.html", "./voice-control.html", "./src/**/*.{js,ts,jsx,tsx}"],
 	theme: {
-		extend: {},
+		extend: {
+			colors: {
+				// Primary coral/orange accent
+				primary: {
+					50: '#FFF5F2',
+					100: '#FFE8E2',
+					200: '#FFD1C5',
+					300: '#FFB09D',
+					400: '#FF8C69',
+					500: '#FF6B4A',
+					600: '#E55A3A',
+					700: '#CC4A2D',
+					800: '#A33B24',
+					900: '#7A2C1B',
+				},
+				// Deep ocean/midnight blue for backgrounds (optional dark mode)
+				midnight: {
+					50: '#E8EDF4',
+					100: '#C5D1E3',
+					200: '#9FB5D1',
+					300: '#6B8DB5',
+					400: '#4A6D99',
+					500: '#2A4D7D',
+					600: '#1E3A5F',
+					700: '#142337',
+					800: '#0F1E32',
+					900: '#0A1628',
+				},
+				// Accent teal
+				accent: {
+					50: '#E6F7F8',
+					100: '#B3E8EB',
+					200: '#80D9DE',
+					300: '#4DCAD1',
+					400: '#1DB9C3',
+					500: '#14919B',
+					600: '#0D7377',
+					700: '#095558',
+					800: '#063739',
+					900: '#03191A',
+				},
+			},
+			fontFamily: {
+				sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+			},
+		},
 	},
 	plugins: [],
 };
