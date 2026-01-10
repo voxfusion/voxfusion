@@ -1,6 +1,6 @@
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
-import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import eden from "../lib/eden";
 import TranscriptionCard from "./TranscriptionCard";
@@ -18,8 +18,13 @@ type Transcription = {
 	model: string;
 };
 
+type GroupedTranscriptions = {
+	label: string;
+	transcriptions: Transcription[];
+};
+
 export default function TranscriptionList() {
-	const [t] = useI18n();
+	const [t, { locale }] = useI18n();
 	const [transcriptions, setTranscriptions] = createSignal<Transcription[]>([]);
 	const [loading, setLoading] = createSignal(false);
 	const [initialLoading, setInitialLoading] = createSignal(true);
@@ -30,6 +35,50 @@ export default function TranscriptionList() {
 	const [sentinelRef, setSentinelRef] = createSignal<HTMLDivElement | null>(null);
 	let observer: IntersectionObserver | null = null;
 	let unlisten: UnlistenFn | null = null;
+
+	const getDateLabel = (date: Date): string => {
+		const today = new Date();
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
+
+		const isToday =
+			date.getDate() === today.getDate() &&
+			date.getMonth() === today.getMonth() &&
+			date.getFullYear() === today.getFullYear();
+
+		const isYesterday =
+			date.getDate() === yesterday.getDate() &&
+			date.getMonth() === yesterday.getMonth() &&
+			date.getFullYear() === yesterday.getFullYear();
+
+		if (isToday) {
+			return t("transcriptionList.today");
+		}
+		if (isYesterday) {
+			return t("transcriptionList.yesterday");
+		}
+
+		return date.toLocaleDateString(locale(), {
+			weekday: "long",
+			month: "long",
+			day: "numeric",
+		});
+	};
+
+	const groupedTranscriptions = createMemo((): GroupedTranscriptions[] => {
+		const groups: Map<string, Transcription[]> = new Map();
+
+		for (const transcription of transcriptions()) {
+			const label = getDateLabel(transcription.createdAt);
+			const existing = groups.get(label) ?? [];
+			groups.set(label, [...existing, transcription]);
+		}
+
+		return Array.from(groups.entries()).map(([label, items]) => ({
+			label,
+			transcriptions: items,
+		}));
+	});
 
 	const fetchTranscriptions = async (cursor?: string) => {
 		if (loading()) return;
@@ -70,10 +119,6 @@ export default function TranscriptionList() {
 		}
 	};
 
-	const handleRatingChange = (id: string, rating: "up" | "down" | null) => {
-		setTranscriptions((prev) => prev.map((t) => (t.id === id ? { ...t, rating } : t)));
-	};
-
 	onMount(async () => {
 		fetchTranscriptions();
 
@@ -82,11 +127,9 @@ export default function TranscriptionList() {
 		});
 	});
 
-	// Use createEffect to observe sentinel when it becomes available after conditional rendering
 	createEffect(() => {
 		const sentinel = sentinelRef();
 
-		// Clean up previous observer if any
 		if (observer) {
 			observer.disconnect();
 			observer = null;
@@ -113,7 +156,7 @@ export default function TranscriptionList() {
 	});
 
 	return (
-		<div class="space-y-4">
+		<div class="space-y-6">
 			<Show when={initialLoading()}>
 				<div class="flex items-center justify-center py-12">
 					<Loader class="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
@@ -141,9 +184,16 @@ export default function TranscriptionList() {
 			</Show>
 
 			<Show when={!initialLoading() && transcriptions().length > 0}>
-				<For each={transcriptions()}>
-					{(transcription) => (
-						<TranscriptionCard transcription={transcription} onRatingChange={handleRatingChange} />
+				<For each={groupedTranscriptions()}>
+					{(group) => (
+						<div>
+							<h3 class="text-sm font-medium text-slate-500 mb-2 px-1">{group.label}</h3>
+							<div class="bg-white rounded-lg divide-y divide-slate-100">
+								<For each={group.transcriptions}>
+									{(transcription) => <TranscriptionCard transcription={transcription} />}
+								</For>
+							</div>
+						</div>
 					)}
 				</For>
 
