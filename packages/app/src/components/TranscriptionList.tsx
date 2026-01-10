@@ -187,8 +187,8 @@ export default function TranscriptionList() {
 				<For each={groupedTranscriptions()}>
 					{(group) => (
 						<div>
-							<h3 class="text-sm font-medium text-slate-500 mb-2 px-1">{group.label}</h3>
-							<div class="bg-white rounded-lg divide-y divide-slate-100">
+							<h3 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 px-1">{group.label}</h3>
+							<div class="bg-white dark:bg-midnight-800 rounded-lg divide-y divide-slate-100 dark:divide-midnight-700">
 								<For each={group.transcriptions}>
 									{(transcription) => <TranscriptionCard transcription={transcription} />}
 								</For>
