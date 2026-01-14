@@ -80,7 +80,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 
 				// Build dynamic prompt with dictionary words
 				let prompt =
-					"The user is also speaking Russian language. You should mix up these languages in transcription.";
+					"If necessary, use both languages, English and Russian, in final transcription. It does not mean that transcription 100% will have mixed up languages. ";
 				if (userWords.length > 0) {
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
