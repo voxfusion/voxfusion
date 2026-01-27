@@ -43,6 +43,13 @@
       "when": 1768029213102,
       "tag": "0005_massive_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1768761554811,
+      "tag": "0006_luxuriant_bruce_banner",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import { useNavigate } from "@solidjs/router";
 import { useStore } from "@nanostores/solid";
 import { authClient } from "./lib/authClient";
 import { initSettings, useSettings, markOnboardingComplete, updateMicrophone } from "./lib/settingsStore";
+import tauriconf from "../src-tauri/tauri.conf.json";
 import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
@@ -51,9 +52,16 @@ function App(props: ParentProps) {
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
-		const windowWidth = 140;
-		const windowHeight = 40;
-		const bottomPadding = 0;
+
+		const voicecontrolWindow = tauriconf.app.windows.find(w => w.label === "voice-control");
+		if (!voicecontrolWindow) {
+			console.error("Voice control window not found");
+			throw new Error("Voice control window not found");
+		}
+
+		const windowWidth = voicecontrolWindow.width;
+		const windowHeight = voicecontrolWindow.height;
+		const bottomPadding = 20
 
 		const monitor = await primaryMonitor();
 		if (!monitor) {

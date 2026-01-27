@@ -6,11 +6,16 @@ import { createSignal, For, onMount, onCleanup, Show } from "solid-js";
 import eden from "../lib/eden";
 import { loadSettings } from "../lib/settingsStore";
 
+const NUM_BARS = 12;
+// Randomized multipliers for organic wave look
+const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
+
 export default function VoiceControl() {
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [loading, setLoading] = createSignal(false);
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
+	const [audioLevel, setAudioLevel] = createSignal(0);
 	let isStopping = false;
 	let isStarting = false;
 
@@ -49,7 +54,7 @@ export default function VoiceControl() {
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 
 		// Listen for settings changes from the main window
-		const unlisten = await listen("settings-changed", async () => {
+		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
 			if (newSettings.hotkey !== currentShortcut()) {
 				await registerShortcut(newSettings.hotkey);
@@ -57,8 +62,14 @@ export default function VoiceControl() {
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
 		});
 
+		// Listen for real-time audio levels from the backend
+		const unlistenAudio = await listen<number>("audio-level", (event) => {
+			setAudioLevel(event.payload);
+		});
+
 		onCleanup(() => {
-			unlisten();
+			unlistenSettings();
+			unlistenAudio();
 		});
 	});
 
@@ -129,17 +140,17 @@ export default function VoiceControl() {
 	};
 
 	return (
-		<div class="min-h-2 bg-black rounded-xl flex align-center justify-center">
+		<div class={`min-h-2 mx-auto bg-black h-full rounded-xl flex align-center justify-center ${!isRecording() && !loading() ? "opacity-0" : ""}`}>
 			<Show when={loading()}>
-				<Loader class="w-4 h-4 animate-spin text-white" />
+				<Loader class="w-4 h-4 animate-spin text-white m-auto" />
 			</Show>
-			<Show when={!loading() && isRecording()}>
+			<Show when={isRecording() && !loading()}>
 				<div class="flex items-center justify-center gap-[3px]">
-					<For each={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}>
-						{(i) => (
+					<For each={BAR_MULTIPLIERS}>
+						{(multiplier) => (
 							<div
-								class="w-[5px] rounded bg-primary-500 animate-voice-wave"
-								style={{ "animation-delay": `${i * 0.1}s` }}
+								class="w-[2px] rounded bg-gray-300 transition-all duration-75"
+								style={{ height: `${Math.max(4, audioLevel() * multiplier * 3)}px` }}
 							/>
 						)}
 					</For>

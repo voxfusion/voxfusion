@@ -1,10 +1,15 @@
 import { cors } from "@elysiajs/cors";
 import { Elysia } from "elysia";
-import { transcribeRoutes } from "./routes/transcribe";
-import { deeplinkRoutes } from "./routes/deeplink";
-import { dictionaryRoutes } from "./routes/dictionary";
 import { BunAdapter } from "elysia/adapter/bun";
 import { auth } from "./auth";
+import { deeplinkRoutes } from "./routes/deeplink";
+import { dictionaryRoutes } from "./routes/dictionary";
+import {
+	subscriptionAdminRoutes,
+	subscriptionRoutes,
+	yookassaWebhookRoutes,
+} from "./routes/subscription";
+import { transcribeRoutes } from "./routes/transcribe";
 
 const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 	.use(
@@ -17,6 +22,9 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 	.use(transcribeRoutes)
 	.use(dictionaryRoutes)
 	.use(deeplinkRoutes)
+	.use(subscriptionRoutes)
+	.use(yookassaWebhookRoutes)
+	.use(subscriptionAdminRoutes)
 	.get("/", () => ({
 		name: "VoxFusion API",
 		version: "0.1.0",
