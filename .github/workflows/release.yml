@@ -58,23 +58,39 @@ jobs:
       - name: Find build artifacts
         id: artifacts
         run: |
+          echo "Searching for artifacts..."
+          find packages/app/src-tauri/target -name "*.dmg" -type f
+          find packages/app/src-tauri/target -name "latest.json" -type f
+          
           DMG_PATH=$(find packages/app/src-tauri/target -name "*.dmg" -type f | head -1)
+          if [ -z "$DMG_PATH" ]; then
+            echo "Error: No DMG file found"
+            exit 1
+          fi
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
           echo "DMG_NAME=$(basename $DMG_PATH)" >> $GITHUB_OUTPUT
 
           UPDATER_JSON=$(find packages/app/src-tauri/target -name "latest.json" -type f | head -1)
+          if [ -z "$UPDATER_JSON" ]; then
+            echo "Error: No latest.json file found"
+            exit 1
+          fi
           echo "UPDATER_JSON=$UPDATER_JSON" >> $GITHUB_OUTPUT
 
       - name: Update latest.json with GitHub release URLs
         run: |
           # Update the download URL in latest.json to point to the public releases repo
           DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion-latest.dmg"
+          
+          echo "Updating latest.json at: ${{ steps.artifacts.outputs.UPDATER_JSON }}"
+          echo "New download URL: $DOWNLOAD_URL"
+          
           jq --arg url "$DOWNLOAD_URL" \
              '.platforms."darwin-universal".url = $url | .platforms."darwin-x86_64".url = $url | .platforms."darwin-aarch64".url = $url' \
              "${{ steps.artifacts.outputs.UPDATER_JSON }}" > latest.json.tmp
           mv latest.json.tmp "${{ steps.artifacts.outputs.UPDATER_JSON }}"
 
-          echo "Updated latest.json with URL: $DOWNLOAD_URL"
+          echo "Updated latest.json:"
           cat "${{ steps.artifacts.outputs.UPDATER_JSON }}"
 
       - name: Copy DMG as VoxFusion-latest.dmg
