@@ -125,4 +125,11 @@ export const ru: Translations = {
 		accessibilityInstructions:
 			"Нажмите на замок для внесения изменений, затем отметьте VoxFusion в списке.",
 	},
+	update: {
+		available: "Доступно обновление",
+		newVersion: "Версия",
+		downloading: "Загрузка обновления...",
+		ignore: "Пропустить",
+		downloadAndRestart: "Загрузить и перезапустить",
+	},
 };
