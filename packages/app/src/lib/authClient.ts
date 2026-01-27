@@ -7,7 +7,7 @@ import {
 } from "better-auth/client";
 import { tokenManager } from "./tokenManager";
 
-const API_BASE_URL = "http://localhost:3000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 const extractTokenFromCookie = (cookieHeader: string | null): string | null => {
 	if (!cookieHeader) return null;

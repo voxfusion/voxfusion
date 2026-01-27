@@ -11,9 +11,7 @@ use handlers::{
 };
 
 #[cfg(desktop)]
-fn build_microphone_submenu(app: &tauri::AppHandle, selected_mic: Option<String>) -> Result<Submenu<tauri::Wry>, Box<dyn std::error::Error>> {
-    let devices = handlers::audio::list_audio_devices().unwrap_or_default();
-
+fn build_microphone_submenu(app: &tauri::AppHandle, selected_mic: Option<String>, devices: Vec<handlers::audio::AudioDevice>) -> Result<Submenu<tauri::Wry>, Box<dyn std::error::Error>> {
     let submenu = Submenu::with_id(app, "microphone", "Microphone", true)?;
 
     for device in devices {
@@ -106,8 +104,10 @@ pub fn run() {
                     .and_then(|store| store.get("selectedMicrophoneId"))
                     .and_then(|v| v.as_str().map(|s| s.to_string()));
 
-                // Build microphone submenu
-                let mic_submenu = build_microphone_submenu(&handle, selected_mic)?;
+                // Build microphone submenu with empty devices initially
+                // Devices will be populated when the user grants microphone permission
+                // This avoids triggering a microphone permission request on app startup
+                let mic_submenu = build_microphone_submenu(&handle, selected_mic, vec![])?;
 
                 // Create menu items (no shortcuts to avoid conflicts with global shortcuts)
                 let home_item = MenuItem::with_id(app, "home", "Home", true, None::<&str>)?;
@@ -196,14 +196,28 @@ pub fn run() {
                         .and_then(|store| store.get("selectedMicrophoneId"))
                         .and_then(|v| v.as_str().map(|s| s.to_string()));
 
-                    // Update checkmarks in submenu
+                    // Fetch devices and update menu
+                    // This is safe to call here as it only happens after user interaction
                     let devices = handlers::audio::list_audio_devices().unwrap_or_default();
+                    
                     for device in &devices {
                         let mic_id = format!("mic_{}", device.name);
+                        let is_selected = selected_mic.as_ref().map_or(false, |s| s == &device.name);
+                        
+                        // Try to update existing item, or add new one
                         if let Some(item) = mic_submenu_for_listener.get(&mic_id) {
                             if let Some(check_item) = item.as_check_menuitem() {
-                                let is_selected = selected_mic.as_ref().map_or(false, |s| s == &device.name);
                                 let _ = check_item.set_checked(is_selected);
+                            }
+                        } else {
+                            // Add new item if it doesn't exist
+                            let label = if device.is_default {
+                                format!("{} (Default)", device.name)
+                            } else {
+                                device.name.clone()
+                            };
+                            if let Ok(item) = CheckMenuItem::with_id(&app_handle, &mic_id, &label, true, is_selected, None::<&str>) {
+                                let _ = mic_submenu_for_listener.append(&item);
                             }
                         }
                     }

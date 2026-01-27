@@ -1,8 +1,9 @@
 import { treaty } from "@elysiajs/eden";
 import type { App } from "@voxfusion/server";
 import { tokenManager } from "./tokenManager";
+import { API_BASE_URL } from "./authClient";
 
-const client = treaty<App>("localhost:3000", {
+const client = treaty<App>(API_BASE_URL.replace(/^https?:\/\//, ""), {
 	onRequest: async (_path, options) => {
 		const token = await tokenManager.getToken();
 		if (token) {
