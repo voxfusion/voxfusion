@@ -63,7 +63,8 @@
 		"updater": {
 			"endpoints": [
 				"https://github.com/gregor-tokarev/voxfusion-releases/releases/latest/download/latest.json"
-			]
+			],
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIxQkVBN0EwRjU0MjM5RUIKUldUck9VTDFvS2UrSVd4U2VuNFZXeUdpNzlSZGFpMld3RC9mdlduY05lVnFaUE5kNVhKaW9vSUUK"
 		}
 	}
 }
