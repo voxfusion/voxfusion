@@ -15,10 +15,19 @@
 					"url": "https://voxfusion.io/*"
 				},
 				{
+					"url": "https://*.voxfusion.io/*"
+				},
+				{
+					"url": "https://*.github.com/*"
+				},
+				{
 					"url": "https://accounts.google.com/*"
 				},
 				{
 					"url": "http://localhost:3000/*"
+				},
+				{
+					"url": "https://voxfusion-production.up.railway.app/*"
 				}
 			]
 		},

@@ -1,6 +1,6 @@
 import { createSignal } from "solid-js";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { authClient } from "../lib/authClient";
+import { authClient, API_BASE_URL } from "../lib/authClient";
 import { tokenManager } from "../lib/tokenManager";
 import { useI18n } from "../i18n";
 
@@ -9,14 +9,29 @@ function Auth() {
 	const [devToken, setDevToken] = createSignal("");
 
 	const handleGoogleLogin = async () => {
-		const data = await authClient.signIn.social({
-			provider: "google",
-			callbackURL: "http://localhost:3000/api/deeplink",
-			disableRedirect: true,
-		});
+		try {
+			console.log("Starting Google login...");
+			const data = await authClient.signIn.social({
+				provider: "google",
+				callbackURL: `${API_BASE_URL}/api/deeplink`,
+				disableRedirect: true,
+			});
 
-		if (data.data?.url) {
-			await openUrl(data.data.url);
+			console.log("Auth response:", data);
+
+			if (data.error) {
+				console.error("Auth error:", data.error);
+				return;
+			}
+
+			if (data.data?.url) {
+				console.log("Opening URL:", data.data.url);
+				await openUrl(data.data.url);
+			} else {
+				console.error("No URL returned from auth server");
+			}
+		} catch (error) {
+			console.error("Google login failed:", error);
 		}
 	};
 
