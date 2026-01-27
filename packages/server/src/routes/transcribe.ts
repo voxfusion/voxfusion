@@ -3,9 +3,12 @@ import { join } from "node:path";
 import { and, desc, eq, lt } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import { auth } from "../auth";
+import { checkUserRateLimit } from "../middleware/rateLimit";
 import { db } from "../providers/db";
 import { dictionaryWords, transcriptions } from "../providers/db/schema";
 import { groq } from "../providers/groq";
+import { canUserTranscribe, getUserSubscription } from "./subscription";
+
 async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	const tempFile = join(tmpdir(), `audio-${crypto.randomUUID()}.webm`);
 	try {
@@ -33,8 +36,26 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	}
 }
 
+/**
+ * Count words in a text string
+ */
+function countWords(text: string): number {
+	// Trim and split by whitespace, filter out empty strings
+	const words = text
+		.trim()
+		.split(/\s+/)
+		.filter((word) => word.length > 0);
+	return words.length;
+}
+
 type TranscriptionResult = {
 	text: string;
+	wordCount?: number;
+	usage?: {
+		wordsUsed: number;
+		wordsRemaining: number | null;
+		plan: "free" | "pro";
+	};
 };
 
 type Session = {
@@ -47,6 +68,7 @@ type Session = {
 
 type TranscriptionMetadata = {
 	text: string;
+	wordCount: number;
 	processingTimeMs: number;
 	fileBuffer: ArrayBuffer;
 };
@@ -67,7 +89,35 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 		async (ctx) => {
 			const file = ctx.body.file;
 			const session = (ctx as any).session as Session;
+
 			try {
+				// Check rate limit first
+				const subscription = await getUserSubscription(session.user.id);
+				const rateLimitResult = await checkUserRateLimit(session.user.id, subscription.plan);
+
+				if (!rateLimitResult.allowed) {
+					return status(429, {
+						error: "Rate limit exceeded",
+						message: `Too many requests. Try again in ${rateLimitResult.retryAfter} seconds.`,
+						retryAfter: rateLimitResult.retryAfter,
+					});
+				}
+
+				// Check usage limits for free tier
+				const usageCheck = await canUserTranscribe(session.user.id);
+				if (!usageCheck.allowed) {
+					return status(403, {
+						error: "Usage limit exceeded",
+						message: `You've reached your monthly limit of ${usageCheck.limit.toLocaleString()} words. Upgrade to Pro for unlimited transcription.`,
+						usage: {
+							wordsUsed: usageCheck.used,
+							wordsRemaining: 0,
+							wordLimit: usageCheck.limit,
+							plan: usageCheck.plan,
+						},
+					});
+				}
+
 				const fileBuffer = await file.arrayBuffer();
 
 				// Fetch user's dictionary words
@@ -100,14 +150,31 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				const endTime = performance.now();
 				const processingTimeMs = Math.round(endTime - startTime);
 
+				const transcriptionText = transcription.text.trim();
+				const wordCount = countWords(transcriptionText);
+
 				ctx.store.transcriptionMetadata = {
-					text: transcription.text.trim(),
+					text: transcriptionText,
+					wordCount,
 					processingTimeMs,
 					fileBuffer,
 				};
 
+				// Calculate updated usage (after this transcription)
+				const newUsage = usageCheck.used + wordCount;
+				const newRemaining =
+					usageCheck.limit === Number.POSITIVE_INFINITY
+						? null
+						: Math.max(0, usageCheck.limit - newUsage);
+
 				return {
-					text: transcription.text.trim(),
+					text: transcriptionText,
+					wordCount,
+					usage: {
+						wordsUsed: newUsage,
+						wordsRemaining: newRemaining,
+						plan: usageCheck.plan,
+					},
 				} satisfies TranscriptionResult;
 			} catch (error) {
 				return status(500, {
@@ -146,10 +213,11 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 						userId: session.user.id,
 						fileUrl,
 						text: metadata.text,
+						wordCount: metadata.wordCount,
 						processingTimeMs: metadata.processingTimeMs,
 						audioDurationMs,
 						provider: "groq",
-						model: "whisper-large-v3",
+						model: "whisper-large-v3-turbo",
 					});
 				} catch (error) {
 					console.error("Failed to save transcription:", error);

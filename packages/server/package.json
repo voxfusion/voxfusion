@@ -21,8 +21,10 @@
 		"@elysiajs/cors": "^1.1.1",
 		"@elysiajs/html": "^1.4.0",
 		"@gladiaio/sdk": "^0.6.1",
+		"better-auth": "1.4.15",
 		"drizzle-orm": "^0.38.3",
 		"elysia": "^1.2.10",
+		"groq-sdk": "^0.37.0",
 		"postgres": "^3.4.5"
 	},
 	"devDependencies": {

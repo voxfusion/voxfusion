@@ -6,8 +6,10 @@ use serde::Serialize;
 use std::fs::{create_dir_all, File};
 use std::io::BufWriter;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Instant;
+use tauri::Emitter;
 
 type WavWriterHandle = Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>;
 
@@ -21,6 +23,8 @@ struct RecordingState {
     save_path: Arc<Mutex<Option<PathBuf>>>,
     writer: WavWriterHandle,
     stream: Arc<Mutex<Option<SafeStream>>>,
+    app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
+    last_emit_time: Arc<AtomicU64>,
 }
 
 impl RecordingState {
@@ -30,6 +34,8 @@ impl RecordingState {
             save_path: Arc::new(Mutex::new(None)),
             writer: Arc::new(Mutex::new(None)),
             stream: Arc::new(Mutex::new(None)),
+            app_handle: Arc::new(Mutex::new(None)),
+            last_emit_time: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -82,6 +88,9 @@ pub async fn start_recording_with_device(
     }
     state.is_recording.store(true, Ordering::SeqCst);
 
+    // Store app handle for emitting events
+    *state.app_handle.lock().map_err(|err| err.to_string())? = Some(app_handle.clone());
+
     let host = cpal::default_host();
 
     let device = if let Some(ref name) = device_name {
@@ -109,6 +118,8 @@ pub async fn start_recording_with_device(
     let writer = Arc::new(Mutex::new(Some(writer)));
 
     let writer_2 = writer.clone();
+    let app_handle_2 = state.app_handle.clone();
+    let last_emit_time = state.last_emit_time.clone();
 
     let err_fn = move |err: cpal::StreamError| {
         eprintln!("an error occurred on stream: {}", err);
@@ -118,7 +129,7 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::I8 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data::<i8, i8>(data, &writer_2),
+                move |data, _: &_| write_input_data_with_levels::<i8, i8>(data, &writer_2, &app_handle_2, &last_emit_time),
                 err_fn,
                 None,
             )
@@ -126,7 +137,7 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::I16 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data::<i16, i16>(data, &writer_2),
+                move |data, _: &_| write_input_data_with_levels::<i16, i16>(data, &writer_2, &app_handle_2, &last_emit_time),
                 err_fn,
                 None,
             )
@@ -134,7 +145,7 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::I32 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data::<i32, i32>(data, &writer_2),
+                move |data, _: &_| write_input_data_with_levels::<i32, i32>(data, &writer_2, &app_handle_2, &last_emit_time),
                 err_fn,
                 None,
             )
@@ -142,7 +153,7 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::F32 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data::<f32, f32>(data, &writer_2),
+                move |data, _: &_| write_input_data_with_levels::<f32, f32>(data, &writer_2, &app_handle_2, &last_emit_time),
                 err_fn,
                 None,
             )
@@ -176,6 +187,9 @@ pub async fn stop_recording_with_device() -> Result<PathBuf, String> {
     if let Some(writer) = state.writer.lock().map_err(|err| err.to_string())?.take() {
         writer.finalize().map_err(|err| err.to_string())?;
     }
+
+    // Clear app handle
+    *state.app_handle.lock().map_err(|err| err.to_string())? = None;
 
     // Get and clear the save path
     let save_path = state
@@ -222,16 +236,53 @@ fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> WavSpec {
     }
 }
 
-fn write_input_data<T, U>(input: &[T], writer: &WavWriterHandle)
+// Timestamp tracking for throttling - using a static Instant for reference
+static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
+
+fn write_input_data_with_levels<T, U>(
+    input: &[T],
+    writer: &WavWriterHandle,
+    app_handle: &Arc<Mutex<Option<tauri::AppHandle>>>,
+    last_emit_time: &Arc<AtomicU64>,
+)
 where
     T: Sample,
     U: Sample + hound::Sample + FromSample<T>,
 {
     if let Ok(mut guard) = writer.try_lock() {
         if let Some(writer) = guard.as_mut() {
+            // Calculate RMS (root mean square) for audio level
+            let mut sum: f64 = 0.0;
+            let mut peak: f64 = 0.0;
+
             for &sample in input.iter() {
-                let sample: U = U::from_sample(sample);
-                writer.write_sample(sample).ok();
+                let sample_u: U = U::from_sample(sample);
+                writer.write_sample(sample_u).ok();
+
+                // Convert to f32 first, then to f64 for level calculation
+                let value: f32 = sample.to_float_sample().to_sample();
+                let value_f64 = value as f64;
+                sum += value_f64 * value_f64;
+                peak = peak.max(value_f64.abs());
+            }
+
+            // Calculate RMS and normalize to 0-100 range
+            let rms = (sum / input.len() as f64).sqrt();
+            // Use a combination of RMS and peak for more responsive visualization
+            let level = ((rms * 0.7 + peak * 0.3) * 150.0).min(100.0);
+
+            // Throttle to ~30fps (every ~33ms)
+            let now = START_TIME.elapsed().as_millis() as u64;
+            let last = last_emit_time.load(Ordering::Relaxed);
+            if now - last >= 33 {
+                last_emit_time.store(now, Ordering::Relaxed);
+
+                // Emit to frontend
+                if let Ok(handle_guard) = app_handle.try_lock() {
+                    if let Some(h) = handle_guard.as_ref() {
+                        let _ = h.emit("audio-level", level);
+                    }
+                }
             }
         }
     }

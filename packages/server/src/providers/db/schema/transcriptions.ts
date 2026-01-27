@@ -8,6 +8,7 @@ export const transcriptions = pgTable("transcriptions", {
 		.references(() => users.id, { onDelete: "cascade" }),
 	fileUrl: text("file_url").notNull(),
 	text: text("text").notNull(),
+	wordCount: integer("word_count"), // Number of words in transcription for billing
 	processingTimeMs: integer("processing_time_ms").notNull(),
 	audioDurationMs: integer("audio_duration_ms"),
 	provider: text("provider").notNull(),
