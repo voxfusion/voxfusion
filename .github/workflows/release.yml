@@ -51,7 +51,7 @@ jobs:
         id: artifacts
         run: |
           echo "Searching for artifacts..."
-          
+
           DMG_PATH=$(find packages/app/src-tauri/target -name "*.dmg" -type f | head -1)
           if [ -z "$DMG_PATH" ]; then
             echo "Error: No DMG file found"
@@ -65,7 +65,7 @@ jobs:
           BUNDLE_DIR=$(dirname "$DMG_PATH")
           VERSION=${{ github.ref_name }}
           VERSION=${VERSION#v}
-          
+
           # Find the .tar.gz.sig file for signature
           SIG_FILE=$(find packages/app/src-tauri/target -name "*.tar.gz.sig" -type f | head -1)
           if [ -n "$SIG_FILE" ]; then
@@ -74,7 +74,7 @@ jobs:
             SIGNATURE=""
             echo "Warning: No signature file found"
           fi
-          
+
           # Create latest.json
           UPDATER_JSON="packages/app/src-tauri/target/latest.json"
           cat > "$UPDATER_JSON" << EOF
@@ -98,7 +98,7 @@ jobs:
             }
           }
           EOF
-          
+
           echo "Created latest.json"
           echo "UPDATER_JSON=$UPDATER_JSON" >> $GITHUB_OUTPUT
 
@@ -106,10 +106,10 @@ jobs:
         run: |
           # Update the download URL in latest.json to point to the public releases repo
           DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion-latest.dmg"
-          
+
           echo "Updating latest.json at: ${{ steps.artifacts.outputs.UPDATER_JSON }}"
           echo "New download URL: $DOWNLOAD_URL"
-          
+
           jq --arg url "$DOWNLOAD_URL" \
              '.platforms."darwin-universal".url = $url | .platforms."darwin-x86_64".url = $url | .platforms."darwin-aarch64".url = $url' \
              "${{ steps.artifacts.outputs.UPDATER_JSON }}" > latest.json.tmp
@@ -124,9 +124,10 @@ jobs:
 
       - name: Create release in public repository
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
         with:
           repository: ${{ env.RELEASES_REPO }}
-          token: ${{ secrets.RELEASES_GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: VoxFusion ${{ github.ref_name }}
           body: |
