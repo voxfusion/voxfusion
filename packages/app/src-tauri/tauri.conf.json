@@ -4,8 +4,12 @@
 	"version": "0.1.0",
 	"identifier": "io.voxfusion.app",
 	"bundle": {
+		"active": true,
+		"targets": ["dmg", "app"],
 		"macOS": {
-			"entitlements": "entitlements.plist"
+			"entitlements": "entitlements.plist",
+			"minimumSystemVersion": "10.15",
+			"hardenedRuntime": true
 		}
 	},
 	"build": {
@@ -55,6 +59,11 @@
 			"desktop": {
 				"schemes": ["voxfusion"]
 			}
+		},
+		"updater": {
+			"endpoints": [
+				"https://github.com/gregor-tokarev/voxfusion-releases/releases/latest/download/latest.json"
+			]
 		}
 	}
 }
