@@ -114,6 +114,13 @@ export type Translations = {
 		openSystemPreferences: string;
 		accessibilityInstructions: string;
 	};
+	update: {
+		available: string;
+		newVersion: string;
+		downloading: string;
+		ignore: string;
+		downloadAndRestart: string;
+	};
 };
 
 export const en: Translations = {
@@ -240,5 +247,12 @@ export const en: Translations = {
 		openSystemPreferences: "Open System Preferences",
 		accessibilityInstructions:
 			"Click the lock icon to make changes, then check VoxFusion in the list.",
+	},
+	update: {
+		available: "Update Available",
+		newVersion: "Version",
+		downloading: "Downloading update...",
+		ignore: "Ignore",
+		downloadAndRestart: "Download & Restart",
 	},
 };
