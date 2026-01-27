@@ -37,19 +37,11 @@ jobs:
         run: bun install
 
       - name: Build Tauri app
-        id: tauri-build
-        uses: tauri-apps/tauri-action@v0.6.1
+        working-directory: packages/app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          projectPath: packages/app
-          tauriScript: bun run tauri
-          args: --target universal-apple-darwin
-          includeRelease: false
-          includeUpdaterJson: true
-          updaterJsonKeepUniversal: true
+        run: bun run tauri build --target universal-apple-darwin
 
       - name: Get version from tag
         id: version
@@ -59,22 +51,55 @@ jobs:
         id: artifacts
         run: |
           echo "Searching for artifacts..."
-          find packages/app/src-tauri/target -name "*.dmg" -type f
-          find packages/app/src-tauri/target -name "latest.json" -type f
           
           DMG_PATH=$(find packages/app/src-tauri/target -name "*.dmg" -type f | head -1)
           if [ -z "$DMG_PATH" ]; then
             echo "Error: No DMG file found"
+            find packages/app/src-tauri/target -type f -name "*.dmg" || true
             exit 1
           fi
+          echo "Found DMG: $DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
-          echo "DMG_NAME=$(basename $DMG_PATH)" >> $GITHUB_OUTPUT
 
-          UPDATER_JSON=$(find packages/app/src-tauri/target -name "latest.json" -type f | head -1)
-          if [ -z "$UPDATER_JSON" ]; then
-            echo "Error: No latest.json file found"
-            exit 1
+          # Generate latest.json for updater
+          BUNDLE_DIR=$(dirname "$DMG_PATH")
+          VERSION=${{ github.ref_name }}
+          VERSION=${VERSION#v}
+          
+          # Find the .tar.gz.sig file for signature
+          SIG_FILE=$(find packages/app/src-tauri/target -name "*.tar.gz.sig" -type f | head -1)
+          if [ -n "$SIG_FILE" ]; then
+            SIGNATURE=$(cat "$SIG_FILE")
+          else
+            SIGNATURE=""
+            echo "Warning: No signature file found"
           fi
+          
+          # Create latest.json
+          UPDATER_JSON="packages/app/src-tauri/target/latest.json"
+          cat > "$UPDATER_JSON" << EOF
+          {
+            "version": "$VERSION",
+            "notes": "See release notes on GitHub",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-universal": {
+                "signature": "$SIGNATURE",
+                "url": "PLACEHOLDER"
+              },
+              "darwin-x86_64": {
+                "signature": "$SIGNATURE",
+                "url": "PLACEHOLDER"
+              },
+              "darwin-aarch64": {
+                "signature": "$SIGNATURE",
+                "url": "PLACEHOLDER"
+              }
+            }
+          }
+          EOF
+          
+          echo "Created latest.json"
           echo "UPDATER_JSON=$UPDATER_JSON" >> $GITHUB_OUTPUT
 
       - name: Update latest.json with GitHub release URLs
