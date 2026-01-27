@@ -66,6 +66,8 @@ pub fn run() {
         .plugin(tauri_plugin_keychain::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             {
