@@ -1,0 +1,219 @@
+name: PR Release
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  RELEASES_REPO: gregor-tokarev/voxfusion-releases
+
+jobs:
+  build-release:
+    runs-on: macos-latest
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+      tag_name: ${{ steps.version.outputs.TAG_NAME }}
+      release_url: ${{ steps.create-release.outputs.html_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.3'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app/src-tauri -> target'
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate version string
+        id: version
+        run: |
+          # Create a version based on PR number or branch + short SHA
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            SHORT_SHA=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
+            VERSION="0.0.0-pr.${PR_NUMBER}.${SHORT_SHA}"
+            TAG_NAME="pr-${PR_NUMBER}-${SHORT_SHA}"
+          else
+            # For branch pushes without PR
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9]/-/g' | cut -c1-20)
+            SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+            VERSION="0.0.0-dev.${BRANCH_NAME}.${SHORT_SHA}"
+            TAG_NAME="dev-${BRANCH_NAME}-${SHORT_SHA}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION"
+          echo "Generated tag: $TAG_NAME"
+
+      - name: Update version in tauri.conf.json
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          echo "Setting version to $VERSION"
+          cd packages/app/src-tauri
+          jq --arg v "$VERSION" '.version = $v' tauri.conf.json > tmp.json && mv tmp.json tauri.conf.json
+          echo "Updated tauri.conf.json:"
+          grep '"version"' tauri.conf.json
+
+      - name: Build Tauri app
+        working-directory: packages/app
+        env:
+          VITE_API_URL: https://voxfusion-production.up.railway.app
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bun run tauri build --target universal-apple-darwin
+
+      - name: Find build artifacts
+        id: artifacts
+        run: |
+          echo "Searching for artifacts..."
+
+          DMG_PATH=$(find packages/app/src-tauri/target -name "*.dmg" -type f | head -1)
+          if [ -z "$DMG_PATH" ]; then
+            echo "Error: No DMG file found"
+            find packages/app/src-tauri/target -type f -name "*.dmg" || true
+            exit 1
+          fi
+          echo "Found DMG: $DMG_PATH"
+          echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
+
+          # Find the .tar.gz and .tar.gz.sig files
+          TAR_GZ_PATH=$(find packages/app/src-tauri/target -name "*.tar.gz" -not -name "*.sig" -type f | head -1)
+          SIG_FILE=$(find packages/app/src-tauri/target -name "*.tar.gz.sig" -type f | head -1)
+
+          if [ -n "$TAR_GZ_PATH" ]; then
+            echo "TAR_GZ_PATH=$TAR_GZ_PATH" >> $GITHUB_OUTPUT
+          fi
+          if [ -n "$SIG_FILE" ]; then
+            echo "SIG_PATH=$SIG_FILE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Copy DMG with version name
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          cp "${{ steps.artifacts.outputs.DMG_PATH }}" "VoxFusion-${VERSION}.dmg"
+          echo "DMG_VERSIONED=VoxFusion-${VERSION}.dmg" >> $GITHUB_ENV
+
+      - name: Delete existing release if present
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
+          # Try to delete existing release (ignore errors if it doesn't exist)
+          gh release delete "$TAG_NAME" --repo "${{ env.RELEASES_REPO }}" --yes 2>/dev/null || true
+          # Try to delete the tag (ignore errors if it doesn't exist)
+          gh api -X DELETE "repos/${{ env.RELEASES_REPO }}/git/refs/tags/$TAG_NAME" 2>/dev/null || true
+          echo "Cleaned up any existing release/tag for $TAG_NAME"
+
+      - name: Create prerelease in releases repository
+        id: create-release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        with:
+          repository: ${{ env.RELEASES_REPO }}
+          tag_name: ${{ steps.version.outputs.TAG_NAME }}
+          name: "Test Build: ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## Test Build: ${{ steps.version.outputs.VERSION }}
+
+            **This is a pre-release build for testing purposes.**
+
+            ${{ github.event_name == 'pull_request' && format('**Pull Request:** #{0} - {1}', github.event.pull_request.number, github.event.pull_request.title) || format('**Branch:** {0}', github.ref_name) }}
+            **Commit:** ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+            ### Download
+            Download the DMG file below and drag VoxFusion to your Applications folder.
+
+            ### First Launch (Important)
+            Since this app is not signed with an Apple Developer ID, macOS will show a warning.
+
+            **To open the app:**
+            1. Right-click (or Control-click) on VoxFusion in Applications
+            2. Select "Open" from the context menu
+            3. Click "Open" in the dialog that appears
+
+            ---
+            *This prerelease will be automatically cleaned up when the PR is closed or merged.*
+          draft: false
+          prerelease: true
+          files: |
+            ${{ env.DMG_VERSIONED }}
+            ${{ steps.artifacts.outputs.DMG_PATH }}
+
+  comment-on-pr:
+    needs: build-release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Find existing comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '## Test Build Available'
+
+      - name: Create or update PR comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            ## Test Build Available
+
+            A new test build has been created for this PR.
+
+            **Version:** `${{ needs.build-release.outputs.version }}`
+
+            ### Download
+
+            [**Download VoxFusion Test Build**](https://github.com/gregor-tokarev/voxfusion-releases/releases/tag/${{ needs.build-release.outputs.tag_name }})
+
+            Or visit the [releases page](https://github.com/gregor-tokarev/voxfusion-releases/releases) and look for the prerelease tagged `${{ needs.build-release.outputs.tag_name }}`.
+
+            ---
+            *Updated: ${{ github.event.pull_request.head.sha }}*
+
+  cleanup-old-pr-releases:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Cleanup old releases for this PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          CURRENT_SHA=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7)
+
+          echo "Looking for old releases for PR #${PR_NUMBER}..."
+
+          # List all releases and find ones matching this PR but not the current SHA
+          gh release list --repo "${{ env.RELEASES_REPO }}" --limit 100 --json tagName --jq '.[].tagName' | while read TAG; do
+            if [[ "$TAG" == pr-${PR_NUMBER}-* ]] && [[ "$TAG" != "pr-${PR_NUMBER}-${CURRENT_SHA}" ]]; then
+              echo "Deleting old release: $TAG"
+              gh release delete "$TAG" --repo "${{ env.RELEASES_REPO }}" --yes 2>/dev/null || true
+              gh api -X DELETE "repos/${{ env.RELEASES_REPO }}/git/refs/tags/$TAG" 2>/dev/null || true
+            fi
+          done
+
+          echo "Cleanup complete"
