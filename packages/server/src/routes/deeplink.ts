@@ -4,11 +4,10 @@ const isDev = process.env.NODE_ENV === "development";
 
 export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 	const cookieHeader = ctx.request.headers.get("cookie") || "";
-	console.log(cookieHeader);
 	const sessionToken = cookieHeader
 		.split(";")
 		.map((c) => c.trim())
-		.find((c) => c.startsWith("better-auth.session_token="))
+		.find((c) => c.startsWith("better-auth.session_token=") || c.startsWith("__Secure-better-auth.session_token="))
 		?.split("=")[1];
 
 	if (!sessionToken) {
