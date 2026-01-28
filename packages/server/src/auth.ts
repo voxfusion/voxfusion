@@ -50,6 +50,10 @@ export const auth = betterAuth({
 	],
 	advanced: {
 		disableCSRFCheck: true,
+		defaultCookieAttributes: {
+			sameSite: "none",
+			secure: true,
+		},
 	},
 	trustedOrigins: ["voxfusion://"],
 });
