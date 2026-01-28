@@ -1,0 +1,34 @@
+name: PR Release Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+env:
+  RELEASES_REPO: gregor-tokarev/voxfusion-releases
+
+jobs:
+  cleanup-pr-releases:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete all releases for this PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          echo "Cleaning up all releases for PR #${PR_NUMBER}..."
+
+          # List all releases and find ones matching this PR
+          gh release list --repo "${{ env.RELEASES_REPO }}" --limit 100 --json tagName --jq '.[].tagName' | while read TAG; do
+            if [[ "$TAG" == pr-${PR_NUMBER}-* ]]; then
+              echo "Deleting release: $TAG"
+              gh release delete "$TAG" --repo "${{ env.RELEASES_REPO }}" --yes 2>/dev/null || true
+              gh api -X DELETE "repos/${{ env.RELEASES_REPO }}/git/refs/tags/$TAG" 2>/dev/null || true
+            fi
+          done
+
+          echo "Cleanup complete for PR #${PR_NUMBER}"
