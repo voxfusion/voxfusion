@@ -1,6 +1,5 @@
 import { Elysia } from "elysia";
 
-const isDev = process.env.NODE_ENV === "development";
 
 export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 	const cookieHeader = ctx.request.headers.get("cookie") || "";
@@ -16,8 +15,7 @@ export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 		});
 	}
 
-	const deepLinkScheme = isDev ? "voxfusion-dev" : "voxfusion";
-	const deepLink = `${deepLinkScheme}://settings?token=${sessionToken}`;
+	const deepLink = `voxfusion://settings?token=${sessionToken}`;
 
 	const devSection = isDev
 		? `
