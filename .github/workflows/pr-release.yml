@@ -16,7 +16,7 @@ env:
 
 jobs:
   build-release:
-    runs-on: macos-latest
+    runs-on: tenki-macos-latest-small
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
       tag_name: ${{ steps.version.outputs.TAG_NAME }}
@@ -161,7 +161,7 @@ jobs:
 
   comment-on-pr:
     needs: build-release
-    runs-on: ubuntu-latest
+    runs-on: tenki-macos-latest-small
     if: github.event_name == 'pull_request'
     steps:
       - name: Find existing comment
@@ -195,7 +195,7 @@ jobs:
             *Updated: ${{ github.event.pull_request.head.sha }}*
 
   cleanup-old-pr-releases:
-    runs-on: ubuntu-latest
+    runs-on: tenki-macos-latest-small
     if: github.event_name == 'pull_request'
     steps:
       - name: Cleanup old releases for this PR
