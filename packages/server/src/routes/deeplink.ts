@@ -17,6 +17,8 @@ export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 
 	const deepLink = `voxfusion://settings?token=${sessionToken}`;
 
+	const isDev = process.env.NODE_ENV === "development";
+
 	const devSection = isDev
 		? `
 		<div class="dev-section">
