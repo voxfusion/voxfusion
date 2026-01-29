@@ -34,7 +34,6 @@ const t = useTranslations(lang);
 				<a href="#features">{t("nav.features")}</a>
 				<a href="#demo">{t("nav.demo")}</a>
 				<a href="#pricing">{t("nav.pricing")}</a>
-				<a href="#reviews">{t("nav.reviews")}</a>
 			</div>
 
 			<div class="nav-actions">
@@ -82,22 +81,6 @@ const t = useTranslations(lang);
 			</a>
 		</div>
 
-		<div class="hero-stats">
-			<div class="stat">
-				<span class="stat-value">50K+</span>
-				<span class="stat-label">{t("hero.stats.users")}</span>
-			</div>
-			<div class="stat-divider"></div>
-			<div class="stat">
-				<span class="stat-value">2M+</span>
-				<span class="stat-label">{t("hero.stats.hours")}</span>
-			</div>
-			<div class="stat-divider"></div>
-			<div class="stat">
-				<span class="stat-value">4.9</span>
-				<span class="stat-label">{t("hero.stats.rating")}</span>
-			</div>
-		</div>
 	</div>
 
 	<div class="hero-visual">
@@ -348,39 +331,8 @@ const t = useTranslations(lang);
 		display: flex;
 		align-items: center;
 		gap: 16px;
-		margin-bottom: 64px;
 		flex-wrap: wrap;
 		justify-content: center;
-	}
-
-	.hero-stats {
-		display: flex;
-		align-items: center;
-		gap: 40px;
-	}
-
-	.stat {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-	}
-
-	.stat-value {
-		font-size: 28px;
-		font-weight: 700;
-		color: var(--color-text);
-	}
-
-	.stat-label {
-		font-size: 14px;
-		color: var(--color-text-muted);
-	}
-
-	.stat-divider {
-		width: 1px;
-		height: 40px;
-		background: var(--color-border);
 	}
 
 	.hero-visual {
@@ -419,16 +371,6 @@ const t = useTranslations(lang);
 
 		.mobile-menu-btn {
 			display: flex;
-		}
-
-		.hero-stats {
-			flex-direction: column;
-			gap: 24px;
-		}
-
-		.stat-divider {
-			width: 60px;
-			height: 1px;
 		}
 	}
 

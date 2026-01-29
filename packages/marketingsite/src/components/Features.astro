@@ -9,21 +9,27 @@ const { lang = defaultLang } = Astro.props;
 const t = useTranslations(lang);
 
 const featureIcons = [
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>`,
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`,
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>`,
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>`,
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>`,
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/></svg>`
+	// Global Hotkey - keyboard icon
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01"/><path d="M10 8h.01"/><path d="M14 8h.01"/><path d="M18 8h.01"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/><path d="M7 16h10"/></svg>`,
+	// Instant Transcription - zap/lightning icon
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>`,
+	// Custom Dictionary - book icon
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>`,
+	// Transcription History - clock/history icon
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+	// English & Russian - globe icon
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`,
+	// Simple Setup - play/start icon
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`
 ];
 
 const featureKeys = [
-	{ title: "features.instantRecording.title", description: "features.instantRecording.description" },
-	{ title: "features.smartSearch.title", description: "features.smartSearch.description" },
-	{ title: "features.autoTranscription.title", description: "features.autoTranscription.description" },
-	{ title: "features.privacy.title", description: "features.privacy.description" },
-	{ title: "features.aiSummaries.title", description: "features.aiSummaries.description" },
-	{ title: "features.organization.title", description: "features.organization.description" }
+	{ title: "features.globalHotkey.title", description: "features.globalHotkey.description" },
+	{ title: "features.instantTranscription.title", description: "features.instantTranscription.description" },
+	{ title: "features.customDictionary.title", description: "features.customDictionary.description" },
+	{ title: "features.history.title", description: "features.history.description" },
+	{ title: "features.languages.title", description: "features.languages.description" },
+	{ title: "features.simpleSetup.title", description: "features.simpleSetup.description" }
 ] as const;
 ---
 
@@ -75,34 +81,32 @@ const featureKeys = [
 				</ul>
 			</div>
 			<div class="highlight-visual">
-				<div class="mock-window">
-					<div class="mock-header">
-						<div class="mock-dots">
-							<span></span>
-							<span></span>
-							<span></span>
+				<div class="mock-desktop">
+					<div class="mock-window">
+						<div class="mock-header">
+							<div class="mock-dots">
+								<span></span>
+								<span></span>
+								<span></span>
+							</div>
+							<span class="mock-title">Messages</span>
 						</div>
-						<span class="mock-title">VoxFusion</span>
+						<div class="mock-content">
+							<div class="mock-input-area">
+								<span class="mock-typed-text">Hey team, let's schedule a meeting for tomorrow at 2pm to discuss the project timeline.</span>
+								<span class="mock-cursor"></span>
+							</div>
+						</div>
 					</div>
-					<div class="mock-content">
-						<div class="mock-search">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-							<span>budget discussion Q4</span>
+					<div class="voice-control-bubble">
+						<div class="bubble-waveform">
+							<span class="wave-bar"></span>
+							<span class="wave-bar"></span>
+							<span class="wave-bar"></span>
+							<span class="wave-bar"></span>
+							<span class="wave-bar"></span>
 						</div>
-						<div class="mock-results">
-							<div class="mock-result">
-								<span class="mock-time">14:32</span>
-								<span class="mock-text">"...the Q4 budget needs to account for the new..."</span>
-							</div>
-							<div class="mock-result active">
-								<span class="mock-time">18:45</span>
-								<span class="mock-text">"...we agreed on $50K for the Q4 marketing budget..."</span>
-							</div>
-							<div class="mock-result">
-								<span class="mock-time">23:12</span>
-								<span class="mock-text">"...Sarah will finalize the budget by Friday..."</span>
-							</div>
-						</div>
+						<span class="bubble-text">Listening...</span>
 					</div>
 				</div>
 			</div>
@@ -312,52 +316,85 @@ const featureKeys = [
 		padding: 16px;
 	}
 
-	.mock-search {
+	.mock-desktop {
+		position: relative;
+	}
+
+	.mock-input-area {
+		padding: 12px 14px;
+		background: var(--color-bg-secondary);
+		border-radius: 8px;
+		font-size: 14px;
+		color: var(--color-text);
+		line-height: 1.5;
+		min-height: 48px;
+	}
+
+	.mock-cursor {
+		display: inline-block;
+		width: 2px;
+		height: 16px;
+		background: var(--color-primary);
+		margin-left: 1px;
+		animation: blink 1s infinite;
+		vertical-align: text-bottom;
+	}
+
+	@keyframes blink {
+		0%, 50% { opacity: 1; }
+		51%, 100% { opacity: 0; }
+	}
+
+	.mock-typed-text {
+		color: var(--color-text);
+	}
+
+	.voice-control-bubble {
+		position: absolute;
+		bottom: -20px;
+		left: 50%;
+		transform: translateX(-50%);
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 10px 14px;
-		background: var(--color-bg-secondary);
-		border-radius: 8px;
-		margin-bottom: 16px;
-		color: var(--color-text-secondary);
-		font-size: 14px;
+		padding: 10px 16px;
+		background: rgba(30, 30, 30, 0.95);
+		backdrop-filter: blur(20px);
+		border-radius: 24px;
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+		border: 1px solid rgba(255, 255, 255, 0.1);
 	}
 
-	.mock-results {
+	.bubble-waveform {
 		display: flex;
-		flex-direction: column;
-		gap: 8px;
+		align-items: center;
+		gap: 3px;
+		height: 20px;
 	}
 
-	.mock-result {
-		display: flex;
-		align-items: flex-start;
-		gap: 12px;
-		padding: 12px;
-		background: var(--color-bg-secondary);
-		border-radius: 8px;
+	.wave-bar {
+		width: 3px;
+		background: var(--color-primary);
+		border-radius: 2px;
+		animation: wave 1s ease-in-out infinite;
+	}
+
+	.wave-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+	.wave-bar:nth-child(2) { height: 16px; animation-delay: 0.1s; }
+	.wave-bar:nth-child(3) { height: 12px; animation-delay: 0.2s; }
+	.wave-bar:nth-child(4) { height: 18px; animation-delay: 0.3s; }
+	.wave-bar:nth-child(5) { height: 10px; animation-delay: 0.4s; }
+
+	@keyframes wave {
+		0%, 100% { transform: scaleY(1); }
+		50% { transform: scaleY(0.5); }
+	}
+
+	.bubble-text {
 		font-size: 13px;
-	}
-
-	.mock-result.active {
-		background: rgba(255, 107, 74, 0.1);
-		border: 1px solid rgba(255, 107, 74, 0.2);
-	}
-
-	.mock-time {
-		font-weight: 600;
-		color: var(--color-primary);
-		flex-shrink: 0;
-	}
-
-	.mock-text {
-		color: var(--color-text-secondary);
-		line-height: 1.4;
-	}
-
-	.mock-result.active .mock-text {
-		color: var(--color-text);
+		font-weight: 500;
+		color: rgba(255, 255, 255, 0.9);
+		white-space: nowrap;
 	}
 
 	@media (max-width: 1024px) {
