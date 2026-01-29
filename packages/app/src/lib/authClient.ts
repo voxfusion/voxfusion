@@ -1,9 +1,10 @@
+import { emit } from "@tauri-apps/api/event";
 import {
-	createAuthClient,
 	type BetterFetchPlugin,
 	type RequestContext,
 	type ResponseContext,
 	type SuccessContext,
+	createAuthClient,
 } from "better-auth/client";
 import { tokenManager } from "./tokenManager";
 
@@ -87,6 +88,7 @@ const tokenPlugin: BetterFetchPlugin = {
 				const newToken = extractTokenFromCookie(setCookieHeader);
 				if (newToken) {
 					await tokenManager.storeToken(newToken);
+					await emit("auth-changed");
 				}
 			}
 
@@ -107,6 +109,7 @@ const tokenPlugin: BetterFetchPlugin = {
 			const newToken = extractTokenFromBody(context.data);
 			if (newToken) {
 				await tokenManager.storeToken(newToken);
+				await emit("auth-changed");
 			}
 		},
 	},

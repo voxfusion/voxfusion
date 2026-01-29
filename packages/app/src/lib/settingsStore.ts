@@ -1,5 +1,5 @@
-import { load } from "@tauri-apps/plugin-store";
 import { emit } from "@tauri-apps/api/event";
+import { load } from "@tauri-apps/plugin-store";
 import { createSignal } from "solid-js";
 import type { Locale } from "../i18n";
 
@@ -176,6 +176,7 @@ export async function markOnboardingComplete(): Promise<void> {
 	const store = await getStore();
 	await store.set("onboardingComplete", true);
 	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: true }));
+	await emit("settings-changed");
 }
 
 export async function resetOnboarding(): Promise<void> {

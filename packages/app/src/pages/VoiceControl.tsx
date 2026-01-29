@@ -1,10 +1,11 @@
-import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
+import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Loader } from "lucide-solid";
-import { createSignal, For, onMount, onCleanup, Show } from "solid-js";
+import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import eden from "../lib/eden";
 import { loadSettings } from "../lib/settingsStore";
+import { tokenManager } from "../lib/tokenManager";
 
 const NUM_BARS = 12;
 // Randomized multipliers for organic wave look
@@ -16,12 +17,19 @@ export default function VoiceControl() {
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
 	const [audioLevel, setAudioLevel] = createSignal(0);
+	const [isAuthenticated, setIsAuthenticated] = createSignal(false);
+	const [isOnboardingComplete, setIsOnboardingComplete] = createSignal(false);
 	let isStopping = false;
 	let isStarting = false;
 
 	const handleShortcut = (evt: { state: string }) => {
 		if (evt.state !== "Pressed") return;
 		console.log("shortcut pressed");
+
+		// Guard: must be authenticated and have completed onboarding
+		if (!isAuthenticated() || !isOnboardingComplete()) {
+			return;
+		}
 
 		if (isStarting || isStopping) return;
 		if (isRecording()) {
@@ -52,6 +60,17 @@ export default function VoiceControl() {
 		const settings = await loadSettings();
 		await registerShortcut(settings.hotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
+		setIsOnboardingComplete(settings.onboardingComplete);
+
+		// Initialize auth state
+		const token = await tokenManager.getToken();
+		setIsAuthenticated(!!token);
+
+		// Listen for auth changes from the main window
+		const unlistenAuth = await listen("auth-changed", async () => {
+			const newToken = await tokenManager.getToken();
+			setIsAuthenticated(!!newToken);
+		});
 
 		// Listen for settings changes from the main window
 		const unlistenSettings = await listen("settings-changed", async () => {
@@ -60,6 +79,7 @@ export default function VoiceControl() {
 				await registerShortcut(newSettings.hotkey);
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
+			setIsOnboardingComplete(newSettings.onboardingComplete);
 		});
 
 		// Listen for real-time audio levels from the backend
@@ -70,6 +90,7 @@ export default function VoiceControl() {
 		onCleanup(() => {
 			unlistenSettings();
 			unlistenAudio();
+			unlistenAuth();
 		});
 	});
 
@@ -140,7 +161,9 @@ export default function VoiceControl() {
 	};
 
 	return (
-		<div class={`min-h-2 mx-auto bg-black h-full rounded-xl flex align-center justify-center ${!isRecording() && !loading() ? "opacity-0" : ""}`}>
+		<div
+			class={`min-h-2 mx-auto bg-black h-full rounded-xl flex align-center justify-center ${!isRecording() && !loading() ? "opacity-0" : ""}`}
+		>
 			<Show when={loading()}>
 				<Loader class="w-4 h-4 animate-spin text-white m-auto" />
 			</Show>
