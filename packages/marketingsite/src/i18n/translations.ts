@@ -8,84 +8,74 @@ export const defaultLang = "en";
 export const translations = {
 	en: {
 		// Meta
-		"meta.title": "VoxFusion - Speak it. Search it. Never lose a thought.",
+		"meta.title": "VoxFusion - Type with your voice. Anywhere on Mac.",
 		"meta.description":
-			"VoxFusion - Capture your voice, free your mind. The fastest way to turn speech into searchable notes.",
+			"VoxFusion - Press a hotkey, speak, and text appears wherever you're typing. Fast dictation powered by Whisper AI.",
 
 		// Navigation
 		"nav.features": "Features",
 		"nav.demo": "Demo",
 		"nav.pricing": "Pricing",
-		"nav.reviews": "Reviews",
 		"nav.signIn": "Sign In",
 		"nav.tryFree": "Try Free",
 
 		// Hero
-		"hero.badge": "Now with real-time transcription",
-		"hero.title.line1": "Speak it. Search it.",
-		"hero.title.line2": "Never lose a thought.",
+		"hero.badge": "Voice-to-text in any app",
+		"hero.title.line1": "Type with your voice.",
+		"hero.title.line2": "Anywhere on Mac.",
 		"hero.subtitle":
-			"VoxFusion turns your voice into searchable, organized notes in seconds. Record meetings, brainstorms, and ideas - then find anything with a simple search.",
+			"Press Cmd+;, speak naturally, and watch your words appear instantly in any application. VoxFusion brings fast, accurate dictation to your entire Mac.",
 		"hero.cta.download": "Download for Mac",
 		"hero.cta.watchDemo": "Watch Demo",
-		"hero.stats.users": "Active Users",
-		"hero.stats.hours": "Hours Recorded",
-		"hero.stats.rating": "App Store Rating",
 
 		// Features
 		"features.tag": "Features",
 		"features.title":
-			"Everything you need to capture, find, and organize your voice",
+			"Simple, fast dictation that works everywhere",
 		"features.description":
-			"Built for professionals who think faster than they type.",
-		"features.instantRecording.title": "Instant Recording",
-		"features.instantRecording.description":
-			"One-click recording that captures your voice with studio-quality clarity. Works offline, syncs when connected.",
-		"features.smartSearch.title": "Smart Search",
-		"features.smartSearch.description":
-			"Find any moment by searching what was said. Our AI understands context, not just keywords.",
-		"features.autoTranscription.title": "Auto Transcription",
-		"features.autoTranscription.description":
-			"Real-time transcription powered by Whisper. 99% accuracy in 50+ languages.",
-		"features.privacy.title": "Local-First Privacy",
-		"features.privacy.description":
-			"Your recordings stay on your device. No cloud uploads unless you choose to sync.",
-		"features.aiSummaries.title": "AI Summaries",
-		"features.aiSummaries.description":
-			"Get instant summaries, action items, and key points from any recording.",
-		"features.organization.title": "Smart Organization",
-		"features.organization.description":
-			"Auto-tagging and folders keep your recordings organized without any effort.",
+			"No switching apps. No copy-pasting. Just speak and type.",
+		"features.globalHotkey.title": "Global Hotkey",
+		"features.globalHotkey.description":
+			"Press Cmd+; anywhere on your Mac to start dictating. Works in any app - emails, documents, chat, code editors.",
+		"features.instantTranscription.title": "Instant Transcription",
+		"features.instantTranscription.description":
+			"Powered by Whisper AI (via Groq) for fast, accurate speech-to-text. Your words appear in seconds.",
+		"features.customDictionary.title": "Custom Dictionary",
+		"features.customDictionary.description":
+			"Add up to 50 specialized terms, names, or technical words for better accuracy in your field.",
+		"features.history.title": "Transcription History",
+		"features.history.description":
+			"Review past transcriptions with timestamps. Copy any text to clipboard or rate accuracy for improvements.",
+		"features.languages.title": "English & Russian",
+		"features.languages.description":
+			"Full support for English and Russian dictation with language-specific optimizations.",
+		"features.simpleSetup.title": "Simple Setup",
+		"features.simpleSetup.description":
+			"Download, grant microphone access, and start dictating. No complex configuration needed.",
 		"features.highlight.tag": "Why VoxFusion?",
 		"features.highlight.title":
-			"Record a 60-minute meeting. Find any quote in 3 seconds.",
+			"Dictate into any app without switching windows.",
 		"features.highlight.description":
-			"Traditional note-taking is broken. You're either writing and missing what's said, or listening and forgetting later. VoxFusion captures everything and makes it instantly searchable.",
-		"features.highlight.list1": "Works with any meeting app - Zoom, Meet, Teams",
-		"features.highlight.list2": "Identifies different speakers automatically",
-		"features.highlight.list3": "Export to Notion, Obsidian, or plain text",
+			"Traditional dictation apps make you copy and paste. VoxFusion inserts text directly where your cursor is - in any application, any text field.",
+		"features.highlight.list1": "Works in every Mac app - browsers, editors, email",
+		"features.highlight.list2": "Customizable hotkey (default Cmd+;)",
+		"features.highlight.list3": "Custom terms for names and technical vocabulary",
 
 		// Demo
 		"demo.tag": "Demo",
 		"demo.title": "See VoxFusion in action",
 		"demo.description":
-			"Watch how easy it is to record, transcribe, and search your voice notes.",
+			"Three simple steps to dictate anywhere on your Mac.",
 		"demo.videoLabel": "Product Demo",
-		"demo.step1.title": "Start Recording",
+		"demo.step1.title": "Press Hotkey",
 		"demo.step1.description":
-			"Click once to start capturing audio from any source - your mic or system audio.",
-		"demo.step2.title": "Instant Transcription",
+			"Hit Cmd+; from anywhere on your Mac. A small indicator shows VoxFusion is listening.",
+		"demo.step2.title": "Speak Naturally",
 		"demo.step2.description":
-			"Watch as your words appear in real-time with speaker identification.",
-		"demo.step3.title": "Search Everything",
+			"Talk at your normal pace. Whisper AI captures your speech with high accuracy.",
+		"demo.step3.title": "Text Appears Instantly",
 		"demo.step3.description":
-			"Type any phrase to jump directly to that moment in your recording.",
-
-		// Reviews
-		"reviews.tag": "Reviews",
-		"reviews.title": "Loved by people who talk for a living",
-		"reviews.description":
-			"Join thousands of professionals who've transformed how they capture ideas.",
+			"Your words are inserted directly where your cursor was. No copy-paste needed.",
 
 		// Pricing
 		"pricing.tag": "Pricing",
@@ -94,38 +84,34 @@ export const translations = {
 		"pricing.free.name": "Free",
 		"pricing.free.price": "$0",
 		"pricing.free.period": "forever",
-		"pricing.free.description": "Perfect for getting started with voice notes",
-		"pricing.free.feature1": "5 hours of recording per month",
-		"pricing.free.feature2": "Basic transcription",
-		"pricing.free.feature3": "Full-text search",
-		"pricing.free.feature4": "Local storage",
-		"pricing.free.feature5": "Export to text",
+		"pricing.free.description": "Perfect for trying voice dictation",
+		"pricing.free.feature1": "25,000 words per month",
+		"pricing.free.feature2": "Whisper AI transcription",
+		"pricing.free.feature3": "Custom dictionary (50 terms)",
+		"pricing.free.feature4": "Transcription history",
+		"pricing.free.feature5": "English & Russian support",
 		"pricing.free.cta": "Get Started Free",
 		"pricing.pro.badge": "Most Popular",
 		"pricing.pro.name": "Pro",
 		"pricing.pro.price": "$8",
 		"pricing.pro.period": "per month",
-		"pricing.pro.description": "For professionals who rely on voice daily",
+		"pricing.pro.description": "For professionals who dictate daily",
 		"pricing.pro.feature1": "Unlimited",
-		"pricing.pro.feature1.suffix": " recording",
-		"pricing.pro.feature2": "Premium transcription (99% accuracy)",
-		"pricing.pro.feature3": "Speaker identification",
-		"pricing.pro.feature4": "AI summaries & action items",
-		"pricing.pro.feature5": "Cloud sync across devices",
-		"pricing.pro.feature6": "50+ language support",
-		"pricing.pro.feature7": "Export to Notion, Obsidian, etc.",
-		"pricing.pro.feature8": "Priority support",
-		"pricing.pro.cta": "Start 14-Day Free Trial",
+		"pricing.pro.feature1.suffix": " transcription",
+		"pricing.pro.feature2": "Everything in Free",
+		"pricing.pro.feature3": "Priority processing",
+		"pricing.pro.feature4": "Priority support",
+		"pricing.pro.cta": "Start Pro",
 		"pricing.faq": "Questions? Email us at",
 		"pricing.faq.suffix": "- we respond within 24 hours.",
 
 		// CTA
-		"cta.title": "Ready to capture every idea?",
-		"cta.description": "Start recording for free. No credit card required.",
+		"cta.title": "Ready to type with your voice?",
+		"cta.description": "Download VoxFusion free. Start dictating in seconds.",
 		"cta.button": "Download for Mac",
 
 		// Footer
-		"footer.tagline": "Capture your voice, free your mind.",
+		"footer.tagline": "Type with your voice. Anywhere on Mac.",
 		"footer.product": "Product",
 		"footer.company": "Company",
 		"footer.legal": "Legal",
@@ -142,129 +128,114 @@ export const translations = {
 	},
 	ru: {
 		// Meta
-		"meta.title": "VoxFusion - Скажите. Найдите. Никогда не теряйте мысль.",
+		"meta.title": "VoxFusion - Печатайте голосом. В любом приложении на Mac.",
 		"meta.description":
-			"VoxFusion - Запечатлейте свой голос, освободите разум. Самый быстрый способ превратить речь в поисковые заметки.",
+			"VoxFusion - Нажмите горячую клавишу, говорите, и текст появится там, где вы печатаете. Быстрая диктовка на базе Whisper AI.",
 
 		// Navigation
 		"nav.features": "Возможности",
 		"nav.demo": "Демо",
 		"nav.pricing": "Цены",
-		"nav.reviews": "Отзывы",
 		"nav.signIn": "Войти",
 		"nav.tryFree": "Попробовать",
 
 		// Hero
-		"hero.badge": "Теперь с транскрипцией в реальном времени",
-		"hero.title.line1": "Скажите. Найдите.",
-		"hero.title.line2": "Никогда не теряйте мысль.",
+		"hero.badge": "Голос в текст в любом приложении",
+		"hero.title.line1": "Печатайте голосом.",
+		"hero.title.line2": "В любом приложении на Mac.",
 		"hero.subtitle":
-			"VoxFusion превращает ваш голос в организованные заметки с поиском за секунды. Записывайте встречи, мозговые штурмы и идеи - находите что угодно простым поиском.",
+			"Нажмите Cmd+;, говорите естественно, и ваши слова мгновенно появятся в любом приложении. VoxFusion - быстрая и точная диктовка для всего Mac.",
 		"hero.cta.download": "Скачать для Mac",
 		"hero.cta.watchDemo": "Смотреть демо",
-		"hero.stats.users": "Активных пользователей",
-		"hero.stats.hours": "Часов записано",
-		"hero.stats.rating": "Рейтинг App Store",
 
 		// Features
 		"features.tag": "Возможности",
 		"features.title":
-			"Все, что нужно для записи, поиска и организации голосовых заметок",
+			"Простая и быстрая диктовка везде",
 		"features.description":
-			"Создано для профессионалов, которые думают быстрее, чем печатают.",
-		"features.instantRecording.title": "Мгновенная запись",
-		"features.instantRecording.description":
-			"Запись в один клик со студийным качеством. Работает офлайн, синхронизируется при подключении.",
-		"features.smartSearch.title": "Умный поиск",
-		"features.smartSearch.description":
-			"Находите любой момент по сказанному. Наш ИИ понимает контекст, а не только ключевые слова.",
-		"features.autoTranscription.title": "Авто-транскрипция",
-		"features.autoTranscription.description":
-			"Транскрипция в реальном времени на базе Whisper. 99% точность на 50+ языках.",
-		"features.privacy.title": "Приватность прежде всего",
-		"features.privacy.description":
-			"Ваши записи остаются на устройстве. Никакой загрузки в облако без вашего согласия.",
-		"features.aiSummaries.title": "ИИ-резюме",
-		"features.aiSummaries.description":
-			"Мгновенные резюме, задачи и ключевые моменты из любой записи.",
-		"features.organization.title": "Умная организация",
-		"features.organization.description":
-			"Авто-теги и папки организуют записи без усилий.",
+			"Без переключения приложений. Без копирования. Просто говорите.",
+		"features.globalHotkey.title": "Глобальная горячая клавиша",
+		"features.globalHotkey.description":
+			"Нажмите Cmd+; в любом месте на Mac для диктовки. Работает везде - почта, документы, чаты, редакторы кода.",
+		"features.instantTranscription.title": "Мгновенная транскрипция",
+		"features.instantTranscription.description":
+			"На базе Whisper AI (через Groq) для быстрого и точного распознавания речи. Текст появляется за секунды.",
+		"features.customDictionary.title": "Свой словарь",
+		"features.customDictionary.description":
+			"Добавьте до 50 специальных терминов, имен или технических слов для лучшей точности.",
+		"features.history.title": "История транскрипций",
+		"features.history.description":
+			"Просматривайте прошлые транскрипции с временными метками. Копируйте в буфер или оценивайте точность.",
+		"features.languages.title": "Английский и русский",
+		"features.languages.description":
+			"Полная поддержка диктовки на английском и русском с оптимизацией для каждого языка.",
+		"features.simpleSetup.title": "Простая настройка",
+		"features.simpleSetup.description":
+			"Скачайте, дайте доступ к микрофону и начните диктовать. Никакой сложной настройки.",
 		"features.highlight.tag": "Почему VoxFusion?",
 		"features.highlight.title":
-			"Запишите 60-минутную встречу. Найдите любую цитату за 3 секунды.",
+			"Диктуйте в любое приложение без переключения окон.",
 		"features.highlight.description":
-			"Традиционные заметки не работают. Вы либо пишете и упускаете сказанное, либо слушаете и забываете потом. VoxFusion фиксирует все и делает мгновенно доступным для поиска.",
-		"features.highlight.list1":
-			"Работает с любым приложением для встреч - Zoom, Meet, Teams",
-		"features.highlight.list2": "Автоматически определяет разных спикеров",
-		"features.highlight.list3": "Экспорт в Notion, Obsidian или текст",
+			"Обычные приложения для диктовки заставляют копировать и вставлять. VoxFusion вставляет текст прямо туда, где курсор - в любом приложении, любом текстовом поле.",
+		"features.highlight.list1": "Работает в любом приложении Mac - браузеры, редакторы, почта",
+		"features.highlight.list2": "Настраиваемая горячая клавиша (по умолчанию Cmd+;)",
+		"features.highlight.list3": "Свои термины для имен и технической лексики",
 
 		// Demo
 		"demo.tag": "Демо",
 		"demo.title": "Посмотрите VoxFusion в действии",
 		"demo.description":
-			"Узнайте, как легко записывать, транскрибировать и искать голосовые заметки.",
+			"Три простых шага для диктовки в любом месте на Mac.",
 		"demo.videoLabel": "Демонстрация продукта",
-		"demo.step1.title": "Начните запись",
+		"demo.step1.title": "Нажмите горячую клавишу",
 		"demo.step1.description":
-			"Один клик для записи аудио из любого источника - микрофона или системы.",
-		"demo.step2.title": "Мгновенная транскрипция",
+			"Нажмите Cmd+; откуда угодно на Mac. Индикатор покажет, что VoxFusion слушает.",
+		"demo.step2.title": "Говорите естественно",
 		"demo.step2.description":
-			"Смотрите, как ваши слова появляются в реальном времени с определением спикеров.",
-		"demo.step3.title": "Ищите все",
+			"Говорите в обычном темпе. Whisper AI распознает речь с высокой точностью.",
+		"demo.step3.title": "Текст появляется мгновенно",
 		"demo.step3.description":
-			"Введите любую фразу, чтобы перейти к этому моменту в записи.",
-
-		// Reviews
-		"reviews.tag": "Отзывы",
-		"reviews.title": "Любимый инструмент тех, кто много говорит",
-		"reviews.description":
-			"Присоединяйтесь к тысячам профессионалов, изменивших способ записи идей.",
+			"Ваши слова вставляются прямо туда, где был курсор. Без копирования.",
 
 		// Pricing
 		"pricing.tag": "Цены",
-		"pricing.title": "Начните бесплатно, обновляйтесь по мере необходимости",
+		"pricing.title": "Начните бесплатно, обновляйтесь по необходимости",
 		"pricing.description":
-			"Кредитная карта не требуется. Отмена в любое время.",
+			"Карта не требуется. Отмена в любое время.",
 		"pricing.free.name": "Бесплатно",
-		"pricing.free.price": "$0",
+		"pricing.free.price": "0 ₽",
 		"pricing.free.period": "навсегда",
 		"pricing.free.description":
-			"Идеально для начала работы с голосовыми заметками",
-		"pricing.free.feature1": "5 часов записи в месяц",
-		"pricing.free.feature2": "Базовая транскрипция",
-		"pricing.free.feature3": "Полнотекстовый поиск",
-		"pricing.free.feature4": "Локальное хранение",
-		"pricing.free.feature5": "Экспорт в текст",
+			"Идеально для знакомства с голосовой диктовкой",
+		"pricing.free.feature1": "25 000 слов в месяц",
+		"pricing.free.feature2": "Транскрипция Whisper AI",
+		"pricing.free.feature3": "Свой словарь (50 терминов)",
+		"pricing.free.feature4": "История транскрипций",
+		"pricing.free.feature5": "Английский и русский",
 		"pricing.free.cta": "Начать бесплатно",
 		"pricing.pro.badge": "Популярный",
 		"pricing.pro.name": "Pro",
-		"pricing.pro.price": "$8",
+		"pricing.pro.price": "800 ₽",
 		"pricing.pro.period": "в месяц",
 		"pricing.pro.description":
-			"Для профессионалов, использующих голос ежедневно",
+			"Для тех, кто диктует каждый день",
 		"pricing.pro.feature1": "Безлимитная",
-		"pricing.pro.feature1.suffix": " запись",
-		"pricing.pro.feature2": "Премиум транскрипция (99% точность)",
-		"pricing.pro.feature3": "Определение спикеров",
-		"pricing.pro.feature4": "ИИ-резюме и задачи",
-		"pricing.pro.feature5": "Облачная синхронизация",
-		"pricing.pro.feature6": "Поддержка 50+ языков",
-		"pricing.pro.feature7": "Экспорт в Notion, Obsidian и др.",
-		"pricing.pro.feature8": "Приоритетная поддержка",
-		"pricing.pro.cta": "Начать 14-дневный пробный период",
-		"pricing.faq": "Вопросы? Напишите нам на",
+		"pricing.pro.feature1.suffix": " транскрипция",
+		"pricing.pro.feature2": "Все из бесплатного тарифа",
+		"pricing.pro.feature3": "Приоритетная обработка",
+		"pricing.pro.feature4": "Приоритетная поддержка",
+		"pricing.pro.cta": "Начать Pro",
+		"pricing.faq": "Вопросы? Напишите на",
 		"pricing.faq.suffix": "- отвечаем в течение 24 часов.",
 
 		// CTA
-		"cta.title": "Готовы записать каждую идею?",
+		"cta.title": "Готовы печатать голосом?",
 		"cta.description":
-			"Начните записывать бесплатно. Кредитная карта не требуется.",
+			"Скачайте VoxFusion бесплатно. Начните диктовать за секунды.",
 		"cta.button": "Скачать для Mac",
 
 		// Footer
-		"footer.tagline": "Запечатлейте свой голос, освободите разум.",
+		"footer.tagline": "Печатайте голосом. В любом приложении на Mac.",
 		"footer.product": "Продукт",
 		"footer.company": "Компания",
 		"footer.legal": "Правовая информация",
