@@ -12,7 +12,7 @@ env:
 
 jobs:
   cleanup-pr-releases:
-    runs-on: ubuntu-latest
+    runs-on: tenki-macos-latest-small
     steps:
       - name: Delete all releases for this PR
         env:
