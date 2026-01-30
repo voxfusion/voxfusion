@@ -55,5 +55,5 @@ export const auth = betterAuth({
 			secure: true,
 		},
 	},
-	trustedOrigins: ["voxfusion://"],
+	trustedOrigins: ["voxfusion://", process.env.BETTER_AUTH_URL || "http://localhost:3000"],
 });
