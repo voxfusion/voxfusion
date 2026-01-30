@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, type ParentProps, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, type ParentProps, Show } from "solid-js";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -29,7 +29,8 @@ const handleDeepLinkUrls = async (urls: string[]) => {
 				await tokenManager.storeToken(token);
 				console.log(await tokenManager.getToken())
 				await authClient.useSession.get().refetch();
-				window.location.reload();
+
+				console.log(await authClient.getSession());
 				break;
 			}
 		} catch (error) {
@@ -43,7 +44,10 @@ function App(props: ParentProps) {
 	const settings = useSettings();
 	const navigate = useNavigate();
 	const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
-	console.log("session", session());
+
+	createEffect(() => {
+		console.log("session", session());
+	});
 
 	const shouldShowOnboarding = () => {
 		if (FORCE_SHOW_ONBOARDING) return true;
