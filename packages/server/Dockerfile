@@ -35,12 +35,16 @@ WORKDIR /app
 RUN echo 'fetch("http://localhost:3000/api/health").then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))' > healthcheck.ts
 RUN bun build --compile healthcheck.ts --outfile healthcheck --target bun
 
-FROM gcr.io/distroless/base-debian12:nonroot
+FROM debian:12-slim
+
+RUN useradd --create-home --shell /bin/bash appuser
 
 WORKDIR /app
 
-COPY --from=builder --chown=nonroot:nonroot /app/packages/server/server ./server
-COPY --from=healthcheck-builder --chown=nonroot:nonroot /app/healthcheck ./healthcheck
+COPY --from=builder --chown=appuser:appuser /app/packages/server/server ./server
+COPY --from=healthcheck-builder --chown=appuser:appuser /app/healthcheck ./healthcheck
+
+USER appuser
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

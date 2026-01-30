@@ -18,8 +18,9 @@ export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 	const isDev = process.env.NODE_ENV === "development";
 
 	const template = isDev ? deeplinkDevHtml : deeplinkProductionHtml;
-	let html = template.replaceAll("{{DEEP_LINK}}", deepLink);
-	html = html.replaceAll("{{SESSION_TOKEN}}", session.session.token);
+	const html = (template as unknown as string)
+		.replaceAll("{{DEEP_LINK}}", deepLink)
+		.replaceAll("{{SESSION_TOKEN}}", session.session.token);
 
 	return new Response(html, {
 		headers: { "Content-Type": "text/html" },
