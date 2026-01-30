@@ -5,7 +5,6 @@ export const ru: Translations = {
 		welcome: "Добро пожаловать в VoxFusion",
 		signInToContinue: "Войдите, чтобы продолжить",
 		continueWithGoogle: "Продолжить с Google",
-		googleLogo: "Логотип Google",
 		devPasteToken: "Разработка: Вставьте токен для аутентификации",
 		pasteTokenPlaceholder: "Вставьте токен сюда",
 		authenticate: "Аутентификация",
