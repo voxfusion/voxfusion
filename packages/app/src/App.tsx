@@ -2,9 +2,11 @@ import { createSignal, onCleanup, onMount, type ParentProps, Show } from "solid-
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useNavigate } from "@solidjs/router";
 import { useStore } from "@nanostores/solid";
 import { authClient } from "./lib/authClient";
+import { tokenManager } from "./lib/tokenManager";
 import { initSettings, useSettings, markOnboardingComplete, updateMicrophone } from "./lib/settingsStore";
 import tauriconf from "../src-tauri/tauri.conf.json";
 import Auth from "./components/Auth";
@@ -15,6 +17,23 @@ import UpdateNotification from "./components/UpdateNotification";
 
 const FORCE_SHOW_ONBOARDING =
 	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
+
+const handleDeepLinkUrls = async (urls: string[]) => {
+	for (const urlString of urls) {
+		try {
+			const url = new URL(urlString);
+			const token = url.searchParams.get("token");
+
+			if (token) {
+				await tokenManager.storeToken(token);
+				await authClient.useSession.fetch();
+				break;
+			}
+		} catch (error) {
+			console.error("Failed to handle deep link:", error);
+		}
+	}
+};
 
 function App(props: ParentProps) {
 	const session = useStore(authClient.useSession);
@@ -31,6 +50,16 @@ function App(props: ParentProps) {
 	onMount(async () => {
 		// Initialize settings from store
 		await initSettings();
+
+		const initialUrls = await getCurrent();
+		if (initialUrls) {
+			await handleDeepLinkUrls(initialUrls);
+		}
+
+		const unlistenDeepLink = await onOpenUrl((urls) => {
+			handleDeepLinkUrls(urls).catch(console.error);
+		});
+		onCleanup(() => unlistenDeepLink());
 
 		// Listen for tray menu events
 		const unlistenNavigate = await listen<string>("navigate", (event) => {
