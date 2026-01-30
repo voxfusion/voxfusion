@@ -28,6 +28,7 @@ const handleDeepLinkUrls = async (urls: string[]) => {
 				await tokenManager.storeToken(token);
 				console.log(await tokenManager.getToken())
 				await authClient.useSession.get().refetch();
+				window.location.reload();
 				break;
 			}
 		} catch (error) {
