@@ -13,7 +13,7 @@ env:
 
 jobs:
   build:
-    runs-on: tenki-macos-latest-small
+    runs-on: tenki-macos-latest-mini
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
