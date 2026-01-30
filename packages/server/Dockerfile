@@ -35,6 +35,7 @@ WORKDIR /app
 RUN echo 'fetch("http://localhost:3000/api/health").then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))' > healthcheck.ts
 RUN bun build --compile healthcheck.ts --outfile healthcheck --target bun
 
+#deploy
 FROM debian:12-slim
 
 RUN useradd --create-home --shell /bin/bash appuser
