@@ -22,6 +22,7 @@ const handleDeepLinkUrls = async (urls: string[]) => {
 	for (const urlString of urls) {
 		try {
 			const url = new URL(urlString);
+			console.log(url);
 			const token = url.searchParams.get("token");
 
 			if (token) {
@@ -55,6 +56,7 @@ function App(props: ParentProps) {
 
 		const initialUrls = await getCurrent();
 		if (initialUrls) {
+			console.log("initialUrls", initialUrls);
 			await handleDeepLinkUrls(initialUrls);
 		}
 
