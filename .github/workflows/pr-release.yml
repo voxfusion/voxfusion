@@ -15,12 +15,11 @@ env:
   RELEASES_REPO: gregor-tokarev/voxfusion-releases
 
 jobs:
-  build-release:
+  build:
     runs-on: tenki-macos-latest-small
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
       tag_name: ${{ steps.version.outputs.TAG_NAME }}
-      release_url: ${{ steps.create-release.outputs.html_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -95,28 +94,36 @@ jobs:
           echo "Found DMG: $DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
 
-          # Find the .tar.gz and .tar.gz.sig files
-          TAR_GZ_PATH=$(find packages/app/src-tauri/target -name "*.tar.gz" -not -name "*.sig" -type f | head -1)
-          SIG_FILE=$(find packages/app/src-tauri/target -name "*.tar.gz.sig" -type f | head -1)
-
-          if [ -n "$TAR_GZ_PATH" ]; then
-            echo "TAR_GZ_PATH=$TAR_GZ_PATH" >> $GITHUB_OUTPUT
-          fi
-          if [ -n "$SIG_FILE" ]; then
-            echo "SIG_PATH=$SIG_FILE" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Copy DMG with version name
+      - name: Prepare artifacts for upload
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
-          cp "${{ steps.artifacts.outputs.DMG_PATH }}" "VoxFusion-${VERSION}.dmg"
-          echo "DMG_VERSIONED=VoxFusion-${VERSION}.dmg" >> $GITHUB_ENV
+          mkdir -p release-artifacts
+          cp "${{ steps.artifacts.outputs.DMG_PATH }}" "release-artifacts/VoxFusion-${VERSION}.dmg"
+          cp "${{ steps.artifacts.outputs.DMG_PATH }}" "release-artifacts/VoxFusion.dmg"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+
+  publish:
+    runs-on: tenki-standard-autoscale
+    needs: build
+    outputs:
+      release_url: ${{ steps.create-release.outputs.html_url }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
 
       - name: Delete existing release if present
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
         run: |
-          TAG_NAME="${{ steps.version.outputs.TAG_NAME }}"
+          TAG_NAME="${{ needs.build.outputs.tag_name }}"
           # Try to delete existing release (ignore errors if it doesn't exist)
           gh release delete "$TAG_NAME" --repo "${{ env.RELEASES_REPO }}" --yes 2>/dev/null || true
           # Try to delete the tag (ignore errors if it doesn't exist)
@@ -130,10 +137,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
         with:
           repository: ${{ env.RELEASES_REPO }}
-          tag_name: ${{ steps.version.outputs.TAG_NAME }}
-          name: "Test Build: ${{ steps.version.outputs.VERSION }}"
+          tag_name: ${{ needs.build.outputs.tag_name }}
+          name: "Test Build: ${{ needs.build.outputs.version }}"
           body: |
-            ## Test Build: ${{ steps.version.outputs.VERSION }}
+            ## Test Build: ${{ needs.build.outputs.version }}
 
             **This is a pre-release build for testing purposes.**
 
@@ -156,12 +163,12 @@ jobs:
           draft: false
           prerelease: true
           files: |
-            ${{ env.DMG_VERSIONED }}
-            ${{ steps.artifacts.outputs.DMG_PATH }}
+            release-artifacts/VoxFusion-${{ needs.build.outputs.version }}.dmg
+            release-artifacts/VoxFusion.dmg
 
   comment-on-pr:
-    needs: build-release
-    runs-on: tenki-macos-latest-small
+    needs: [build, publish]
+    runs-on: tenki-standard-autoscale
     if: github.event_name == 'pull_request'
     steps:
       - name: Find existing comment
@@ -183,19 +190,19 @@ jobs:
 
             A new test build has been created for this PR.
 
-            **Version:** `${{ needs.build-release.outputs.version }}`
+            **Version:** `${{ needs.build.outputs.version }}`
 
             ### Download
 
-            [**Download VoxFusion Test Build**](https://github.com/gregor-tokarev/voxfusion-releases/releases/tag/${{ needs.build-release.outputs.tag_name }})
+            [**Download VoxFusion Test Build**](https://github.com/gregor-tokarev/voxfusion-releases/releases/tag/${{ needs.build.outputs.tag_name }})
 
-            Or visit the [releases page](https://github.com/gregor-tokarev/voxfusion-releases/releases) and look for the prerelease tagged `${{ needs.build-release.outputs.tag_name }}`.
+            Or visit the [releases page](https://github.com/gregor-tokarev/voxfusion-releases/releases) and look for the prerelease tagged `${{ needs.build.outputs.tag_name }}`.
 
             ---
             *Updated: ${{ github.event.pull_request.head.sha }}*
 
   cleanup-old-pr-releases:
-    runs-on: tenki-macos-latest-small
+    runs-on: tenki-standard-autoscale
     if: github.event_name == 'pull_request'
     steps:
       - name: Cleanup old releases for this PR

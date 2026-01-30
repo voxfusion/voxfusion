@@ -12,7 +12,7 @@ env:
 
 jobs:
   cleanup-pr-releases:
-    runs-on: tenki-macos-latest-small
+    runs-on: tenki-standard-autoscale
     steps:
       - name: Delete all releases for this PR
         env:

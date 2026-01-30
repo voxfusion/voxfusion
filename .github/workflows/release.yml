@@ -12,7 +12,7 @@ env:
   RELEASES_REPO: gregor-tokarev/voxfusion-releases
 
 jobs:
-  release:
+  build:
     runs-on: tenki-macos-latest-small
     steps:
       - name: Checkout repository
@@ -53,10 +53,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: bun run tauri build --target universal-apple-darwin
 
-      - name: Get version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
       - name: Find build artifacts
         id: artifacts
         run: |
@@ -71,12 +67,6 @@ jobs:
           echo "Found DMG: $DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
 
-          # Generate latest.json for updater
-          BUNDLE_DIR=$(dirname "$DMG_PATH")
-          VERSION=${{ github.ref_name }}
-          VERSION=${VERSION#v}
-
-          # Find the .tar.gz.sig file for signature
           SIG_FILE=$(find packages/app/src-tauri/target -name "*.tar.gz.sig" -type f | head -1)
           if [ -n "$SIG_FILE" ]; then
             SIGNATURE=$(cat "$SIG_FILE")
@@ -84,10 +74,62 @@ jobs:
             SIGNATURE=""
             echo "Warning: No signature file found"
           fi
+          echo "SIGNATURE=$SIGNATURE" >> $GITHUB_OUTPUT
 
-          # Create latest.json
-          UPDATER_JSON="packages/app/src-tauri/target/latest.json"
-          cat > "$UPDATER_JSON" << EOF
+      - name: Prepare artifacts for upload
+        run: |
+          mkdir -p release-artifacts
+          cp "${{ steps.artifacts.outputs.DMG_PATH }}" release-artifacts/VoxFusion.dmg
+          cp "${{ steps.artifacts.outputs.DMG_PATH }}" release-artifacts/VoxFusion-latest.dmg
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+
+      - name: Save signature
+        run: echo "${{ steps.artifacts.outputs.SIGNATURE }}" > release-artifacts/signature.txt
+
+      - name: Upload signature
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-signature
+          path: release-artifacts/signature.txt
+
+  publish:
+    runs-on: tenki-standard-autoscale
+    needs: build
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts
+          path: release-artifacts/
+
+      - name: Download signature
+        uses: actions/download-artifact@v4
+        with:
+          name: release-signature
+          path: release-signature/
+
+      - name: Read signature
+        id: sig
+        run: |
+          SIGNATURE=$(cat release-signature/signature.txt)
+          echo "SIGNATURE=$SIGNATURE" >> $GITHUB_OUTPUT
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Generate latest.json
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          SIGNATURE="${{ steps.sig.outputs.SIGNATURE }}"
+          DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion-latest.dmg"
+
+          cat > latest.json << EOF
           {
             "version": "$VERSION",
             "notes": "See release notes on GitHub",
@@ -95,42 +137,22 @@ jobs:
             "platforms": {
               "darwin-universal": {
                 "signature": "$SIGNATURE",
-                "url": "PLACEHOLDER"
+                "url": "$DOWNLOAD_URL"
               },
               "darwin-x86_64": {
                 "signature": "$SIGNATURE",
-                "url": "PLACEHOLDER"
+                "url": "$DOWNLOAD_URL"
               },
               "darwin-aarch64": {
                 "signature": "$SIGNATURE",
-                "url": "PLACEHOLDER"
+                "url": "$DOWNLOAD_URL"
               }
             }
           }
           EOF
 
-          echo "Created latest.json"
-          echo "UPDATER_JSON=$UPDATER_JSON" >> $GITHUB_OUTPUT
-
-      - name: Update latest.json with GitHub release URLs
-        run: |
-          # Update the download URL in latest.json to point to the public releases repo
-          DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion-latest.dmg"
-
-          echo "Updating latest.json at: ${{ steps.artifacts.outputs.UPDATER_JSON }}"
-          echo "New download URL: $DOWNLOAD_URL"
-
-          jq --arg url "$DOWNLOAD_URL" \
-             '.platforms."darwin-universal".url = $url | .platforms."darwin-x86_64".url = $url | .platforms."darwin-aarch64".url = $url' \
-             "${{ steps.artifacts.outputs.UPDATER_JSON }}" > latest.json.tmp
-          mv latest.json.tmp "${{ steps.artifacts.outputs.UPDATER_JSON }}"
-
-          echo "Updated latest.json:"
-          cat "${{ steps.artifacts.outputs.UPDATER_JSON }}"
-
-      - name: Copy DMG as VoxFusion-latest.dmg
-        run: |
-          cp "${{ steps.artifacts.outputs.DMG_PATH }}" "VoxFusion-latest.dmg"
+          echo "Created latest.json:"
+          cat latest.json
 
       - name: Create release in public repository
         uses: softprops/action-gh-release@v2
@@ -161,6 +183,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            ${{ steps.artifacts.outputs.DMG_PATH }}
-            VoxFusion-latest.dmg
-            ${{ steps.artifacts.outputs.UPDATER_JSON }}
+            release-artifacts/VoxFusion.dmg
+            release-artifacts/VoxFusion-latest.dmg
+            latest.json
