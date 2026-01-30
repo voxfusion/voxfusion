@@ -3,7 +3,6 @@ export type Translations = {
 		welcome: string;
 		signInToContinue: string;
 		continueWithGoogle: string;
-		googleLogo: string;
 		devPasteToken: string;
 		pasteTokenPlaceholder: string;
 		authenticate: string;
@@ -128,7 +127,6 @@ export const en: Translations = {
 		welcome: "Welcome to VoxFusion",
 		signInToContinue: "Sign in to continue",
 		continueWithGoogle: "Continue with Google",
-		googleLogo: "Google logo",
 		devPasteToken: "Development: Paste token to authenticate",
 		pasteTokenPlaceholder: "Paste token here",
 		authenticate: "Authenticate",
