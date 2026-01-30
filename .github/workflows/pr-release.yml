@@ -1,7 +1,9 @@
 name: PR Release
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
 
 permissions:
   contents: write
@@ -12,7 +14,7 @@ env:
 
 jobs:
   build:
-    if: github.event.label.name == 'pr-release'
+    environment: pr-release
     runs-on: tenki-macos-latest-small
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
