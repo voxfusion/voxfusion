@@ -26,6 +26,7 @@ const handleDeepLinkUrls = async (urls: string[]) => {
 
 			if (token) {
 				await tokenManager.storeToken(token);
+				console.log(await tokenManager.getToken())
 				await authClient.useSession.get().refetch();
 				break;
 			}
@@ -129,6 +130,7 @@ function App(props: ParentProps) {
 				</div>
 			</Show>
 			<Show when={!session()?.isPending}>
+				{JSON.stringify(session()?.data?.user)}
 				<Show
 					when={session()?.data?.user}
 					fallback={
