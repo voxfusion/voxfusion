@@ -1,7 +1,8 @@
 name: PR Release
 
 on:
-  workflow_dispatch:
+  pull_request:
+    types: [labeled]
 
 permissions:
   contents: write
@@ -12,11 +13,23 @@ env:
 
 jobs:
   build:
+    if: github.event.label.name == 'pr-release'
     runs-on: tenki-macos-latest-small
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
       tag_name: ${{ steps.version.outputs.TAG_NAME }}
     steps:
+      - name: Remove pr-release label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              name: 'pr-release'
+            });
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
