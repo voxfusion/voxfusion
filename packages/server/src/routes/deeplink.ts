@@ -1,7 +1,6 @@
 import { Elysia } from "elysia";
-import { join } from "path";
-
-const templatesDir = join(import.meta.dir, "../templates");
+import deeplinkDevHtml from "../templates/deeplink-dev.html" with { type: "text" };
+import deeplinkProductionHtml from "../templates/deeplink-production.html" with { type: "text" };
 
 export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 	const cookieHeader = ctx.request.headers.get("cookie") || "";
@@ -20,11 +19,8 @@ export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 	const deepLink = `voxfusion://settings?token=${sessionToken}`;
 	const isDev = process.env.NODE_ENV === "development";
 
-	const templateFile = isDev ? "deeplink-dev.html" : "deeplink-production.html";
-	const templatePath = join(templatesDir, templateFile);
-
-	let html = await Bun.file(templatePath).text();
-	html = html.replaceAll("{{DEEP_LINK}}", deepLink);
+	const template = isDev ? deeplinkDevHtml : deeplinkProductionHtml;
+	let html = template.replaceAll("{{DEEP_LINK}}", deepLink);
 	html = html.replaceAll("{{SESSION_TOKEN}}", sessionToken);
 
 	return new Response(html, {
