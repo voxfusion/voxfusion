@@ -31,7 +31,6 @@ out
 
 # Other packages (monorepo)
 packages/app
-packages/marketingsite
 
 # Logs
 logs
