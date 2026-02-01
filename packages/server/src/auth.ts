@@ -29,9 +29,7 @@ export const auth = betterAuth({
 		},
 	},
 	session: {
-		// Maximum allowed cookie duration: 400 days (34,560,000 seconds)
 		expiresIn: 60 * 60 * 24 * 400,
-		// Refresh window: 30 days - session expiration extends by 30 days on each access
 		updateAge: 60 * 60 * 24 * 30,
 	},
 	account: {
@@ -43,7 +41,6 @@ export const auth = betterAuth({
 			jwt: {
 				issuer: process.env.BETTER_AUTH_URL || "http://localhost:3000",
 				audience: "voxfusion",
-				// Match session expiration: 400 days (max cookie duration)
 				expirationTime: "400d",
 			},
 		}),

@@ -1,11 +1,9 @@
-/** @type {import('tailwindcss').Config} */
 export default {
 	darkMode: 'class',
 	content: ["./index.html", "./voice-control.html", "./src/**/*.{js,ts,jsx,tsx}"],
 	theme: {
 		extend: {
 			colors: {
-				// Primary coral/orange accent
 				primary: {
 					50: '#FFF5F2',
 					100: '#FFE8E2',
@@ -18,7 +16,6 @@ export default {
 					800: '#A33B24',
 					900: '#7A2C1B',
 				},
-				// Deep ocean/midnight blue for backgrounds (optional dark mode)
 				midnight: {
 					50: '#E8EDF4',
 					100: '#C5D1E3',
@@ -31,7 +28,6 @@ export default {
 					800: '#0F1E32',
 					900: '#0A1628',
 				},
-				// Accent teal
 				accent: {
 					50: '#E6F7F8',
 					100: '#B3E8EB',

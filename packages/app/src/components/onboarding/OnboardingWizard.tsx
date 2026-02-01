@@ -59,15 +59,12 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 
 	return (
 		<div class="fixed inset-0 bg-slate-100 dark:bg-midnight-900 flex flex-col items-center justify-center p-8">
-			{/* Drag region for window */}
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 
-			{/* Step Indicator */}
 			<div class="mb-12">
 				<StepIndicator currentStep={currentStep()} totalSteps={TOTAL_STEPS} />
 			</div>
 
-			{/* Step Content */}
 			<div class="flex-1 flex items-center justify-center w-full max-w-2xl">
 				<div
 					class={`w-full transition-all duration-200 ${
@@ -99,7 +96,6 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 				</div>
 			</div>
 
-			{/* Navigation */}
 			<div class="flex items-center justify-between w-full max-w-2xl mt-8">
 				<Show when={currentStep() > 1} fallback={<div />}>
 					<button

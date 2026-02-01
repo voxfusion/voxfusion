@@ -61,11 +61,9 @@ export async function loadSettings(): Promise<Settings> {
 export async function saveTheme(theme: Theme): Promise<void> {
 	const store = await getStore();
 	await store.set("theme", theme);
-	// Also save to localStorage for immediate access on page load (prevents white flash)
 	try {
 		localStorage.setItem("voxfusion-theme", theme);
 	} catch (e) {
-		// Ignore localStorage errors
 	}
 }
 
@@ -103,7 +101,6 @@ export async function getAudioInputDevices(): Promise<AudioDevice[]> {
 	}
 }
 
-// Reactive settings signals
 const [settings, setSettingsInternal] = createSignal<Settings>(DEFAULT_SETTINGS);
 
 export function useSettings() {
@@ -114,11 +111,9 @@ export async function initSettings(): Promise<void> {
 	const loaded = await loadSettings();
 	setSettingsInternal(loaded);
 	applyTheme(loaded.theme);
-	// Sync theme to localStorage for immediate access on next page load
 	try {
 		localStorage.setItem("voxfusion-theme", loaded.theme);
 	} catch (e) {
-		// Ignore localStorage errors
 	}
 }
 
@@ -131,14 +126,12 @@ export async function updateTheme(theme: Theme): Promise<void> {
 export async function updateHotkey(hotkey: string): Promise<void> {
 	await saveHotkey(hotkey);
 	setSettingsInternal((prev) => ({ ...prev, hotkey }));
-	// Notify other windows about the settings change
 	await emit("settings-changed");
 }
 
 export async function updateMicrophone(microphoneId: string | null): Promise<void> {
 	await saveMicrophone(microphoneId);
 	setSettingsInternal((prev) => ({ ...prev, selectedMicrophoneId: microphoneId }));
-	// Notify other windows about the settings change
 	await emit("settings-changed");
 }
 
@@ -162,7 +155,6 @@ function applyTheme(theme: Theme): void {
 	}
 }
 
-// Listen for system theme changes
 if (typeof window !== "undefined") {
 	window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
 		const currentSettings = settings();

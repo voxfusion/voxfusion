@@ -106,7 +106,6 @@ export const ru: Translations = {
 		languageDescription: "Выберите предпочитаемый язык интерфейса.",
 		completionTitle: "Всё готово!",
 		completionDescription: "VoxFusion готов помочь вам с транскрипцией голоса.",
-		// Microphone Permission Step
 		micPermissionTitle: "Доступ к микрофону",
 		micPermissionDescription:
 			"VoxFusion нужен доступ к микрофону для записи и транскрипции голоса.",
@@ -114,7 +113,6 @@ export const ru: Translations = {
 		micPermissionNotGranted: "Требуется доступ к микрофону",
 		grantMicPermission: "Предоставить доступ",
 		checkingPermission: "Проверка...",
-		// Accessibility Permission Step
 		accessibilityTitle: "Универсальный доступ",
 		accessibilityDescription:
 			"VoxFusion нужен универсальный доступ для ввода текста в любое приложение.",

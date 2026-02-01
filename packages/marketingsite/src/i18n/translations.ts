@@ -7,18 +7,15 @@ export const defaultLang = "ru";
 
 export const translations = {
 	en: {
-		// Meta
 		"meta.title": "VoxFusion - Type with your voice. Anywhere on Mac.",
 		"meta.description":
 			"VoxFusion - Press a hotkey, speak, and text appears wherever you're typing. Fast dictation powered by Whisper AI.",
 
-		// Navigation
 		"nav.features": "Features",
 		"nav.demo": "Demo",
 		"nav.pricing": "Pricing",
 		"nav.download": "Download",
 
-		// Hero
 		"hero.badge": "Voice-to-text in any app",
 		"hero.title.line1": "Type with your voice.",
 		"hero.title.line2": "Anywhere on Mac.",
@@ -27,7 +24,6 @@ export const translations = {
 		"hero.cta.download": "Download for Mac",
 		"hero.cta.watchDemo": "Watch Demo",
 
-		// Features
 		"features.tag": "Features",
 		"features.title":
 			"Simple, fast dictation that works everywhere",
@@ -60,7 +56,6 @@ export const translations = {
 		"features.highlight.list2": "Customizable hotkey (default Cmd+;)",
 		"features.highlight.list3": "Custom terms for names and technical vocabulary",
 
-		// Demo
 		"demo.tag": "Demo",
 		"demo.title": "See VoxFusion in action",
 		"demo.description":
@@ -76,7 +71,6 @@ export const translations = {
 		"demo.step3.description":
 			"Your words are inserted directly where your cursor was. No copy-paste needed.",
 
-		// Pricing
 		"pricing.tag": "Pricing",
 		"pricing.title": "Start free, upgrade when you need more",
 		"pricing.description": "No credit card required. Cancel anytime.",
@@ -104,12 +98,10 @@ export const translations = {
 		"pricing.faq": "Questions? Email us at",
 		"pricing.faq.suffix": "- we respond within 24 hours.",
 
-		// CTA
 		"cta.title": "Ready to type with your voice?",
 		"cta.description": "Download VoxFusion free. Start dictating in seconds.",
 		"cta.button": "Download for Mac",
 
-		// Footer
 		"footer.tagline": "Type with your voice. Anywhere on Mac.",
 		"footer.product": "Product",
 		"footer.company": "Company",
@@ -126,18 +118,15 @@ export const translations = {
 		"footer.status": "All systems operational",
 	},
 	ru: {
-		// Meta
 		"meta.title": "VoxFusion - Печатайте голосом. В любом приложении на Mac.",
 		"meta.description":
 			"VoxFusion - Нажмите горячую клавишу, говорите, и текст появится там, где вы печатаете. Быстрая диктовка на базе Whisper AI.",
 
-		// Navigation
 		"nav.features": "Возможности",
 		"nav.demo": "Демо",
 		"nav.pricing": "Цены",
 		"nav.download": "Скачать",
 
-		// Hero
 		"hero.badge": "Голос в текст в любом приложении",
 		"hero.title.line1": "Печатайте голосом.",
 		"hero.title.line2": "В любом приложении на Mac.",
@@ -146,7 +135,6 @@ export const translations = {
 		"hero.cta.download": "Скачать для Mac",
 		"hero.cta.watchDemo": "Смотреть демо",
 
-		// Features
 		"features.tag": "Возможности",
 		"features.title":
 			"Простая и быстрая диктовка везде",
@@ -179,7 +167,6 @@ export const translations = {
 		"features.highlight.list2": "Настраиваемая горячая клавиша (по умолчанию Cmd+;)",
 		"features.highlight.list3": "Свои термины для имен и технической лексики",
 
-		// Demo
 		"demo.tag": "Демо",
 		"demo.title": "Посмотрите VoxFusion в действии",
 		"demo.description":
@@ -195,7 +182,6 @@ export const translations = {
 		"demo.step3.description":
 			"Ваши слова вставляются прямо туда, где был курсор. Без копирования.",
 
-		// Pricing
 		"pricing.tag": "Цены",
 		"pricing.title": "Начните бесплатно, обновляйтесь по необходимости",
 		"pricing.description":
@@ -226,13 +212,11 @@ export const translations = {
 		"pricing.faq": "Вопросы? Напишите на",
 		"pricing.faq.suffix": "- отвечаем в течение 24 часов.",
 
-		// CTA
 		"cta.title": "Готовы печатать голосом?",
 		"cta.description":
 			"Скачайте VoxFusion бесплатно. Начните диктовать за секунды.",
 		"cta.button": "Скачать для Mac",
 
-		// Footer
 		"footer.tagline": "Печатайте голосом. В любом приложении на Mac.",
 		"footer.product": "Продукт",
 		"footer.company": "Компания",

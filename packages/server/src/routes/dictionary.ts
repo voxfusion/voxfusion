@@ -22,7 +22,6 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 		}
 		return { session };
 	})
-	// GET /api/dictionary - List all words for user
 	.get("/", async (ctx) => {
 		const session = (ctx as any).session as Session;
 		const words = await db
@@ -33,7 +32,6 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 
 		return { words };
 	})
-	// POST /api/dictionary - Add new word
 	.post(
 		"/",
 		async (ctx) => {
@@ -58,7 +56,6 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 			}),
 		}
 	)
-	// PATCH /api/dictionary/:id - Update word
 	.patch(
 		"/:id",
 		async (ctx) => {
@@ -66,7 +63,6 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 			const { id } = ctx.params;
 			const { word } = ctx.body;
 
-			// Verify ownership
 			const existing = await db
 				.select()
 				.from(dictionaryWords)
@@ -94,7 +90,6 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 			}),
 		}
 	)
-	// DELETE /api/dictionary/:id - Delete word
 	.delete(
 		"/:id",
 		async (ctx) => {

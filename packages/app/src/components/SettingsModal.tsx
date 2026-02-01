@@ -19,7 +19,6 @@ interface SettingsModalProps {
 
 type SettingsSection = "audio" | "hotkey" | "appearance" | "language";
 
-// Custom Select Component with ShadCN-like styling
 interface SelectOption {
 	value: string;
 	label: string;
@@ -122,14 +121,12 @@ export default function SettingsModal(props: SettingsModalProps) {
 		}
 	};
 
-	// Fetch devices when modal opens
 	createEffect(() => {
 		if (props.isOpen) {
 			fetchAudioDevices();
 		}
 	});
 
-	// Close modal on Escape key
 	createEffect(() => {
 		if (!props.isOpen) return;
 
@@ -156,7 +153,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 		if (e.shiftKey) modifiers.push("Shift");
 
 		const key = e.key;
-		// Ignore pure modifier keys
 		if (["Meta", "Control", "Alt", "Shift"].includes(key)) {
 			return;
 		}
@@ -206,7 +202,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 
 	const microphoneOptions = (): SelectOption[] => {
 		const devices = audioDevices();
-		// Find the default device to show it first with a special label
 		const defaultDevice = devices.find((d) => d.isDefault);
 		const otherDevices = devices.filter((d) => !d.isDefault);
 
@@ -236,7 +231,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 				onClick={handleOverlayClick}
 			>
 				<div class="bg-white dark:bg-midnight-900 rounded-xl shadow-2xl w-[800px] h-[600px] flex overflow-hidden border border-slate-200 dark:border-midnight-700">
-					{/* Sidebar */}
 					<div class="w-56 bg-slate-50 dark:bg-midnight-800 border-r border-slate-200 dark:border-midnight-700 p-4">
 						<div class="flex items-center justify-between mb-6 px-2">
 							<h2 class="text-lg font-semibold text-slate-900 dark:text-white">
@@ -263,9 +257,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 						</nav>
 					</div>
 
-					{/* Main content area */}
 					<div class="flex-1 flex flex-col">
-						{/* Header */}
 						<div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-midnight-700">
 							<h3 class="text-lg font-semibold text-slate-900 dark:text-white">
 								{activeSection() === "audio" && t("settings.audio")}
@@ -282,9 +274,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 							</button>
 						</div>
 
-						{/* Content */}
 						<div class="flex-1 overflow-auto p-6">
-							{/* Audio Section */}
 							<Show when={activeSection() === "audio"}>
 								<div class="space-y-6">
 									<div>
@@ -316,7 +306,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 								</div>
 							</Show>
 
-							{/* Hotkey Section */}
 							<Show when={activeSection() === "hotkey"}>
 								<div class="space-y-6">
 									<div>
@@ -357,7 +346,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 								</div>
 							</Show>
 
-							{/* Appearance Section */}
 							<Show when={activeSection() === "appearance"}>
 								<div class="space-y-6">
 									<div>
@@ -388,7 +376,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 								</div>
 							</Show>
 
-							{/* Language Section */}
 							<Show when={activeSection() === "language"}>
 								<div class="space-y-6">
 									<div>

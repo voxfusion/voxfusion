@@ -14,7 +14,6 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	try {
 		await Bun.write(tempFile, buffer);
 
-		// Use ffprobe to get duration
 		const proc = Bun.spawn(
 			["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", tempFile],
 			{ stdout: "pipe", stderr: "pipe" }
@@ -31,16 +30,11 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 		console.error("Failed to get audio duration:", err);
 		return null;
 	} finally {
-		// Clean up temp file
 		(await Bun.file(tempFile).exists()) && (await Bun.$`rm ${tempFile}`);
 	}
 }
 
-/**
- * Count words in a text string
- */
 function countWords(text: string): number {
-	// Trim and split by whitespace, filter out empty strings
 	const words = text
 		.trim()
 		.split(/\s+/)
@@ -91,7 +85,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			const session = (ctx as any).session as Session;
 
 			try {
-				// Check rate limit first
 				const subscription = await getUserSubscription(session.user.id);
 				const rateLimitResult = await checkUserRateLimit(session.user.id, subscription.plan);
 
@@ -103,7 +96,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					});
 				}
 
-				// Check usage limits for free tier
 				const usageCheck = await canUserTranscribe(session.user.id);
 				if (!usageCheck.allowed) {
 					return status(403, {
@@ -120,7 +112,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 
 				const fileBuffer = await file.arrayBuffer();
 
-				// Fetch user's dictionary words
 				const userWords = await db
 					.select({ word: dictionaryWords.word })
 					.from(dictionaryWords)
@@ -128,7 +119,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					.orderBy(desc(dictionaryWords.updatedAt))
 					.limit(50);
 
-				// Build dynamic prompt with dictionary words
 				let prompt =
 					"If necessary, use both languages, English and Russian, in final transcription. It does not mean that transcription 100% will have mixed up languages. ";
 				if (userWords.length > 0) {
@@ -160,7 +150,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					fileBuffer,
 				};
 
-				// Calculate updated usage (after this transcription)
 				const newUsage = usageCheck.used + wordCount;
 				const newRemaining =
 					usageCheck.limit === Number.POSITIVE_INFINITY
@@ -196,7 +185,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				}
 
 				try {
-					// Extract audio duration (non-blocking for user)
 					const audioDurationMs = await getAudioDuration(metadata.fileBuffer);
 
 					const fileName = `${crypto.randomUUID()}.webm`;
@@ -243,7 +231,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 
 			let cursorDate: Date | null = null;
 			if (cursor) {
-				// Strip surrounding quotes if present (handles double-stringified values)
 				const cleanCursor = cursor.replace(/^"|"$/g, "");
 				cursorDate = new Date(cleanCursor);
 				if (Number.isNaN(cursorDate.getTime())) {

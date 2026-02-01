@@ -1,20 +1,16 @@
 import { Elysia, status } from "elysia";
 
-// Simple in-memory rate limiter
-// For production, consider using Redis for distributed rate limiting
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
-// Configuration for different rate limit tiers
 const RATE_LIMITS = {
 	free: {
-		requests: 20, // requests per window
-		windowMs: 60 * 1000, // 1 minute
+		requests: 20,
+		windowMs: 60 * 1000,
 	},
 	pro: {
-		requests: 100, // requests per window
-		windowMs: 60 * 1000, // 1 minute
+		requests: 100,
+		windowMs: 60 * 1000,
 	},
-	// Global limit for unauthenticated requests
 	anonymous: {
 		requests: 10,
 		windowMs: 60 * 1000,
@@ -23,9 +19,6 @@ const RATE_LIMITS = {
 
 type RateLimitTier = keyof typeof RATE_LIMITS;
 
-/**
- * Check if request should be rate limited
- */
 function checkRateLimit(
 	key: string,
 	tier: RateLimitTier
@@ -34,7 +27,6 @@ function checkRateLimit(
 	const limit = RATE_LIMITS[tier];
 	const record = rateLimitStore.get(key);
 
-	// If no record or expired, create new
 	if (!record || record.resetAt <= now) {
 		rateLimitStore.set(key, {
 			count: 1,
@@ -47,10 +39,8 @@ function checkRateLimit(
 		};
 	}
 
-	// Increment count
 	record.count++;
 
-	// Check if over limit
 	if (record.count > limit.requests) {
 		return {
 			allowed: false,
@@ -66,9 +56,6 @@ function checkRateLimit(
 	};
 }
 
-/**
- * Clean up expired entries periodically
- */
 function cleanupExpiredEntries() {
 	const now = Date.now();
 	for (const [key, record] of rateLimitStore.entries()) {
@@ -78,28 +65,19 @@ function cleanupExpiredEntries() {
 	}
 }
 
-// Run cleanup every 5 minutes
 setInterval(cleanupExpiredEntries, 5 * 60 * 1000);
 
-/**
- * Rate limiting middleware for Elysia
- * Usage: .use(rateLimit({ tier: 'free' })) or use the derive pattern
- */
 export function createRateLimiter(options: { getTier?: (ctx: any) => RateLimitTier } = {}) {
 	return new Elysia({ name: "rateLimit" }).derive(async ({ request, set }) => {
-		// Get client identifier (IP or user ID)
 		const forwarded = request.headers.get("x-forwarded-for");
 		const ip = forwarded?.split(",")[0]?.trim() || "unknown";
 
-		// Default to anonymous tier
 		const tier: RateLimitTier = "anonymous";
 
-		// Create rate limit key
 		const key = `${tier}:${ip}`;
 
 		const result = checkRateLimit(key, tier);
 
-		// Set rate limit headers
 		set.headers["X-RateLimit-Limit"] = String(RATE_LIMITS[tier].requests);
 		set.headers["X-RateLimit-Remaining"] = String(result.remaining);
 		set.headers["X-RateLimit-Reset"] = String(Math.ceil(result.resetAt / 1000));
@@ -118,9 +96,6 @@ export function createRateLimiter(options: { getTier?: (ctx: any) => RateLimitTi
 	});
 }
 
-/**
- * Check rate limit for authenticated user with specific tier
- */
 export async function checkUserRateLimit(
 	userId: string,
 	tier: "free" | "pro"
@@ -138,9 +113,6 @@ export async function checkUserRateLimit(
 	return result;
 }
 
-/**
- * Simple rate limit check for use in routes
- */
 export function rateLimitCheck(
 	userId: string | null,
 	ip: string,

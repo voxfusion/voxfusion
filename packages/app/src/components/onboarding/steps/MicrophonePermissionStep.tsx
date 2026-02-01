@@ -20,7 +20,6 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 			setIsGranted(granted);
 			props.onPermissionChange(granted);
 		} catch {
-			// Fallback: try to get user media to check
 			try {
 				const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 				stream.getTracks().forEach((track) => track.stop());
@@ -40,14 +39,11 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 	const handleRequest = async () => {
 		setIsRequesting(true);
 		try {
-			// Request microphone access - this triggers the native macOS permission dialog
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-			// Stop the stream immediately, we just needed to trigger the permission
 			stream.getTracks().forEach((track) => track.stop());
 			setIsGranted(true);
 			props.onPermissionChange(true);
 		} catch {
-			// User denied or error occurred
 			setIsGranted(false);
 			props.onPermissionChange(false);
 		}
@@ -68,7 +64,6 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 				{t("onboarding.micPermissionDescription")}
 			</p>
 
-			{/* Status indicator */}
 			<div class="mb-6">
 				<Show when={isGranted() === null}>
 					<div class="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
@@ -90,7 +85,6 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 				</Show>
 			</div>
 
-			{/* Action button */}
 			<Show when={isGranted() !== true}>
 				<button
 					type="button"

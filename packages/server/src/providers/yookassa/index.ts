@@ -1,8 +1,3 @@
-/**
- * YooKassa API Client
- * Documentation: https://yookassa.ru/developers/api
- */
-
 const YOOKASSA_API_URL = "https://api.yookassa.ru/v3";
 
 export interface YooKassaConfig {
@@ -12,18 +7,18 @@ export interface YooKassaConfig {
 
 export interface CreatePaymentParams {
 	amount: {
-		value: string; // e.g. "800.00"
-		currency: string; // "RUB"
+		value: string;
+		currency: string;
 	};
-	capture: boolean; // true = auto-capture, false = hold
+	capture: boolean;
 	confirmation: {
 		type: "redirect";
 		return_url: string;
 	};
 	description?: string;
 	metadata?: Record<string, string>;
-	save_payment_method?: boolean; // For recurring payments
-	payment_method_id?: string; // For auto-payments using saved method
+	save_payment_method?: boolean;
+	payment_method_id?: string;
 }
 
 export interface YooKassaPayment {
@@ -68,7 +63,7 @@ export interface CreateRecurringPaymentParams {
 		currency: string;
 	};
 	capture: boolean;
-	payment_method_id: string; // Saved payment method ID
+	payment_method_id: string;
 	description?: string;
 	metadata?: Record<string, string>;
 }
@@ -123,10 +118,6 @@ class YooKassaClient {
 		return response.json();
 	}
 
-	/**
-	 * Create a payment
-	 * https://yookassa.ru/developers/api#create_payment
-	 */
 	async createPayment(
 		params: CreatePaymentParams,
 		idempotenceKey?: string
@@ -139,18 +130,10 @@ class YooKassaClient {
 		);
 	}
 
-	/**
-	 * Get payment info
-	 * https://yookassa.ru/developers/api#get_payment
-	 */
 	async getPayment(paymentId: string): Promise<YooKassaPayment> {
 		return this.request<YooKassaPayment>("GET", `/payments/${paymentId}`);
 	}
 
-	/**
-	 * Capture a payment (for two-stage payments)
-	 * https://yookassa.ru/developers/api#capture_payment
-	 */
 	async capturePayment(
 		paymentId: string,
 		amount?: { value: string; currency: string },
@@ -164,10 +147,6 @@ class YooKassaClient {
 		);
 	}
 
-	/**
-	 * Cancel a payment
-	 * https://yookassa.ru/developers/api#cancel_payment
-	 */
 	async cancelPayment(paymentId: string, idempotenceKey?: string): Promise<YooKassaPayment> {
 		return this.request<YooKassaPayment>(
 			"POST",
@@ -177,9 +156,6 @@ class YooKassaClient {
 		);
 	}
 
-	/**
-	 * Create a recurring payment using saved payment method
-	 */
 	async createRecurringPayment(
 		params: CreateRecurringPaymentParams,
 		idempotenceKey?: string
@@ -195,9 +171,6 @@ class YooKassaClient {
 		);
 	}
 
-	/**
-	 * Create a subscription payment (first payment that saves payment method)
-	 */
 	async createSubscriptionPayment(
 		userId: string,
 		returnUrl: string,
@@ -206,7 +179,7 @@ class YooKassaClient {
 		return this.createPayment(
 			{
 				amount: {
-					value: "800.00", // 800 RUB = ~$8
+					value: "800.00",
 					currency: "RUB",
 				},
 				capture: true,
@@ -215,7 +188,7 @@ class YooKassaClient {
 					return_url: returnUrl,
 				},
 				description,
-				save_payment_method: true, // Save for recurring
+				save_payment_method: true,
 				metadata: {
 					user_id: userId,
 					type: "subscription",
@@ -226,9 +199,6 @@ class YooKassaClient {
 		);
 	}
 
-	/**
-	 * Renew subscription using saved payment method
-	 */
 	async renewSubscription(userId: string, paymentMethodId: string): Promise<YooKassaPayment> {
 		return this.createRecurringPayment(
 			{
@@ -250,7 +220,6 @@ class YooKassaClient {
 	}
 }
 
-// Export singleton instance
 export const yookassa = new YooKassaClient({
 	shopId: process.env.YOOKASSA_SHOP_ID || "",
 	secretKey: process.env.YOOKASSA_SECRET_KEY || "",

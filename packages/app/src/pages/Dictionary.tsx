@@ -60,7 +60,6 @@ export default function Dictionary() {
 	};
 
 	const handleDelete = async (id: string) => {
-		// Optimistic update
 		setWords(words().filter((w) => w.id !== id));
 		await eden.api.dictionary({ id }).delete();
 	};
@@ -79,7 +78,6 @@ export default function Dictionary() {
 		const word = editingWord().trim();
 		if (!word) return;
 
-		// Optimistic update
 		setWords(words().map((w) => (w.id === id ? { ...w, word } : w)));
 		setEditingId(null);
 		setEditingWord("");
@@ -110,7 +108,6 @@ export default function Dictionary() {
 					</Show>
 				</div>
 
-				{/* Add Word Form */}
 				<div class="bg-white dark:bg-midnight-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-midnight-700 mb-6">
 					<div class="flex gap-3">
 						<input
@@ -135,14 +132,12 @@ export default function Dictionary() {
 					</div>
 				</div>
 
-				{/* Loading State */}
 				<Show when={loading()}>
 					<div class="flex justify-center py-12">
 						<Loader class="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
 					</div>
 				</Show>
 
-				{/* Empty State */}
 				<Show when={!loading() && words().length === 0}>
 					<div class="bg-white dark:bg-midnight-800 rounded-xl p-12 shadow-sm border border-slate-200 dark:border-midnight-700 flex flex-col items-center justify-center text-center">
 						<div class="w-16 h-16 bg-slate-100 dark:bg-midnight-700 rounded-full flex items-center justify-center mb-4">
@@ -157,7 +152,6 @@ export default function Dictionary() {
 					</div>
 				</Show>
 
-				{/* Word List */}
 				<Show when={!loading() && words().length > 0}>
 					<div class="space-y-2">
 						<For each={words()}>

@@ -8,7 +8,6 @@ import { loadSettings } from "../lib/settingsStore";
 import { tokenManager } from "../lib/tokenManager";
 
 const NUM_BARS = 12;
-// Randomized multipliers for organic wave look
 const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
 
 export default function VoiceControl() {
@@ -26,7 +25,6 @@ export default function VoiceControl() {
 		if (evt.state !== "Pressed") return;
 		console.log("shortcut pressed");
 
-		// Guard: must be authenticated and have completed onboarding
 		if (!isAuthenticated() || !isOnboardingComplete()) {
 			return;
 		}
@@ -56,23 +54,19 @@ export default function VoiceControl() {
 	};
 
 	onMount(async () => {
-		// Load settings and register the initial shortcut
 		const settings = await loadSettings();
 		await registerShortcut(settings.hotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 		setIsOnboardingComplete(settings.onboardingComplete);
 
-		// Initialize auth state
 		const token = await tokenManager.getToken();
 		setIsAuthenticated(!!token);
 
-		// Listen for auth changes from the main window
 		const unlistenAuth = await listen("auth-changed", async () => {
 			const newToken = await tokenManager.getToken();
 			setIsAuthenticated(!!newToken);
 		});
 
-		// Listen for settings changes from the main window
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
 			if (newSettings.hotkey !== currentShortcut()) {
@@ -82,7 +76,6 @@ export default function VoiceControl() {
 			setIsOnboardingComplete(newSettings.onboardingComplete);
 		});
 
-		// Listen for real-time audio levels from the backend
 		const unlistenAudio = await listen<number>("audio-level", (event) => {
 			setAudioLevel(event.payload);
 		});

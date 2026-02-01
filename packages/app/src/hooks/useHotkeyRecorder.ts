@@ -18,7 +18,6 @@ export function useHotkeyRecorder() {
 		if (e.shiftKey) modifiers.push("Shift");
 
 		const key = e.key;
-		// Ignore pure modifier keys
 		if (["Meta", "Control", "Alt", "Shift"].includes(key)) {
 			return;
 		}

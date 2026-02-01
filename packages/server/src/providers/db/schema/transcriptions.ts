@@ -8,11 +8,11 @@ export const transcriptions = pgTable("transcriptions", {
 		.references(() => users.id, { onDelete: "cascade" }),
 	fileUrl: text("file_url").notNull(),
 	text: text("text").notNull(),
-	wordCount: integer("word_count"), // Number of words in transcription for billing
+	wordCount: integer("word_count"),
 	processingTimeMs: integer("processing_time_ms").notNull(),
 	audioDurationMs: integer("audio_duration_ms"),
 	provider: text("provider").notNull(),
 	model: text("model").notNull(),
-	rating: text("rating"), // "up" | "down" | null
+	rating: text("rating"),
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -55,7 +55,6 @@ function App(props: ParentProps) {
 	};
 
 	onMount(async () => {
-		// Initialize settings from store
 		await initSettings();
 
 		const initialUrls = await getCurrent();
@@ -69,7 +68,6 @@ function App(props: ParentProps) {
 		});
 		onCleanup(() => unlistenDeepLink());
 
-		// Listen for tray menu events
 		const unlistenNavigate = await listen<string>("navigate", (event) => {
 			navigate(event.payload);
 		});
@@ -81,7 +79,6 @@ function App(props: ParentProps) {
 		});
 		onCleanup(() => unlistenMicrophone());
 
-		// Register Cmd+, shortcut to open settings
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.metaKey && e.key === ",") {
 				e.preventDefault();
@@ -137,7 +134,6 @@ function App(props: ParentProps) {
 				</div>
 			</Show>
 			<Show when={!session()?.isPending}>
-				{JSON.stringify(session()?.data?.user)}
 				<Show
 					when={session()?.data?.user}
 					fallback={

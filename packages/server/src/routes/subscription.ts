@@ -13,14 +13,10 @@ type Session = {
 	};
 };
 
-// Constants for tier limits
-const FREE_TIER_WORD_LIMIT = 25000; // 25K words per month
-const PRO_TIER_WORD_LIMIT = Number.POSITIVE_INFINITY; // Unlimited for Pro
-const SUBSCRIPTION_PRICE_RUB = "800.00"; // 800 RUB per month
+const FREE_TIER_WORD_LIMIT = 25000;
+const PRO_TIER_WORD_LIMIT = Number.POSITIVE_INFINITY;
+const SUBSCRIPTION_PRICE_RUB = "800.00";
 
-/**
- * Get user's subscription plan
- */
 export async function getUserSubscription(userId: string) {
 	const result = await db
 		.select()
@@ -29,7 +25,6 @@ export async function getUserSubscription(userId: string) {
 		.limit(1);
 
 	if (result.length === 0) {
-		// No subscription record = free tier
 		return {
 			plan: "free" as const,
 			status: "active" as const,
@@ -39,7 +34,6 @@ export async function getUserSubscription(userId: string) {
 
 	const sub = result[0]!;
 
-	// Check if subscription is active
 	const isActive =
 		sub.status === "active" &&
 		(!sub.currentPeriodEnd || new Date(sub.currentPeriodEnd) > new Date());
@@ -54,9 +48,6 @@ export async function getUserSubscription(userId: string) {
 	};
 }
 
-/**
- * Get user's word usage for current month
- */
 export async function getMonthlyWordUsage(userId: string): Promise<number> {
 	const startOfMonth = new Date();
 	startOfMonth.setDate(1);
@@ -72,9 +63,6 @@ export async function getMonthlyWordUsage(userId: string): Promise<number> {
 	return result[0]?.totalWords ?? 0;
 }
 
-/**
- * Check if user can transcribe more words
- */
 export async function canUserTranscribe(userId: string): Promise<{
 	allowed: boolean;
 	remaining: number;
@@ -99,9 +87,6 @@ export async function canUserTranscribe(userId: string): Promise<{
 	};
 }
 
-/**
- * Activate subscription for a user after successful payment
- */
 async function activateSubscription(
 	userId: string,
 	paymentMethodId: string | null,
@@ -109,7 +94,7 @@ async function activateSubscription(
 ) {
 	const now = new Date();
 	const periodEnd = new Date(now);
-	periodEnd.setMonth(periodEnd.getMonth() + 1); // 1 month subscription
+	periodEnd.setMonth(periodEnd.getMonth() + 1);
 
 	await db
 		.insert(subscriptions)
@@ -149,7 +134,6 @@ export const subscriptionRoutes = new Elysia({ prefix: "/subscription" })
 		}
 		return { session };
 	})
-	// Get current subscription status
 	.get("/", async (ctx) => {
 		const session = (ctx as any).session as Session | undefined;
 
@@ -171,7 +155,6 @@ export const subscriptionRoutes = new Elysia({ prefix: "/subscription" })
 			cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
 		};
 	})
-	// Get usage statistics
 	.get("/usage", async (ctx) => {
 		const session = (ctx as any).session as Session | undefined;
 
@@ -191,7 +174,6 @@ export const subscriptionRoutes = new Elysia({ prefix: "/subscription" })
 			canTranscribe: usage.allowed,
 		};
 	})
-	// Create checkout session for Pro subscription
 	.post(
 		"/checkout",
 		async (ctx) => {
@@ -204,13 +186,11 @@ export const subscriptionRoutes = new Elysia({ prefix: "/subscription" })
 			const { returnUrl } = ctx.body as { returnUrl: string };
 
 			try {
-				// Check if user already has an active subscription
 				const existingSub = await getUserSubscription(session.user.id);
 				if (existingSub.plan === "pro" && existingSub.status === "active") {
 					return status(400, { error: "Already subscribed to Pro plan" });
 				}
 
-				// Create payment with YooKassa
 				const payment = await yookassa.createSubscriptionPayment(session.user.id, returnUrl);
 
 				if (!payment.confirmation?.confirmation_url) {
@@ -233,7 +213,6 @@ export const subscriptionRoutes = new Elysia({ prefix: "/subscription" })
 			}),
 		}
 	)
-	// Cancel subscription (will remain active until period end)
 	.post("/cancel", async (ctx) => {
 		const session = (ctx as any).session as Session | undefined;
 
@@ -265,7 +244,6 @@ export const subscriptionRoutes = new Elysia({ prefix: "/subscription" })
 			return status(500, { error: "Failed to cancel subscription" });
 		}
 	})
-	// Reactivate a canceled subscription
 	.post("/reactivate", async (ctx) => {
 		const session = (ctx as any).session as Session | undefined;
 
@@ -299,12 +277,9 @@ export const subscriptionRoutes = new Elysia({ prefix: "/subscription" })
 		}
 	});
 
-// YooKassa webhook handler - handles payment events
 export const yookassaWebhookRoutes = new Elysia({ prefix: "/yookassa" }).post(
 	"/webhooks",
 	async ({ body, request }) => {
-		// YooKassa sends notifications to this endpoint
-		// In production, verify IP is from YooKassa: https://yookassa.ru/developers/using-api/webhooks#ip
 		const payload = body as YooKassaWebhookPayload;
 
 		console.log("YooKassa webhook received:", payload.event, payload.object?.id);
@@ -321,13 +296,10 @@ export const yookassaWebhookRoutes = new Elysia({ prefix: "/yookassa" }).post(
 
 			switch (payload.event) {
 				case "payment.succeeded": {
-					// Payment was successful
 					console.log("Payment succeeded for user:", userId);
 
-					// Get the saved payment method ID for recurring billing
 					const paymentMethodId = payment.payment_method?.saved ? payment.payment_method.id : null;
 
-					// Activate the subscription
 					await activateSubscription(userId, paymentMethodId, payment.id);
 
 					console.log("Subscription activated for user:", userId);
@@ -335,10 +307,8 @@ export const yookassaWebhookRoutes = new Elysia({ prefix: "/yookassa" }).post(
 				}
 
 				case "payment.canceled": {
-					// Payment was canceled/failed
 					console.log("Payment canceled for user:", userId);
 
-					// If this was a renewal attempt, mark subscription as past_due
 					if (payment.metadata.type === "subscription_renewal") {
 						await db
 							.update(subscriptions)
@@ -352,13 +322,11 @@ export const yookassaWebhookRoutes = new Elysia({ prefix: "/yookassa" }).post(
 				}
 
 				case "payment.waiting_for_capture": {
-					// For two-stage payments (we use auto-capture, so this shouldn't happen)
 					console.log("Payment waiting for capture:", payment.id);
 					break;
 				}
 
 				case "refund.succeeded": {
-					// Refund was processed - cancel subscription
 					console.log("Refund processed for user:", userId);
 
 					await db
@@ -384,16 +352,11 @@ export const yookassaWebhookRoutes = new Elysia({ prefix: "/yookassa" }).post(
 	}
 );
 
-/**
- * Renew expiring subscriptions
- * This should be called by a cron job daily
- */
 export async function renewExpiringSubscriptions() {
 	const now = new Date();
 	const tomorrow = new Date(now);
 	tomorrow.setDate(tomorrow.getDate() + 1);
 
-	// Find subscriptions expiring in the next 24 hours that are not canceled
 	const expiring = await db
 		.select()
 		.from(subscriptions)
@@ -423,11 +386,9 @@ export async function renewExpiringSubscriptions() {
 		}
 
 		try {
-			// Attempt to charge using saved payment method
 			const payment = await yookassa.renewSubscription(sub.userId, sub.yookassaPaymentMethodId);
 
 			if (payment.status === "succeeded") {
-				// Extend subscription period
 				const newPeriodEnd = new Date(sub.currentPeriodEnd!);
 				newPeriodEnd.setMonth(newPeriodEnd.getMonth() + 1);
 
@@ -450,7 +411,6 @@ export async function renewExpiringSubscriptions() {
 		} catch (error) {
 			console.error(`Failed to renew subscription for user ${sub.userId}:`, error);
 
-			// Mark as past_due
 			await db
 				.update(subscriptions)
 				.set({
@@ -466,11 +426,9 @@ export async function renewExpiringSubscriptions() {
 	return results;
 }
 
-// Admin endpoint to trigger renewal manually (protected by secret)
 export const subscriptionAdminRoutes = new Elysia({ prefix: "/admin/subscription" }).post(
 	"/renew",
 	async ({ headers }) => {
-		// Simple secret-based auth for admin endpoints
 		const adminSecret = headers["x-admin-secret"];
 		if (adminSecret !== process.env.ADMIN_SECRET) {
 			return status(401, { error: "Unauthorized" });

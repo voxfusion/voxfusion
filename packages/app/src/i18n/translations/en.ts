@@ -98,14 +98,12 @@ export type Translations = {
 		languageDescription: string;
 		completionTitle: string;
 		completionDescription: string;
-		// Microphone Permission Step
 		micPermissionTitle: string;
 		micPermissionDescription: string;
 		micPermissionGranted: string;
 		micPermissionNotGranted: string;
 		grantMicPermission: string;
 		checkingPermission: string;
-		// Accessibility Permission Step
 		accessibilityTitle: string;
 		accessibilityDescription: string;
 		accessibilityGranted: string;
@@ -228,7 +226,6 @@ export const en: Translations = {
 		languageDescription: "Select your preferred language for the interface.",
 		completionTitle: "You're All Set!",
 		completionDescription: "VoxFusion is ready to help you with voice transcription.",
-		// Microphone Permission Step
 		micPermissionTitle: "Microphone Access",
 		micPermissionDescription:
 			"VoxFusion needs access to your microphone to record and transcribe your voice.",
@@ -236,7 +233,6 @@ export const en: Translations = {
 		micPermissionNotGranted: "Microphone access required",
 		grantMicPermission: "Grant Microphone Access",
 		checkingPermission: "Checking...",
-		// Accessibility Permission Step
 		accessibilityTitle: "Accessibility Access",
 		accessibilityDescription:
 			"VoxFusion needs accessibility access to type transcribed text into any application.",

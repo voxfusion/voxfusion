@@ -19,9 +19,9 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 	const checkPermission = async () => {
 		try {
 			const granted = await checkAccessibilityPermission();
+			console.log(granted);
 			setIsGranted(granted);
 			props.onPermissionChange(granted);
-			// Stop polling if permission is granted
 			if (granted && pollInterval) {
 				clearInterval(pollInterval);
 				pollInterval = undefined;
@@ -32,8 +32,11 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 		}
 	};
 
-	onMount(() => {
-		checkPermission();
+	onMount(async () => {
+		await checkPermission();
+		if (!isGranted() && !pollInterval) {
+			pollInterval = setInterval(checkPermission, 1000);
+		}
 	});
 
 	onCleanup(() => {
@@ -46,10 +49,8 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 		setIsRequesting(true);
 		try {
 			await requestAccessibilityPermission();
-			// Start polling to detect when user grants permission
 			pollInterval = setInterval(checkPermission, 1000);
 		} catch {
-			// Still start polling in case the settings opened
 			pollInterval = setInterval(checkPermission, 1000);
 		}
 		setIsRequesting(false);
@@ -69,14 +70,12 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 				{t("onboarding.accessibilityDescription")}
 			</p>
 
-			{/* Instructions */}
 			<Show when={isGranted() === false}>
 				<p class="text-sm text-slate-500 dark:text-slate-500 mb-6 italic">
 					{t("onboarding.accessibilityInstructions")}
 				</p>
 			</Show>
 
-			{/* Status indicator */}
 			<div class="mb-6">
 				<Show when={isGranted() === null}>
 					<div class="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
@@ -98,7 +97,6 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 				</Show>
 			</div>
 
-			{/* Action button */}
 			<Show when={isGranted() !== true}>
 				<button
 					type="button"
