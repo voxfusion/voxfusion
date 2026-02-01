@@ -5,8 +5,8 @@ export default defineConfig({
 	site: "https://voxfusion.com",
 	output: "static",
 	i18n: {
-		defaultLocale: "en",
-		locales: ["en", "ru"],
+		defaultLocale: "ru",
+		locales: ["ru", "en"],
 		routing: {
 			prefixDefaultLocale: false,
 		},

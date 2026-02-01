@@ -36,22 +36,25 @@ const locales = getAlternateLocales(currentLang, currentPath);
 </div>
 
 <script>
-	const switcher = document.querySelector('.language-switcher');
-	const btn = switcher?.querySelector('.language-btn');
-	const dropdown = switcher?.querySelector('.language-dropdown');
+	document.querySelectorAll('.language-switcher').forEach((switcher) => {
+		const btn = switcher.querySelector('.language-btn');
+		const dropdown = switcher.querySelector('.language-dropdown');
 
-	btn?.addEventListener('click', () => {
-		const isExpanded = btn.getAttribute('aria-expanded') === 'true';
-		btn.setAttribute('aria-expanded', (!isExpanded).toString());
-		dropdown?.classList.toggle('open');
+		btn?.addEventListener('click', () => {
+			const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+			btn.setAttribute('aria-expanded', (!isExpanded).toString());
+			dropdown?.classList.toggle('open');
+		});
 	});
 
-	// Close dropdown when clicking outside
+	// Close all dropdowns when clicking outside
 	document.addEventListener('click', (e) => {
-		if (!switcher?.contains(e.target as Node)) {
-			btn?.setAttribute('aria-expanded', 'false');
-			dropdown?.classList.remove('open');
-		}
+		document.querySelectorAll('.language-switcher').forEach((switcher) => {
+			if (!switcher.contains(e.target as Node)) {
+				switcher.querySelector('.language-btn')?.setAttribute('aria-expanded', 'false');
+				switcher.querySelector('.language-dropdown')?.classList.remove('open');
+			}
+		});
 	});
 </script>
 

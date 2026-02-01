@@ -1,9 +1,9 @@
 export const languages = {
-	en: "English",
 	ru: "Русский",
+	en: "English",
 };
 
-export const defaultLang = "en";
+export const defaultLang = "ru";
 
 export const translations = {
 	en: {
@@ -16,8 +16,7 @@ export const translations = {
 		"nav.features": "Features",
 		"nav.demo": "Demo",
 		"nav.pricing": "Pricing",
-		"nav.signIn": "Sign In",
-		"nav.tryFree": "Try Free",
+		"nav.download": "Download",
 
 		// Hero
 		"hero.badge": "Voice-to-text in any app",
@@ -136,8 +135,7 @@ export const translations = {
 		"nav.features": "Возможности",
 		"nav.demo": "Демо",
 		"nav.pricing": "Цены",
-		"nav.signIn": "Войти",
-		"nav.tryFree": "Попробовать",
+		"nav.download": "Скачать",
 
 		// Hero
 		"hero.badge": "Голос в текст в любом приложении",

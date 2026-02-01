@@ -38,8 +38,7 @@ const t = useTranslations(lang);
 
 			<div class="nav-actions">
 				<LanguageSwitcher currentLang={lang} />
-				<a href="https://app.voxfusion.com" class="btn btn-ghost">{t("nav.signIn")}</a>
-				<a href="https://app.voxfusion.com" class="btn btn-primary">{t("nav.tryFree")}</a>
+				<a href="#download" class="btn btn-primary">{t("nav.download")}</a>
 			</div>
 
 			<button class="mobile-menu-btn" aria-label="Toggle menu">
@@ -47,6 +46,17 @@ const t = useTranslations(lang);
 				<span></span>
 				<span></span>
 			</button>
+		</div>
+
+		<div class="mobile-menu">
+			<div class="mobile-menu-links">
+				<a href="#features">{t("nav.features")}</a>
+				<a href="#demo">{t("nav.demo")}</a>
+				<a href="#pricing">{t("nav.pricing")}</a>
+			</div>
+			<div class="mobile-menu-actions">
+				<LanguageSwitcher currentLang={lang} />
+			</div>
 		</div>
 	</nav>
 
@@ -360,6 +370,75 @@ const t = useTranslations(lang);
 		pointer-events: none;
 	}
 
+	.mobile-menu {
+		display: none;
+		flex-direction: column;
+		gap: 24px;
+		padding: 24px;
+		border-top: 1px solid var(--color-border);
+	}
+
+	.mobile-menu.open {
+		display: flex;
+	}
+
+	.mobile-menu-links {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.mobile-menu-links a {
+		font-size: 16px;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+		transition: color 0.2s ease;
+	}
+
+	.mobile-menu-links a:hover {
+		color: var(--color-text);
+	}
+
+	.mobile-menu-actions {
+		display: flex;
+	}
+
+	.mobile-menu-actions :global(.language-switcher) {
+		width: 100%;
+	}
+
+	.mobile-menu-actions :global(.language-btn) {
+		width: 100%;
+	}
+
+	.mobile-menu-actions :global(.language-dropdown) {
+		position: static;
+		transform: none;
+		min-width: unset;
+		width: 100%;
+		margin-top: 8px;
+		opacity: 0;
+		visibility: hidden;
+		box-shadow: none;
+	}
+
+	.mobile-menu-actions :global(.language-dropdown.open) {
+		opacity: 1;
+		visibility: visible;
+	}
+
+	.mobile-menu-btn.open span:nth-child(1) {
+		transform: translateY(7px) rotate(45deg);
+	}
+
+	.mobile-menu-btn.open span:nth-child(2) {
+		opacity: 0;
+	}
+
+	.mobile-menu-btn.open span:nth-child(3) {
+		transform: translateY(-7px) rotate(-45deg);
+	}
+
 	@media (max-width: 900px) {
 		.nav-links {
 			display: none;
@@ -397,3 +476,21 @@ const t = useTranslations(lang);
 		}
 	}
 </style>
+
+<script>
+	const menuBtn = document.querySelector('.mobile-menu-btn');
+	const mobileMenu = document.querySelector('.mobile-menu');
+
+	menuBtn?.addEventListener('click', () => {
+		menuBtn.classList.toggle('open');
+		mobileMenu?.classList.toggle('open');
+	});
+
+	// Close menu when a link is clicked
+	mobileMenu?.querySelectorAll('a').forEach((link) => {
+		link.addEventListener('click', () => {
+			menuBtn?.classList.remove('open');
+			mobileMenu?.classList.remove('open');
+		});
+	});
+</script>
