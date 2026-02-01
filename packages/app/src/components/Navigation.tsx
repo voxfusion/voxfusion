@@ -1,7 +1,8 @@
-import { createSignal, Show } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
-import { Home, BookOpen, User, Settings, Shield, LogOut } from "lucide-solid";
+import { emit } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { BookOpen, Home, LogOut, Settings, Shield, User } from "lucide-solid";
+import { Show, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
 import { authClient } from "../lib/authClient";
 import { tokenManager } from "../lib/tokenManager";
@@ -20,6 +21,7 @@ export default function Sidebar(props: SidebarProps) {
 	const handleLogout = async () => {
 		await authClient.signOut();
 		await tokenManager.deleteToken();
+		await emit("auth-changed");
 		setIsUserMenuOpen(false);
 	};
 
