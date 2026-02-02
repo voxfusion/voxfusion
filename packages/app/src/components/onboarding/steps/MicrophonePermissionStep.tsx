@@ -20,15 +20,8 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 			setIsGranted(granted);
 			props.onPermissionChange(granted);
 		} catch {
-			try {
-				const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-				stream.getTracks().forEach((track) => track.stop());
-				setIsGranted(true);
-				props.onPermissionChange(true);
-			} catch {
-				setIsGranted(false);
-				props.onPermissionChange(false);
-			}
+			setIsGranted(false);
+			props.onPermissionChange(false);
 		}
 	};
 
