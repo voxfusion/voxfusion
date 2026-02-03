@@ -57,6 +57,12 @@ function App(props: ParentProps) {
 	onMount(async () => {
 		await initSettings();
 
+		// Restore session from stored token on app restart
+		const storedToken = await tokenManager.getToken();
+		if (storedToken) {
+			await authClient.useSession.get().refetch();
+		}
+
 		const initialUrls = await getCurrent();
 		if (initialUrls) {
 			console.log("initialUrls", initialUrls);
