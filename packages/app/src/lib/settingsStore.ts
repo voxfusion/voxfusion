@@ -11,6 +11,7 @@ export interface Settings {
 	selectedMicrophoneId: string | null;
 	language: Locale;
 	onboardingComplete: boolean;
+	onboardingStep: number;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -19,6 +20,7 @@ const DEFAULT_SETTINGS: Settings = {
 	selectedMicrophoneId: null,
 	language: "en",
 	onboardingComplete: false,
+	onboardingStep: 1,
 };
 
 const STORE_NAME = "settings.json";
@@ -34,6 +36,7 @@ async function getStore() {
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
+				onboardingStep: DEFAULT_SETTINGS.onboardingStep,
 			},
 			autoSave: 500,
 		});
@@ -48,6 +51,7 @@ export async function loadSettings(): Promise<Settings> {
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
 	const onboardingComplete = await store.get<boolean>("onboardingComplete");
+	const onboardingStep = await store.get<number>("onboardingStep");
 
 	return {
 		theme: theme ?? DEFAULT_SETTINGS.theme,
@@ -55,6 +59,7 @@ export async function loadSettings(): Promise<Settings> {
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
+		onboardingStep: onboardingStep ?? DEFAULT_SETTINGS.onboardingStep,
 	};
 }
 
@@ -164,10 +169,17 @@ if (typeof window !== "undefined") {
 	});
 }
 
+export async function updateOnboardingStep(step: number): Promise<void> {
+	const store = await getStore();
+	await store.set("onboardingStep", step);
+	setSettingsInternal((prev) => ({ ...prev, onboardingStep: step }));
+}
+
 export async function markOnboardingComplete(): Promise<void> {
 	const store = await getStore();
 	await store.set("onboardingComplete", true);
-	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: true }));
+	await store.set("onboardingStep", 1);
+	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: true, onboardingStep: 1 }));
 	await emit("settings-changed");
 }
 
