@@ -1,0 +1,242 @@
+---
+import { useTranslations, defaultLang, languages } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
+
+const baseUrl = "https://github.com/gregor-tokarev/voxfusion-releases/releases/latest/download";
+---
+
+<section class="downloads">
+	<div class="container">
+		<div class="downloads-header">
+			<h1 class="downloads-title">{t("downloads.title")}</h1>
+			<p class="downloads-subtitle">{t("downloads.subtitle")}</p>
+		</div>
+
+		<div class="platform-section">
+			<h2 class="platform-title">
+				<svg class="platform-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+				</svg>
+				{t("downloads.macos.title")}
+			</h2>
+			<div class="download-grid">
+				<div class="download-card">
+					<div class="card-content">
+						<h3 class="card-title">{t("downloads.macos.latest")}</h3>
+						<p class="card-description">{t("downloads.macos.latest.description")}</p>
+					</div>
+					<a href={`${baseUrl}/VoxFusion-latest.dmg`} class="download-btn primary">
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+							<path d="M10 3V17M10 17L4 11M10 17L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+						<span>.dmg</span>
+					</a>
+				</div>
+				<div class="download-card">
+					<div class="card-content">
+						<h3 class="card-title">{t("downloads.macos.universal")}</h3>
+						<p class="card-description">{t("downloads.macos.universal.description")}</p>
+					</div>
+					<a href={`${baseUrl}/VoxFusion-universal.dmg`} class="download-btn primary">
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+							<path d="M10 3V17M10 17L4 11M10 17L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+						<span>.dmg</span>
+					</a>
+				</div>
+			</div>
+		</div>
+
+		<div class="platform-section">
+			<h2 class="platform-title">
+				<svg class="platform-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+					<path d="M3 5.548l7.066-.966v6.822H3V5.548zm0 12.904l7.066.966v-6.822H3v5.856zm7.854 1.074L21 21V12.596H10.854v6.93zM10.854 4.474v6.93H21V3l-10.146 1.474z"/>
+				</svg>
+				{t("downloads.windows.title")}
+			</h2>
+			<div class="warning-banner">
+				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+					<path d="M10 7V11M10 13.5V14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+					<path d="M2.87 14.5L8.59 3.49C9.21 2.28 10.79 2.28 11.41 3.49L17.13 14.5C17.72 15.65 16.93 17 15.72 17H4.28C3.07 17 2.28 15.65 2.87 14.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+				</svg>
+				<span>{t("downloads.windows.warning")}</span>
+			</div>
+			<div class="download-grid">
+				<div class="download-card">
+					<div class="card-content">
+						<h3 class="card-title">{t("downloads.windows.download")}</h3>
+						<p class="card-description">{t("downloads.windows.description")}</p>
+					</div>
+					<a href={`${baseUrl}/VoxFusion-latest.exe`} class="download-btn secondary">
+						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+							<path d="M10 3V17M10 17L4 11M10 17L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+						</svg>
+						<span>.exe</span>
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<style>
+	.downloads {
+		padding: 160px 0 120px;
+		background: var(--color-bg);
+		min-height: 100vh;
+	}
+
+	.downloads-header {
+		text-align: center;
+		margin-bottom: 64px;
+	}
+
+	.downloads-title {
+		font-size: clamp(36px, 6vw, 56px);
+		font-weight: 800;
+		letter-spacing: -0.03em;
+		margin-bottom: 16px;
+	}
+
+	.downloads-subtitle {
+		font-size: 18px;
+		color: var(--color-text-secondary);
+	}
+
+	.platform-section {
+		max-width: 800px;
+		margin: 0 auto 56px;
+	}
+
+	.platform-title {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		font-size: 22px;
+		font-weight: 700;
+		letter-spacing: -0.01em;
+		margin-bottom: 20px;
+		color: var(--color-text);
+	}
+
+	.platform-icon {
+		flex-shrink: 0;
+		color: var(--color-text-secondary);
+	}
+
+	.download-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 20px;
+	}
+
+	.download-card {
+		background: var(--color-bg-card);
+		border: 1px solid var(--color-border);
+		border-radius: 20px;
+		padding: 28px;
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+	}
+
+	.card-content {
+		flex: 1;
+	}
+
+	.card-title {
+		font-size: 17px;
+		font-weight: 600;
+		margin-bottom: 6px;
+	}
+
+	.card-description {
+		font-size: 14px;
+		color: var(--color-text-secondary);
+		line-height: 1.5;
+	}
+
+	.download-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		padding: 12px 24px;
+		border-radius: 12px;
+		font-size: 15px;
+		font-weight: 600;
+		transition: all 0.2s ease;
+	}
+
+	.download-btn.primary {
+		background: var(--color-primary);
+		color: white;
+	}
+
+	.download-btn.primary:hover {
+		background: var(--color-primary-dark);
+		transform: translateY(-1px);
+		box-shadow: 0 8px 24px rgba(255, 107, 74, 0.3);
+	}
+
+	.download-btn.secondary {
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border-hover);
+		color: var(--color-text);
+	}
+
+	.download-btn.secondary:hover {
+		border-color: var(--color-primary);
+		background: rgba(255, 107, 74, 0.05);
+		transform: translateY(-1px);
+	}
+
+	.warning-banner {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 14px 20px;
+		background: rgba(251, 191, 36, 0.08);
+		border: 1px solid rgba(251, 191, 36, 0.2);
+		border-radius: 12px;
+		font-size: 14px;
+		color: #fbbf24;
+		margin-bottom: 20px;
+		line-height: 1.5;
+	}
+
+	.warning-banner svg {
+		flex-shrink: 0;
+		color: #fbbf24;
+	}
+
+	@media (max-width: 768px) {
+		.downloads {
+			padding: 120px 0 80px;
+		}
+
+		.download-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.downloads-subtitle {
+			font-size: 16px;
+		}
+	}
+
+	@media (max-width: 600px) {
+		.downloads {
+			padding: 100px 0 60px;
+		}
+
+		.download-card {
+			padding: 24px;
+		}
+	}
+</style>

@@ -1,5 +1,5 @@
 ---
-import { useTranslations, defaultLang, languages } from "../i18n/utils";
+import { useTranslations, defaultLang, languages, getLocalizedPath } from "../i18n/utils";
 
 interface Props {
 	lang?: keyof typeof languages;
@@ -54,7 +54,7 @@ const checkIconPrimary = `<svg width="20" height="20" viewBox="0 0 20 20" fill="
 					</li>
 				</ul>
 
-				<a href="#download" class="pricing-cta">
+				<a href={getLocalizedPath("/download", lang)} class="pricing-cta">
 					{t("pricing.free.cta")}
 				</a>
 			</div>
@@ -89,7 +89,7 @@ const checkIconPrimary = `<svg width="20" height="20" viewBox="0 0 20 20" fill="
 					</li>
 				</ul>
 
-				<a href="#download" class="pricing-cta featured-cta">
+				<a href={getLocalizedPath("/download", lang)} class="pricing-cta featured-cta">
 					{t("pricing.pro.cta")}
 				</a>
 			</div>

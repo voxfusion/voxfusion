@@ -1,6 +1,6 @@
 ---
 import LanguageSwitcher from "./LanguageSwitcher.astro";
-import { useTranslations, defaultLang, languages } from "../i18n/utils";
+import { useTranslations, defaultLang, languages, getLocalizedPath } from "../i18n/utils";
 
 interface Props {
 	lang?: keyof typeof languages;
@@ -38,7 +38,7 @@ const t = useTranslations(lang);
 
 			<div class="nav-actions">
 				<LanguageSwitcher currentLang={lang} />
-				<a href="#download" class="btn btn-primary">{t("nav.download")}</a>
+				<a href={getLocalizedPath("/download", lang)} class="btn btn-primary">{t("nav.download")}</a>
 			</div>
 
 			<button class="mobile-menu-btn" aria-label="Toggle menu">
@@ -76,7 +76,7 @@ const t = useTranslations(lang);
 		</p>
 
 		<div class="hero-cta">
-			<a href="https://github.com/gregor-tokarev/voxfusion-releases/releases/latest/download/VoxFusion-latest.dmg" class="btn btn-primary btn-lg">
+			<a href={getLocalizedPath("/download", lang)} class="btn btn-primary btn-lg">
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 					<path d="M10 3V17M10 17L4 11M10 17L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 				</svg>
