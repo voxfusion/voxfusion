@@ -2,6 +2,7 @@ import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { Shield, Check, AlertCircle, ExternalLink } from "lucide-solid";
 import { useI18n } from "../../../i18n";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { requestAccessibilityPermission } from "tauri-plugin-macos-permissions-api";
 
 interface AccessibilityPermissionStepProps {
@@ -13,11 +14,20 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 	const [isGranted, setIsGranted] = createSignal<boolean | null>(null);
 	const [isRequesting, setIsRequesting] = createSignal(false);
 	let pollInterval: ReturnType<typeof setInterval> | undefined;
+	let unlistenFn: UnlistenFn | undefined;
+
+	const markGranted = () => {
+		setIsGranted(true);
+		props.onPermissionChange(true);
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = undefined;
+		}
+	};
 
 	const checkPermission = async () => {
 		try {
 			const granted = await invoke<boolean>("check_accessibility_probe");
-			console.log(granted);
 			setIsGranted(granted);
 			props.onPermissionChange(granted);
 			if (granted && pollInterval) {
@@ -30,10 +40,45 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 		}
 	};
 
+	const checkWithRetries = async () => {
+		// Try immediately
+		await checkPermission();
+		if (isGranted()) return;
+
+		// Retry after 200ms (let TCC settle)
+		await new Promise((r) => setTimeout(r, 200));
+		await checkPermission();
+		if (isGranted()) return;
+
+		// Retry after 500ms more
+		await new Promise((r) => setTimeout(r, 500));
+		await checkPermission();
+		if (isGranted()) return;
+
+		// Final retry after 1s more — if probes are fully cached,
+		// trust the notification since it only fires on an actual toggle
+		await new Promise((r) => setTimeout(r, 1000));
+		await checkPermission();
+		if (!isGranted()) {
+			// Both CGEventTapCreate and AXIsProcessTrusted are cached.
+			// The notification itself is reliable — it fires when the user
+			// toggles the switch. Trust it.
+			markGranted();
+		}
+	};
+
 	onMount(async () => {
 		await checkPermission();
-		if (!isGranted() && !pollInterval) {
+
+		if (!isGranted()) {
+			// Poll as fallback
 			pollInterval = setInterval(checkPermission, 1000);
+
+			// Listen for macOS distributed notification when the user
+			// toggles accessibility in System Settings
+			unlistenFn = await listen("accessibility-changed", () => {
+				checkWithRetries();
+			});
 		}
 	});
 
@@ -41,14 +86,19 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 		if (pollInterval) {
 			clearInterval(pollInterval);
 		}
+		if (unlistenFn) {
+			unlistenFn();
+		}
 	});
 
 	const handleOpenSettings = async () => {
 		setIsRequesting(true);
 		try {
 			await requestAccessibilityPermission();
-			pollInterval = setInterval(checkPermission, 1000);
 		} catch {
+			// ignore - settings may still open
+		}
+		if (!pollInterval) {
 			pollInterval = setInterval(checkPermission, 1000);
 		}
 		setIsRequesting(false);

@@ -20,6 +20,7 @@ pub fn check_accessibility_probe() -> bool {
         CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
     };
 
+    // Try a passive event tap first (won't trigger a system permission prompt)
     let tap_result = CGEventTap::new(
         CGEventTapLocation::HID,
         CGEventTapPlacement::HeadInsertEventTap,
@@ -28,7 +29,17 @@ pub fn check_accessibility_probe() -> bool {
         |_proxy, _event_type, event| Some(event.clone()),
     );
 
-    tap_result.is_ok()
+    if tap_result.is_ok() {
+        return true;
+    }
+
+    // Fall back to AXIsProcessTrusted (also silent, no prompt)
+    #[link(name = "ApplicationServices", kind = "framework")]
+    unsafe extern "C" {
+        fn AXIsProcessTrusted() -> bool;
+    }
+
+    unsafe { AXIsProcessTrusted() }
 }
 
 #[cfg(not(target_os = "macos"))]

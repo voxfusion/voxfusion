@@ -6192,6 +6192,8 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "chrono",
+ "core-foundation 0.10.1",
+ "core-foundation-sys",
  "core-graphics 0.24.0",
  "cpal",
  "enigo",

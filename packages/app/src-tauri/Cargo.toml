@@ -42,6 +42,8 @@ sha2 = "0.10"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.24"
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
 
 [profile.dev.package.scrypt]
 opt-level = 3
