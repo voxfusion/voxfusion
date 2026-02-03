@@ -7,7 +7,6 @@ import { checkUserRateLimit } from "../middleware/rateLimit";
 import { db } from "../providers/db";
 import { dictionaryWords, transcriptions } from "../providers/db/schema";
 import { groq } from "../providers/groq";
-import { canUserTranscribe, getUserSubscription } from "./subscription";
 
 async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	const tempFile = join(tmpdir(), `audio-${crypto.randomUUID()}.webm`);
@@ -85,31 +84,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			const session = (ctx as any).session as Session;
 
 			try {
-				const subscription = await getUserSubscription(session.user.id);
-				const rateLimitResult = await checkUserRateLimit(session.user.id, subscription.plan);
-
-				if (!rateLimitResult.allowed) {
-					return status(429, {
-						error: "Rate limit exceeded",
-						message: `Too many requests. Try again in ${rateLimitResult.retryAfter} seconds.`,
-						retryAfter: rateLimitResult.retryAfter,
-					});
-				}
-
-				const usageCheck = await canUserTranscribe(session.user.id);
-				if (!usageCheck.allowed) {
-					return status(403, {
-						error: "Usage limit exceeded",
-						message: `You've reached your monthly limit of ${usageCheck.limit.toLocaleString()} words. Upgrade to Pro for unlimited transcription.`,
-						usage: {
-							wordsUsed: usageCheck.used,
-							wordsRemaining: 0,
-							wordLimit: usageCheck.limit,
-							plan: usageCheck.plan,
-						},
-					});
-				}
-
 				const fileBuffer = await file.arrayBuffer();
 
 				const userWords = await db
@@ -149,20 +123,13 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					processingTimeMs,
 					fileBuffer,
 				};
-
-				const newUsage = usageCheck.used + wordCount;
-				const newRemaining =
-					usageCheck.limit === Number.POSITIVE_INFINITY
-						? null
-						: Math.max(0, usageCheck.limit - newUsage);
-
 				return {
 					text: transcriptionText,
 					wordCount,
 					usage: {
-						wordsUsed: newUsage,
-						wordsRemaining: newRemaining,
-						plan: usageCheck.plan,
+						wordsUsed: 0,
+						wordsRemaining: 1000000,
+						plan: "free",
 					},
 				} satisfies TranscriptionResult;
 			} catch (error) {
