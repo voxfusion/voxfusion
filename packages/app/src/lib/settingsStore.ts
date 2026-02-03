@@ -172,6 +172,7 @@ if (typeof window !== "undefined") {
 export async function updateOnboardingStep(step: number): Promise<void> {
 	const store = await getStore();
 	await store.set("onboardingStep", step);
+	await store.save();
 	setSettingsInternal((prev) => ({ ...prev, onboardingStep: step }));
 }
 
@@ -179,6 +180,7 @@ export async function markOnboardingComplete(): Promise<void> {
 	const store = await getStore();
 	await store.set("onboardingComplete", true);
 	await store.set("onboardingStep", 1);
+	await store.save();
 	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: true, onboardingStep: 1 }));
 	await emit("settings-changed");
 }

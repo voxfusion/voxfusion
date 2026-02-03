@@ -16,7 +16,7 @@ const extractTokenFromCookie = (cookieHeader: string | null): string | null => {
 		.split(";")
 		.map((c) => c.trim())
 		.find((c) => c.startsWith("better-auth.session_token="));
-	return sessionCookie?.split("=")[1] || null;
+	return sessionCookie?.split("=").slice(1).join("=") || null;
 };
 
 const extractTokenFromBody = (data: unknown): string | null => {

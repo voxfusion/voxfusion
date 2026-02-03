@@ -18,6 +18,25 @@ import UpdateNotification from "./components/UpdateNotification";
 const FORCE_SHOW_ONBOARDING =
 	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
 
+function waitForTauriIPC(): Promise<void> {
+	if ((window as any).__TAURI_INTERNALS__) return Promise.resolve();
+
+	return new Promise((resolve, reject) => {
+		const timeout = setTimeout(() => {
+			clearInterval(interval);
+			reject(new Error("Tauri IPC bridge not ready after 5s"));
+		}, 5000);
+
+		const interval = setInterval(() => {
+			if ((window as any).__TAURI_INTERNALS__) {
+				clearInterval(interval);
+				clearTimeout(timeout);
+				resolve();
+			}
+		}, 50);
+	});
+}
+
 const handleDeepLinkUrls = async (urls: string[]) => {
 	for (const urlString of urls) {
 		try {
@@ -44,6 +63,7 @@ function App(props: ParentProps) {
 	const settings = useSettings();
 	const navigate = useNavigate();
 	const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
+	const [isSessionChecked, setIsSessionChecked] = createSignal(false);
 
 	createEffect(() => {
 		console.log("session", session());
@@ -55,13 +75,27 @@ function App(props: ParentProps) {
 	};
 
 	onMount(async () => {
+		await waitForTauriIPC();
+		await tokenManager.init();
 		await initSettings();
 
+		// setInterval(async () => {
+		// 	console.log("interval token", await tokenManager.getToken())
+		// }, 50);
+
+		// await new Promise((resolve) => setTimeout(resolve, 10000));
+
 		// Restore session from stored token on app restart
-		const storedToken = await tokenManager.getToken();
-		if (storedToken) {
-			await authClient.useSession.get().refetch();
+		try {
+			const storedToken = await tokenManager.getToken();
+			console.log("storedToken", storedToken);
+			if (storedToken) {
+				await authClient.useSession.get().refetch();
+			}
+		} catch (error) {
+			console.error("Failed to restore session:", error);
 		}
+		setIsSessionChecked(true);
 
 		const initialUrls = await getCurrent();
 		if (initialUrls) {
@@ -131,7 +165,7 @@ function App(props: ParentProps) {
 	return (
 		<div class="relative min-h-screen h-full w-full bg-slate-100 dark:bg-midnight-900 transition-colors">
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
-			<Show when={session()?.isPending}>
+			<Show when={!isSessionChecked() || session()?.isPending}>
 				<div class="h-full flex flex-col items-center justify-center">
 					<div class="w-16 h-16 bg-slate-300 rounded-2xl mb-8" />
 					<div class="w-48 h-1 bg-slate-200 rounded-full overflow-hidden">
@@ -139,7 +173,7 @@ function App(props: ParentProps) {
 					</div>
 				</div>
 			</Show>
-			<Show when={!session()?.isPending}>
+			<Show when={isSessionChecked() && !session()?.isPending}>
 				<Show
 					when={session()?.data?.user}
 					fallback={
