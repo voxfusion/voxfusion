@@ -118,6 +118,10 @@ export const translations = {
 		"downloads.windows.download": "Download for Windows",
 		"downloads.windows.description": "Windows 10/11 (x64)",
 
+		"notFound.title": "Page not found",
+		"notFound.description": "The page you're looking for doesn't exist or has been moved.",
+		"notFound.cta": "Back to Home",
+
 		"footer.tagline": "Type with your voice. Anywhere on Mac.",
 		"footer.product": "Product",
 		"footer.company": "Company",
@@ -248,6 +252,10 @@ export const translations = {
 			"Сборки для Windows нестабильны и не протестированы. Используйте на свой риск.",
 		"downloads.windows.download": "Скачать для Windows",
 		"downloads.windows.description": "Windows 10/11 (x64)",
+
+		"notFound.title": "Страница не найдена",
+		"notFound.description": "Страница, которую вы ищете, не существует или была перемещена.",
+		"notFound.cta": "На главную",
 
 		"footer.tagline": "Печатайте голосом. В любом приложении на Mac.",
 		"footer.product": "Продукт",
