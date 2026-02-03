@@ -6192,6 +6192,7 @@ version = "0.1.0"
 dependencies = [
  "argon2",
  "chrono",
+ "core-graphics 0.24.0",
  "cpal",
  "enigo",
  "hound",

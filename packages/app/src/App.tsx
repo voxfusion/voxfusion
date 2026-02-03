@@ -144,7 +144,7 @@ function App(props: ParentProps) {
 				>
 					<Show
 						when={!shouldShowOnboarding()}
-						fallback={<OnboardingWizard onComplete={() => markOnboardingComplete()} />}
+						fallback={<OnboardingWizard initialStep={settings().onboardingStep} onComplete={() => markOnboardingComplete()} />}
 					>
 						<div class="flex h-full">
 							<Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />

@@ -40,6 +40,9 @@ tauri-plugin-process = "2"
 tauri-plugin-global-shortcut = "2"
 sha2 = "0.10"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.24"
+
 [profile.dev.package.scrypt]
 opt-level = 3
 

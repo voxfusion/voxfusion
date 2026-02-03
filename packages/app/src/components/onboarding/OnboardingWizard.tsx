@@ -1,5 +1,6 @@
 import { createSignal, Show } from "solid-js";
 import { useI18n } from "../../i18n";
+import { updateOnboardingStep } from "../../lib/settingsStore";
 import StepIndicator from "./StepIndicator";
 import MicrophonePermissionStep from "./steps/MicrophonePermissionStep";
 import AccessibilityPermissionStep from "./steps/AccessibilityPermissionStep";
@@ -9,6 +10,7 @@ import LanguageStep from "./steps/LanguageStep";
 import CompletionStep from "./steps/CompletionStep";
 
 interface OnboardingWizardProps {
+	initialStep: number;
 	onComplete: () => void;
 }
 
@@ -16,7 +18,7 @@ const TOTAL_STEPS = 6;
 
 export default function OnboardingWizard(props: OnboardingWizardProps) {
 	const [t] = useI18n();
-	const [currentStep, setCurrentStep] = createSignal(1);
+	const [currentStep, setCurrentStep] = createSignal(props.initialStep);
 	const [isAnimating, setIsAnimating] = createSignal(false);
 	const [animationDirection, setAnimationDirection] = createSignal<"forward" | "backward">(
 		"forward"
@@ -29,8 +31,10 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 			setAnimationDirection("forward");
 			setIsAnimating(true);
 			setTimeout(() => {
-				setCurrentStep(currentStep() + 1);
+				const nextStep = currentStep() + 1;
+				setCurrentStep(nextStep);
 				setIsAnimating(false);
+				updateOnboardingStep(nextStep);
 			}, 200);
 		}
 	};
@@ -40,8 +44,10 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 			setAnimationDirection("backward");
 			setIsAnimating(true);
 			setTimeout(() => {
-				setCurrentStep(currentStep() - 1);
+				const prevStep = currentStep() - 1;
+				setCurrentStep(prevStep);
 				setIsAnimating(false);
+				updateOnboardingStep(prevStep);
 			}, 200);
 		}
 	};
