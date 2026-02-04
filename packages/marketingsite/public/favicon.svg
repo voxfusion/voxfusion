@@ -1,20 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="32" height="32">
   <defs>
     <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1"/>
-      <stop offset="50%" style="stop-color:#8b5cf6"/>
-      <stop offset="100%" style="stop-color:#a855f7"/>
+      <stop offset="0%" style="stop-color:#FF6B4A"/>
+      <stop offset="50%" style="stop-color:#E55A3A"/>
+      <stop offset="100%" style="stop-color:#14919B"/>
     </linearGradient>
     <linearGradient id="waveGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#8b5cf6"/>
-      <stop offset="100%" style="stop-color:#c084fc"/>
+      <stop offset="0%" style="stop-color:#FF8C69"/>
+      <stop offset="100%" style="stop-color:#1DB9C3"/>
     </linearGradient>
     <linearGradient id="waveGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#a855f7"/>
-      <stop offset="100%" style="stop-color:#d8b4fe"/>
+      <stop offset="0%" style="stop-color:#1DB9C3"/>
+      <stop offset="100%" style="stop-color:#14919B"/>
     </linearGradient>
   </defs>
-  <rect x="5" y="5" width="190" height="190" rx="38" ry="38" fill="#0f0f23"/>
+  <rect x="5" y="5" width="190" height="190" rx="38" ry="38" fill="#0A1628"/>
   <rect x="25" y="45" width="8" height="35" rx="4" fill="url(#waveGradient3)" opacity="0.7"/>
   <rect x="42" y="55" width="8" height="50" rx="4" fill="url(#waveGradient2)" opacity="0.8"/>
   <rect x="59" y="70" width="8" height="55" rx="4" fill="url(#waveGradient)" opacity="0.9"/>

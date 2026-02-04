@@ -1,22 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
   <defs>
     <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#6366f1"/>
-      <stop offset="50%" style="stop-color:#8b5cf6"/>
-      <stop offset="100%" style="stop-color:#a855f7"/>
+      <stop offset="0%" style="stop-color:#FF6B4A"/>
+      <stop offset="50%" style="stop-color:#E55A3A"/>
+      <stop offset="100%" style="stop-color:#14919B"/>
     </linearGradient>
     <linearGradient id="waveGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#8b5cf6"/>
-      <stop offset="100%" style="stop-color:#c084fc"/>
+      <stop offset="0%" style="stop-color:#FF8C69"/>
+      <stop offset="100%" style="stop-color:#1DB9C3"/>
     </linearGradient>
     <linearGradient id="waveGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#a855f7"/>
-      <stop offset="100%" style="stop-color:#d8b4fe"/>
+      <stop offset="0%" style="stop-color:#1DB9C3"/>
+      <stop offset="100%" style="stop-color:#14919B"/>
     </linearGradient>
   </defs>
   
   <!-- Background circle (optional - can be removed) -->
-  <circle cx="100" cy="100" r="95" fill="#0f0f23" opacity="0"/>
+  <circle cx="100" cy="100" r="95" fill="#0A1628" opacity="0"/>
   
   <!-- Voice wave bars forming V shape - Left side -->
   <!-- Outer left wave -->
