@@ -1,7 +1,7 @@
 import { createEffect, createSignal, onCleanup, onMount, type ParentProps, Show } from "solid-js";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useNavigate } from "@solidjs/router";
 import { useStore } from "@nanostores/solid";
@@ -38,7 +38,9 @@ function waitForTauriIPC(): Promise<void> {
 }
 
 const handleDeepLinkUrls = async (urls: string[]) => {
-	for (const urlString of urls) {
+  await tokenManager.init();
+
+  for (const urlString of urls) {
 		try {
 			const url = new URL(urlString);
 			console.log(url);
@@ -46,10 +48,9 @@ const handleDeepLinkUrls = async (urls: string[]) => {
 
 			if (token) {
 				await tokenManager.storeToken(token);
-				console.log(await tokenManager.getToken())
+				console.log("freshawait tokenManager.getToken()", await tokenManager.getToken());
 				await authClient.useSession.get().refetch();
 
-				console.log(await authClient.getSession());
 				break;
 			}
 		} catch (error) {
@@ -79,13 +80,6 @@ function App(props: ParentProps) {
 		await tokenManager.init();
 		await initSettings();
 
-		// setInterval(async () => {
-		// 	console.log("interval token", await tokenManager.getToken())
-		// }, 50);
-
-		// await new Promise((resolve) => setTimeout(resolve, 10000));
-
-		// Restore session from stored token on app restart
 		try {
 			const storedToken = await tokenManager.getToken();
 			console.log("storedToken", storedToken);
@@ -96,6 +90,15 @@ function App(props: ParentProps) {
 			console.error("Failed to restore session:", error);
 		}
 		setIsSessionChecked(true);
+
+		// Notify other windows of current auth state after init completes.
+		// Also respond to future auth-request events from windows that
+		// start after this emit.
+		await emit("auth-changed");
+		const unlistenAuthRequest = await listen("auth-request", async () => {
+			await emit("auth-changed");
+		});
+		onCleanup(() => unlistenAuthRequest());
 
 		const initialUrls = await getCurrent();
 		if (initialUrls) {

@@ -59,13 +59,17 @@ export default function VoiceControl() {
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 		setIsOnboardingComplete(settings.onboardingComplete);
 
-		const token = await tokenManager.getToken();
-		setIsAuthenticated(!!token);
-
 		const unlistenAuth = await listen("auth-changed", async () => {
-			const newToken = await tokenManager.getToken();
-			setIsAuthenticated(!!newToken);
+			await tokenManager.init();
+			const token = await tokenManager.getToken();
+			setIsAuthenticated(!!token);
 		});
+
+		// Request current auth state from the main window. This avoids
+		// calling Stronghold.load() concurrently with the main window,
+		// which replaces the Rust-side vault instance and causes token
+		// reads to fail.
+		await emit("auth-request");
 
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();

@@ -8,19 +8,25 @@ const VAULT_PASSWORD = "vault password";
 
 let strongholdInstance: Stronghold | null = null;
 let clientInstance: Client | null = null;
+let initPromise: Promise<void> | null = null;
 
 export const tokenManager = {
 	init: async () => {
 		if (strongholdInstance && clientInstance) return;
+		if (initPromise) return initPromise;
 
-		const vaultPath = `${await appDataDir()}/vault.hold`;
-		strongholdInstance = await Stronghold.load(vaultPath, VAULT_PASSWORD);
+		initPromise = (async () => {
+			const vaultPath = `${await appDataDir()}/vault.hold`;
+			strongholdInstance = await Stronghold.load(vaultPath, VAULT_PASSWORD);
 
-		try {
-			clientInstance = await strongholdInstance.loadClient(CLIENT_NAME);
-		} catch {
-			clientInstance = await strongholdInstance.createClient(CLIENT_NAME);
-		}
+			try {
+				clientInstance = await strongholdInstance.loadClient(CLIENT_NAME);
+			} catch {
+				clientInstance = await strongholdInstance.createClient(CLIENT_NAME);
+			}
+		})();
+
+		return initPromise;
 	},
 	storeToken: async (token: string) => {
 		const store = clientInstance!.getStore();
@@ -34,7 +40,8 @@ export const tokenManager = {
 			const data = await store.get(TOKEN_KEY);
 			if (!data) return null;
 			return new TextDecoder().decode(new Uint8Array(data));
-		} catch {
+		} catch (error) {
+			console.error("Failed to get token from vault:", error);
 			return null;
 		}
 	},
