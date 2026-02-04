@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="50%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+    <linearGradient id="waveGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#c084fc"/>
+    </linearGradient>
+    <linearGradient id="waveGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#d8b4fe"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle (optional - can be removed) -->
+  <circle cx="100" cy="100" r="95" fill="#0f0f23" opacity="0"/>
+  
+  <!-- Voice wave bars forming V shape - Left side -->
+  <!-- Outer left wave -->
+  <rect x="25" y="45" width="8" height="35" rx="4" fill="url(#waveGradient3)" opacity="0.7">
+    <animate attributeName="height" values="35;45;35" dur="1s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="45;40;45" dur="1s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Second left wave -->
+  <rect x="42" y="55" width="8" height="50" rx="4" fill="url(#waveGradient2)" opacity="0.8">
+    <animate attributeName="height" values="50;60;50" dur="0.8s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="55;50;55" dur="0.8s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Third left wave -->
+  <rect x="59" y="70" width="8" height="55" rx="4" fill="url(#waveGradient)" opacity="0.9">
+    <animate attributeName="height" values="55;70;55" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="70;62;70" dur="1.2s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Fourth left wave -->
+  <rect x="76" y="85" width="8" height="60" rx="4" fill="url(#waveGradient)">
+    <animate attributeName="height" values="60;75;60" dur="0.9s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="85;77;85" dur="0.9s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Center bottom wave (tip of V) -->
+  <rect x="96" y="110" width="8" height="55" rx="4" fill="url(#waveGradient)">
+    <animate attributeName="height" values="55;70;55" dur="1.1s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="110;102;110" dur="1.1s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Fourth right wave -->
+  <rect x="116" y="85" width="8" height="60" rx="4" fill="url(#waveGradient)">
+    <animate attributeName="height" values="60;75;60" dur="0.9s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="85;77;85" dur="0.9s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Third right wave -->
+  <rect x="133" y="70" width="8" height="55" rx="4" fill="url(#waveGradient)" opacity="0.9">
+    <animate attributeName="height" values="55;70;55" dur="1.2s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="70;62;70" dur="1.2s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Second right wave -->
+  <rect x="150" y="55" width="8" height="50" rx="4" fill="url(#waveGradient2)" opacity="0.8">
+    <animate attributeName="height" values="50;60;50" dur="0.8s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="55;50;55" dur="0.8s" repeatCount="indefinite"/>
+  </rect>
+  
+  <!-- Outer right wave -->
+  <rect x="167" y="45" width="8" height="35" rx="4" fill="url(#waveGradient3)" opacity="0.7">
+    <animate attributeName="height" values="35;45;35" dur="1s" repeatCount="indefinite"/>
+    <animate attributeName="y" values="45;40;45" dur="1s" repeatCount="indefinite"/>
+  </rect>
+</svg>

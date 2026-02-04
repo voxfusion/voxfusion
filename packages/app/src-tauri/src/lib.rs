@@ -173,9 +173,13 @@ pub fn run() {
                 let mic_submenu_for_menu = mic_submenu.clone();
                 let mic_submenu_for_listener = mic_submenu.clone();
 
-                // Build tray icon
+                // Build tray icon with dedicated tray icon
+                let tray_icon_bytes = include_bytes!("../icons/tray-icon.png");
+                let tray_image = tauri::image::Image::from_bytes(tray_icon_bytes)
+                    .expect("Failed to load tray icon");
                 let _tray = TrayIconBuilder::new()
-                    .icon(app.default_window_icon().unwrap().clone())
+                    .icon(tray_image)
+                    .icon_as_template(true)
                     .menu(&menu)
                     .show_menu_on_left_click(true)
                     .on_menu_event(move |app, event| {

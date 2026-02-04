@@ -15,16 +15,22 @@ const t = useTranslations(lang);
 		<div class="container nav-container">
 			<a href="/" class="logo">
 				<div class="logo-icon">
-					<svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-						<rect width="32" height="32" rx="8" fill="url(#logo-gradient)"/>
-						<path d="M10 16C10 16 12 12 16 12C20 12 22 16 22 16C22 16 20 20 16 20C12 20 10 16 10 16Z" stroke="white" stroke-width="2" stroke-linecap="round"/>
-						<circle cx="16" cy="16" r="2" fill="white"/>
+					<svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
 						<defs>
-							<linearGradient id="logo-gradient" x1="0" y1="0" x2="32" y2="32">
-								<stop stop-color="#FF6B4A"/>
-								<stop offset="1" stop-color="#FF8C69"/>
-							</linearGradient>
+							<linearGradient id="logo-wg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6366f1"/><stop offset="50%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#a855f7"/></linearGradient>
+							<linearGradient id="logo-wg2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#c084fc"/></linearGradient>
+							<linearGradient id="logo-wg3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a855f7"/><stop offset="100%" stop-color="#d8b4fe"/></linearGradient>
 						</defs>
+						<rect x="5" y="5" width="190" height="190" rx="38" ry="38" fill="#0f0f23"/>
+						<rect x="25" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3)" opacity="0.7"/>
+						<rect x="42" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2)" opacity="0.8"/>
+						<rect x="59" y="70" width="8" height="55" rx="4" fill="url(#logo-wg)" opacity="0.9"/>
+						<rect x="76" y="85" width="8" height="60" rx="4" fill="url(#logo-wg)"/>
+						<rect x="96" y="110" width="8" height="55" rx="4" fill="url(#logo-wg)"/>
+						<rect x="116" y="85" width="8" height="60" rx="4" fill="url(#logo-wg)"/>
+						<rect x="133" y="70" width="8" height="55" rx="4" fill="url(#logo-wg)" opacity="0.9"/>
+						<rect x="150" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2)" opacity="0.8"/>
+						<rect x="167" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3)" opacity="0.7"/>
 					</svg>
 				</div>
 				<span class="logo-text">VoxFusion</span>

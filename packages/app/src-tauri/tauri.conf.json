@@ -6,6 +6,10 @@
 	"bundle": {
 		"active": true,
 		"targets": ["dmg", "app"],
+		"icon": [
+			"icons/icon.icns",
+			"icons/icon.png"
+		],
 		"macOS": {
 			"entitlements": "entitlements.plist",
 			"minimumSystemVersion": "10.15",
