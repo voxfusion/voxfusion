@@ -62,12 +62,17 @@ jobs:
           # Allow codesign to access the keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Add keychain to search list
-          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain
+          # Set the keychain as default and add to search list (put our keychain FIRST)
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychain -d user | tr -d '"')
 
-          # Verify the certificate is available
-          echo "Available signing identities:"
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          # Verify the certificate is available globally (not just in our keychain)
+          echo "Available signing identities (all keychains):"
+          security find-identity -v -p codesigning
+          
+          echo ""
+          echo "Keychain search list:"
+          security list-keychain -d user
 
       - name: Sync version from git tag
         run: |
