@@ -134,7 +134,7 @@ jobs:
           path: release-artifacts/
 
   publish:
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-autoscale
     needs: build
     steps:
       - name: Download build artifacts
