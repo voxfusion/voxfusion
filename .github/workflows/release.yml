@@ -67,35 +67,42 @@ jobs:
           echo "Found DMG: $DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
 
-          SIG_FILE=$(find packages/app/src-tauri/target -name "*.tar.gz.sig" -type f | head -1)
-          if [ -n "$SIG_FILE" ]; then
-            SIGNATURE=$(cat "$SIG_FILE")
-          else
-            SIGNATURE=""
-            echo "Warning: No signature file found"
+          # Find the .app.tar.gz file (this is what Tauri updater uses, not the .dmg)
+          TARBALL_PATH=$(find packages/app/src-tauri/target -name "*.app.tar.gz" -type f | head -1)
+          if [ -z "$TARBALL_PATH" ]; then
+            echo "Error: No .app.tar.gz file found"
+            find packages/app/src-tauri/target -type f -name "*.tar.gz" || true
+            exit 1
           fi
-          echo "SIGNATURE=$SIGNATURE" >> $GITHUB_OUTPUT
+          echo "Found tarball: $TARBALL_PATH"
+          echo "TARBALL_PATH=$TARBALL_PATH" >> $GITHUB_OUTPUT
+
+          # Find the signature file for the tarball
+          SIG_FILE="${TARBALL_PATH}.sig"
+          if [ -f "$SIG_FILE" ]; then
+            echo "Found signature file: $SIG_FILE"
+            cat "$SIG_FILE"
+          else
+            echo "Error: No signature file found at $SIG_FILE"
+            echo "Looking for any .sig files:"
+            find packages/app/src-tauri/target -name "*.sig" -type f || true
+            exit 1
+          fi
+          echo "SIG_FILE=$SIG_FILE" >> $GITHUB_OUTPUT
 
       - name: Prepare artifacts for upload
         run: |
           mkdir -p release-artifacts
           cp "${{ steps.artifacts.outputs.DMG_PATH }}" release-artifacts/VoxFusion.dmg
           cp "${{ steps.artifacts.outputs.DMG_PATH }}" release-artifacts/VoxFusion-latest.dmg
+          cp "${{ steps.artifacts.outputs.TARBALL_PATH }}" release-artifacts/VoxFusion.app.tar.gz
+          cp "${{ steps.artifacts.outputs.SIG_FILE }}" release-artifacts/VoxFusion.app.tar.gz.sig
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
           path: release-artifacts/
-
-      - name: Save signature
-        run: echo "${{ steps.artifacts.outputs.SIGNATURE }}" > release-artifacts/signature.txt
-
-      - name: Upload signature
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-signature
-          path: release-artifacts/signature.txt
 
   publish:
     runs-on: tenki-standard-autoscale
@@ -107,18 +114,6 @@ jobs:
           name: release-artifacts
           path: release-artifacts/
 
-      - name: Download signature
-        uses: actions/download-artifact@v4
-        with:
-          name: release-signature
-          path: release-signature/
-
-      - name: Read signature
-        id: sig
-        run: |
-          SIGNATURE=$(cat release-signature/signature.txt)
-          echo "SIGNATURE=$SIGNATURE" >> $GITHUB_OUTPUT
-
       - name: Get version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
@@ -126,30 +121,27 @@ jobs:
       - name: Generate latest.json
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          SIGNATURE="${{ steps.sig.outputs.SIGNATURE }}"
-          DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion-latest.dmg"
+          # Read the signature file content (contains multi-line minisign signature)
+          SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
+          # The updater URL should point to the .app.tar.gz, not the .dmg
+          DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
 
-          cat > latest.json << EOF
-          {
-            "version": "$VERSION",
-            "notes": "See release notes on GitHub",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "darwin-universal": {
-                "signature": "$SIGNATURE",
-                "url": "$DOWNLOAD_URL"
-              },
-              "darwin-x86_64": {
-                "signature": "$SIGNATURE",
-                "url": "$DOWNLOAD_URL"
-              },
-              "darwin-aarch64": {
-                "signature": "$SIGNATURE",
-                "url": "$DOWNLOAD_URL"
+          # Use jq to properly escape the signature for JSON
+          jq -n \
+            --arg version "$VERSION" \
+            --arg signature "$SIGNATURE" \
+            --arg url "$DOWNLOAD_URL" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              version: $version,
+              notes: "See release notes on GitHub",
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-universal": { signature: $signature, url: $url },
+                "darwin-x86_64": { signature: $signature, url: $url },
+                "darwin-aarch64": { signature: $signature, url: $url }
               }
-            }
-          }
-          EOF
+            }' > latest.json
 
           echo "Created latest.json:"
           cat latest.json
@@ -185,4 +177,5 @@ jobs:
           files: |
             release-artifacts/VoxFusion.dmg
             release-artifacts/VoxFusion-latest.dmg
+            release-artifacts/VoxFusion.app.tar.gz
             latest.json
