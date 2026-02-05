@@ -14,7 +14,11 @@ env:
 
 jobs:
   build:
-    runs-on: tenki-macos-latest-mini
+    runs-on: macos-latest
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,62 +52,27 @@ jobs:
           echo "Updated tauri.conf.json:"
           grep '"version"' tauri.conf.json
 
-      - name: Setup Apple code signing
+      - name: Import Apple Developer Certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Debug info
-          echo "macOS version: $(sw_vers -productVersion)"
-          echo "Current user: $(whoami)"
-          echo "Home: $HOME"
-          
-          # Create a keychain in a temp location we definitely have access to
-          KEYCHAIN_PATH="${RUNNER_TEMP}/build.keychain"
-          echo "Creating keychain at: $KEYCHAIN_PATH"
-          
-          # Decode certificate
-          echo $APPLE_CERTIFICATE | base64 --decode > "${RUNNER_TEMP}/certificate.p12"
-          
-          # Create keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          
-          # Disable keychain auto-lock
-          security set-keychain-settings -lut 7200 "$KEYCHAIN_PATH"
-          
-          # Unlock
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          
-          # Import with -A flag (allow all apps) and -x for non-extractable
-          security import "${RUNNER_TEMP}/certificate.p12" \
-            -k "$KEYCHAIN_PATH" \
-            -P "$APPLE_CERTIFICATE_PASSWORD" \
-            -A
-          
-          # Set partition list to allow codesign access without prompt
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          
-          # CRITICAL: Add to search list by prepending to existing list
-          security list-keychains -s "$KEYCHAIN_PATH" $(security list-keychains | xargs)
-          
-          echo ""
-          echo "Keychain search list:"
-          security list-keychains
-          
-          echo ""
-          echo "Identities in our keychain:"
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
-          
-          echo ""
-          echo "All available identities:"
-          security find-identity -v -p codesigning
-          
-          # Save path for other steps
-          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
-          
-          # Cleanup
-          rm "${RUNNER_TEMP}/certificate.p12"
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Verify Certificate
+        run: |
+          CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
+          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
+          echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
+          echo "Certificate imported: $CERT_ID"
 
       - name: Build Tauri app
         working-directory: packages/app
@@ -111,13 +80,10 @@ jobs:
           VITE_API_URL: https://voxfusion-production.up.railway.app
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          # Keep keychain unlocked
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
-          bun run tauri build --target universal-apple-darwin
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
+        run: bun run tauri build --target universal-apple-darwin
 
       - name: Find build artifacts
         id: artifacts
@@ -133,7 +99,6 @@ jobs:
           echo "Found DMG: $DMG_PATH"
           echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
 
-          # Find the .app.tar.gz file (this is what Tauri updater uses, not the .dmg)
           TARBALL_PATH=$(find packages/app/src-tauri/target -name "*.app.tar.gz" -type f | head -1)
           if [ -z "$TARBALL_PATH" ]; then
             echo "Error: No .app.tar.gz file found"
@@ -143,14 +108,12 @@ jobs:
           echo "Found tarball: $TARBALL_PATH"
           echo "TARBALL_PATH=$TARBALL_PATH" >> $GITHUB_OUTPUT
 
-          # Find the signature file for the tarball
           SIG_FILE="${TARBALL_PATH}.sig"
           if [ -f "$SIG_FILE" ]; then
             echo "Found signature file: $SIG_FILE"
             cat "$SIG_FILE"
           else
             echo "Error: No signature file found at $SIG_FILE"
-            echo "Looking for any .sig files:"
             find packages/app/src-tauri/target -name "*.sig" -type f || true
             exit 1
           fi
@@ -171,7 +134,7 @@ jobs:
           path: release-artifacts/
 
   publish:
-    runs-on: tenki-standard-autoscale
+    runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Download build artifacts
@@ -187,12 +150,9 @@ jobs:
       - name: Generate latest.json
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          # Read the signature file content (contains multi-line minisign signature)
           SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
-          # The updater URL should point to the .app.tar.gz, not the .dmg
           DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
 
-          # Use jq to properly escape the signature for JSON
           jq -n \
             --arg version "$VERSION" \
             --arg signature "$SIGNATURE" \
@@ -226,15 +186,7 @@ jobs:
             ### Download
             Download the DMG file below and drag VoxFusion to your Applications folder.
 
-            ### First Launch (Important)
-            Since this app is not signed with an Apple Developer ID, macOS will show a warning.
-
-            **To open the app:**
-            1. Right-click (or Control-click) on VoxFusion in Applications
-            2. Select "Open" from the context menu
-            3. Click "Open" in the dialog that appears
-
-            You only need to do this once. After that, the app will open normally.
+            This release is signed and notarized by Apple.
 
             ---
             Existing users will receive this update automatically.
