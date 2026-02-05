@@ -82,16 +82,12 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           
           echo ""
+          echo "Setting keychain search list (common domain)..."
+          security list-keychain -s "$KEYCHAIN_PATH"
+          
+          echo ""
           echo "Keychain search list:"
-          security list-keychain -d user
-          
-          echo ""
-          echo "All identities in our keychain:"
-          security find-identity -v "$KEYCHAIN_PATH"
-          
-          echo ""
-          echo "Codesigning identities in our keychain:"
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          security list-keychain
           
           echo ""
           echo "All codesigning identities (all keychains):"
