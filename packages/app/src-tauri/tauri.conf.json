@@ -15,7 +15,7 @@
 			"entitlements": "entitlements.plist",
 			"minimumSystemVersion": "10.15",
 			"hardenedRuntime": true,
-			"signingIdentity": "-"
+			"signingIdentity": "488EFE8CE12725ACA2280CBDCED80EC3EC1F9A9B"
 		}
 	},
 	"build": {
