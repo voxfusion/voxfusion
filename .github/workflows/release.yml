@@ -53,20 +53,23 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import certificate
+          # Import certificate with explicit codesign access
           CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
           echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
-          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH" -T /usr/bin/codesign -T /usr/bin/security
           rm "$CERTIFICATE_PATH"
 
           # Allow codesign to access the keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Set the keychain as default and add to search list (put our keychain FIRST)
-          security default-keychain -s "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychain -d user | tr -d '"')
+          # Add keychain to search list (put our keychain FIRST, preserve existing)
+          EXISTING_KEYCHAINS=$(security list-keychain -d user | xargs)
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $EXISTING_KEYCHAINS
 
-          # Verify the certificate is available globally (not just in our keychain)
+          # Keep keychain unlocked
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Verify the certificate is available globally
           echo "Available signing identities (all keychains):"
           security find-identity -v -p codesigning
           
