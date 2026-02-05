@@ -85,10 +85,11 @@ jobs:
           security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
           
           # Add to keychain search list (put our keychain FIRST so codesign finds it)
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          # Try multiple methods since Tenki runners have restricted permissions
+          security list-keychains -s "$KEYCHAIN_PATH" /Library/Keychains/System.keychain
           
-          # Try to set default, but don't fail if we can't
-          security default-keychain -s "$KEYCHAIN_PATH" 2>/dev/null || echo "Could not set default keychain (non-fatal)"
+          echo "Verifying keychain is in search list:"
+          security list-keychains
           
           # Import certificate with explicit codesign access
           security import certificate.p12 -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
