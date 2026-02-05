@@ -45,6 +45,16 @@ jobs:
           echo "Updated tauri.conf.json:"
           grep '"version"' tauri.conf.json
 
+      - name: Debug signing key format
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          echo "Key length: ${#TAURI_SIGNING_PRIVATE_KEY}"
+          echo "Key starts with: ${TAURI_SIGNING_PRIVATE_KEY:0:30}..."
+          echo "Key ends with: ...${TAURI_SIGNING_PRIVATE_KEY: -20}"
+          # Check if it's valid base64 and decodes to expected format
+          echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d 2>/dev/null | head -c 50 || echo "Failed to decode as base64"
+
       - name: Build Tauri app
         working-directory: packages/app
         env:
