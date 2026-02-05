@@ -1,6 +1,5 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import LanguageSwitcher from "../components/LanguageSwitcher.astro";
 import Downloads from "../components/Downloads.astro";
 import Footer from "../components/Footer.astro";
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
@@ -36,7 +35,6 @@ const t = useTranslations(lang);
 			</a>
 
 			<div class="nav-actions">
-				<LanguageSwitcher currentLang={lang} />
 				<a href={getLocalizedPath("/", lang)} class="btn btn-outline">{t("nav.features")}</a>
 			</div>
 
@@ -51,10 +49,7 @@ const t = useTranslations(lang);
 			<div class="mobile-menu-links">
 				<a href={getLocalizedPath("/", lang)}>{t("nav.features")}</a>
 			</div>
-			<div class="mobile-menu-actions">
-				<LanguageSwitcher currentLang={lang} />
 			</div>
-		</div>
 	</nav>
 
 	<Downloads lang={lang} />
@@ -164,10 +159,6 @@ const t = useTranslations(lang);
 
 	.mobile-menu-links a:hover {
 		color: var(--color-text);
-	}
-
-	.mobile-menu-actions {
-		display: flex;
 	}
 
 	.mobile-menu-btn.open span:nth-child(1) {

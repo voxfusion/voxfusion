@@ -1,142 +1,10 @@
 export const languages = {
 	ru: "Русский",
-	en: "English",
 };
 
 export const defaultLang = "ru";
 
 export const translations = {
-	en: {
-		"meta.title": "VoxFusion - Type with your voice. Anywhere on Mac.",
-		"meta.description":
-			"VoxFusion - Press a hotkey, speak, and text appears wherever you're typing. Fast dictation powered by Whisper AI.",
-
-		"nav.features": "Features",
-		"nav.demo": "Demo",
-		"nav.pricing": "Pricing",
-		"nav.download": "Download",
-
-		"hero.badge": "Voice-to-text in any app",
-		"hero.title.line1": "Type with your voice.",
-		"hero.title.line2": "Anywhere on Mac.",
-		"hero.subtitle":
-			"Press Cmd+;, speak naturally, and watch your words appear instantly in any application. VoxFusion brings fast, accurate dictation to your entire Mac.",
-		"hero.cta.download": "Download for Mac",
-		"hero.cta.watchDemo": "Watch Demo",
-
-		"features.tag": "Features",
-		"features.title":
-			"Simple, fast dictation that works everywhere",
-		"features.description":
-			"No switching apps. No copy-pasting. Just speak and type.",
-		"features.globalHotkey.title": "Global Hotkey",
-		"features.globalHotkey.description":
-			"Press Cmd+; anywhere on your Mac to start dictating. Works in any app - emails, documents, chat, code editors.",
-		"features.instantTranscription.title": "Instant Transcription",
-		"features.instantTranscription.description":
-			"Powered by Whisper AI (via Groq) for fast, accurate speech-to-text. Your words appear in seconds.",
-		"features.customDictionary.title": "Custom Dictionary",
-		"features.customDictionary.description":
-			"Add up to 50 specialized terms, names, or technical words for better accuracy in your field.",
-		"features.history.title": "Transcription History",
-		"features.history.description":
-			"Review past transcriptions with timestamps. Copy any text to clipboard or rate accuracy for improvements.",
-		"features.languages.title": "English & Russian",
-		"features.languages.description":
-			"Full support for English and Russian dictation with language-specific optimizations.",
-		"features.simpleSetup.title": "Simple Setup",
-		"features.simpleSetup.description":
-			"Download, grant microphone access, and start dictating. No complex configuration needed.",
-		"features.highlight.tag": "Why VoxFusion?",
-		"features.highlight.title":
-			"Dictate into any app without switching windows.",
-		"features.highlight.description":
-			"Traditional dictation apps make you copy and paste. VoxFusion inserts text directly where your cursor is - in any application, any text field.",
-		"features.highlight.list1": "Works in every Mac app - browsers, editors, email",
-		"features.highlight.list2": "Customizable hotkey (default Cmd+;)",
-		"features.highlight.list3": "Custom terms for names and technical vocabulary",
-
-		"demo.tag": "Demo",
-		"demo.title": "See VoxFusion in action",
-		"demo.description":
-			"Three simple steps to dictate anywhere on your Mac.",
-		"demo.videoLabel": "Product Demo",
-		"demo.step1.title": "Press Hotkey",
-		"demo.step1.description":
-			"Hit Cmd+; from anywhere on your Mac. A small indicator shows VoxFusion is listening.",
-		"demo.step2.title": "Speak Naturally",
-		"demo.step2.description":
-			"Talk at your normal pace. Whisper AI captures your speech with high accuracy.",
-		"demo.step3.title": "Text Appears Instantly",
-		"demo.step3.description":
-			"Your words are inserted directly where your cursor was. No copy-paste needed.",
-
-		"pricing.tag": "Pricing",
-		"pricing.title": "Start free, upgrade when you need more",
-		"pricing.description": "No credit card required. Cancel anytime.",
-		"pricing.free.name": "Free",
-		"pricing.free.price": "$0",
-		"pricing.free.period": "forever",
-		"pricing.free.description": "Perfect for trying voice dictation",
-		"pricing.free.feature1": "25,000 words per month",
-		"pricing.free.feature2": "Whisper AI transcription",
-		"pricing.free.feature3": "Custom dictionary (50 terms)",
-		"pricing.free.feature4": "Transcription history",
-		"pricing.free.feature5": "English & Russian support",
-		"pricing.free.cta": "Get Started Free",
-		"pricing.pro.badge": "Most Popular",
-		"pricing.pro.name": "Pro",
-		"pricing.pro.price": "$8",
-		"pricing.pro.period": "per month",
-		"pricing.pro.description": "For professionals who dictate daily",
-		"pricing.pro.feature1": "Unlimited",
-		"pricing.pro.feature1.suffix": " transcription",
-		"pricing.pro.feature2": "Everything in Free",
-		"pricing.pro.feature3": "Priority processing",
-		"pricing.pro.feature4": "Priority support",
-		"pricing.pro.cta": "Start Pro",
-		"pricing.faq": "Questions? Email us at",
-		"pricing.faq.suffix": "- we respond within 24 hours.",
-
-		"cta.title": "Ready to type with your voice?",
-		"cta.description": "Download VoxFusion free. Start dictating in seconds.",
-		"cta.button": "Download for Mac",
-
-		"downloads.title": "Downloads",
-		"downloads.subtitle":
-			"Get VoxFusion for your platform.",
-		"downloads.macos.title": "macOS",
-		"downloads.macos.latest": "macOS (latest)",
-		"downloads.macos.latest.description":
-			"For Apple Silicon Macs (M1, M2, M3, M4)",
-		"downloads.macos.universal": "macOS Universal",
-		"downloads.macos.universal.description":
-			"For both Intel and Apple Silicon Macs",
-		"downloads.windows.title": "Windows",
-		"downloads.windows.warning":
-			"Windows builds are unstable and untested. Use at your own risk.",
-		"downloads.windows.download": "Download for Windows",
-		"downloads.windows.description": "Windows 10/11 (x64)",
-
-		"notFound.title": "Page not found",
-		"notFound.description": "The page you're looking for doesn't exist or has been moved.",
-		"notFound.cta": "Back to Home",
-
-		"footer.tagline": "Type with your voice. Anywhere on Mac.",
-		"footer.product": "Product",
-		"footer.company": "Company",
-		"footer.legal": "Legal",
-		"footer.changelog": "Changelog",
-		"footer.about": "About",
-		"footer.blog": "Blog",
-		"footer.careers": "Careers",
-		"footer.contact": "Contact",
-		"footer.privacy": "Privacy Policy",
-		"footer.terms": "Terms of Service",
-		"footer.security": "Security",
-		"footer.copyright": "VoxFusion. All rights reserved.",
-		"footer.status": "All systems operational",
-	},
 	ru: {
 		"meta.title": "VoxFusion - Печатайте голосом. В любом приложении на Mac.",
 		"meta.description":
@@ -274,4 +142,4 @@ export const translations = {
 	},
 } as const;
 
-export type TranslationKey = keyof (typeof translations)["en"];
+export type TranslationKey = keyof (typeof translations)["ru"];
