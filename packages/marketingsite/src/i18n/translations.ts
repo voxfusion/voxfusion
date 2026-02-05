@@ -87,7 +87,7 @@ export const translations = {
 		"pricing.free.cta": "Начать бесплатно",
 		"pricing.pro.badge": "Популярный",
 		"pricing.pro.name": "Pro",
-		"pricing.pro.price": "400 ₽",
+		"pricing.pro.price": "300 ₽",
 		"pricing.pro.period": "в месяц",
 		"pricing.pro.description":
 			"Для тех, кто диктует каждый день",
