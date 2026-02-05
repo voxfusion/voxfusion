@@ -46,6 +46,7 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           
           echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -59,6 +60,10 @@ jobs:
 
           echo "Available signing identities:"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          
+          echo ""
+          echo "Keychain search list:"
+          security list-keychain -d user
 
       - name: Sync version from git tag
         run: |
@@ -69,6 +74,16 @@ jobs:
           echo "Updated tauri.conf.json:"
           grep '"version"' tauri.conf.json
 
+      - name: Unlock keychain for build
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          
+          # Verify codesign can access the identity
+          echo "Testing codesign access..."
+          security find-identity -v -p codesigning
+          
       - name: Build Tauri app
         working-directory: packages/app
         env:
