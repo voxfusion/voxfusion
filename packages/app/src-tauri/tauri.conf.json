@@ -5,6 +5,7 @@
 	"identifier": "io.voxfusion.app",
 	"bundle": {
 		"active": true,
+		"createUpdaterArtifacts": true,
 		"targets": ["dmg", "app"],
 		"icon": [
 			"icons/icon.icns",
