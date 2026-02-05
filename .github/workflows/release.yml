@@ -78,9 +78,22 @@ jobs:
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
+          echo "Current keychain search list:"
+          security list-keychain -d user
+          
+          echo ""
+          echo "Adding keychain to search list..."
+          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychain -d user | xargs)
+          
+          echo ""
+          echo "Updated keychain search list:"
+          security list-keychain -d user
+          
+          echo ""
+          echo "Unlocking keychain..."
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           
-          # Verify codesign can access the identity
+          echo ""
           echo "Testing codesign access..."
           security find-identity -v -p codesigning
           
