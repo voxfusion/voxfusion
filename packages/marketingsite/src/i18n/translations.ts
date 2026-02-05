@@ -8,7 +8,7 @@ export const translations = {
 	ru: {
 		"meta.title": "VoxFusion - Печатайте голосом. В любом приложении на Mac.",
 		"meta.description":
-			"VoxFusion - Нажмите горячую клавишу, говорите, и текст появится там, где вы печатаете. Быстрая диктовка на базе Whisper AI.",
+			"VoxFusion - Нажмите горячую клавишу, говорите, и текст появится там, где вы печатаете. Точная и быстрая диктовка для Mac.",
 
 		"nav.features": "Возможности",
 		"nav.demo": "Демо",
@@ -33,7 +33,7 @@ export const translations = {
 			"Нажмите Cmd+; в любом месте на Mac для диктовки. Работает везде - почта, документы, чаты, редакторы кода.",
 		"features.instantTranscription.title": "Мгновенная транскрипция",
 		"features.instantTranscription.description":
-			"На базе Whisper AI (через Groq) для быстрого и точного распознавания речи. Текст появляется за секунды.",
+			"Точность распознавания значительно выше, чем у встроенной диктовки macOS. Текст появляется за секунды.",
 		"features.customDictionary.title": "Свой словарь",
 		"features.customDictionary.description":
 			"Добавьте до 50 специальных терминов, имен или технических слов для лучшей точности.",
@@ -65,7 +65,7 @@ export const translations = {
 			"Нажмите Cmd+; откуда угодно на Mac. Индикатор покажет, что VoxFusion слушает.",
 		"demo.step2.title": "Говорите естественно",
 		"demo.step2.description":
-			"Говорите в обычном темпе. Whisper AI распознает речь с высокой точностью.",
+			"Говорите в обычном темпе. VoxFusion распознает речь с высокой точностью.",
 		"demo.step3.title": "Текст появляется мгновенно",
 		"demo.step3.description":
 			"Ваши слова вставляются прямо туда, где был курсор. Без копирования.",
@@ -80,7 +80,7 @@ export const translations = {
 		"pricing.free.description":
 			"Идеально для знакомства с голосовой диктовкой",
 		"pricing.free.feature1": "25 000 слов в месяц",
-		"pricing.free.feature2": "Транскрипция Whisper AI",
+		"pricing.free.feature2": "Точная транскрипция",
 		"pricing.free.feature3": "Свой словарь (50 терминов)",
 		"pricing.free.feature4": "История транскрипций",
 		"pricing.free.feature5": "Английский и русский",
