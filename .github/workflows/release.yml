@@ -81,12 +81,14 @@ jobs:
           
           # Create and configure keychain with full path
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security default-keychain -s "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH"
           
-          # Add to keychain search list (important for some runners)
+          # Add to keychain search list (put our keychain FIRST so codesign finds it)
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          
+          # Try to set default, but don't fail if we can't
+          security default-keychain -s "$KEYCHAIN_PATH" 2>/dev/null || echo "Could not set default keychain (non-fatal)"
           
           # Import certificate with explicit codesign access
           security import certificate.p12 -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
