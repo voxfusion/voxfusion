@@ -159,27 +159,27 @@ export default function TranscriptionList() {
 		<div class="space-y-6">
 			<Show when={initialLoading()}>
 				<div class="flex items-center justify-center py-12">
-					<Loader class="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
+					<Loader class="w-6 h-6 animate-spin text-[#ff3e00]" />
 				</div>
 			</Show>
 
 			<Show when={error()}>
-				<div class="text-center py-8">
-					<p class="text-red-500 dark:text-red-400 mb-2">{error()}</p>
+				<div class="text-center py-8 font-mono">
+					<p class="text-[#ff3e00] mb-2">[ERROR] {error()}</p>
 					<button
 						type="button"
 						onClick={() => fetchTranscriptions()}
-						class="text-sm text-blue-500 dark:text-blue-400 hover:underline"
+						class="text-[#ff3e00] hover:underline"
 					>
-						{t("transcriptionList.tryAgain")}
+						[RETRY]
 					</button>
 				</div>
 			</Show>
 
 			<Show when={!initialLoading() && !error() && transcriptions().length === 0}>
-				<div class="text-center py-12">
-					<p class="text-slate-500 dark:text-slate-400 text-lg mb-2">{t("transcriptionList.noTranscriptions")}</p>
-					<p class="text-slate-400 dark:text-slate-500 text-sm">{t("transcriptionList.useCommandToRecord")}</p>
+				<div class="text-center py-12 font-mono">
+					<p class="text-[#888] mb-2">[INFO] NO_TRANSCRIPTIONS</p>
+					<p class="text-[#666] text-sm">{t("transcriptionList.useCommandToRecord")}</p>
 				</div>
 			</Show>
 
@@ -187,8 +187,8 @@ export default function TranscriptionList() {
 				<For each={groupedTranscriptions()}>
 					{(group) => (
 						<div>
-							<h3 class="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2 px-1">{group.label}</h3>
-							<div class="bg-white dark:bg-midnight-800 rounded-lg divide-y divide-slate-100 dark:divide-midnight-700">
+							<h3 class="text-[#ff3e00] font-mono text-xs uppercase tracking-wider mb-2 px-1">{group.label}</h3>
+							<div class="bg-[#111] border border-[#222] divide-y divide-[#222]">
 								<For each={group.transcriptions}>
 									{(transcription) => <TranscriptionCard transcription={transcription} />}
 								</For>
@@ -201,12 +201,12 @@ export default function TranscriptionList() {
 
 				<Show when={loading() && transcriptions().length > 0}>
 					<div class="flex items-center justify-center py-4">
-						<Loader class="w-5 h-5 animate-spin text-slate-400 dark:text-slate-500" />
+						<Loader class="w-5 h-5 animate-spin text-[#ff3e00]" />
 					</div>
 				</Show>
 
 				<Show when={!hasMore() && transcriptions().length > 0}>
-					<p class="text-center text-slate-400 dark:text-slate-500 text-sm py-4">{t("transcriptionList.noMore")}</p>
+					<p class="text-center text-[#666] font-mono text-xs py-4">{t("transcriptionList.noMore")}</p>
 				</Show>
 			</Show>
 		</div>

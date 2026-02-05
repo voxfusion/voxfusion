@@ -63,9 +63,26 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 		return true;
 	};
 
+	const formatStep = (step: number) => step.toString().padStart(2, "0");
+
 	return (
-		<div class="fixed inset-0 bg-slate-100 dark:bg-midnight-900 flex flex-col items-center justify-center p-8">
+		<div class="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center p-8">
+			{/* Grid overlay background */}
+			<div
+				class="absolute inset-0 opacity-[0.03] pointer-events-none"
+				style={{
+					"background-image":
+						"linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+					"background-size": "40px 40px",
+				}}
+			/>
+
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
+
+			{/* Progress fraction */}
+			<div class="absolute top-8 right-8 font-mono text-[#666] text-sm tracking-wider">
+				{formatStep(currentStep())}/{formatStep(TOTAL_STEPS)}
+			</div>
 
 			<div class="mb-12">
 				<StepIndicator currentStep={currentStep()} totalSteps={TOTAL_STEPS} />
@@ -107,7 +124,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 					<button
 						type="button"
 						onClick={goToPrevious}
-						class="px-6 py-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors font-medium"
+						class="px-6 py-3 font-mono text-[#888] hover:text-[#e0e0e0] transition-colors uppercase tracking-wider text-sm border border-[#333] hover:border-[#ff3e00]"
 					>
 						{t("onboarding.back")}
 					</button>
@@ -119,7 +136,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 						<button
 							type="button"
 							onClick={handleComplete}
-							class="px-8 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors"
+							class="px-8 py-3 bg-[#ff3e00] text-black font-mono font-bold uppercase tracking-wider text-sm hover:bg-[#ff5722] transition-colors"
 						>
 							{t("onboarding.getStarted")}
 						</button>
@@ -129,7 +146,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 						type="button"
 						onClick={goToNext}
 						disabled={!canProceed()}
-						class="px-8 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						class="px-8 py-3 bg-[#ff3e00] text-black font-mono font-bold uppercase tracking-wider text-sm hover:bg-[#ff5722] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 					>
 						{t("onboarding.next")}
 					</button>

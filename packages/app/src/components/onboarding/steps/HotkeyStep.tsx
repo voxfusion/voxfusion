@@ -10,42 +10,50 @@ export default function HotkeyStep() {
 
 	return (
 		<div class="text-center max-w-md mx-auto">
-			<div class="w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-				<Keyboard class="w-10 h-10 text-primary-600 dark:text-primary-400" />
+			{/* Terminal-style header */}
+			<div class="font-mono text-[#ff3e00] text-sm mb-8 tracking-wider">
+				[STEP_05] &gt; HOTKEY_CONFIG
 			</div>
 
-			<h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-				{t("onboarding.hotkeyTitle")}
-			</h2>
-
-			<p class="text-slate-600 dark:text-slate-400 mb-8">
-				{t("onboarding.hotkeyDescription")}
-			</p>
-
-			<div class="space-y-4">
-				<div
-					class={`px-6 py-4 border-2 rounded-xl font-mono text-lg ${
-						isRecording()
-							? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400"
-							: "border-slate-200 dark:border-midnight-600 bg-slate-50 dark:bg-midnight-800 text-slate-700 dark:text-slate-300"
-					}`}
-				>
-					{isRecording()
-						? pendingHotkey() || t("onboarding.pressKeys")
-						: settings().hotkey}
+			{/* Card container */}
+			<div class="border border-[#222] bg-[#111] p-8">
+				<div class="w-16 h-16 border border-[#333] flex items-center justify-center mx-auto mb-6">
+					<Keyboard class="w-8 h-8 text-[#ff3e00]" />
 				</div>
 
-				<button
-					type="button"
-					onClick={toggleRecording}
-					class={`px-6 py-3 rounded-xl font-medium transition-colors ${
-						isRecording()
-							? "bg-slate-200 dark:bg-midnight-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-midnight-600"
-							: "bg-primary-500 text-white hover:bg-primary-600"
-					}`}
-				>
-					{isRecording() ? t("settings.cancel") : t("onboarding.recordHotkey")}
-				</button>
+				<h2 class="font-mono text-xl uppercase tracking-wider text-[#e0e0e0] mb-3">
+					{t("onboarding.hotkeyTitle")}
+				</h2>
+
+				<p class="font-mono text-sm text-[#888] mb-8">
+					{t("onboarding.hotkeyDescription")}
+				</p>
+
+				<div class="space-y-4">
+					<div
+						class={`px-6 py-4 border font-mono text-lg ${
+							isRecording()
+								? "border-[#ff3e00] bg-[#ff3e00]/10 text-[#ff3e00]"
+								: "border-[#333] bg-[#0a0a0a] text-[#e0e0e0]"
+						}`}
+					>
+						{isRecording()
+							? pendingHotkey() || t("onboarding.pressKeys")
+							: settings().hotkey}
+					</div>
+
+					<button
+						type="button"
+						onClick={toggleRecording}
+						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors ${
+							isRecording()
+								? "border border-[#333] text-[#888] hover:border-[#ff3e00] hover:text-[#e0e0e0] bg-transparent"
+								: "bg-[#ff3e00] text-black hover:bg-[#ff5722]"
+						}`}
+					>
+						{isRecording() ? t("settings.cancel") : t("onboarding.recordHotkey")}
+					</button>
+				</div>
 			</div>
 		</div>
 	);

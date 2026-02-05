@@ -26,55 +26,55 @@ export default function Sidebar(props: SidebarProps) {
 	};
 
 	return (
-		<aside class="w-56 bg-white dark:bg-midnight-800 border-r border-slate-200 dark:border-midnight-700 flex flex-col h-full transition-colors">
+		<aside class="w-56 bg-[#0a0a0a] border-r border-[#222] flex flex-col h-full">
 			<nav class="flex-1 p-3 pt-9 space-y-1">
 				<A
 					href="/"
-					class={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+					class={`flex items-center gap-3 px-3 py-2 font-mono uppercase tracking-wider text-xs transition-colors ${
 						isActive("/")
-							? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
-							: "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-midnight-700 hover:text-slate-900 dark:hover:text-white"
+							? "text-[#ff3e00] border-l-2 border-[#ff3e00] bg-[#111]"
+							: "text-[#888] hover:text-[#e0e0e0] hover:bg-[#111] border-l-2 border-transparent"
 					}`}
 				>
-					<Home class="w-5 h-5" />
-					{t("sidebar.home")}
+					<Home class="w-4 h-4" />
+					<span>01 {t("sidebar.home")}</span>
 				</A>
 				<A
 					href="/dictionary"
-					class={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+					class={`flex items-center gap-3 px-3 py-2 font-mono uppercase tracking-wider text-xs transition-colors ${
 						isActive("/dictionary")
-							? "bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
-							: "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-midnight-700 hover:text-slate-900 dark:hover:text-white"
+							? "text-[#ff3e00] border-l-2 border-[#ff3e00] bg-[#111]"
+							: "text-[#888] hover:text-[#e0e0e0] hover:bg-[#111] border-l-2 border-transparent"
 					}`}
 				>
-					<BookOpen class="w-5 h-5" />
-					{t("sidebar.dictionary")}
+					<BookOpen class="w-4 h-4" />
+					<span>02 {t("sidebar.dictionary")}</span>
 				</A>
 			</nav>
 
-			<div class="p-3 border-t border-slate-200 dark:border-midnight-700 relative">
+			<div class="p-3 border-t border-[#222] relative">
 				<button
 					type="button"
 					onClick={() => setIsUserMenuOpen(!isUserMenuOpen())}
-					class="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-midnight-700 hover:text-slate-900 dark:hover:text-white transition-colors"
+					class="flex items-center gap-3 w-full px-3 py-2 font-mono uppercase tracking-wider text-xs text-[#888] hover:text-[#e0e0e0] hover:bg-[#111] transition-colors"
 				>
-					<div class="w-8 h-8 bg-slate-200 dark:bg-midnight-600 rounded-full flex items-center justify-center">
-						<User class="w-4 h-4 text-slate-600 dark:text-slate-400" />
+					<div class="w-8 h-8 bg-[#222] border border-[#333] flex items-center justify-center">
+						<User class="w-4 h-4 text-[#888]" />
 					</div>
 					<span>{t("sidebar.account")}</span>
 				</button>
 
 				<Show when={isUserMenuOpen()}>
-					<div class="absolute bottom-full left-3 right-3 mb-2 bg-white dark:bg-midnight-800 rounded-lg shadow-lg border border-slate-200 dark:border-midnight-600 py-1 z-50">
+					<div class="absolute bottom-full left-3 right-3 mb-2 bg-[#111] border border-[#222] py-1 z-50">
 						<button
 							type="button"
 							onClick={() => {
 								setIsUserMenuOpen(false);
 								props.onOpenSettings();
 							}}
-							class="flex items-center gap-3 w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-midnight-700 hover:text-slate-900 dark:hover:text-white transition-colors"
+							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-[#888] hover:text-[#e0e0e0] hover:bg-[#0a0a0a] transition-colors"
 						>
-							<Settings class="w-5 h-5" />
+							<Settings class="w-4 h-4" />
 							{t("sidebar.settings")}
 						</button>
 						<button
@@ -83,18 +83,18 @@ export default function Sidebar(props: SidebarProps) {
 								openUrl("https://voxfusion.io/privacy");
 								setIsUserMenuOpen(false);
 							}}
-							class="flex items-center gap-3 w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-midnight-700 hover:text-slate-900 dark:hover:text-white transition-colors"
+							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-[#888] hover:text-[#e0e0e0] hover:bg-[#0a0a0a] transition-colors"
 						>
-							<Shield class="w-5 h-5" />
+							<Shield class="w-4 h-4" />
 							{t("sidebar.privacy")}
 						</button>
-						<div class="border-t border-slate-100 dark:border-midnight-600 my-1" />
+						<div class="border-t border-[#222] my-1" />
 						<button
 							type="button"
 							onClick={handleLogout}
-							class="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-[#ff3e00] hover:bg-[#0a0a0a] transition-colors"
 						>
-							<LogOut class="w-5 h-5" />
+							<LogOut class="w-4 h-4" />
 							{t("sidebar.logout")}
 						</button>
 					</div>

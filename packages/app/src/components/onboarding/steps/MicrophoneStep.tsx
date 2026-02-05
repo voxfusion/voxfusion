@@ -48,16 +48,16 @@ function Select(props: SelectProps) {
 			<button
 				type="button"
 				onClick={() => setIsOpen(!isOpen())}
-				class="flex items-center justify-between w-full px-4 py-3 bg-white dark:bg-midnight-800 border border-slate-200 dark:border-midnight-600 rounded-xl text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-midnight-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+				class="flex items-center justify-between w-full px-4 py-3 bg-[#0a0a0a] border border-[#333] text-[#e0e0e0] hover:border-[#ff3e00] focus:outline-none focus:border-[#ff3e00] transition-colors font-mono text-sm"
 			>
 				<span class="truncate">{selectedLabel()}</span>
 				<ChevronDown
-					class={`w-5 h-5 ml-2 text-slate-500 dark:text-slate-400 transition-transform ${isOpen() ? "rotate-180" : ""}`}
+					class={`w-5 h-5 ml-2 text-[#666] transition-transform ${isOpen() ? "rotate-180" : ""}`}
 				/>
 			</button>
 
 			<Show when={isOpen()}>
-				<div class="absolute z-50 w-full mt-2 bg-white dark:bg-midnight-800 border border-slate-200 dark:border-midnight-600 rounded-xl shadow-lg max-h-60 overflow-auto">
+				<div class="absolute z-50 w-full mt-1 bg-[#111] border border-[#333] max-h-60 overflow-auto">
 					<For each={props.options}>
 						{(option) => (
 							<button
@@ -66,15 +66,15 @@ function Select(props: SelectProps) {
 									props.onChange(option.value);
 									setIsOpen(false);
 								}}
-								class={`flex items-center justify-between w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-midnight-700 transition-colors first:rounded-t-xl last:rounded-b-xl ${
+								class={`flex items-center justify-between w-full px-4 py-3 text-left hover:bg-[#1a1a1a] transition-colors font-mono text-sm ${
 									option.value === props.value
-										? "bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400"
-										: "text-slate-900 dark:text-slate-100"
+										? "bg-[#ff3e00]/10 text-[#ff3e00]"
+										: "text-[#e0e0e0]"
 								}`}
 							>
 								<span class="truncate">{option.label}</span>
 								<Show when={option.value === props.value}>
-									<Check class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+									<Check class="w-4 h-4 text-[#ff3e00]" />
 								</Show>
 							</button>
 						)}
@@ -115,39 +115,47 @@ export default function MicrophoneStep() {
 
 	return (
 		<div class="text-center max-w-md mx-auto">
-			<div class="w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-				<Mic class="w-10 h-10 text-primary-600 dark:text-primary-400" />
+			{/* Terminal-style header */}
+			<div class="font-mono text-[#ff3e00] text-sm mb-8 tracking-wider">
+				[STEP_04] &gt; MICROPHONE_SELECT
 			</div>
 
-			<h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-				{t("onboarding.microphoneTitle")}
-			</h2>
-
-			<p class="text-slate-600 dark:text-slate-400 mb-8">
-				{t("onboarding.microphoneDescription")}
-			</p>
-
-			<div class="space-y-3">
-				<div class="flex items-center justify-end">
-					<button
-						type="button"
-						onClick={fetchDevices}
-						disabled={isLoading()}
-						class="flex items-center gap-2 px-3 py-1.5 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-midnight-700 rounded-lg transition-colors disabled:opacity-50"
-					>
-						<RefreshCw class={`w-4 h-4 ${isLoading() ? "animate-spin" : ""}`} />
-						{t("onboarding.refreshDevices")}
-					</button>
+			{/* Card container */}
+			<div class="border border-[#222] bg-[#111] p-8">
+				<div class="w-16 h-16 border border-[#333] flex items-center justify-center mx-auto mb-6">
+					<Mic class="w-8 h-8 text-[#ff3e00]" />
 				</div>
 
-				<Select
-					value={settings().selectedMicrophoneId ?? "default"}
-					options={microphoneOptions()}
-					onChange={(value) => {
-						updateMicrophone(value === "default" ? null : value);
-					}}
-					placeholder={t("onboarding.selectMicrophone")}
-				/>
+				<h2 class="font-mono text-xl uppercase tracking-wider text-[#e0e0e0] mb-3">
+					{t("onboarding.microphoneTitle")}
+				</h2>
+
+				<p class="font-mono text-sm text-[#888] mb-8">
+					{t("onboarding.microphoneDescription")}
+				</p>
+
+				<div class="space-y-3">
+					<div class="flex items-center justify-end">
+						<button
+							type="button"
+							onClick={fetchDevices}
+							disabled={isLoading()}
+							class="flex items-center gap-2 px-3 py-1.5 font-mono text-xs text-[#666] hover:text-[#ff3e00] border border-transparent hover:border-[#333] transition-colors disabled:opacity-50 uppercase tracking-wider"
+						>
+							<RefreshCw class={`w-4 h-4 ${isLoading() ? "animate-spin" : ""}`} />
+							{t("onboarding.refreshDevices")}
+						</button>
+					</div>
+
+					<Select
+						value={settings().selectedMicrophoneId ?? "default"}
+						options={microphoneOptions()}
+						onChange={(value) => {
+							updateMicrophone(value === "default" ? null : value);
+						}}
+						placeholder={t("onboarding.selectMicrophone")}
+					/>
+				</div>
 			</div>
 		</div>
 	);

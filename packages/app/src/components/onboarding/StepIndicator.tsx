@@ -1,5 +1,4 @@
 import { For } from "solid-js";
-import { Check } from "lucide-solid";
 
 interface StepIndicatorProps {
 	currentStep: number;
@@ -7,28 +6,28 @@ interface StepIndicatorProps {
 }
 
 export default function StepIndicator(props: StepIndicatorProps) {
+	const formatStep = (step: number) => step.toString().padStart(2, "0");
+
 	return (
-		<div class="flex items-center gap-3">
+		<div class="flex items-center gap-4 font-mono">
 			<For each={Array.from({ length: props.totalSteps }, (_, i) => i + 1)}>
 				{(step) => (
 					<div class="flex items-center">
 						<div
-							class={`w-10 h-10 rounded-full flex items-center justify-center font-medium transition-all ${
+							class={`text-sm tracking-wider transition-all ${
 								step < props.currentStep
-									? "bg-primary-500 text-white"
+									? "text-[#ff3e00]"
 									: step === props.currentStep
-										? "bg-primary-500 text-white ring-4 ring-primary-200 dark:ring-primary-900/50"
-										: "bg-slate-200 dark:bg-midnight-700 text-slate-500 dark:text-slate-400"
+										? "text-[#ff3e00] font-bold"
+										: "text-[#666]"
 							}`}
 						>
-							{step < props.currentStep ? <Check class="w-5 h-5" /> : step}
+							{formatStep(step)}
 						</div>
 						{step < props.totalSteps && (
 							<div
-								class={`w-12 h-1 mx-2 rounded-full transition-colors ${
-									step < props.currentStep
-										? "bg-primary-500"
-										: "bg-slate-200 dark:bg-midnight-700"
+								class={`w-8 h-px mx-3 transition-colors ${
+									step < props.currentStep ? "bg-[#ff3e00]" : "bg-[#333]"
 								}`}
 							/>
 						)}

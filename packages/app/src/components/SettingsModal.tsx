@@ -1,5 +1,5 @@
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
-import { X, Mic, Keyboard, Palette, ChevronDown, Check, Globe, RefreshCw } from "lucide-solid";
+import { ChevronDown, RefreshCw } from "lucide-solid";
 import { useI18n, type Locale } from "../i18n";
 import {
 	useSettings,
@@ -63,16 +63,16 @@ function Select(props: SelectProps) {
 			<button
 				type="button"
 				onClick={() => setIsOpen(!isOpen())}
-				class="flex items-center justify-between w-full px-4 py-2.5 bg-white dark:bg-midnight-800 border border-slate-200 dark:border-midnight-600 rounded-lg text-slate-900 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-midnight-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+				class="flex items-center justify-between w-full px-4 py-2.5 bg-[#111] border border-[#333] text-[#e0e0e0] hover:border-[#ff3e00] focus:outline-none focus:border-[#ff3e00] transition-colors font-mono text-sm"
 			>
 				<span class="truncate">{selectedLabel()}</span>
 				<ChevronDown
-					class={`w-4 h-4 ml-2 text-slate-500 dark:text-slate-400 transition-transform ${isOpen() ? "rotate-180" : ""}`}
+					class={`w-4 h-4 ml-2 text-[#666] transition-transform ${isOpen() ? "rotate-180" : ""}`}
 				/>
 			</button>
 
 			<Show when={isOpen()}>
-				<div class="absolute z-50 w-full mt-1 bg-white dark:bg-midnight-800 border border-slate-200 dark:border-midnight-600 rounded-lg shadow-lg max-h-60 overflow-auto">
+				<div class="absolute z-50 w-full mt-1 bg-[#111] border border-[#333] max-h-60 overflow-auto">
 					<For each={props.options}>
 						{(option) => (
 							<button
@@ -81,15 +81,15 @@ function Select(props: SelectProps) {
 									props.onChange(option.value);
 									setIsOpen(false);
 								}}
-								class={`flex items-center justify-between w-full px-4 py-2.5 text-left hover:bg-slate-100 dark:hover:bg-midnight-700 transition-colors ${
+								class={`flex items-center justify-between w-full px-4 py-2.5 text-left hover:bg-[#1a1a1a] transition-colors font-mono text-sm ${
 									option.value === props.value
-										? "bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400"
-										: "text-slate-900 dark:text-slate-100"
+										? "text-[#ff3e00] bg-[#1a1a1a]"
+										: "text-[#e0e0e0]"
 								}`}
 							>
 								<span class="truncate">{option.label}</span>
 								<Show when={option.value === props.value}>
-									<Check class="w-4 h-4 text-primary-600 dark:text-primary-400" />
+									<span class="text-[#ff3e00]">[*]</span>
 								</Show>
 							</button>
 						)}
@@ -188,10 +188,10 @@ export default function SettingsModal(props: SettingsModalProps) {
 	});
 
 	const sidebarItems = [
-		{ id: "audio" as const, icon: Mic, label: t("settings.audio") },
-		{ id: "hotkey" as const, icon: Keyboard, label: t("settings.hotkey") },
-		{ id: "appearance" as const, icon: Palette, label: t("settings.appearance") },
-		{ id: "language" as const, icon: Globe, label: t("settings.language") },
+		{ id: "audio" as const, num: "01", label: "AUDIO" },
+		{ id: "hotkey" as const, num: "02", label: "HOTKEY" },
+		{ id: "appearance" as const, num: "03", label: "APPEARANCE" },
+		{ id: "language" as const, num: "04", label: "LANGUAGE" },
 	];
 
 	const handleOverlayClick = (e: MouseEvent) => {
@@ -220,73 +220,80 @@ export default function SettingsModal(props: SettingsModalProps) {
 	};
 
 	const languageOptions: SelectOption[] = [
-		{ value: "en", label: "English" },
-		{ value: "ru", label: "Русский" },
+		{ value: "en", label: "ENGLISH" },
+		{ value: "ru", label: "RUSSIAN" },
 	];
 
 	return (
 		<Show when={props.isOpen}>
 			<div
-				class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+				class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
 				onClick={handleOverlayClick}
 			>
-				<div class="bg-white dark:bg-midnight-900 rounded-xl shadow-2xl w-[800px] h-[600px] flex overflow-hidden border border-slate-200 dark:border-midnight-700">
-					<div class="w-56 bg-slate-50 dark:bg-midnight-800 border-r border-slate-200 dark:border-midnight-700 p-4">
-						<div class="flex items-center justify-between mb-6 px-2">
-							<h2 class="text-lg font-semibold text-slate-900 dark:text-white">
-								{t("settings.title")}
+				<div class="bg-[#0a0a0a] border border-[#222] w-[800px] h-[600px] flex overflow-hidden">
+					{/* Sidebar */}
+					<div class="w-56 bg-[#0a0a0a] border-r border-[#222] flex flex-col">
+						{/* Header */}
+						<div class="px-4 py-4 border-b border-[#222]">
+							<h2 class="font-mono text-[#ff3e00] text-sm tracking-wider">
+								[VOXFUSION] &gt; SETTINGS
 							</h2>
 						</div>
-						<nav class="space-y-1">
+						{/* Navigation */}
+						<nav class="flex-1 py-2">
 							<For each={sidebarItems}>
 								{(item) => (
 									<button
 										type="button"
 										onClick={() => setActiveSection(item.id)}
-										class={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+										class={`flex items-center gap-3 w-full px-4 py-3 font-mono text-xs tracking-wider transition-colors ${
 											activeSection() === item.id
-												? "bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400"
-												: "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-midnight-700 hover:text-slate-900 dark:hover:text-white"
+												? "text-[#ff3e00] border-l-2 border-[#ff3e00] bg-[#111]"
+												: "text-[#666] hover:text-[#888] hover:bg-[#111] border-l-2 border-transparent"
 										}`}
 									>
-										<item.icon class="w-5 h-5" />
-										<span class="truncate">{item.label}</span>
+										<span class="text-[#444]">{item.num}</span>
+										<span>{item.label}</span>
 									</button>
 								)}
 							</For>
 						</nav>
 					</div>
 
+					{/* Content */}
 					<div class="flex-1 flex flex-col">
-						<div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-midnight-700">
-							<h3 class="text-lg font-semibold text-slate-900 dark:text-white">
-								{activeSection() === "audio" && t("settings.audio")}
-								{activeSection() === "hotkey" && t("settings.hotkey")}
-								{activeSection() === "appearance" && t("settings.appearance")}
-								{activeSection() === "language" && t("settings.language")}
+						{/* Content Header */}
+						<div class="flex items-center justify-between px-6 py-4 border-b border-[#222]">
+							<h3 class="font-mono text-[#e0e0e0] text-sm tracking-wider uppercase">
+								{activeSection() === "audio" && "// AUDIO_CONFIG"}
+								{activeSection() === "hotkey" && "// HOTKEY_CONFIG"}
+								{activeSection() === "appearance" && "// APPEARANCE_CONFIG"}
+								{activeSection() === "language" && "// LANGUAGE_CONFIG"}
 							</h3>
 							<button
 								type="button"
 								onClick={props.onClose}
-								class="p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-midnight-700 transition-colors"
+								class="font-mono text-[#666] hover:text-[#ff3e00] transition-colors text-sm"
 							>
-								<X class="w-5 h-5" />
+								[X]
 							</button>
 						</div>
 
+						{/* Content Body */}
 						<div class="flex-1 overflow-auto p-6">
+							{/* Audio Section */}
 							<Show when={activeSection() === "audio"}>
 								<div class="space-y-6">
 									<div>
-										<div class="flex items-center justify-between mb-2">
-											<label class="block text-sm font-medium text-slate-700 dark:text-slate-300">
-												{t("settings.microphone")}
+										<div class="flex items-center justify-between mb-3">
+											<label class="font-mono text-[#666] text-xs uppercase tracking-wider">
+												INPUT_DEVICE
 											</label>
 											<button
 												type="button"
 												onClick={fetchAudioDevices}
 												disabled={isLoadingDevices()}
-												class="p-1.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-midnight-700 rounded-lg transition-colors disabled:opacity-50"
+												class="p-1.5 text-[#666] hover:text-[#ff3e00] transition-colors disabled:opacity-50"
 												title="Refresh devices"
 											>
 												<RefreshCw class={`w-4 h-4 ${isLoadingDevices() ? "animate-spin" : ""}`} />
@@ -299,29 +306,30 @@ export default function SettingsModal(props: SettingsModalProps) {
 												updateMicrophone(value === "default" ? null : value);
 											}}
 										/>
-										<p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+										<p class="mt-3 font-mono text-xs text-[#444]">
 											{t("settings.microphoneDescription")}
 										</p>
 									</div>
 								</div>
 							</Show>
 
+							{/* Hotkey Section */}
 							<Show when={activeSection() === "hotkey"}>
 								<div class="space-y-6">
 									<div>
-										<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-											{t("settings.recordingHotkey")}
+										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-3">
+											RECORDING_TRIGGER
 										</label>
 										<div class="flex items-center gap-3">
 											<div
-												class={`flex-1 px-4 py-3 border rounded-lg font-mono text-center ${
+												class={`flex-1 px-4 py-3 border font-mono text-center text-sm ${
 													isRecordingHotkey()
-														? "border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400"
-														: "border-slate-300 dark:border-midnight-600 bg-slate-50 dark:bg-midnight-800 text-slate-700 dark:text-slate-300"
+														? "border-[#ff3e00] bg-[#1a0a00] text-[#ff3e00]"
+														: "border-[#333] bg-[#111] text-[#e0e0e0]"
 												}`}
 											>
 												{isRecordingHotkey()
-													? pendingHotkey() || t("settings.pressHotkey")
+													? pendingHotkey() || "_ WAITING FOR INPUT _"
 													: settings().hotkey}
 											</div>
 											<button
@@ -330,44 +338,45 @@ export default function SettingsModal(props: SettingsModalProps) {
 													setIsRecordingHotkey(!isRecordingHotkey());
 													setPendingHotkey("");
 												}}
-												class={`px-4 py-2.5 rounded-lg font-medium transition-colors ${
+												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors ${
 													isRecordingHotkey()
-														? "bg-slate-200 dark:bg-midnight-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-midnight-600"
-														: "bg-primary-500 text-white hover:bg-primary-600"
+														? "bg-[#222] text-[#888] hover:bg-[#333]"
+														: "bg-[#ff3e00] text-[#0a0a0a] hover:bg-[#ff5500]"
 												}`}
 											>
-												{isRecordingHotkey() ? t("settings.cancel") : t("settings.change")}
+												{isRecordingHotkey() ? "[CANCEL]" : "[CHANGE]"}
 											</button>
 										</div>
-										<p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+										<p class="mt-3 font-mono text-xs text-[#444]">
 											{t("settings.hotkeyDescription")}
 										</p>
 									</div>
 								</div>
 							</Show>
 
+							{/* Appearance Section */}
 							<Show when={activeSection() === "appearance"}>
 								<div class="space-y-6">
 									<div>
-										<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-											{t("settings.theme")}
+										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-4">
+											THEME_MODE
 										</label>
 										<div class="grid grid-cols-3 gap-4">
 											<ThemeOption
 												value="light"
-												label={t("settings.light")}
+												label="LIGHT"
 												isSelected={settings().theme === "light"}
 												onClick={() => updateTheme("light")}
 											/>
 											<ThemeOption
 												value="dark"
-												label={t("settings.dark")}
+												label="DARK"
 												isSelected={settings().theme === "dark"}
 												onClick={() => updateTheme("dark")}
 											/>
 											<ThemeOption
 												value="system"
-												label={t("settings.system")}
+												label="SYSTEM"
 												isSelected={settings().theme === "system"}
 												onClick={() => updateTheme("system")}
 											/>
@@ -376,11 +385,12 @@ export default function SettingsModal(props: SettingsModalProps) {
 								</div>
 							</Show>
 
+							{/* Language Section */}
 							<Show when={activeSection() === "language"}>
 								<div class="space-y-6">
 									<div>
-										<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-											{t("settings.language")}
+										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-3">
+											INTERFACE_LANGUAGE
 										</label>
 										<Select
 											value={locale()}
@@ -392,6 +402,13 @@ export default function SettingsModal(props: SettingsModalProps) {
 									</div>
 								</div>
 							</Show>
+						</div>
+
+						{/* Footer */}
+						<div class="px-6 py-3 border-t border-[#222]">
+							<p class="font-mono text-[10px] text-[#333]">
+								ESC TO CLOSE | CHANGES SAVED AUTOMATICALLY
+							</p>
 						</div>
 					</div>
 				</div>
@@ -412,44 +429,42 @@ function ThemeOption(props: ThemeOptionProps) {
 		<button
 			type="button"
 			onClick={props.onClick}
-			class={`relative p-4 rounded-xl border-2 transition-all ${
+			class={`relative p-4 border transition-all ${
 				props.isSelected
-					? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
-					: "border-slate-200 dark:border-midnight-600 hover:border-slate-300 dark:hover:border-midnight-500 bg-white dark:bg-midnight-800"
+					? "border-[#ff3e00] bg-[#1a0a00]"
+					: "border-[#333] bg-[#111] hover:border-[#444]"
 			}`}
 		>
 			<div class="mb-3">
 				<Show when={props.value === "light"}>
-					<div class="w-full h-16 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-						<div class="w-8 h-2 bg-slate-200 rounded" />
+					<div class="w-full h-12 bg-[#e0e0e0] border border-[#ccc] flex items-center justify-center">
+						<div class="w-8 h-1.5 bg-[#999]" />
 					</div>
 				</Show>
 				<Show when={props.value === "dark"}>
-					<div class="w-full h-16 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
-						<div class="w-8 h-2 bg-slate-600 rounded" />
+					<div class="w-full h-12 bg-[#1a1a1a] border border-[#333] flex items-center justify-center">
+						<div class="w-8 h-1.5 bg-[#444]" />
 					</div>
 				</Show>
 				<Show when={props.value === "system"}>
-					<div class="w-full h-16 rounded-lg overflow-hidden flex">
-						<div class="w-1/2 bg-white border-l border-t border-b border-slate-200 flex items-center justify-center">
-							<div class="w-4 h-2 bg-slate-200 rounded" />
+					<div class="w-full h-12 overflow-hidden flex">
+						<div class="w-1/2 bg-[#e0e0e0] border-l border-t border-b border-[#ccc] flex items-center justify-center">
+							<div class="w-4 h-1.5 bg-[#999]" />
 						</div>
-						<div class="w-1/2 bg-slate-800 border-r border-t border-b border-slate-700 flex items-center justify-center">
-							<div class="w-4 h-2 bg-slate-600 rounded" />
+						<div class="w-1/2 bg-[#1a1a1a] border-r border-t border-b border-[#333] flex items-center justify-center">
+							<div class="w-4 h-1.5 bg-[#444]" />
 						</div>
 					</div>
 				</Show>
 			</div>
 			<span
-				class={`text-sm font-medium ${props.isSelected ? "text-primary-700 dark:text-primary-400" : "text-slate-700 dark:text-slate-300"}`}
+				class={`font-mono text-xs uppercase tracking-wider ${props.isSelected ? "text-[#ff3e00]" : "text-[#888]"}`}
 			>
 				{props.label}
 			</span>
 			<Show when={props.isSelected}>
-				<div class="absolute top-2 right-2 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center">
-					<svg class="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-					</svg>
+				<div class="absolute top-2 right-2 font-mono text-[#ff3e00] text-xs">
+					[*]
 				</div>
 			</Show>
 		</button>

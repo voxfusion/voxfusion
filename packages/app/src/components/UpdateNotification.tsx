@@ -1,7 +1,7 @@
 import { createSignal, onMount, Show } from "solid-js";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { Download, X } from "lucide-solid";
+import { Download } from "lucide-solid";
 import { useI18n } from "../i18n";
 
 export default function UpdateNotification() {
@@ -53,27 +53,27 @@ export default function UpdateNotification() {
 	return (
 		<Show when={isVisible() && update()}>
 			<div class="fixed bottom-4 right-4 z-50 max-w-sm">
-				<div class="bg-white dark:bg-midnight-800 rounded-xl shadow-2xl border border-slate-200 dark:border-midnight-600 overflow-hidden">
+				<div class="bg-[#111] border border-[#222] overflow-hidden">
 					<div class="p-4">
 						<div class="flex items-start gap-3">
-							<div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-								<Download class="h-5 w-5 text-primary-600 dark:text-primary-400" />
+							<div class="flex-shrink-0 w-10 h-10 bg-[#ff3e00]/10 border border-[#ff3e00] flex items-center justify-center">
+								<Download class="h-5 w-5 text-[#ff3e00]" />
 							</div>
 							<div class="flex-1 min-w-0">
 								<div class="flex items-start justify-between gap-2">
-									<h3 class="text-sm font-semibold text-slate-900 dark:text-white">
+									<h3 class="text-sm font-mono uppercase tracking-wider text-[#e0e0e0]">
 										{t("update.available")}
 									</h3>
 									<button
 										type="button"
 										onClick={handleIgnore}
 										disabled={isDownloading()}
-										class="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded transition-colors disabled:opacity-50"
+										class="font-mono text-[#666] hover:text-[#ff3e00] transition-colors disabled:opacity-50"
 									>
-										<X class="w-4 h-4" />
+										[X]
 									</button>
 								</div>
-								<p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+								<p class="mt-1 text-sm font-mono text-[#888]">
 									{t("update.newVersion")} {update()?.version}
 								</p>
 							</div>
@@ -81,13 +81,13 @@ export default function UpdateNotification() {
 
 						<Show when={isDownloading()}>
 							<div class="mt-3">
-								<div class="w-full h-1.5 bg-slate-200 dark:bg-midnight-700 rounded-full overflow-hidden">
+								<div class="w-full h-1.5 bg-[#222] overflow-hidden">
 									<div
-										class="h-full bg-primary-500 rounded-full transition-all duration-300"
+										class="h-full bg-[#ff3e00] transition-all duration-300"
 										style={{ width: `${Math.min(downloadProgress() / 10, 100)}%` }}
 									/>
 								</div>
-								<p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+								<p class="mt-1.5 text-xs font-mono text-[#888]">
 									{t("update.downloading")}
 								</p>
 							</div>
@@ -98,14 +98,14 @@ export default function UpdateNotification() {
 								<button
 									type="button"
 									onClick={handleIgnore}
-									class="flex-1 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-midnight-700 hover:bg-slate-200 dark:hover:bg-midnight-600 rounded-lg transition-colors"
+									class="flex-1 px-3 py-2 text-sm font-mono bg-[#0a0a0a] border border-[#333] text-[#888] hover:border-[#666] transition-colors"
 								>
 									{t("update.ignore")}
 								</button>
 								<button
 									type="button"
 									onClick={handleDownloadAndRestart}
-									class="flex-1 px-3 py-2 text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
+									class="flex-1 px-3 py-2 text-sm font-mono uppercase bg-[#ff3e00] text-black hover:bg-[#ff3e00]/90 transition-colors"
 								>
 									{t("update.downloadAndRestart")}
 								</button>

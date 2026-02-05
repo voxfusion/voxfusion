@@ -48,51 +48,125 @@ function Auth() {
 	};
 
 	return (
-		<div class="flex items-center justify-center min-h-full w-full">
-			<div class="flex flex-col items-center gap-8 p-12 bg-white dark:bg-midnight-800 rounded-2xl shadow-xl border border-slate-200 dark:border-midnight-700 transition-colors">
-				<div class="flex flex-col items-center gap-2">
-					<h1 class="text-3xl font-bold text-slate-800 dark:text-white tracking-tight">{t("auth.welcome")}</h1>
-					<p class="text-slate-500 dark:text-slate-400 text-sm">{t("auth.signInToContinue")}</p>
+		<div class="relative flex items-center justify-center min-h-full w-full bg-[#0a0a0a] overflow-hidden">
+			{/* Grid overlay pattern */}
+			<div
+				class="absolute inset-0 opacity-[0.03]"
+				style={{
+					"background-image": `
+						linear-gradient(to right, #ff3e00 1px, transparent 1px),
+						linear-gradient(to bottom, #ff3e00 1px, transparent 1px)
+					`,
+					"background-size": "40px 40px",
+				}}
+			/>
+
+			{/* Scanline effect */}
+			<div
+				class="absolute inset-0 pointer-events-none opacity-[0.02]"
+				style={{
+					"background-image": "repeating-linear-gradient(0deg, transparent, transparent 2px, #fff 2px, #fff 4px)",
+				}}
+			/>
+
+			<div class="relative z-10 flex flex-col w-full max-w-md mx-4">
+				{/* Terminal header */}
+				<div class="border border-[#333] border-b-0 bg-[#0a0a0a] px-4 py-3">
+					<div class="flex items-center gap-2">
+						<span class="text-[#ff3e00] font-mono text-sm">[VOXFUSION]</span>
+						<span class="text-[#666] font-mono text-sm">&gt;</span>
+						<span class="text-[#e0e0e0] font-mono text-sm uppercase tracking-wider">AUTH_REQUIRED</span>
+						<span class="ml-auto text-[#666] font-mono text-xs">v1.0.0</span>
+					</div>
 				</div>
 
-				<button
-					type="button"
-					onClick={handleGoogleLogin}
-					disabled={isLoading()}
-					class="group flex items-center gap-3 px-6 py-3.5 bg-white dark:bg-midnight-700 border-2 border-slate-200 dark:border-midnight-600 rounded-xl hover:border-primary-500 dark:hover:border-primary-500 hover:shadow-lg hover:shadow-primary-100 dark:hover:shadow-primary-900/20 transition-all duration-200 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-slate-200 disabled:dark:hover:border-midnight-600 disabled:hover:shadow-none"
-				>
-					<Show
-						when={!isLoading()}
-						fallback={<Loader class="w-5 h-5 animate-spin text-slate-500 dark:text-slate-400" />}
-					>
-						<GoogleIcon class="w-5 h-5" />
-					</Show>
-					<span class="text-slate-700 dark:text-slate-200 font-medium group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-						{t("auth.continueWithGoogle")}
-					</span>
-				</button>
-
-				{import.meta.env.DEV && (
-					<div class="flex flex-col gap-3 w-full mt-4 pt-6 border-t border-slate-200 dark:border-midnight-600">
-						<p class="text-xs text-slate-500 dark:text-slate-400 text-center">
-							{t("auth.devPasteToken")}
+				{/* Main container */}
+				<div class="border border-[#333] bg-[#0a0a0a] p-8">
+					{/* Status line */}
+					<div class="mb-8 font-mono">
+						<p class="text-[#888] text-xs uppercase tracking-wider mb-2">// STATUS</p>
+						<p class="text-[#e0e0e0] text-sm">
+							<span class="text-[#ff3e00]">&gt;</span> {t("auth.signInToContinue")}
 						</p>
-						<input
-							type="text"
-							value={devToken()}
-							onInput={(e) => setDevToken(e.currentTarget.value)}
-							placeholder={t("auth.pasteTokenPlaceholder")}
-							class="px-4 py-2.5 border-2 border-slate-200 dark:border-midnight-600 bg-white dark:bg-midnight-700 text-slate-900 dark:text-slate-100 rounded-xl focus:outline-none focus:border-primary-500 transition-colors text-sm font-mono"
-						/>
-						<button
-							type="button"
-							onClick={handleDevTokenSubmit}
-							class="px-4 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors text-sm font-medium"
-						>
-							{t("auth.authenticate")}
-						</button>
 					</div>
-				)}
+
+					{/* Welcome message */}
+					<div class="mb-8">
+						<h1 class="text-[#e0e0e0] font-mono text-2xl uppercase tracking-wider mb-2">
+							{t("auth.welcome")}
+						</h1>
+						<div class="h-[1px] bg-[#333] w-full" />
+					</div>
+
+					{/* Google login button */}
+					<button
+						type="button"
+						onClick={handleGoogleLogin}
+						disabled={isLoading()}
+						class="group w-full flex items-center justify-center gap-3 px-6 py-4 bg-transparent border border-[#ff3e00] font-mono text-sm uppercase tracking-wider text-[#e0e0e0] hover:bg-[#ff3e00] hover:text-[#0a0a0a] transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#e0e0e0]"
+					>
+						<Show
+							when={!isLoading()}
+							fallback={<Loader class="w-5 h-5 animate-spin" />}
+						>
+							<GoogleIcon class="w-5 h-5" />
+						</Show>
+						<span>{t("auth.continueWithGoogle")}</span>
+					</button>
+
+					{/* Terminal output style status */}
+					<div class="mt-6 font-mono text-xs">
+						<p class="text-[#666]">
+							<span class="text-[#888]">[INFO]</span> Secure OAuth 2.0 authentication
+						</p>
+					</div>
+
+					{/* Dev token section */}
+					{import.meta.env.DEV && (
+						<div class="mt-8 pt-6 border-t border-[#222]">
+							<div class="mb-4 font-mono">
+								<p class="text-[#888] text-xs uppercase tracking-wider mb-2">// DEV_MODE</p>
+								<p class="text-[#666] text-xs">
+									<span class="text-[#ff3e00]">&gt;</span> {t("auth.devPasteToken")}
+								</p>
+							</div>
+
+							<div class="flex flex-col gap-3">
+								<div class="relative">
+									<span class="absolute left-3 top-1/2 -translate-y-1/2 text-[#ff3e00] font-mono text-sm">$</span>
+									<input
+										type="text"
+										value={devToken()}
+										onInput={(e) => setDevToken(e.currentTarget.value)}
+										placeholder={t("auth.pasteTokenPlaceholder")}
+										class="w-full pl-8 pr-4 py-3 bg-[#0a0a0a] border border-[#333] text-[#e0e0e0] font-mono text-sm placeholder:text-[#444] focus:outline-none focus:border-[#ff3e00] transition-colors"
+									/>
+								</div>
+								<button
+									type="button"
+									onClick={handleDevTokenSubmit}
+									class="w-full px-4 py-3 bg-[#ff3e00] text-[#0a0a0a] font-mono text-sm uppercase tracking-wider hover:bg-[#e03800] transition-colors"
+								>
+									{t("auth.authenticate")}
+								</button>
+							</div>
+
+							{/* Dev status */}
+							<div class="mt-4 font-mono text-xs">
+								<p class="text-[#666]">
+									<span class="text-[#888]">[WARN]</span> Development mode active
+								</p>
+							</div>
+						</div>
+					)}
+				</div>
+
+				{/* Footer */}
+				<div class="border border-[#333] border-t-0 bg-[#0a0a0a] px-4 py-2">
+					<p class="text-[#444] font-mono text-xs text-center uppercase tracking-wider">
+						Press ENTER to continue_
+					</p>
+				</div>
 			</div>
 		</div>
 	);

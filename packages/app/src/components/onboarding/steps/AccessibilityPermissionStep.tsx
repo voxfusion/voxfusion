@@ -106,56 +106,64 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 
 	return (
 		<div class="text-center max-w-md mx-auto">
-			<div class="w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-				<Shield class="w-10 h-10 text-primary-600 dark:text-primary-400" />
+			{/* Terminal-style header */}
+			<div class="font-mono text-[#ff3e00] text-sm mb-8 tracking-wider">
+				[STEP_03] &gt; ACCESSIBILITY_PERMISSION
 			</div>
 
-			<h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-				{t("onboarding.accessibilityTitle")}
-			</h2>
+			{/* Card container */}
+			<div class="border border-[#222] bg-[#111] p-8">
+				<div class="w-16 h-16 border border-[#333] flex items-center justify-center mx-auto mb-6">
+					<Shield class="w-8 h-8 text-[#ff3e00]" />
+				</div>
 
-			<p class="text-slate-600 dark:text-slate-400 mb-4">
-				{t("onboarding.accessibilityDescription")}
-			</p>
+				<h2 class="font-mono text-xl uppercase tracking-wider text-[#e0e0e0] mb-3">
+					{t("onboarding.accessibilityTitle")}
+				</h2>
 
-			<Show when={isGranted() === false}>
-				<p class="text-sm text-slate-500 dark:text-slate-500 mb-6 italic">
-					{t("onboarding.accessibilityInstructions")}
+				<p class="font-mono text-sm text-[#888] mb-4">
+					{t("onboarding.accessibilityDescription")}
 				</p>
-			</Show>
 
-			<div class="mb-6">
-				<Show when={isGranted() === null}>
-					<div class="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
-						<div class="w-4 h-4 border-2 border-slate-400 dark:border-slate-500 border-t-transparent rounded-full animate-spin" />
-						<span>{t("onboarding.checkingPermission")}</span>
-					</div>
-				</Show>
-				<Show when={isGranted() === true}>
-					<div class="flex items-center justify-center gap-2 text-green-600 dark:text-green-400">
-						<Check class="w-5 h-5" />
-						<span>{t("onboarding.accessibilityGranted")}</span>
-					</div>
-				</Show>
 				<Show when={isGranted() === false}>
-					<div class="flex items-center justify-center gap-2 text-amber-600 dark:text-amber-400">
-						<AlertCircle class="w-5 h-5" />
-						<span>{t("onboarding.accessibilityNotGranted")}</span>
-					</div>
+					<p class="font-mono text-xs text-[#666] mb-6 border-l-2 border-[#333] pl-3 text-left">
+						{t("onboarding.accessibilityInstructions")}
+					</p>
+				</Show>
+
+				<div class="mb-6">
+					<Show when={isGranted() === null}>
+						<div class="flex items-center justify-center gap-2 font-mono text-sm text-[#666]">
+							<div class="w-4 h-4 border-2 border-[#666] border-t-transparent rounded-full animate-spin" />
+							<span>{t("onboarding.checkingPermission")}</span>
+						</div>
+					</Show>
+					<Show when={isGranted() === true}>
+						<div class="flex items-center justify-center gap-2 font-mono text-sm text-[#00ff88]">
+							<Check class="w-5 h-5" />
+							<span>{t("onboarding.accessibilityGranted")}</span>
+						</div>
+					</Show>
+					<Show when={isGranted() === false}>
+						<div class="flex items-center justify-center gap-2 font-mono text-sm text-[#ff3e00]">
+							<AlertCircle class="w-5 h-5" />
+							<span>{t("onboarding.accessibilityNotGranted")}</span>
+						</div>
+					</Show>
+				</div>
+
+				<Show when={isGranted() !== true}>
+					<button
+						type="button"
+						onClick={handleOpenSettings}
+						disabled={isRequesting() || isGranted() === null}
+						class="inline-flex items-center gap-2 px-6 py-3 bg-[#ff3e00] text-black font-mono font-bold uppercase tracking-wider text-sm hover:bg-[#ff5722] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+					>
+						<span>{t("onboarding.openSystemPreferences")}</span>
+						<ExternalLink class="w-4 h-4" />
+					</button>
 				</Show>
 			</div>
-
-			<Show when={isGranted() !== true}>
-				<button
-					type="button"
-					onClick={handleOpenSettings}
-					disabled={isRequesting() || isGranted() === null}
-					class="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-				>
-					<span>{t("onboarding.openSystemPreferences")}</span>
-					<ExternalLink class="w-4 h-4" />
-				</button>
-			</Show>
 		</div>
 	);
 }

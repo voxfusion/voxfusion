@@ -6,14 +6,17 @@ export default function About() {
 	return (
 		<div class="min-h-screen flex items-center justify-center">
 			<div class="text-center space-y-8 max-w-2xl px-4">
-				<h1 class="text-5xl font-bold bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent">
+				<div class="font-mono text-[#888] text-sm tracking-wider mb-2">
+					[ABOUT] &gt; VOXFUSION
+				</div>
+				<h1 class="text-5xl font-bold text-[#ff3e00] font-mono uppercase tracking-wider">
 					{t("about.title")}
 				</h1>
-				<div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 space-y-4">
-					<p class="text-white text-lg">
+				<div class="bg-[#111] border border-[#222] p-8 space-y-4">
+					<p class="text-[#e0e0e0] text-lg font-mono">
 						{t("about.welcomeDescription")}
 					</p>
-					<p class="text-slate-300">
+					<p class="text-[#888] font-mono">
 						{t("about.navigationDescription")}
 					</p>
 				</div>

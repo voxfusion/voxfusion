@@ -1,6 +1,6 @@
 import { For, Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
-import { BookOpen, Loader, Pencil, Plus, Trash2, X, Check } from "lucide-solid";
+import { Loader } from "lucide-solid";
 import eden from "../lib/eden";
 
 type DictionaryWord = {
@@ -94,21 +94,29 @@ export default function Dictionary() {
 	};
 
 	return (
-		<div class="min-h-screen px-6 py-8">
+		<div class="min-h-screen bg-black px-6 py-8">
 			<div class="max-w-2xl mx-auto">
-				<div class="mb-8 flex items-center justify-between">
-					<div>
-						<h1 class="text-2xl font-bold text-slate-800 dark:text-white">{t("dictionary.title")}</h1>
-						<p class="text-slate-500 dark:text-slate-400 text-sm mt-1">{t("dictionary.description")}</p>
+				{/* Header */}
+				<div class="mb-8">
+					<div class="flex items-center justify-between">
+						<h1 class="font-mono text-[#e0e0e0] text-lg">
+							<span class="text-[#ff3e00]">[DICTIONARY]</span>
+							<span class="text-[#666]"> {">"} </span>
+							<span class="text-[#888]">CUSTOM_TERMS</span>
+						</h1>
+						<Show when={words().length > 0}>
+							<span class="text-[#666] font-mono text-xs uppercase">
+								{t("dictionary.wordCount").replace("{count}", String(words().length))}
+							</span>
+						</Show>
 					</div>
-					<Show when={words().length > 0}>
-						<span class="text-sm text-slate-400 dark:text-slate-500">
-							{t("dictionary.wordCount").replace("{count}", String(words().length))}
-						</span>
-					</Show>
+					<p class="text-[#666] font-mono text-xs mt-2 uppercase tracking-wide">
+						{t("dictionary.description")}
+					</p>
 				</div>
 
-				<div class="bg-white dark:bg-midnight-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-midnight-700 mb-6">
+				{/* Add Word Input */}
+				<div class="bg-[#111] border border-[#222] p-4 mb-6">
 					<div class="flex gap-3">
 						<input
 							type="text"
@@ -116,15 +124,15 @@ export default function Dictionary() {
 							onInput={(e) => setNewWord(e.currentTarget.value)}
 							onKeyDown={handleKeyDown}
 							placeholder={t("dictionary.wordPlaceholder")}
-							class="flex-1 px-4 py-2 border border-slate-200 dark:border-midnight-600 bg-white dark:bg-midnight-700 text-slate-900 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+							class="flex-1 px-4 py-2 bg-[#0a0a0a] border border-[#333] text-[#e0e0e0] font-mono placeholder-[#666] focus:outline-none focus:border-[#ff3e00] transition-colors"
 						/>
 						<button
 							type="button"
 							onClick={handleAdd}
 							disabled={!newWord().trim() || adding()}
-							class="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							class="flex items-center gap-2 px-4 py-2 bg-[#ff3e00] text-black font-mono uppercase tracking-wider text-sm hover:bg-[#ff5722] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 						>
-							<Show when={adding()} fallback={<Plus class="w-4 h-4" />}>
+							<Show when={adding()} fallback={<span>+</span>}>
 								<Loader class="w-4 h-4 animate-spin" />
 							</Show>
 							{t("dictionary.addWord")}
@@ -132,35 +140,38 @@ export default function Dictionary() {
 					</div>
 				</div>
 
+				{/* Loading State */}
 				<Show when={loading()}>
-					<div class="flex justify-center py-12">
-						<Loader class="w-6 h-6 animate-spin text-slate-400 dark:text-slate-500" />
+					<div class="bg-[#111] border border-[#222] p-12 flex justify-center">
+						<Loader class="w-6 h-6 animate-spin text-[#ff3e00]" />
 					</div>
 				</Show>
 
+				{/* Empty State */}
 				<Show when={!loading() && words().length === 0}>
-					<div class="bg-white dark:bg-midnight-800 rounded-xl p-12 shadow-sm border border-slate-200 dark:border-midnight-700 flex flex-col items-center justify-center text-center">
-						<div class="w-16 h-16 bg-slate-100 dark:bg-midnight-700 rounded-full flex items-center justify-center mb-4">
-							<BookOpen class="w-8 h-8 text-slate-400 dark:text-slate-500" />
+					<div class="bg-[#111] border border-[#222] p-12 flex flex-col items-center justify-center text-center">
+						<div class="font-mono text-[#666] text-sm mb-4">
+							<span class="text-[#ff3e00]">[INFO]</span> NO_TERMS_FOUND
 						</div>
-						<h2 class="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
+						<p class="text-[#888] font-mono text-xs uppercase tracking-wide">
 							{t("dictionary.emptyState")}
-						</h2>
-						<p class="text-slate-500 dark:text-slate-400 text-sm max-w-sm">
+						</p>
+						<p class="text-[#666] font-mono text-xs mt-2 max-w-sm">
 							{t("dictionary.emptyStateDescription")}
 						</p>
 					</div>
 				</Show>
 
+				{/* Word List */}
 				<Show when={!loading() && words().length > 0}>
-					<div class="space-y-2">
+					<div class="space-y-1">
 						<For each={words()}>
 							{(word) => (
-								<div class="bg-white dark:bg-midnight-800 rounded-lg px-4 py-3 shadow-sm border border-slate-200 dark:border-midnight-700 flex items-center justify-between group">
+								<div class="bg-[#111] border border-[#222] px-4 py-3 flex items-center justify-between group hover:border-[#333] transition-colors">
 									<Show
 										when={editingId() === word.id}
 										fallback={
-											<span class="text-slate-800 dark:text-slate-200 font-medium">{word.word}</span>
+											<span class="text-[#e0e0e0] font-mono">{word.word}</span>
 										}
 									>
 										<input
@@ -168,12 +179,12 @@ export default function Dictionary() {
 											value={editingWord()}
 											onInput={(e) => setEditingWord(e.currentTarget.value)}
 											onKeyDown={(e) => handleEditKeyDown(e, word.id)}
-											class="flex-1 px-2 py-1 border border-slate-200 dark:border-midnight-600 bg-white dark:bg-midnight-700 text-slate-900 dark:text-slate-100 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+											class="flex-1 px-2 py-1 bg-[#0a0a0a] border border-[#333] text-[#e0e0e0] font-mono focus:outline-none focus:border-[#ff3e00] transition-colors mr-4"
 											autofocus
 										/>
 									</Show>
 
-									<div class="flex items-center gap-1">
+									<div class="flex items-center gap-2 font-mono text-xs">
 										<Show
 											when={editingId() === word.id}
 											fallback={
@@ -181,18 +192,18 @@ export default function Dictionary() {
 													<button
 														type="button"
 														onClick={() => startEdit(word)}
-														class="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity"
+														class="text-[#666] hover:text-[#ff3e00] opacity-0 group-hover:opacity-100 transition-all uppercase tracking-wider"
 														title={t("dictionary.edit")}
 													>
-														<Pencil class="w-4 h-4" />
+														[EDIT]
 													</button>
 													<button
 														type="button"
 														onClick={() => handleDelete(word.id)}
-														class="p-2 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+														class="text-[#666] hover:text-[#ff3e00] opacity-0 group-hover:opacity-100 transition-all uppercase tracking-wider"
 														title={t("dictionary.delete")}
 													>
-														<Trash2 class="w-4 h-4" />
+														[DEL]
 													</button>
 												</>
 											}
@@ -200,18 +211,18 @@ export default function Dictionary() {
 											<button
 												type="button"
 												onClick={() => handleEdit(word.id)}
-												class="p-2 text-green-500 hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
+												class="text-[#00ff88] hover:text-[#33ff99] uppercase tracking-wider"
 												title={t("dictionary.save")}
 											>
-												<Check class="w-4 h-4" />
+												[SAVE]
 											</button>
 											<button
 												type="button"
 												onClick={cancelEdit}
-												class="p-2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+												class="text-[#666] hover:text-[#888] uppercase tracking-wider"
 												title={t("dictionary.cancel")}
 											>
-												<X class="w-4 h-4" />
+												[CANCEL]
 											</button>
 										</Show>
 									</div>

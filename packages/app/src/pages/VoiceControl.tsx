@@ -159,17 +159,17 @@ export default function VoiceControl() {
 
 	return (
 		<div
-			class={`min-h-2 mx-auto bg-black h-full rounded-xl flex align-center justify-center ${!isRecording() && !loading() ? "opacity-0" : ""}`}
+			class={`min-h-2 mx-auto bg-[#0a0a0a] h-full rounded-xl flex align-center justify-center ${!isRecording() && !loading() ? "opacity-0" : ""}`}
 		>
 			<Show when={loading()}>
-				<Loader class="w-4 h-4 animate-spin text-white m-auto" />
+				<Loader class="w-4 h-4 animate-spin text-[#ff3e00] m-auto" />
 			</Show>
 			<Show when={isRecording() && !loading()}>
 				<div class="flex items-center justify-center gap-[3px]">
 					<For each={BAR_MULTIPLIERS}>
 						{(multiplier) => (
 							<div
-								class="w-[2px] rounded bg-gray-300 transition-all duration-75"
+								class="w-[2px] rounded bg-[#ff3e00] transition-all duration-75"
 								style={{ height: `${Math.max(4, audioLevel() * multiplier * 3)}px` }}
 							/>
 						)}

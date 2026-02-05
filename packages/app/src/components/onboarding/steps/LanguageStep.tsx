@@ -16,23 +16,23 @@ function LanguageCard(props: LanguageCardProps) {
 		<button
 			type="button"
 			onClick={props.onClick}
-			class={`relative flex flex-col items-center p-6 rounded-xl border-2 transition-all ${
+			class={`relative flex flex-col items-center p-6 border transition-all bg-[#111] ${
 				props.isSelected
-					? "border-primary-500 bg-primary-50 dark:bg-primary-900/20"
-					: "border-slate-200 dark:border-midnight-600 hover:border-slate-300 dark:hover:border-midnight-500 bg-white dark:bg-midnight-800"
+					? "border-[#ff3e00]"
+					: "border-[#333] hover:border-[#ff3e00]"
 			}`}
 		>
-			<div class="text-4xl mb-3">{props.value === "en" ? "🇺🇸" : "🇷🇺"}</div>
+			<div class="text-5xl mb-3">{props.value === "en" ? "🇺🇸" : "🇷🇺"}</div>
 			<span
-				class={`text-lg font-semibold ${props.isSelected ? "text-primary-700 dark:text-primary-400" : "text-slate-900 dark:text-white"}`}
+				class={`font-mono text-lg uppercase tracking-wider ${props.isSelected ? "text-[#ff3e00]" : "text-[#e0e0e0]"}`}
 			>
 				{props.nativeLabel}
 			</span>
-			<span class="text-sm text-slate-500 dark:text-slate-400">{props.label}</span>
+			<span class="font-mono text-sm text-[#666] mt-1">{props.label}</span>
 
 			<Show when={props.isSelected}>
-				<div class="absolute top-3 right-3 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
-					<Check class="w-4 h-4 text-white" />
+				<div class="absolute top-3 right-3 w-6 h-6 bg-[#ff3e00] flex items-center justify-center">
+					<Check class="w-4 h-4 text-black" />
 				</div>
 			</Show>
 		</button>
@@ -48,33 +48,41 @@ export default function LanguageStep() {
 
 	return (
 		<div class="text-center max-w-md mx-auto">
-			<div class="w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-				<Globe class="w-10 h-10 text-primary-600 dark:text-primary-400" />
+			{/* Terminal-style header */}
+			<div class="font-mono text-[#ff3e00] text-sm mb-8 tracking-wider">
+				[STEP_01] &gt; LANGUAGE_SELECT
 			</div>
 
-			<h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-3">
-				{t("onboarding.languageTitle")}
-			</h2>
+			{/* Card container */}
+			<div class="border border-[#222] bg-[#111] p-8">
+				<div class="w-16 h-16 border border-[#333] flex items-center justify-center mx-auto mb-6">
+					<Globe class="w-8 h-8 text-[#ff3e00]" />
+				</div>
 
-			<p class="text-slate-600 dark:text-slate-400 mb-8">
-				{t("onboarding.languageDescription")}
-			</p>
+				<h2 class="font-mono text-xl uppercase tracking-wider text-[#e0e0e0] mb-3">
+					{t("onboarding.languageTitle")}
+				</h2>
 
-			<div class="grid grid-cols-2 gap-4">
-				<LanguageCard
-					value="en"
-					label="English"
-					nativeLabel="English"
-					isSelected={locale() === "en"}
-					onClick={() => handleLanguageChange("en")}
-				/>
-				<LanguageCard
-					value="ru"
-					label="Russian"
-					nativeLabel="Русский"
-					isSelected={locale() === "ru"}
-					onClick={() => handleLanguageChange("ru")}
-				/>
+				<p class="font-mono text-sm text-[#888] mb-8">
+					{t("onboarding.languageDescription")}
+				</p>
+
+				<div class="grid grid-cols-2 gap-4">
+					<LanguageCard
+						value="en"
+						label="English"
+						nativeLabel="English"
+						isSelected={locale() === "en"}
+						onClick={() => handleLanguageChange("en")}
+					/>
+					<LanguageCard
+						value="ru"
+						label="Russian"
+						nativeLabel="Русский"
+						isSelected={locale() === "ru"}
+						onClick={() => handleLanguageChange("ru")}
+					/>
+				</div>
 			</div>
 		</div>
 	);

@@ -166,13 +166,21 @@ function App(props: ParentProps) {
 	});
 
 	return (
-		<div class="relative min-h-screen h-full w-full bg-slate-100 dark:bg-midnight-900 transition-colors">
+		<div class="relative min-h-screen h-full w-full bg-[#0a0a0a] transition-colors">
+			{/* Grid overlay pattern */}
+			<div
+				class="pointer-events-none absolute inset-0 z-0"
+				style={{
+					"background-image": "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+					"background-size": "40px 40px",
+				}}
+			/>
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 			<Show when={!isSessionChecked() || session()?.isPending}>
 				<div class="h-full flex flex-col items-center justify-center">
-					<div class="w-16 h-16 bg-slate-300 rounded-2xl mb-8" />
-					<div class="w-48 h-1 bg-slate-200 rounded-full overflow-hidden">
-						<div class="w-1/4 h-full bg-slate-400 rounded-full animate-slide" />
+					<div class="w-16 h-16 bg-[#111] border border-[#222] mb-8 font-mono" />
+					<div class="w-48 h-1 bg-[#222] overflow-hidden">
+						<div class="w-1/4 h-full bg-[#ff3e00] animate-slide" />
 					</div>
 				</div>
 			</Show>

@@ -1,235 +1,407 @@
 ---
-import Layout from "../layouts/Layout.astro";
-import Footer from "../components/Footer.astro";
+/**
+ * 404 PAGE: BRUTALIST / RAW INDUSTRIAL
+ *
+ * Design Direction: Raw, industrial, unapologetic. Exposed grid structures,
+ * monospace typography, harsh contrasts, visible construction elements.
+ * Think concrete architecture meets command-line interfaces.
+ */
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
 
 const lang = defaultLang;
 const t = useTranslations(lang);
 ---
 
-<Layout title={`404 - ${t("notFound.title")}`} lang={lang}>
+<!doctype html>
+<html lang={lang}>
+<head>
+	<meta charset="UTF-8" />
+	<meta name="description" content={t("notFound.description")} />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+	<title>404 - {t("notFound.title")}</title>
+</head>
+<body>
+	<div class="grid-overlay"></div>
+
 	<nav class="nav">
-		<div class="container nav-container">
+		<div class="nav-inner">
 			<a href={getLocalizedPath("/", lang)} class="logo">
-				<div class="logo-icon">
-					<svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-						<defs>
-							<linearGradient id="logo-wg-404" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF6B4A"/><stop offset="50%" stop-color="#E55A3A"/><stop offset="100%" stop-color="#14919B"/></linearGradient>
-							<linearGradient id="logo-wg2-404" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF8C69"/><stop offset="100%" stop-color="#1DB9C3"/></linearGradient>
-							<linearGradient id="logo-wg3-404" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1DB9C3"/><stop offset="100%" stop-color="#14919B"/></linearGradient>
-						</defs>
-						<rect x="5" y="5" width="190" height="190" rx="38" ry="38" fill="#0A1628"/>
-						<rect x="25" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3-404)" opacity="0.7"/>
-						<rect x="42" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2-404)" opacity="0.8"/>
-						<rect x="59" y="70" width="8" height="55" rx="4" fill="url(#logo-wg-404)" opacity="0.9"/>
-						<rect x="76" y="85" width="8" height="60" rx="4" fill="url(#logo-wg-404)"/>
-						<rect x="96" y="110" width="8" height="55" rx="4" fill="url(#logo-wg-404)"/>
-						<rect x="116" y="85" width="8" height="60" rx="4" fill="url(#logo-wg-404)"/>
-						<rect x="133" y="70" width="8" height="55" rx="4" fill="url(#logo-wg-404)" opacity="0.9"/>
-						<rect x="150" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2-404)" opacity="0.8"/>
-						<rect x="167" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3-404)" opacity="0.7"/>
-					</svg>
-				</div>
-				<span class="logo-text">VoxFusion</span>
+				<span class="logo-bracket">[</span>VOX<span class="logo-accent">FUSION</span><span class="logo-bracket">]</span>
 			</a>
 		</div>
 	</nav>
 
-	<main class="not-found">
-		<div class="container not-found-content">
-			<div class="error-code">404</div>
-			<h1 class="not-found-title">{t("notFound.title")}</h1>
-			<p class="not-found-description">{t("notFound.description")}</p>
-			<a href={getLocalizedPath("/", lang)} class="btn btn-primary btn-lg">
-				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-					<path d="M16 10H4M4 10L9 5M4 10L9 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-				</svg>
-				<span>{t("notFound.cta")}</span>
-			</a>
-		</div>
+	<main class="error-page">
+		<div class="error-container">
+			<div class="terminal">
+				<div class="terminal-header">
+					<span class="terminal-title">~ system/error</span>
+					<div class="terminal-controls">
+						<span></span><span></span><span></span>
+					</div>
+				</div>
+				<div class="terminal-body">
+					<div class="terminal-line">
+						<span class="prompt">$</span>
+						<span class="command">locate --page</span>
+					</div>
+					<div class="terminal-line output">
+						<span class="status error">[ERROR_404]</span> PAGE_NOT_FOUND
+					</div>
+					<div class="terminal-line output">
+						<span class="timestamp">[{new Date().toISOString().slice(0, 19).replace('T', ' ')}]</span>
+					</div>
+					<div class="terminal-line">
+						<span class="prompt">$</span>
+						<span class="cursor">_</span>
+					</div>
+				</div>
+			</div>
 
-		<div class="not-found-visual">
-			<svg class="waveform-svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-				<defs>
-					<linearGradient id="nf-wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-						<stop offset="0%" stop-color="#FF6B4A" stop-opacity="0"/>
-						<stop offset="20%" stop-color="#FF6B4A" stop-opacity="0.3"/>
-						<stop offset="50%" stop-color="#FF8C69" stop-opacity="0.4"/>
-						<stop offset="80%" stop-color="#FF6B4A" stop-opacity="0.3"/>
-						<stop offset="100%" stop-color="#FF6B4A" stop-opacity="0"/>
-					</linearGradient>
-				</defs>
-				<path stroke="url(#nf-wave-gradient)" fill="none" stroke-width="2" opacity="0.5">
-					<animate
-						attributeName="d"
-						dur="4s"
-						repeatCount="indefinite"
-						values="
-							M0,60 Q100,30 200,60 T400,60 T600,60 T800,60 T1000,60 T1200,60;
-							M0,60 Q100,90 200,60 T400,60 T600,60 T800,60 T1000,60 T1200,60;
-							M0,60 Q100,30 200,60 T400,60 T600,60 T800,60 T1000,60 T1200,60
-						"
-					/>
-				</path>
-				<path stroke="url(#nf-wave-gradient)" fill="none" stroke-width="1.5" opacity="0.3">
-					<animate
-						attributeName="d"
-						dur="5s"
-						repeatCount="indefinite"
-						values="
-							M0,60 Q200,45 400,60 T800,60 T1200,60;
-							M0,60 Q200,75 400,60 T800,60 T1200,60;
-							M0,60 Q200,45 400,60 T800,60 T1200,60
-						"
-					/>
-				</path>
-			</svg>
-			<div class="not-found-glow"></div>
+			<div class="error-content">
+				<div class="error-code">404</div>
+				<h1 class="error-title">{t("notFound.title")}</h1>
+				<p class="error-description">{t("notFound.description")}</p>
+				<a href={getLocalizedPath("/", lang)} class="error-cta">
+					<span class="cta-icon">&larr;</span>
+					<span>{t("notFound.cta")}</span>
+				</a>
+			</div>
+
+			<div class="glitch-lines">
+				{[...Array(5)].map((_, i) => (
+					<div class="glitch-line" style={`--delay: ${i * 0.2}s; --offset: ${(i - 2) * 15}px`}></div>
+				))}
+			</div>
 		</div>
 	</main>
 
-	<Footer lang={lang} />
-</Layout>
+	<footer class="footer">
+		<div class="footer-inner">
+			<span>&copy; 2025 VoxFusion</span>
+			<span class="status"><span class="status-dot"></span> All systems operational</span>
+		</div>
+	</footer>
+</body>
+</html>
 
 <style>
+	@keyframes blink {
+		0%, 50% { opacity: 1; }
+		51%, 100% { opacity: 0; }
+	}
+
+	@keyframes glitch {
+		0%, 100% { transform: translateX(0); opacity: 0; }
+		10% { transform: translateX(var(--offset)); opacity: 0.5; }
+		20% { transform: translateX(calc(var(--offset) * -0.5)); opacity: 0.3; }
+		30% { transform: translateX(0); opacity: 0; }
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 0.5; }
+		50% { opacity: 1; }
+	}
+
+	* {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
+	html {
+		font-family: "JetBrains Mono", "Space Mono", monospace;
+		background: #0a0a0a;
+		color: #e0e0e0;
+		font-size: 15px;
+	}
+
+	body {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		position: relative;
+	}
+
+	.grid-overlay {
+		position: fixed;
+		inset: 0;
+		background-image:
+			linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+		background-size: 40px 40px;
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	/* Navigation */
 	.nav {
 		position: fixed;
 		top: 0;
 		left: 0;
 		right: 0;
 		z-index: 100;
-		padding: 16px 0;
-		background: rgba(10, 22, 40, 0.8);
-		backdrop-filter: blur(20px);
-		border-bottom: 1px solid var(--color-border);
+		border-bottom: 1px solid #222;
+		background: rgba(10, 10, 10, 0.95);
+		backdrop-filter: blur(10px);
 	}
 
-	.nav-container {
+	.nav-inner {
+		max-width: 1400px;
+		margin: 0 auto;
+		padding: 16px 32px;
 		display: flex;
 		align-items: center;
 	}
 
 	.logo {
+		font-size: 18px;
+		font-weight: 700;
+		letter-spacing: 0.1em;
+		text-decoration: none;
+		color: inherit;
+	}
+
+	.logo-bracket {
+		color: #ff3e00;
+	}
+
+	.logo-accent {
+		color: #666;
+	}
+
+	/* Error Page */
+	.error-page {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 120px 32px 60px;
+		position: relative;
+		z-index: 1;
+	}
+
+	.error-container {
+		max-width: 600px;
+		width: 100%;
+		position: relative;
+	}
+
+	/* Terminal */
+	.terminal {
+		background: #111;
+		border: 1px solid #333;
+		border-radius: 4px;
+		overflow: hidden;
+		margin-bottom: 48px;
+	}
+
+	.terminal-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 12px 16px;
+		background: #1a1a1a;
+		border-bottom: 1px solid #333;
+	}
+
+	.terminal-title {
+		font-size: 12px;
+		color: #666;
+	}
+
+	.terminal-controls {
+		display: flex;
+		gap: 8px;
+	}
+
+	.terminal-controls span {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		background: #333;
+	}
+
+	.terminal-body {
+		padding: 20px;
+		font-size: 13px;
+		line-height: 2;
+	}
+
+	.terminal-line {
 		display: flex;
 		align-items: center;
 		gap: 12px;
 	}
 
-	.logo-text {
-		font-weight: 700;
-		font-size: 20px;
-		letter-spacing: -0.02em;
+	.prompt {
+		color: #ff3e00;
 	}
 
-	.not-found {
-		min-height: 100vh;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		position: relative;
-		overflow: hidden;
+	.command {
+		color: #fff;
 	}
 
-	.not-found-content {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
+	.output {
+		color: #666;
+	}
+
+	.status.error {
+		color: #ff3e00;
+		animation: pulse 2s ease-in-out infinite;
+	}
+
+	.timestamp {
+		color: #444;
+		font-size: 11px;
+	}
+
+	.cursor {
+		animation: blink 1s infinite;
+		color: #ff3e00;
+	}
+
+	/* Error Content */
+	.error-content {
 		text-align: center;
-		position: relative;
-		z-index: 2;
 	}
 
 	.error-code {
-		font-size: clamp(100px, 20vw, 200px);
-		font-weight: 900;
+		font-size: clamp(80px, 15vw, 140px);
+		font-weight: 800;
 		line-height: 1;
+		color: transparent;
+		-webkit-text-stroke: 2px #ff3e00;
 		letter-spacing: -0.04em;
-		background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 50%, var(--color-accent-light) 100%);
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		background-clip: text;
-		margin-bottom: 16px;
-		opacity: 0.9;
+		margin-bottom: 24px;
+		position: relative;
 	}
 
-	.not-found-title {
-		font-size: clamp(24px, 4vw, 36px);
-		font-weight: 700;
-		letter-spacing: -0.02em;
-		margin-bottom: 12px;
-	}
-
-	.not-found-description {
-		font-size: 17px;
-		line-height: 1.6;
-		color: var(--color-text-secondary);
-		max-width: 440px;
-		margin-bottom: 32px;
-	}
-
-	.btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		padding: 10px 20px;
-		border-radius: 10px;
-		font-size: 15px;
-		font-weight: 600;
-		transition: all 0.2s ease;
-	}
-
-	.btn-primary {
-		background: var(--color-primary);
-		color: white;
-	}
-
-	.btn-primary:hover {
-		background: var(--color-primary-dark);
-		transform: translateY(-1px);
-		box-shadow: 0 8px 24px rgba(255, 107, 74, 0.3);
-	}
-
-	.btn-lg {
-		padding: 14px 28px;
-		font-size: 16px;
-		border-radius: 12px;
-	}
-
-	.not-found-visual {
+	.error-code::after {
+		content: '404';
 		position: absolute;
-		bottom: 60px;
-		left: 0;
-		right: 0;
-		height: 120px;
-		pointer-events: none;
-	}
-
-	.waveform-svg {
-		width: 100%;
-		height: 100%;
-	}
-
-	.not-found-glow {
-		position: absolute;
-		top: -100px;
+		top: 4px;
 		left: 50%;
 		transform: translateX(-50%);
-		width: 500px;
-		height: 300px;
-		background: radial-gradient(ellipse at center, rgba(255, 107, 74, 0.08) 0%, transparent 70%);
-		pointer-events: none;
+		-webkit-text-stroke: 1px rgba(255, 62, 0, 0.3);
+		z-index: -1;
 	}
 
+	.error-title {
+		font-size: 12px;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.2em;
+		color: #888;
+		margin-bottom: 16px;
+	}
+
+	.error-description {
+		font-size: 14px;
+		color: #666;
+		line-height: 1.8;
+		max-width: 400px;
+		margin: 0 auto 40px;
+	}
+
+	.error-cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 12px;
+		padding: 14px 28px;
+		background: transparent;
+		color: #ff3e00;
+		font-size: 13px;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		font-weight: 600;
+		border: 1px solid #ff3e00;
+		text-decoration: none;
+		transition: all 0.2s;
+	}
+
+	.error-cta:hover {
+		background: #ff3e00;
+		color: #000;
+	}
+
+	.cta-icon {
+		font-size: 18px;
+	}
+
+	/* Glitch Effect */
+	.glitch-lines {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		overflow: hidden;
+	}
+
+	.glitch-line {
+		position: absolute;
+		top: 50%;
+		left: -10%;
+		right: -10%;
+		height: 2px;
+		background: linear-gradient(90deg, transparent, #ff3e00, transparent);
+		opacity: 0;
+		animation: glitch 4s ease-in-out infinite;
+		animation-delay: var(--delay);
+	}
+
+	/* Footer */
+	.footer {
+		border-top: 1px solid #222;
+		padding: 20px 32px;
+		position: relative;
+		z-index: 1;
+	}
+
+	.footer-inner {
+		max-width: 1400px;
+		margin: 0 auto;
+		display: flex;
+		justify-content: space-between;
+		font-size: 12px;
+		color: #666;
+	}
+
+	.status {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.status-dot {
+		width: 8px;
+		height: 8px;
+		background: #00ff88;
+		border-radius: 50%;
+	}
+
+	/* Responsive */
 	@media (max-width: 600px) {
-		.not-found-description {
-			font-size: 15px;
+		.error-page {
+			padding: 100px 20px 40px;
 		}
 
-		.not-found-visual {
-			height: 80px;
-			bottom: 40px;
+		.terminal-body {
+			padding: 16px;
+			font-size: 12px;
+		}
+
+		.error-code {
+			-webkit-text-stroke-width: 1.5px;
+		}
+
+		.footer-inner {
+			flex-direction: column;
+			gap: 12px;
+			align-items: center;
 		}
 	}
 </style>

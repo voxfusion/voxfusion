@@ -7,12 +7,20 @@ export default function Home() {
 	return (
 		<div class="min-h-screen px-6 py-8">
 			<div class="max-w-2xl mx-auto">
-				<div class="mb-8">
-					<h1 class="text-2xl font-bold text-slate-800 dark:text-white">{t("home.yourTranscriptions")}</h1>
-					<p class="text-slate-500 dark:text-slate-400 text-sm mt-1">
-						{t("home.pressToRecord")}
-					</p>
+				{/* Terminal-style section header */}
+				<div class="flex items-center gap-3 mb-6">
+					<span class="text-[#ff3e00] font-mono text-sm">[HOME]</span>
+					<span class="text-[#666] font-mono text-sm">&gt;</span>
+					<h1 class="text-[#e0e0e0] font-mono uppercase tracking-wider text-sm">
+						{t("home.yourTranscriptions")}
+					</h1>
+					<div class="flex-1 h-px bg-[#222]" />
 				</div>
+
+				{/* Subtitle */}
+				<p class="text-[#666] font-mono text-xs mb-8">
+					{t("home.pressToRecord")}
+				</p>
 
 				<TranscriptionList />
 			</div>

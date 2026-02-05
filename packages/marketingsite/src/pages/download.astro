@@ -1,5 +1,4 @@
 ---
-import Layout from "../layouts/Layout.astro";
 import Downloads from "../components/Downloads.astro";
 import Footer from "../components/Footer.astro";
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
@@ -8,112 +7,160 @@ const lang = defaultLang;
 const t = useTranslations(lang);
 ---
 
-<Layout title={`${t("downloads.title")} - VoxFusion`} lang={lang}>
+<!doctype html>
+<html lang={lang}>
+<head>
+	<meta charset="UTF-8" />
+	<meta name="description" content={t("meta.description")} />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+	<title>{t("downloads.title")} - VoxFusion</title>
+</head>
+<body>
+	<div class="grid-overlay"></div>
+
 	<nav class="nav">
-		<div class="container nav-container">
+		<div class="nav-inner">
 			<a href={getLocalizedPath("/", lang)} class="logo">
-				<div class="logo-icon">
-					<svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-						<defs>
-							<linearGradient id="logo-wg-dl" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF6B4A"/><stop offset="50%" stop-color="#E55A3A"/><stop offset="100%" stop-color="#14919B"/></linearGradient>
-							<linearGradient id="logo-wg2-dl" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF8C69"/><stop offset="100%" stop-color="#1DB9C3"/></linearGradient>
-							<linearGradient id="logo-wg3-dl" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1DB9C3"/><stop offset="100%" stop-color="#14919B"/></linearGradient>
-						</defs>
-						<rect x="5" y="5" width="190" height="190" rx="38" ry="38" fill="#0A1628"/>
-						<rect x="25" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3-dl)" opacity="0.7"/>
-						<rect x="42" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2-dl)" opacity="0.8"/>
-						<rect x="59" y="70" width="8" height="55" rx="4" fill="url(#logo-wg-dl)" opacity="0.9"/>
-						<rect x="76" y="85" width="8" height="60" rx="4" fill="url(#logo-wg-dl)"/>
-						<rect x="96" y="110" width="8" height="55" rx="4" fill="url(#logo-wg-dl)"/>
-						<rect x="116" y="85" width="8" height="60" rx="4" fill="url(#logo-wg-dl)"/>
-						<rect x="133" y="70" width="8" height="55" rx="4" fill="url(#logo-wg-dl)" opacity="0.9"/>
-						<rect x="150" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2-dl)" opacity="0.8"/>
-						<rect x="167" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3-dl)" opacity="0.7"/>
-					</svg>
-				</div>
-				<span class="logo-text">VoxFusion</span>
+				<span class="logo-bracket">[</span>VOX<span class="logo-accent">FUSION</span><span class="logo-bracket">]</span>
 			</a>
-
-			<div class="nav-actions">
-				<a href={getLocalizedPath("/", lang)} class="btn btn-outline">{t("nav.features")}</a>
+			<div class="nav-links">
+				<a href={getLocalizedPath("/", lang) + "#features"} class="nav-link"><span class="link-index">01</span>{t("nav.features")}</a>
 			</div>
-
-			<button class="mobile-menu-btn" aria-label="Toggle menu">
-				<span></span>
-				<span></span>
-				<span></span>
-			</button>
+			<a href={getLocalizedPath("/", lang)} class="nav-cta">{t("nav.features")} →</a>
 		</div>
+
+		<button class="mobile-menu-btn" aria-label="Toggle menu">
+			<span></span>
+			<span></span>
+			<span></span>
+		</button>
 
 		<div class="mobile-menu">
 			<div class="mobile-menu-links">
 				<a href={getLocalizedPath("/", lang)}>{t("nav.features")}</a>
 			</div>
-			</div>
+		</div>
 	</nav>
 
 	<Downloads lang={lang} />
 	<Footer lang={lang} />
-</Layout>
+</body>
+</html>
 
 <style>
+	@keyframes blink {
+		0%, 50% { opacity: 1; }
+		51%, 100% { opacity: 0; }
+	}
+
+	* {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
+	html {
+		font-family: "JetBrains Mono", "Space Mono", monospace;
+		background: #0a0a0a;
+		color: #e0e0e0;
+		scroll-behavior: smooth;
+		font-size: 15px;
+	}
+
+	body {
+		min-height: 100vh;
+		position: relative;
+	}
+
+	.grid-overlay {
+		position: fixed;
+		inset: 0;
+		background-image:
+			linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+		background-size: 40px 40px;
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	/* Navigation */
 	.nav {
 		position: fixed;
 		top: 0;
 		left: 0;
 		right: 0;
 		z-index: 100;
-		padding: 16px 0;
-		background: rgba(10, 22, 40, 0.8);
-		backdrop-filter: blur(20px);
-		border-bottom: 1px solid var(--color-border);
+		border-bottom: 1px solid #222;
+		background: rgba(10, 10, 10, 0.95);
+		backdrop-filter: blur(10px);
 	}
 
-	.nav-container {
+	.nav-inner {
+		max-width: 1400px;
+		margin: 0 auto;
+		padding: 16px 32px;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 	}
 
 	.logo {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-	}
-
-	.logo-text {
+		font-size: 18px;
 		font-weight: 700;
-		font-size: 20px;
-		letter-spacing: -0.02em;
+		letter-spacing: 0.1em;
+		text-decoration: none;
+		color: #e0e0e0;
 	}
 
-	.nav-actions {
+	.logo-bracket {
+		color: #ff3e00;
+	}
+
+	.logo-accent {
+		color: #666;
+	}
+
+	.nav-links {
 		display: flex;
-		align-items: center;
-		gap: 12px;
+		gap: 32px;
 	}
 
-	.btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
+	.nav-link {
+		font-size: 13px;
+		color: #888;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		transition: color 0.2s;
+		text-decoration: none;
+	}
+
+	.nav-link:hover {
+		color: #fff;
+	}
+
+	.link-index {
+		color: #ff3e00;
+		margin-right: 8px;
+	}
+
+	.nav-cta {
 		padding: 10px 20px;
-		border-radius: 10px;
-		font-size: 15px;
-		font-weight: 600;
-		transition: all 0.2s ease;
+		border: 1px solid #ff3e00;
+		color: #ff3e00;
+		font-size: 13px;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		transition: all 0.2s;
+		text-decoration: none;
 	}
 
-	.btn-outline {
-		background: transparent;
-		border: 1.5px solid var(--color-border-hover);
-		color: var(--color-text);
-	}
-
-	.btn-outline:hover {
-		border-color: var(--color-primary);
-		background: rgba(255, 107, 74, 0.05);
+	.nav-cta:hover {
+		background: #ff3e00;
+		color: #000;
 	}
 
 	.mobile-menu-btn {
@@ -122,12 +169,14 @@ const t = useTranslations(lang);
 		gap: 5px;
 		padding: 8px;
 		background: none;
+		border: none;
+		cursor: pointer;
 	}
 
 	.mobile-menu-btn span {
 		width: 24px;
 		height: 2px;
-		background: var(--color-text);
+		background: #e0e0e0;
 		border-radius: 2px;
 		transition: all 0.2s;
 	}
@@ -136,8 +185,9 @@ const t = useTranslations(lang);
 		display: none;
 		flex-direction: column;
 		gap: 24px;
-		padding: 24px;
-		border-top: 1px solid var(--color-border);
+		padding: 24px 32px;
+		border-top: 1px solid #222;
+		background: rgba(10, 10, 10, 0.98);
 	}
 
 	.mobile-menu.open {
@@ -151,14 +201,17 @@ const t = useTranslations(lang);
 	}
 
 	.mobile-menu-links a {
-		font-size: 16px;
+		font-size: 14px;
 		font-weight: 500;
-		color: var(--color-text-secondary);
+		color: #888;
+		text-decoration: none;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
 		transition: color 0.2s ease;
 	}
 
 	.mobile-menu-links a:hover {
-		color: var(--color-text);
+		color: #ff3e00;
 	}
 
 	.mobile-menu-btn.open span:nth-child(1) {
@@ -173,13 +226,18 @@ const t = useTranslations(lang);
 		transform: translateY(-7px) rotate(-45deg);
 	}
 
-	@media (max-width: 900px) {
-		.nav-actions {
+	@media (max-width: 768px) {
+		.nav-links,
+		.nav-cta {
 			display: none;
 		}
 
 		.mobile-menu-btn {
 			display: flex;
+		}
+
+		.nav-inner {
+			padding: 16px 24px;
 		}
 	}
 </style>
