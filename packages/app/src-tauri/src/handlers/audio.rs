@@ -172,32 +172,45 @@ pub async fn start_recording_with_device(
 
 #[tauri::command]
 pub async fn stop_recording_with_device() -> Result<PathBuf, String> {
-    let state = RECORDING_STATE.lock().map_err(|err| err.to_string())?;
-    if !state.is_recording.load(Ordering::SeqCst) {
-        return Err("No recording in progress.".to_string());
-    }
-    state.is_recording.store(false, Ordering::SeqCst);
+    // Extract resources while holding the lock, then release lock before dropping
+    let (stream_to_drop, writer_to_finalize, save_path) = {
+        let state = RECORDING_STATE.lock().map_err(|err| err.to_string())?;
+        if !state.is_recording.load(Ordering::SeqCst) {
+            return Err("No recording in progress.".to_string());
+        }
+        state.is_recording.store(false, Ordering::SeqCst);
 
-    // Stop the stream
-    if let Some(stream) = state.stream.lock().map_err(|err| err.to_string())?.take() {
+        // Take the stream
+        let stream = state.stream.lock().map_err(|err| err.to_string())?.take();
+
+        // Take the writer
+        let writer = state.writer.lock().map_err(|err| err.to_string())?.take();
+
+        // Clear app handle
+        *state.app_handle.lock().map_err(|err| err.to_string())? = None;
+
+        // Get and clear the save path
+        let save_path = state
+            .save_path
+            .lock()
+            .map_err(|err| err.to_string())?
+            .take()
+            .ok_or("No recording in progress or save path not set.".to_string())?;
+
+        (stream, writer, save_path)
+    };
+    // Lock is now released
+
+    // Stop the stream - pause first, then drop to ensure macOS releases microphone
+    if let Some(stream) = stream_to_drop {
+        let _ = stream.0.pause();
         drop(stream.0);
     }
 
     // Finalize the writer
-    if let Some(writer) = state.writer.lock().map_err(|err| err.to_string())?.take() {
+    if let Some(writer) = writer_to_finalize {
         writer.finalize().map_err(|err| err.to_string())?;
     }
-
-    // Clear app handle
-    *state.app_handle.lock().map_err(|err| err.to_string())? = None;
-
-    // Get and clear the save path
-    let save_path = state
-        .save_path
-        .lock()
-        .map_err(|err| err.to_string())?
-        .take()
-        .ok_or("No recording in progress or save path not set.".to_string())?;
 
     Ok(save_path)
 }
