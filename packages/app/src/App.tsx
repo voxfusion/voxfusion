@@ -14,6 +14,7 @@ import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
 import UpdateNotification from "./components/UpdateNotification";
+import appIcon from "../src-tauri/icons/icon.svg";
 
 const FORCE_SHOW_ONBOARDING =
 	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
@@ -178,7 +179,7 @@ function App(props: ParentProps) {
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 			<Show when={!isSessionChecked() || session()?.isPending}>
 				<div class="h-full flex flex-col items-center justify-center">
-					<div class="w-16 h-16 bg-[#111] border border-[#222] mb-8 font-mono" />
+					<img src={appIcon} alt="VoxFusion" class="w-16 h-16 mb-8" />
 					<div class="w-48 h-1 bg-[#222] overflow-hidden">
 						<div class="w-1/4 h-full bg-[#ff3e00] animate-slide" />
 					</div>
