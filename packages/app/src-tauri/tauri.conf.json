@@ -18,7 +18,6 @@
 			"signingIdentity": "Developer ID Application: Egor tokarev (P2M3JQ4DR5)"
 		}
 	},
-
 	"build": {
 		"beforeDevCommand": "vite",
 		"devUrl": "http://localhost:1420",
