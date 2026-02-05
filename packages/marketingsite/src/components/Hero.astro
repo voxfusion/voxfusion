@@ -1,13 +1,7 @@
 ---
-import LanguageSwitcher from "./LanguageSwitcher.astro";
-import { useTranslations, defaultLang, languages, getLocalizedPath } from "../i18n/utils";
+import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
 
-interface Props {
-	lang?: keyof typeof languages;
-}
-
-const { lang = defaultLang } = Astro.props;
-const t = useTranslations(lang);
+const t = useTranslations(defaultLang);
 ---
 
 <header class="hero">
@@ -43,8 +37,7 @@ const t = useTranslations(lang);
 			</div>
 
 			<div class="nav-actions">
-				<LanguageSwitcher currentLang={lang} />
-				<a href={getLocalizedPath("/download", lang)} class="btn btn-primary">{t("nav.download")}</a>
+				<a href={getLocalizedPath("/download", defaultLang)} class="btn btn-primary">{t("nav.download")}</a>
 			</div>
 
 			<button class="mobile-menu-btn" aria-label="Toggle menu">
@@ -60,10 +53,7 @@ const t = useTranslations(lang);
 				<a href="#demo">{t("nav.demo")}</a>
 				<a href="#pricing">{t("nav.pricing")}</a>
 			</div>
-			<div class="mobile-menu-actions">
-				<LanguageSwitcher currentLang={lang} />
 			</div>
-		</div>
 	</nav>
 
 	<div class="container hero-content">
@@ -82,7 +72,7 @@ const t = useTranslations(lang);
 		</p>
 
 		<div class="hero-cta">
-			<a href={getLocalizedPath("/download", lang)} class="btn btn-primary btn-lg">
+			<a href={getLocalizedPath("/download", defaultLang)} class="btn btn-primary btn-lg">
 				<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 					<path d="M10 3V17M10 17L4 11M10 17L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 				</svg>
@@ -403,34 +393,6 @@ const t = useTranslations(lang);
 
 	.mobile-menu-links a:hover {
 		color: var(--color-text);
-	}
-
-	.mobile-menu-actions {
-		display: flex;
-	}
-
-	.mobile-menu-actions :global(.language-switcher) {
-		width: 100%;
-	}
-
-	.mobile-menu-actions :global(.language-btn) {
-		width: 100%;
-	}
-
-	.mobile-menu-actions :global(.language-dropdown) {
-		position: static;
-		transform: none;
-		min-width: unset;
-		width: 100%;
-		margin-top: 8px;
-		opacity: 0;
-		visibility: hidden;
-		box-shadow: none;
-	}
-
-	.mobile-menu-actions :global(.language-dropdown.open) {
-		opacity: 1;
-		visibility: visible;
 	}
 
 	.mobile-menu-btn.open span:nth-child(1) {

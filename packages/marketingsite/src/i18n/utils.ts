@@ -24,20 +24,5 @@ export function getLocalizedPath(path: string, lang: keyof typeof translations) 
 	return `/${lang}${path}`;
 }
 
-export function getAlternateLocales(
-	currentLang: keyof typeof translations,
-	currentPath: string
-) {
-	return Object.keys(languages).map((lang) => ({
-		lang,
-		label: languages[lang as keyof typeof languages],
-		path: getLocalizedPath(
-			currentPath.replace(`/${currentLang}`, "") || "/",
-			lang as keyof typeof translations
-		),
-		isCurrent: lang === currentLang,
-	}));
-}
-
 export { translations, defaultLang, languages };
 export type { TranslationKey };
