@@ -32,11 +32,12 @@
 		"tauri-plugin-mic-recorder-api": "^2.0.0"
 	},
 	"devDependencies": {
-		"@tauri-apps/cli": "^2.2.4",
 		"@biomejs/biome": "^1.9.4",
+		"@tauri-apps/cli": "^2.2.4",
 		"autoprefixer": "^10.4.20",
 		"postcss": "^8.4.49",
 		"tailwindcss": "^3.4.17",
+		"terser": "^5.46.0",
 		"typescript": "~5.7.2",
 		"vite": "^6.0.6",
 		"vite-plugin-solid": "^2.11.0"

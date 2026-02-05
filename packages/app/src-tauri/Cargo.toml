@@ -48,6 +48,12 @@ core-foundation-sys = "0.8"
 [profile.dev.package.scrypt]
 opt-level = 3
 
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = "z"
+
 [profile.release.package.wry]
-debug = true
-debug-assertions = true
+debug = false
+debug-assertions = false

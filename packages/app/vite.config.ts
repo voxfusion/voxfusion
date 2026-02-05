@@ -6,6 +6,14 @@ export default defineConfig({
 	plugins: [solid()],
 	clearScreen: false,
 	build: {
+		sourcemap: false,
+		minify: "terser",
+		terserOptions: {
+			compress: {
+				drop_console: true,
+				drop_debugger: true,
+			},
+		},
 		rollupOptions: {
 			input: {
 				main: resolve(__dirname, "index.html"),
