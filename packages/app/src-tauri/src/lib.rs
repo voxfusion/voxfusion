@@ -59,6 +59,37 @@ mod accessibility_watcher {
     }
 }
 
+/// Shows the main window if it exists, or creates a new one if it was closed.
+/// Used for macOS reopen events (dock click, Spotlight activation) and single-instance handling.
+#[cfg(desktop)]
+fn show_or_create_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    } else {
+        // Window was closed, recreate it
+        use tauri::WebviewWindowBuilder;
+        if let Ok(window) = WebviewWindowBuilder::new(
+            app,
+            "main",
+            tauri::WebviewUrl::App("/".into()),
+        )
+        .title("VoxFusion")
+        .inner_size(1360.0, 850.0)
+        .resizable(true)
+        .decorations(true)
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true)
+        .fullscreen(false)
+        .center()
+        .build()
+        {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
 #[cfg(desktop)]
 fn build_microphone_submenu(app: &tauri::AppHandle, selected_mic: Option<String>, devices: Vec<handlers::audio::AudioDevice>) -> Result<Submenu<tauri::Wry>, Box<dyn std::error::Error>> {
     let submenu = Submenu::with_id(app, "microphone", "Microphone", true)?;
@@ -135,10 +166,7 @@ pub fn run() {
             let _ = app
                 .handle()
                 .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-                    let _ = app
-                        .get_webview_window("main")
-                        .expect("no main window")
-                        .set_focus();
+                    show_or_create_main_window(app);
                 }));
 
             Ok(())
@@ -282,6 +310,12 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            #[cfg(desktop)]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                show_or_create_main_window(app);
+            }
+        });
 }
