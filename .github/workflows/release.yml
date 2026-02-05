@@ -54,62 +54,56 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Debug: Show runner info
-          echo "macOS version:"
-          sw_vers
-          echo ""
-          echo "Home directory: $HOME"
-          echo ""
-          echo "Current keychains:"
-          security list-keychains
-          echo ""
+          # Debug info
+          echo "macOS version: $(sw_vers -productVersion)"
+          echo "Current user: $(whoami)"
+          echo "Home: $HOME"
           
-          # Try to create/use login keychain first (sometimes works on runners)
-          KEYCHAIN_PATH="$HOME/Library/Keychains/login.keychain-db"
-          
-          # If login keychain doesn't exist, create it
-          if [ ! -f "$KEYCHAIN_PATH" ]; then
-            echo "Creating login keychain..."
-            security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          fi
-          
-          # Unlock the keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" 2>/dev/null || true
-          
-          # Set keychain settings to prevent auto-lock
-          security set-keychain-settings -t 3600 -u "$KEYCHAIN_PATH" 2>/dev/null || true
+          # Create a keychain in a temp location we definitely have access to
+          KEYCHAIN_PATH="${RUNNER_TEMP}/build.keychain"
+          echo "Creating keychain at: $KEYCHAIN_PATH"
           
           # Decode certificate
-          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          echo $APPLE_CERTIFICATE | base64 --decode > "${RUNNER_TEMP}/certificate.p12"
           
-          # Import certificate - use login keychain
-          echo "Importing certificate to $KEYCHAIN_PATH..."
-          security import certificate.p12 -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          # Create keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           
-          # Allow codesign to access the keychain without prompting
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" 2>/dev/null || true
+          # Disable keychain auto-lock
+          security set-keychain-settings -lut 7200 "$KEYCHAIN_PATH"
           
-          # Also try setting via environment for the current session
-          export KEYCHAIN="$KEYCHAIN_PATH"
+          # Unlock
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           
-          # Verify identity in keychain
+          # Import with -A flag (allow all apps) and -x for non-extractable
+          security import "${RUNNER_TEMP}/certificate.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A
+          
+          # Set partition list to allow codesign access without prompt
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          
+          # CRITICAL: Add to search list by prepending to existing list
+          security list-keychains -s "$KEYCHAIN_PATH" $(security list-keychains | xargs)
+          
           echo ""
-          echo "Identities in keychain:"
+          echo "Keychain search list:"
+          security list-keychains
+          
+          echo ""
+          echo "Identities in our keychain:"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
           
-          # Store keychain path for later steps
+          echo ""
+          echo "All available identities:"
+          security find-identity -v -p codesigning
+          
+          # Save path for other steps
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
           
-          # Clean up certificate file
-          rm certificate.p12
-
-      - name: Get signing identity
-        id: signing
-        run: |
-          CERT_INFO=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application")
-          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
-          echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> $GITHUB_OUTPUT
-          echo "Found signing identity: $CERT_ID"
+          # Cleanup
+          rm "${RUNNER_TEMP}/certificate.p12"
 
       - name: Build Tauri app
         working-directory: packages/app
@@ -117,16 +111,12 @@ jobs:
           VITE_API_URL: https://voxfusion-production.up.railway.app
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.APPLE_SIGNING_IDENTITY }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          # Re-unlock keychain right before build
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" 2>/dev/null || true
+          # Keep keychain unlocked
+          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
           bun run tauri build --target universal-apple-darwin
 
       - name: Find build artifacts
