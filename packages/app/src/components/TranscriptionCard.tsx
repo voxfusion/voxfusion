@@ -28,14 +28,6 @@ export default function TranscriptionCard(props: Props) {
 		setTimeout(() => setCopied(false), 2000);
 	};
 
-	const formatDuration = (ms: number | null) => {
-		if (!ms) return t("transcription.notAvailable");
-		const seconds = Math.floor(ms / 1000);
-		const minutes = Math.floor(seconds / 60);
-		const remainingSeconds = seconds % 60;
-		return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
-	};
-
 	const formatProcessingTime = (ms: number) => {
 		return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 	};
@@ -64,7 +56,6 @@ export default function TranscriptionCard(props: Props) {
 
 			<div class="flex items-center gap-3 text-xs text-slate-400 dark:text-slate-500">
 				<span>{formatTime(props.transcription.createdAt)}</span>
-				<span>{formatDuration(props.transcription.audioDurationMs)}</span>
 				<span>{formatProcessingTime(props.transcription.processingTimeMs)}</span>
 			</div>
 
