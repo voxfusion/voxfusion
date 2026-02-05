@@ -32,6 +32,8 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './packages/app/src-tauri -> target'
+          shared-key: 'release-build'
+          save-if: ${{ github.ref_type == 'tag' }}
 
       - name: Install dependencies
         run: bun install
