@@ -78,23 +78,23 @@ jobs:
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          echo "Current keychain search list:"
-          security list-keychain -d user
-          
-          echo ""
-          echo "Adding keychain to search list..."
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychain -d user | xargs)
-          
-          echo ""
-          echo "Updated keychain search list:"
-          security list-keychain -d user
-          
-          echo ""
           echo "Unlocking keychain..."
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           
           echo ""
-          echo "Testing codesign access..."
+          echo "Keychain search list:"
+          security list-keychain -d user
+          
+          echo ""
+          echo "All identities in our keychain:"
+          security find-identity -v "$KEYCHAIN_PATH"
+          
+          echo ""
+          echo "Codesigning identities in our keychain:"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          
+          echo ""
+          echo "All codesigning identities (all keychains):"
           security find-identity -v -p codesigning
           
       - name: Build Tauri app
