@@ -48,15 +48,70 @@ jobs:
           echo "Updated tauri.conf.json:"
           grep '"version"' tauri.conf.json
 
+      - name: Setup Apple code signing
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Debug: Show runner info
+          echo "macOS version:"
+          sw_vers
+          echo ""
+          echo "Current keychains:"
+          security list-keychains
+          echo ""
+          
+          # Delete existing build.keychain if it exists (for non-ephemeral runners)
+          security delete-keychain build.keychain 2>/dev/null || true
+          
+          # Decode certificate
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          
+          # Create and configure keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          
+          # Add to keychain search list (important for some runners)
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
+          
+          # Import certificate with explicit codesign access
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          
+          # Allow codesign to access the keychain without prompting
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          
+          # Verify
+          echo ""
+          echo "Keychain search list after setup:"
+          security list-keychains
+          echo ""
+          echo "Identities in build.keychain:"
+          security find-identity -v -p codesigning build.keychain
+          echo ""
+          echo "All available signing identities:"
+          security find-identity -v -p codesigning
+          
+          # Clean up certificate file
+          rm certificate.p12
+
+      - name: Get signing identity
+        id: signing
+        run: |
+          CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
+          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
+          echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> $GITHUB_OUTPUT
+          echo "Found signing identity: $CERT_ID"
+
       - name: Build Tauri app
         working-directory: packages/app
         env:
           VITE_API_URL: https://voxfusion-production.up.railway.app
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
