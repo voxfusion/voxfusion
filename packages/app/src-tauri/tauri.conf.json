@@ -13,7 +13,8 @@
 		"macOS": {
 			"entitlements": "entitlements.plist",
 			"minimumSystemVersion": "10.15",
-			"hardenedRuntime": true
+			"hardenedRuntime": true,
+			"signingIdentity": "-"
 		}
 	},
 	"build": {
