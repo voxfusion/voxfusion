@@ -39,39 +39,6 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Install Apple certificate
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          # Create temporary keychain
-          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
-          
-          # Decode certificate
-          echo "$APPLE_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
-          
-          # Create and configure keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          security default-keychain -s $KEYCHAIN_PATH
-          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
-          # Import certificate with all options for private key
-          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH -T /usr/bin/codesign -T /usr/bin/security
-          
-          # Allow codesign to access the key without prompt
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
-          
-          # Add to search list (prepend to ensure it's found first)
-          security list-keychain -d user -s $KEYCHAIN_PATH $(security list-keychain -d user | tr -d '"')
-          
-          # Verify certificate and private key
-          echo "=== Certificates in keychain ==="
-          security find-identity -v -p codesigning $KEYCHAIN_PATH
-          echo "=== Private keys in keychain ==="
-          security find-key -a $KEYCHAIN_PATH 2>/dev/null | head -20 || echo "No keys found or unable to list"
-
       - name: Sync version from git tag
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
