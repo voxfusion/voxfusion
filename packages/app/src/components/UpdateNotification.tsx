@@ -57,7 +57,7 @@ export default function UpdateNotification() {
 					<div class="p-4">
 						<div class="flex items-start gap-3">
 							<div class="flex-shrink-0 w-10 h-10 bg-primary-100 dark:bg-primary-900/30 rounded-lg flex items-center justify-center">
-								<Download class="w-5 h-5 text-primary-600 dark:text-primary-400" />
+								<Download class="h-5 w-5 text-primary-600 dark:text-primary-400" />
 							</div>
 							<div class="flex-1 min-w-0">
 								<div class="flex items-start justify-between gap-2">
