@@ -15,7 +15,7 @@
 			"entitlements": "entitlements.plist",
 			"minimumSystemVersion": "10.15",
 			"hardenedRuntime": true,
-			"signingIdentity": "488EFE8CE12725ACA2280CBDCED80EC3EC1F9A9B"
+			"signingIdentity": "Developer ID Application: Egor tokarev (P2M3JQ4DR5)"
 		}
 	},
 	"build": {
