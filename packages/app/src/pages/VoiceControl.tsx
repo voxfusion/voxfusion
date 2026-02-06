@@ -88,6 +88,12 @@ export default function VoiceControl() {
 				console.log("[VoiceControl] Modifier shortcut registered successfully");
 			} catch (e) {
 				console.error("[VoiceControl] Failed to register modifier shortcut:", e);
+				// Notify the main window about the accessibility permission issue
+				// so it can show a prompt to the user
+				const errorMsg = String(e);
+				if (errorMsg.includes("Accessibility")) {
+					await emit("accessibility-permission-needed");
+				}
 			}
 		} else {
 			// Use the standard Tauri global-shortcut plugin

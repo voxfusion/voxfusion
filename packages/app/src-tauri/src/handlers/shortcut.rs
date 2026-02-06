@@ -1,5 +1,6 @@
 #[cfg(target_os = "macos")]
 mod macos {
+    use core_foundation::base::TCFType;
     use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
     use core_graphics::event::{
         CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
@@ -9,6 +10,13 @@ mod macos {
     use std::sync::mpsc;
     use std::sync::{Arc, Mutex, OnceLock};
     use std::time::Duration;
+
+    // Raw CoreFoundation / CoreGraphics FFI for re-enabling a disabled tap
+    // and checking accessibility permission.
+    unsafe extern "C" {
+        fn CGEventTapEnable(tap: core_foundation_sys::mach_port::CFMachPortRef, enable: bool);
+        fn AXIsProcessTrusted() -> bool;
+    }
 
     // macOS virtual keycodes for modifier keys
     pub const KC_LEFT_COMMAND: u16 = 55;
@@ -106,6 +114,11 @@ mod macos {
         running: AtomicBool,
         /// The Tauri app handle for emitting events
         app_handle: Mutex<Option<tauri::AppHandle>>,
+        /// The raw CFMachPort pointer for re-enabling a disabled tap.
+        /// Stored as a raw pointer because CFMachPortRef is not Send/Sync,
+        /// but we only use it from the callback (same thread) or for
+        /// CGEventTapEnable which is thread-safe.
+        tap_mach_port: AtomicU64,
     }
 
     static STATE: OnceLock<Arc<ShortcutState>> = OnceLock::new();
@@ -120,6 +133,7 @@ mod macos {
                 contaminated: AtomicBool::new(false),
                 running: AtomicBool::new(false),
                 app_handle: Mutex::new(None),
+                tap_mach_port: AtomicU64::new(0),
             })
         })
     }
@@ -146,6 +160,33 @@ mod macos {
                 CGEventTapOptions::ListenOnly,
                 vec![CGEventType::FlagsChanged, CGEventType::KeyDown],
                 move |_proxy, event_type, event| {
+                    // Handle tap-disabled events FIRST. macOS can disable an
+                    // event tap at any time (timeout, user input, security
+                    // policy). When this happens the callback receives a
+                    // special event type. We must re-enable the tap
+                    // immediately or it will stay dead and only receive
+                    // events from our own process (the exact symptom of the
+                    // production bug).
+                    match event_type {
+                        CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput => {
+                            let port_ptr = state_for_tap.tap_mach_port.load(Ordering::SeqCst);
+                            if port_ptr != 0 {
+                                unsafe {
+                                    CGEventTapEnable(
+                                        port_ptr as core_foundation_sys::mach_port::CFMachPortRef,
+                                        true,
+                                    );
+                                }
+                                eprintln!(
+                                    "[VoxFusion] CGEventTap was disabled ({:?}), re-enabled it",
+                                    event_type
+                                );
+                            }
+                            return Some(event.clone());
+                        }
+                        _ => {}
+                    }
+
                     let keycode =
                         event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
 
@@ -255,6 +296,11 @@ mod macos {
 
             match tap_result {
                 Ok(tap) => unsafe {
+                    // Store the raw mach port pointer so the callback can
+                    // re-enable the tap if macOS disables it.
+                    let raw_port = tap.mach_port.as_concrete_TypeRef();
+                    state.tap_mach_port.store(raw_port as u64, Ordering::SeqCst);
+
                     // CRITICAL: Add the tap's mach port as a run loop source.
                     // Without this, the run loop has no sources and events are
                     // never delivered to our callback.
@@ -316,6 +362,16 @@ mod macos {
     pub fn register(app_handle: tauri::AppHandle, shortcut: &str) -> Result<(), String> {
         let (flags_mask, keycode) = parse_shortcut(shortcut)
             .ok_or_else(|| format!("Unknown modifier shortcut: {}", shortcut))?;
+
+        // Verify Accessibility permission before attempting to create the tap.
+        // Without this permission, CGEventTapCreate may succeed but the tap
+        // will only receive events from our own process — not from other apps.
+        if !unsafe { AXIsProcessTrusted() } {
+            return Err("Accessibility permission not granted. \
+                 Please enable VoxFusion in System Settings > Privacy & Security > Accessibility, \
+                 then restart the app."
+                .to_string());
+        }
 
         let state = get_state();
 

@@ -128,6 +128,14 @@ function App(props: ParentProps) {
 		});
 		onCleanup(() => unlistenMicrophone());
 
+		// If the voice-control window reports that a modifier-only shortcut
+		// could not be registered because Accessibility permission is missing,
+		// open the settings modal so the user sees the relevant section.
+		const unlistenAccessibility = await listen("accessibility-permission-needed", () => {
+			setIsSettingsOpen(true);
+		});
+		onCleanup(() => unlistenAccessibility());
+
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.metaKey && e.key === ",") {
 				e.preventDefault();
