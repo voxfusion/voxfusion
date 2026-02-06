@@ -1,258 +1,405 @@
-use rdev::{listen, Event, EventType, Key};
-use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
-
-/// All rdev keys we consider "modifier" keys.
-fn is_modifier_key(key: &Key) -> bool {
-    matches!(
-        key,
-        Key::MetaLeft
-            | Key::MetaRight
-            | Key::ShiftLeft
-            | Key::ShiftRight
-            | Key::Alt
-            | Key::ControlLeft
-            | Key::ControlRight
-            | Key::CapsLock
-            | Key::Function
-    )
-}
-
-/// Parse a shortcut name (from the frontend) into a set of rdev::Key values.
-///
-/// Single modifier: "LeftCommand" -> {MetaLeft}
-/// Multi-modifier:  "Control+Shift" -> {ControlLeft, ControlRight, ShiftLeft, ShiftRight}
-///   (for generic names we accept *either* left or right being held)
-///
-/// Returns None if the string is not a recognized modifier shortcut.
-fn parse_shortcut(name: &str) -> Option<ShortcutTarget> {
-    // Single specific modifier
-    let single = match name {
-        "LeftCommand" => Some(ShortcutTarget::Single(Key::MetaLeft)),
-        "RightCommand" => Some(ShortcutTarget::Single(Key::MetaRight)),
-        "LeftShift" => Some(ShortcutTarget::Single(Key::ShiftLeft)),
-        "RightShift" => Some(ShortcutTarget::Single(Key::ShiftRight)),
-        "LeftOption" | "Option" | "Alt" => Some(ShortcutTarget::Single(Key::Alt)),
-        "RightOption" => Some(ShortcutTarget::Single(Key::Alt)),
-        "LeftControl" => Some(ShortcutTarget::Single(Key::ControlLeft)),
-        "RightControl" => Some(ShortcutTarget::Single(Key::ControlRight)),
-        "CapsLock" => Some(ShortcutTarget::Single(Key::CapsLock)),
-        "Fn" => Some(ShortcutTarget::Single(Key::Function)),
-        _ => None,
+#[cfg(target_os = "macos")]
+mod macos {
+    use core_foundation::base::TCFType;
+    use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
+    use core_graphics::event::{
+        CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
+        CGEventType, EventField,
     };
-    if single.is_some() {
-        return single;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::mpsc;
+    use std::sync::{Arc, Mutex, OnceLock};
+    use std::time::Duration;
+
+    // Raw CoreFoundation / CoreGraphics FFI for re-enabling a disabled tap
+    // and checking accessibility permission.
+    unsafe extern "C" {
+        fn CGEventTapEnable(tap: core_foundation_sys::mach_port::CFMachPortRef, enable: bool);
+        fn AXIsProcessTrusted() -> bool;
     }
 
-    // Multi-modifier combo like "Control+Shift"
-    if name.contains('+') {
-        let mut groups: Vec<Vec<Key>> = Vec::new();
-        for part in name.split('+') {
-            let keys = match part.trim() {
-                "Command" => vec![Key::MetaLeft, Key::MetaRight],
-                "Control" => vec![Key::ControlLeft, Key::ControlRight],
-                "Alt" | "Option" => vec![Key::Alt],
-                "Shift" => vec![Key::ShiftLeft, Key::ShiftRight],
-                "CapsLock" => vec![Key::CapsLock],
-                "Fn" => vec![Key::Function],
-                _ => return None,
-            };
-            groups.push(keys);
-        }
-        if groups.len() >= 2 {
-            return Some(ShortcutTarget::Multi(groups));
-        }
-    }
+    // macOS virtual keycodes for modifier keys
+    pub const KC_LEFT_COMMAND: u16 = 55;
+    pub const KC_RIGHT_COMMAND: u16 = 54;
+    pub const KC_LEFT_SHIFT: u16 = 56;
+    pub const KC_RIGHT_SHIFT: u16 = 60;
+    pub const KC_LEFT_OPTION: u16 = 58;
+    pub const KC_RIGHT_OPTION: u16 = 61;
+    pub const KC_LEFT_CONTROL: u16 = 59;
+    pub const KC_RIGHT_CONTROL: u16 = 62;
+    pub const KC_CAPS_LOCK: u16 = 57;
+    pub const KC_FN: u16 = 63;
 
-    None
-}
-
-/// Describes what modifier key(s) the user wants as their shortcut.
-#[derive(Clone)]
-enum ShortcutTarget {
-    /// Exactly one specific key (e.g. RightCommand = MetaRight).
-    Single(Key),
-    /// Multiple modifier groups; at least one key from each group must be held.
-    /// E.g. "Control+Shift" = [[ControlLeft,ControlRight],[ShiftLeft,ShiftRight]]
-    Multi(Vec<Vec<Key>>),
-}
-
-struct ShortcutState {
-    /// Current target, None means not active.
-    target: Mutex<Option<ShortcutTarget>>,
-    /// Whether the listener thread is running.
-    running: AtomicBool,
-    /// The Tauri app handle for emitting events.
-    app_handle: Mutex<Option<tauri::AppHandle>>,
-    /// Keys currently held down (only modifier keys).
-    held_keys: Mutex<HashSet<Key>>,
-    /// Whether a non-modifier key was pressed during the current modifier hold.
-    contaminated: AtomicBool,
-}
-
-static STATE: OnceLock<Arc<ShortcutState>> = OnceLock::new();
-
-fn get_state() -> &'static Arc<ShortcutState> {
-    STATE.get_or_init(|| {
-        Arc::new(ShortcutState {
-            target: Mutex::new(None),
-            running: AtomicBool::new(false),
-            app_handle: Mutex::new(None),
-            held_keys: Mutex::new(HashSet::new()),
-            contaminated: AtomicBool::new(false),
-        })
-    })
-}
-
-/// Check whether the currently-held modifiers exactly match the target.
-fn target_is_active(target: &ShortcutTarget, held: &HashSet<Key>) -> bool {
-    if held.is_empty() {
-        return false;
-    }
-
-    match target {
-        ShortcutTarget::Single(key) => {
-            // Exactly this key and no other modifiers
-            held.len() == 1 && held.contains(key)
-        }
-        ShortcutTarget::Multi(groups) => {
-            // At least one key from each group must be held …
-            let all_groups_satisfied = groups
-                .iter()
-                .all(|group| group.iter().any(|k| held.contains(k)));
-            if !all_groups_satisfied {
-                return false;
-            }
-            // … and every held key must belong to at least one group
-            // (prevents extra modifiers from triggering the shortcut).
-            let all_keys: HashSet<&Key> = groups.iter().flat_map(|g| g.iter()).collect();
-            held.iter().all(|k| all_keys.contains(k))
-        }
-    }
-}
-
-fn fire_shortcut(state: &ShortcutState) {
-    if let Ok(handle) = state.app_handle.lock() {
-        if let Some(ref app) = *handle {
-            use tauri::Emitter;
-            if let Err(e) = app.emit(
-                "modifier-shortcut-triggered",
-                serde_json::json!({ "state": "Pressed" }),
-            ) {
-                eprintln!("Failed to emit modifier-shortcut-triggered: {:?}", e);
-            }
-        }
-    }
-}
-
-/// Start the rdev listener on a background thread (only once).
-fn start_listener(state: Arc<ShortcutState>) -> Result<(), String> {
-    if state.running.swap(true, Ordering::SeqCst) {
-        return Ok(()); // already running
-    }
-
-    let state_clone = state.clone();
-
-    std::thread::spawn(move || {
-        let st = state_clone.clone();
-        let st_err = state_clone;
-
-        if let Err(e) = listen(move |event: Event| {
-            match event.event_type {
-                EventType::KeyPress(key) => {
-                    if is_modifier_key(&key) {
-                        let mut held = st.held_keys.lock().unwrap();
-                        held.insert(key);
-                    } else {
-                        // Non-modifier key pressed while modifiers held -> contaminate
-                        let held = st.held_keys.lock().unwrap();
-                        if !held.is_empty() {
-                            st.contaminated.store(true, Ordering::SeqCst);
-                        }
+    /// Parse a shortcut string into target flag mask and optional specific keycode.
+    ///
+    /// Single modifier shortcuts like "RightCommand" target a specific keycode.
+    /// Multi-modifier shortcuts like "Control+Shift" target a combined flag mask.
+    ///
+    /// Returns (target_flags_mask, optional_specific_keycode)
+    fn parse_shortcut(name: &str) -> Option<(u64, u16)> {
+        // Try single modifier first
+        match name {
+            "LeftCommand" => Some((CGEventFlags::CGEventFlagCommand.bits(), KC_LEFT_COMMAND)),
+            "RightCommand" => Some((CGEventFlags::CGEventFlagCommand.bits(), KC_RIGHT_COMMAND)),
+            "LeftShift" => Some((CGEventFlags::CGEventFlagShift.bits(), KC_LEFT_SHIFT)),
+            "RightShift" => Some((CGEventFlags::CGEventFlagShift.bits(), KC_RIGHT_SHIFT)),
+            "LeftOption" => Some((CGEventFlags::CGEventFlagAlternate.bits(), KC_LEFT_OPTION)),
+            "RightOption" => Some((CGEventFlags::CGEventFlagAlternate.bits(), KC_RIGHT_OPTION)),
+            "LeftControl" => Some((CGEventFlags::CGEventFlagControl.bits(), KC_LEFT_CONTROL)),
+            "RightControl" => Some((CGEventFlags::CGEventFlagControl.bits(), KC_RIGHT_CONTROL)),
+            "CapsLock" => Some((CGEventFlags::CGEventFlagAlphaShift.bits(), KC_CAPS_LOCK)),
+            "Fn" => Some((CGEventFlags::CGEventFlagSecondaryFn.bits(), KC_FN)),
+            _ => {
+                // Try multi-modifier combo like "Control+Shift"
+                if name.contains('+') {
+                    let mut mask: u64 = 0;
+                    for part in name.split('+') {
+                        let flag = match part.trim() {
+                            "Command" => CGEventFlags::CGEventFlagCommand.bits(),
+                            "Control" => CGEventFlags::CGEventFlagControl.bits(),
+                            "Alt" | "Option" => CGEventFlags::CGEventFlagAlternate.bits(),
+                            "Shift" => CGEventFlags::CGEventFlagShift.bits(),
+                            "CapsLock" => CGEventFlags::CGEventFlagAlphaShift.bits(),
+                            "Fn" => CGEventFlags::CGEventFlagSecondaryFn.bits(),
+                            _ => return None,
+                        };
+                        mask |= flag;
                     }
+                    // For multi-modifier, keycode 0 means "don't check specific keycode"
+                    Some((mask, 0))
+                } else {
+                    None
                 }
-                EventType::KeyRelease(key) => {
-                    if is_modifier_key(&key) {
-                        let was_contaminated = st.contaminated.load(Ordering::SeqCst);
+            }
+        }
+    }
 
-                        // Check if the target was satisfied BEFORE removing this key.
-                        let was_active = {
-                            let held = st.held_keys.lock().unwrap();
-                            if let Ok(target_guard) = st.target.lock() {
-                                if let Some(ref target) = *target_guard {
-                                    target_is_active(target, &held)
-                                } else {
-                                    false
+    fn is_modifier_keycode(keycode: u16) -> bool {
+        matches!(
+            keycode,
+            KC_LEFT_COMMAND
+                | KC_RIGHT_COMMAND
+                | KC_LEFT_SHIFT
+                | KC_RIGHT_SHIFT
+                | KC_LEFT_OPTION
+                | KC_RIGHT_OPTION
+                | KC_LEFT_CONTROL
+                | KC_RIGHT_CONTROL
+                | KC_CAPS_LOCK
+                | KC_FN
+        )
+    }
+
+    /// All modifier flag bits combined, used to mask out non-modifier flags.
+    const ALL_MODIFIER_FLAGS: u64 = 0x00010000  // AlphaShift (CapsLock)
+        | 0x00020000  // Shift
+        | 0x00040000  // Control
+        | 0x00080000  // Alternate (Option)
+        | 0x00100000  // Command
+        | 0x00800000; // SecondaryFn
+
+    struct ShortcutState {
+        /// The flag mask we're watching for (0 means not active)
+        target_flags: AtomicU64,
+        /// Specific keycode for single-modifier shortcuts (0 means multi-modifier)
+        target_keycode: AtomicU64,
+        /// Whether the target modifiers are all currently held down RIGHT NOW
+        modifiers_active: AtomicBool,
+        /// Whether the full combo was active at some point during this press cycle.
+        /// Survives partial releases so we can fire when all keys are fully released.
+        was_fully_active: AtomicBool,
+        /// Whether any non-target key was pressed while the modifiers were held
+        contaminated: AtomicBool,
+        /// Whether the event tap thread is running
+        running: AtomicBool,
+        /// The Tauri app handle for emitting events
+        app_handle: Mutex<Option<tauri::AppHandle>>,
+        /// The raw CFMachPort pointer for re-enabling a disabled tap.
+        /// Stored as a raw pointer because CFMachPortRef is not Send/Sync,
+        /// but we only use it from the callback (same thread) or for
+        /// CGEventTapEnable which is thread-safe.
+        tap_mach_port: AtomicU64,
+    }
+
+    static STATE: OnceLock<Arc<ShortcutState>> = OnceLock::new();
+
+    fn get_state() -> &'static Arc<ShortcutState> {
+        STATE.get_or_init(|| {
+            Arc::new(ShortcutState {
+                target_flags: AtomicU64::new(0),
+                target_keycode: AtomicU64::new(0),
+                modifiers_active: AtomicBool::new(false),
+                was_fully_active: AtomicBool::new(false),
+                contaminated: AtomicBool::new(false),
+                running: AtomicBool::new(false),
+                app_handle: Mutex::new(None),
+                tap_mach_port: AtomicU64::new(0),
+            })
+        })
+    }
+
+    /// Start the CGEventTap on a background thread.
+    /// Returns Ok(()) if the tap was created successfully, or an error message.
+    /// If the tap is already running, returns Ok(()) immediately.
+    fn start_event_tap(state: Arc<ShortcutState>) -> Result<(), String> {
+        if state.running.swap(true, Ordering::SeqCst) {
+            return Ok(()); // Already running
+        }
+
+        // Use a channel so the background thread can report whether the tap
+        // was created successfully before we return to the caller.
+        let (tx, rx) = mpsc::channel::<Result<(), String>>();
+
+        std::thread::spawn(move || {
+            let state_for_tap = state.clone();
+
+            // Listen for FlagsChanged (modifier press/release) and KeyDown (contamination)
+            let tap_result = CGEventTap::new(
+                CGEventTapLocation::Session,
+                CGEventTapPlacement::HeadInsertEventTap,
+                CGEventTapOptions::ListenOnly,
+                vec![CGEventType::FlagsChanged, CGEventType::KeyDown],
+                move |_proxy, event_type, event| {
+                    // Handle tap-disabled events FIRST. macOS can disable an
+                    // event tap at any time (timeout, user input, security
+                    // policy). When this happens the callback receives a
+                    // special event type. We must re-enable the tap
+                    // immediately or it will stay dead and only receive
+                    // events from our own process (the exact symptom of the
+                    // production bug).
+                    match event_type {
+                        CGEventType::TapDisabledByTimeout | CGEventType::TapDisabledByUserInput => {
+                            let port_ptr = state_for_tap.tap_mach_port.load(Ordering::SeqCst);
+                            if port_ptr != 0 {
+                                unsafe {
+                                    CGEventTapEnable(
+                                        port_ptr as core_foundation_sys::mach_port::CFMachPortRef,
+                                        true,
+                                    );
+                                }
+                                eprintln!(
+                                    "[VoxFusion] CGEventTap was disabled ({:?}), re-enabled it",
+                                    event_type
+                                );
+                            }
+                            return Some(event.clone());
+                        }
+                        _ => {}
+                    }
+
+                    let keycode =
+                        event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
+
+                    match event_type {
+                        CGEventType::FlagsChanged => {
+                            let target_mask = state_for_tap.target_flags.load(Ordering::SeqCst);
+                            if target_mask == 0 {
+                                return Some(event.clone());
+                            }
+
+                            let target_kc =
+                                state_for_tap.target_keycode.load(Ordering::SeqCst) as u16;
+
+                            let flags = event.get_flags();
+                            let raw_flags = flags.bits();
+                            // Only look at modifier bits
+                            let current_mods = raw_flags & ALL_MODIFIER_FLAGS;
+
+                            if target_kc != 0 {
+                                // Single-modifier mode: check specific keycode
+                                if keycode == target_kc {
+                                    let has_target = (current_mods & target_mask) == target_mask;
+                                    // Also check no OTHER modifiers are held
+                                    let only_target =
+                                        has_target && (current_mods & !target_mask) == 0;
+
+                                    if only_target {
+                                        // Target modifier pressed (alone)
+                                        state_for_tap
+                                            .modifiers_active
+                                            .store(true, Ordering::SeqCst);
+                                        state_for_tap.contaminated.store(false, Ordering::SeqCst);
+                                    } else if !has_target
+                                        && state_for_tap.modifiers_active.load(Ordering::SeqCst)
+                                    {
+                                        // Target modifier released
+                                        let was_active = state_for_tap
+                                            .modifiers_active
+                                            .swap(false, Ordering::SeqCst);
+                                        let was_contaminated =
+                                            state_for_tap.contaminated.load(Ordering::SeqCst);
+
+                                        if was_active && !was_contaminated {
+                                            fire_shortcut(&state_for_tap);
+                                        }
+                                    }
+                                } else if state_for_tap.modifiers_active.load(Ordering::SeqCst)
+                                    && is_modifier_keycode(keycode)
+                                {
+                                    // A different modifier changed — contaminate
+                                    state_for_tap.contaminated.store(true, Ordering::SeqCst);
                                 }
                             } else {
-                                false
-                            }
-                        };
+                                // Multi-modifier mode: check if all target flags are set
+                                let all_target_set = (current_mods & target_mask) == target_mask;
+                                // Ensure ONLY the target modifiers are held (no extras)
+                                let only_target =
+                                    all_target_set && (current_mods & !target_mask) == 0;
 
-                        // Remove the released key
-                        {
-                            let mut held = st.held_keys.lock().unwrap();
-                            held.remove(&key);
+                                if only_target {
+                                    // All target modifiers are held simultaneously (no extras)
+                                    state_for_tap.modifiers_active.store(true, Ordering::SeqCst);
+                                    state_for_tap.was_fully_active.store(true, Ordering::SeqCst);
+                                    state_for_tap.contaminated.store(false, Ordering::SeqCst);
+                                } else if current_mods == 0 {
+                                    // All modifiers fully released — check if we should fire
+                                    state_for_tap
+                                        .modifiers_active
+                                        .store(false, Ordering::SeqCst);
+                                    let was_active = state_for_tap
+                                        .was_fully_active
+                                        .swap(false, Ordering::SeqCst);
+                                    let was_contaminated =
+                                        state_for_tap.contaminated.load(Ordering::SeqCst);
 
-                            // If all modifiers are released, reset contamination
-                            if held.is_empty() {
-                                st.contaminated.store(false, Ordering::SeqCst);
+                                    if was_active && !was_contaminated {
+                                        fire_shortcut(&state_for_tap);
+                                    }
+                                } else {
+                                    // Partial state: some modifiers held but not the right combo
+                                    state_for_tap
+                                        .modifiers_active
+                                        .store(false, Ordering::SeqCst);
+                                    if state_for_tap.was_fully_active.load(Ordering::SeqCst) {
+                                        // Extra modifier added or wrong combo while releasing
+                                        if (current_mods & !target_mask) != 0 {
+                                            state_for_tap
+                                                .contaminated
+                                                .store(true, Ordering::SeqCst);
+                                        }
+                                    }
+                                }
                             }
                         }
-
-                        // Fire if the shortcut was active and not contaminated
-                        if was_active && !was_contaminated {
-                            fire_shortcut(&st);
+                        CGEventType::KeyDown => {
+                            // Any regular key pressed while modifiers are held — contaminate
+                            if state_for_tap.modifiers_active.load(Ordering::SeqCst) {
+                                state_for_tap.contaminated.store(true, Ordering::SeqCst);
+                            }
                         }
+                        _ => {}
                     }
+
+                    Some(event.clone())
+                },
+            );
+
+            match tap_result {
+                Ok(tap) => unsafe {
+                    // Store the raw mach port pointer so the callback can
+                    // re-enable the tap if macOS disables it.
+                    let raw_port = tap.mach_port.as_concrete_TypeRef();
+                    state.tap_mach_port.store(raw_port as u64, Ordering::SeqCst);
+
+                    // CRITICAL: Add the tap's mach port as a run loop source.
+                    // Without this, the run loop has no sources and events are
+                    // never delivered to our callback.
+                    let loop_source = tap
+                        .mach_port
+                        .create_runloop_source(0)
+                        .expect("Failed to create run loop source for CGEventTap");
+                    CFRunLoop::get_current().add_source(&loop_source, kCFRunLoopCommonModes);
+                    tap.enable();
+
+                    // Signal success before entering the run loop (which blocks forever)
+                    let _ = tx.send(Ok(()));
+
+                    CFRunLoop::run_current();
+                },
+                Err(e) => {
+                    let msg = format!(
+                        "Failed to create CGEventTap: {:?}. \
+                         Make sure Accessibility permissions are granted in \
+                         System Settings > Privacy & Security > Accessibility.",
+                        e
+                    );
+                    eprintln!("{}", msg);
+                    state.running.store(false, Ordering::SeqCst);
+                    let _ = tx.send(Err(msg));
                 }
-                _ => {}
             }
-        }) {
-            eprintln!("[VoxFusion] rdev listen error: {:?}", e);
-            st_err.running.store(false, Ordering::SeqCst);
+        });
+
+        // Wait for the background thread to report success or failure.
+        // Use a timeout so we don't block the IPC thread indefinitely.
+        match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(result) => result,
+            Err(_) => {
+                // Timeout — the thread probably hung or panicked
+                Err("Timed out waiting for CGEventTap to start".to_string())
+            }
         }
-    });
-
-    Ok(())
-}
-
-fn register(app_handle: tauri::AppHandle, shortcut: &str) -> Result<(), String> {
-    let target = parse_shortcut(shortcut)
-        .ok_or_else(|| format!("Unknown modifier shortcut: {}", shortcut))?;
-
-    let state = get_state();
-
-    // Store the app handle
-    if let Ok(mut handle) = state.app_handle.lock() {
-        *handle = Some(app_handle);
     }
 
-    // Set the target
-    if let Ok(mut t) = state.target.lock() {
-        *t = Some(target);
+    fn fire_shortcut(state: &ShortcutState) {
+        if let Ok(handle) = state.app_handle.lock() {
+            if let Some(ref app) = *handle {
+                use tauri::Emitter;
+                if let Err(e) = app.emit(
+                    "modifier-shortcut-triggered",
+                    serde_json::json!({ "state": "Pressed" }),
+                ) {
+                    eprintln!("Failed to emit modifier-shortcut-triggered: {:?}", e);
+                }
+            } else {
+                eprintln!("fire_shortcut: app_handle is None");
+            }
+        } else {
+            eprintln!("fire_shortcut: failed to lock app_handle mutex");
+        }
     }
 
-    // Clear held keys and contamination for a clean start
-    if let Ok(mut held) = state.held_keys.lock() {
-        held.clear();
-    }
-    state.contaminated.store(false, Ordering::SeqCst);
+    pub fn register(app_handle: tauri::AppHandle, shortcut: &str) -> Result<(), String> {
+        let (flags_mask, keycode) = parse_shortcut(shortcut)
+            .ok_or_else(|| format!("Unknown modifier shortcut: {}", shortcut))?;
 
-    // Start the listener if not already running
-    start_listener(state.clone())
-}
+        // Verify Accessibility permission before attempting to create the tap.
+        // Without this permission, CGEventTapCreate may succeed but the tap
+        // will only receive events from our own process — not from other apps.
+        if !unsafe { AXIsProcessTrusted() } {
+            return Err("Accessibility permission not granted. \
+                 Please enable VoxFusion in System Settings > Privacy & Security > Accessibility, \
+                 then restart the app."
+                .to_string());
+        }
 
-fn unregister() {
-    let state = get_state();
-    if let Ok(mut t) = state.target.lock() {
-        *t = None;
+        let state = get_state();
+
+        // Store the app handle
+        if let Ok(mut handle) = state.app_handle.lock() {
+            *handle = Some(app_handle);
+        }
+
+        // Set the targets
+        state.target_flags.store(flags_mask, Ordering::SeqCst);
+        state.target_keycode.store(keycode as u64, Ordering::SeqCst);
+        state.modifiers_active.store(false, Ordering::SeqCst);
+        state.was_fully_active.store(false, Ordering::SeqCst);
+        state.contaminated.store(false, Ordering::SeqCst);
+
+        // Start the event tap if not already running.
+        // This now blocks until the tap is confirmed running or fails.
+        start_event_tap(state.clone())
     }
-    if let Ok(mut held) = state.held_keys.lock() {
-        held.clear();
+
+    pub fn unregister() {
+        let state = get_state();
+        state.target_flags.store(0, Ordering::SeqCst);
+        state.target_keycode.store(0, Ordering::SeqCst);
+        state.modifiers_active.store(false, Ordering::SeqCst);
+        state.was_fully_active.store(false, Ordering::SeqCst);
+        state.contaminated.store(false, Ordering::SeqCst);
     }
-    state.contaminated.store(false, Ordering::SeqCst);
 }
 
 #[tauri::command]
@@ -260,11 +407,27 @@ pub fn register_modifier_shortcut(
     app_handle: tauri::AppHandle,
     shortcut: String,
 ) -> Result<(), String> {
-    register(app_handle, &shortcut)
+    #[cfg(target_os = "macos")]
+    {
+        macos::register(app_handle, &shortcut)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app_handle;
+        let _ = shortcut;
+        Err("Modifier-only shortcuts are only supported on macOS".to_string())
+    }
 }
 
 #[tauri::command]
 pub fn unregister_modifier_shortcut() -> Result<(), String> {
-    unregister();
-    Ok(())
+    #[cfg(target_os = "macos")]
+    {
+        macos::unregister();
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(())
+    }
 }
