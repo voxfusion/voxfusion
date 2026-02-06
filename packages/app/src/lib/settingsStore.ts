@@ -135,6 +135,7 @@ export async function updateTheme(theme: Theme): Promise<void> {
 	await saveTheme(theme);
 	setSettingsInternal((prev) => ({ ...prev, theme }));
 	applyTheme(theme);
+	await emit("settings-changed");
 }
 
 export async function updateHotkey(hotkey: string): Promise<void> {

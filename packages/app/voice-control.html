@@ -8,6 +8,24 @@
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 		<title>Voice Control - VoxFusion</title>
+		<script>
+			(function() {
+				try {
+					var theme = localStorage.getItem('voxfusion-theme');
+					var isDark = false;
+					if (theme === 'dark') {
+						isDark = true;
+					} else if (theme === 'light') {
+						isDark = false;
+					} else {
+						isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					}
+					if (isDark) {
+						document.documentElement.classList.add('dark');
+					}
+				} catch (e) {}
+			})();
+		</script>
 		<style>
 			html, body, #root {
 				background: transparent !important;
