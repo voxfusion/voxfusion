@@ -119,7 +119,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					.limit(50);
 
 				let prompt =
-					"User can possible also speak russian. But not mixup languages in one transcription.";
+					"";
 				if (userWords.length > 0) {
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
@@ -133,7 +133,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 						type: "audio/webm",
 					}),
 					prompt,
-					language: "en",
 				});
 
 				const endTime = performance.now();
