@@ -56,8 +56,7 @@ export const ru: Translations = {
 		failedToFetch: "Не удалось загрузить транскрипции",
 		errorOccurred: "Произошла ошибка",
 		noTranscriptions: "Пока нет транскрипций",
-		useCommandToRecord:
-			"Используйте Command+; чтобы начать запись и создать первую транскрипцию",
+		useCommandToRecord: "Используйте Command+; чтобы начать запись и создать первую транскрипцию",
 		tryAgain: "Попробовать снова",
 		noMore: "Больше нет транскрипций",
 		today: "Сегодня",
@@ -70,6 +69,8 @@ export const ru: Translations = {
 		settings: "Настройки",
 		privacy: "Приватность",
 		logout: "Выйти",
+		wordsUsed: "Слов использовано",
+		limitReached: "Лимит достигнут",
 	},
 	dictionary: {
 		title: "Словарь",
