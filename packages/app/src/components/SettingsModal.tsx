@@ -66,16 +66,16 @@ function Select(props: SelectProps) {
 			<button
 				type="button"
 				onClick={() => setIsOpen(!isOpen())}
-				class="flex items-center justify-between w-full px-4 py-2.5 bg-[#111] border border-[#333] text-[#e0e0e0] hover:border-[#ff3e00] focus:outline-none focus:border-[#ff3e00] transition-colors font-mono text-sm"
+				class="flex items-center justify-between w-full px-4 py-2.5 bg-th-surface border border-border-strong text-txt-primary hover:border-ac focus:outline-none focus:border-ac transition-colors font-mono text-sm"
 			>
 				<span class="truncate">{selectedLabel()}</span>
 				<ChevronDown
-					class={`w-4 h-4 ml-2 text-[#666] transition-transform ${isOpen() ? "rotate-180" : ""}`}
+					class={`w-4 h-4 ml-2 text-txt-muted transition-transform ${isOpen() ? "rotate-180" : ""}`}
 				/>
 			</button>
 
 			<Show when={isOpen()}>
-				<div class="absolute z-50 w-full mt-1 bg-[#111] border border-[#333] max-h-60 overflow-auto">
+				<div class="absolute z-50 w-full mt-1 bg-th-surface border border-border-strong max-h-60 overflow-auto">
 					<For each={props.options}>
 						{(option) => (
 							<button
@@ -84,13 +84,13 @@ function Select(props: SelectProps) {
 									props.onChange(option.value);
 									setIsOpen(false);
 								}}
-								class={`flex items-center justify-between w-full px-4 py-2.5 text-left hover:bg-[#1a1a1a] transition-colors font-mono text-sm ${
-									option.value === props.value ? "text-[#ff3e00] bg-[#1a1a1a]" : "text-[#e0e0e0]"
+								class={`flex items-center justify-between w-full px-4 py-2.5 text-left hover:bg-th-hover transition-colors font-mono text-sm ${
+									option.value === props.value ? "text-ac bg-th-hover" : "text-txt-primary"
 								}`}
 							>
 								<span class="truncate">{option.label}</span>
 								<Show when={option.value === props.value}>
-									<span class="text-[#ff3e00]">[*]</span>
+									<span class="text-ac">[*]</span>
 								</Show>
 							</button>
 						)}
@@ -184,17 +184,15 @@ export default function SettingsModal(props: SettingsModalProps) {
 	return (
 		<Show when={props.isOpen}>
 			<div
-				class="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+				class="fixed inset-0 bg-th-overlay flex items-center justify-center z-50"
 				onClick={handleOverlayClick}
 			>
-				<div class="bg-[#0a0a0a] border border-[#222] w-[800px] h-[600px] flex overflow-hidden">
+				<div class="bg-th-base border border-border w-[800px] h-[600px] flex overflow-hidden">
 					{/* Sidebar */}
-					<div class="w-56 bg-[#0a0a0a] border-r border-[#222] flex flex-col">
+					<div class="w-56 bg-th-base border-r border-border flex flex-col">
 						{/* Header */}
-						<div class="px-4 py-4 border-b border-[#222]">
-							<h2 class="font-mono text-[#ff3e00] text-sm tracking-wider">
-								[VOXFUSION] &gt; SETTINGS
-							</h2>
+						<div class="px-4 py-4 border-b border-border">
+							<h2 class="font-mono text-ac text-sm tracking-wider">[VOXFUSION] &gt; SETTINGS</h2>
 						</div>
 						{/* Navigation */}
 						<nav class="flex-1 py-2">
@@ -205,11 +203,11 @@ export default function SettingsModal(props: SettingsModalProps) {
 										onClick={() => setActiveSection(item.id)}
 										class={`flex items-center gap-3 w-full px-4 py-3 font-mono text-xs tracking-wider transition-colors ${
 											activeSection() === item.id
-												? "text-[#ff3e00] border-l-2 border-[#ff3e00] bg-[#111]"
-												: "text-[#666] hover:text-[#888] hover:bg-[#111] border-l-2 border-transparent"
+												? "text-ac border-l-2 border-ac bg-th-surface"
+												: "text-txt-muted hover:text-txt-secondary hover:bg-th-surface border-l-2 border-transparent"
 										}`}
 									>
-										<span class="text-[#444]">{item.num}</span>
+										<span class="text-txt-faint">{item.num}</span>
 										<span>{item.label}</span>
 									</button>
 								)}
@@ -220,8 +218,8 @@ export default function SettingsModal(props: SettingsModalProps) {
 					{/* Content */}
 					<div class="flex-1 flex flex-col">
 						{/* Content Header */}
-						<div class="flex items-center justify-between px-6 py-4 border-b border-[#222]">
-							<h3 class="font-mono text-[#e0e0e0] text-sm tracking-wider uppercase">
+						<div class="flex items-center justify-between px-6 py-4 border-b border-border">
+							<h3 class="font-mono text-txt-primary text-sm tracking-wider uppercase">
 								{activeSection() === "audio" && "// AUDIO_CONFIG"}
 								{activeSection() === "hotkey" && "// HOTKEY_CONFIG"}
 								{activeSection() === "appearance" && "// APPEARANCE_CONFIG"}
@@ -230,7 +228,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 							<button
 								type="button"
 								onClick={props.onClose}
-								class="font-mono text-[#666] hover:text-[#ff3e00] transition-colors text-sm"
+								class="font-mono text-txt-muted hover:text-ac transition-colors text-sm"
 							>
 								[X]
 							</button>
@@ -243,14 +241,14 @@ export default function SettingsModal(props: SettingsModalProps) {
 								<div class="space-y-6">
 									<div>
 										<div class="flex items-center justify-between mb-3">
-											<label class="font-mono text-[#666] text-xs uppercase tracking-wider">
+											<label class="font-mono text-txt-muted text-xs uppercase tracking-wider">
 												INPUT_DEVICE
 											</label>
 											<button
 												type="button"
 												onClick={fetchAudioDevices}
 												disabled={isLoadingDevices()}
-												class="p-1.5 text-[#666] hover:text-[#ff3e00] transition-colors disabled:opacity-50"
+												class="p-1.5 text-txt-muted hover:text-ac transition-colors disabled:opacity-50"
 												title="Refresh devices"
 											>
 												<RefreshCw class={`w-4 h-4 ${isLoadingDevices() ? "animate-spin" : ""}`} />
@@ -263,14 +261,14 @@ export default function SettingsModal(props: SettingsModalProps) {
 												updateMicrophone(value === "default" ? null : value);
 											}}
 										/>
-										<p class="mt-3 font-mono text-xs text-[#444]">
+										<p class="mt-3 font-mono text-xs text-txt-faint">
 											{t("settings.microphoneDescription")}
 										</p>
 									</div>
 
 									{/* Audio Quality Preset */}
 									<div>
-										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-4">
+										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-4">
 											AUDIO_QUALITY
 										</label>
 										<div class="grid grid-cols-3 gap-4">
@@ -296,7 +294,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 												onClick={() => updateAudioQuality("low")}
 											/>
 										</div>
-										<p class="mt-3 font-mono text-xs text-[#444]">
+										<p class="mt-3 font-mono text-xs text-txt-faint">
 											{t("settings.audioQualityDescription")}
 										</p>
 									</div>
@@ -307,15 +305,15 @@ export default function SettingsModal(props: SettingsModalProps) {
 							<Show when={activeSection() === "hotkey"}>
 								<div class="space-y-6">
 									<div>
-										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-3">
+										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-3">
 											RECORDING_TRIGGER
 										</label>
 										<div class="flex items-center gap-3">
 											<div
 												class={`flex-1 px-4 py-3 border font-mono text-center text-sm ${
 													isRecordingHotkey()
-														? "border-[#ff3e00] bg-[#1a0a00] text-[#ff3e00]"
-														: "border-[#333] bg-[#111] text-[#e0e0e0]"
+														? "border-ac bg-ac-bg text-ac"
+														: "border-border-strong bg-th-surface text-txt-primary"
 												}`}
 											>
 												{isRecordingHotkey()
@@ -327,14 +325,14 @@ export default function SettingsModal(props: SettingsModalProps) {
 												onClick={() => toggleHotkeyRecording()}
 												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors ${
 													isRecordingHotkey()
-														? "bg-[#222] text-[#888] hover:bg-[#333]"
-														: "bg-[#ff3e00] text-[#0a0a0a] hover:bg-[#ff5500]"
+														? "bg-border text-txt-secondary hover:bg-border-strong"
+														: "bg-ac text-ac-on hover:bg-ac-hover"
 												}`}
 											>
 												{isRecordingHotkey() ? "[CANCEL]" : "[CHANGE]"}
 											</button>
 										</div>
-										<p class="mt-3 font-mono text-xs text-[#444]">
+										<p class="mt-3 font-mono text-xs text-txt-faint">
 											{t("settings.hotkeyDescription")}
 										</p>
 									</div>
@@ -345,7 +343,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 							<Show when={activeSection() === "appearance"}>
 								<div class="space-y-6">
 									<div>
-										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-4">
+										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-4">
 											THEME_MODE
 										</label>
 										<div class="grid grid-cols-3 gap-4">
@@ -376,7 +374,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 							<Show when={activeSection() === "language"}>
 								<div class="space-y-6">
 									<div>
-										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-3">
+										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-3">
 											INTERFACE_LANGUAGE
 										</label>
 										<Select
@@ -392,8 +390,8 @@ export default function SettingsModal(props: SettingsModalProps) {
 						</div>
 
 						{/* Footer */}
-						<div class="px-6 py-3 border-t border-[#222]">
-							<p class="font-mono text-[10px] text-[#333]">
+						<div class="px-6 py-3 border-t border-border">
+							<p class="font-mono text-[10px] text-txt-faint">
 								ESC TO CLOSE | CHANGES SAVED AUTOMATICALLY
 							</p>
 						</div>
@@ -418,8 +416,8 @@ function ThemeOption(props: ThemeOptionProps) {
 			onClick={props.onClick}
 			class={`relative p-4 border transition-all ${
 				props.isSelected
-					? "border-[#ff3e00] bg-[#1a0a00]"
-					: "border-[#333] bg-[#111] hover:border-[#444]"
+					? "border-ac bg-ac-bg"
+					: "border-border-strong bg-th-surface hover:border-txt-faint"
 			}`}
 		>
 			<div class="mb-3">
@@ -445,12 +443,12 @@ function ThemeOption(props: ThemeOptionProps) {
 				</Show>
 			</div>
 			<span
-				class={`font-mono text-xs uppercase tracking-wider ${props.isSelected ? "text-[#ff3e00]" : "text-[#888]"}`}
+				class={`font-mono text-xs uppercase tracking-wider ${props.isSelected ? "text-ac" : "text-txt-secondary"}`}
 			>
 				{props.label}
 			</span>
 			<Show when={props.isSelected}>
-				<div class="absolute top-2 right-2 font-mono text-[#ff3e00] text-xs">[*]</div>
+				<div class="absolute top-2 right-2 font-mono text-ac text-xs">[*]</div>
 			</Show>
 		</button>
 	);
@@ -471,47 +469,47 @@ function QualityOption(props: QualityOptionProps) {
 			onClick={props.onClick}
 			class={`relative p-4 border transition-all text-left ${
 				props.isSelected
-					? "border-[#ff3e00] bg-[#1a0a00]"
-					: "border-[#333] bg-[#111] hover:border-[#444]"
+					? "border-ac bg-ac-bg"
+					: "border-border-strong bg-th-surface hover:border-txt-faint"
 			}`}
 		>
 			<div class="mb-2">
 				<div
 					class={`w-full h-8 border flex items-end justify-center gap-[2px] px-2 pb-1 ${
-						props.isSelected ? "border-[#ff3e00]/30 bg-[#111]" : "border-[#333] bg-[#0a0a0a]"
+						props.isSelected ? "border-ac/30 bg-th-surface" : "border-border-strong bg-th-base"
 					}`}
 				>
 					<Show when={props.value === "high"}>
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-6 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-5 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-6 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-5 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
 					</Show>
 					<Show when={props.value === "medium"}>
-						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
 					</Show>
 					<Show when={props.value === "low"}>
-						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
 					</Show>
 				</div>
 			</div>
 			<span
-				class={`font-mono text-xs uppercase tracking-wider block ${props.isSelected ? "text-[#ff3e00]" : "text-[#888]"}`}
+				class={`font-mono text-xs uppercase tracking-wider block ${props.isSelected ? "text-ac" : "text-txt-secondary"}`}
 			>
 				{props.label}
 			</span>
-			<span class="font-mono text-[10px] text-[#555] block mt-1">{props.description}</span>
+			<span class="font-mono text-[10px] text-txt-muted block mt-1">{props.description}</span>
 			<Show when={props.isSelected}>
-				<div class="absolute top-2 right-2 font-mono text-[#ff3e00] text-xs">[*]</div>
+				<div class="absolute top-2 right-2 font-mono text-ac text-xs">[*]</div>
 			</Show>
 		</button>
 	);

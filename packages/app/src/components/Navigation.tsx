@@ -49,14 +49,14 @@ export default function Sidebar(props: SidebarProps) {
 	};
 
 	return (
-		<aside class="w-56 bg-[#0a0a0a] border-r border-[#222] flex flex-col h-full">
+		<aside class="w-56 bg-th-base border-r border-border flex flex-col h-full">
 			<nav class="flex-1 p-3 pt-9 space-y-1">
 				<A
 					href="/"
 					class={`flex items-center gap-3 px-3 py-2 font-mono uppercase tracking-wider text-xs transition-colors ${
 						isActive("/")
-							? "text-[#ff3e00] border-l-2 border-[#ff3e00] bg-[#111]"
-							: "text-[#888] hover:text-[#e0e0e0] hover:bg-[#111] border-l-2 border-transparent"
+							? "text-ac border-l-2 border-ac bg-th-surface"
+							: "text-txt-secondary hover:text-txt-primary hover:bg-th-surface border-l-2 border-transparent"
 					}`}
 				>
 					<Home class="w-4 h-4" />
@@ -66,8 +66,8 @@ export default function Sidebar(props: SidebarProps) {
 					href="/dictionary"
 					class={`flex items-center gap-3 px-3 py-2 font-mono uppercase tracking-wider text-xs transition-colors ${
 						isActive("/dictionary")
-							? "text-[#ff3e00] border-l-2 border-[#ff3e00] bg-[#111]"
-							: "text-[#888] hover:text-[#e0e0e0] hover:bg-[#111] border-l-2 border-transparent"
+							? "text-ac border-l-2 border-ac bg-th-surface"
+							: "text-txt-secondary hover:text-txt-primary hover:bg-th-surface border-l-2 border-transparent"
 					}`}
 				>
 					<BookOpen class="w-4 h-4" />
@@ -78,25 +78,25 @@ export default function Sidebar(props: SidebarProps) {
 			<div class="px-3 pb-3">
 				<div class="px-3 py-2">
 					<div class="flex items-center justify-between mb-1.5">
-						<span class="font-mono uppercase tracking-wider text-[10px] text-[#666]">
+						<span class="font-mono uppercase tracking-wider text-[10px] text-txt-muted">
 							{t("sidebar.wordsUsed")}
 						</span>
 					</div>
 					<div class="font-mono text-xs tabular-nums mb-1.5">
 						<Show
 							when={!isLimitReached()}
-							fallback={<span class="text-[#ff3e00]">{t("sidebar.limitReached")}</span>}
+							fallback={<span class="text-ac">{t("sidebar.limitReached")}</span>}
 						>
-							<span class="text-[#e0e0e0]">{wordsUsed().toLocaleString()}</span>
-							<span class="text-[#666]"> / {wordLimit().toLocaleString()}</span>
+							<span class="text-txt-primary">{wordsUsed().toLocaleString()}</span>
+							<span class="text-txt-muted"> / {wordLimit().toLocaleString()}</span>
 						</Show>
 					</div>
-					<div class="w-full h-1 bg-[#222] overflow-hidden">
+					<div class="w-full h-1 bg-border overflow-hidden">
 						<div
 							class="h-full transition-all duration-300"
 							style={{
 								width: `${usagePercent()}%`,
-								"background-color": isLimitReached() ? "#ff3e00" : "#ff3e00",
+								"background-color": "var(--color-accent)",
 								opacity: isLimitReached() ? 1 : 0.7,
 							}}
 						/>
@@ -104,27 +104,27 @@ export default function Sidebar(props: SidebarProps) {
 				</div>
 			</div>
 
-			<div class="p-3 border-t border-[#222] relative">
+			<div class="p-3 border-t border-border relative">
 				<button
 					type="button"
 					onClick={() => setIsUserMenuOpen(!isUserMenuOpen())}
-					class="flex items-center gap-3 w-full px-3 py-2 font-mono uppercase tracking-wider text-xs text-[#888] hover:text-[#e0e0e0] hover:bg-[#111] transition-colors"
+					class="flex items-center gap-3 w-full px-3 py-2 font-mono uppercase tracking-wider text-xs text-txt-secondary hover:text-txt-primary hover:bg-th-surface transition-colors"
 				>
-					<div class="w-8 h-8 bg-[#222] border border-[#333] flex items-center justify-center">
-						<User class="w-4 h-4 text-[#888]" />
+					<div class="w-8 h-8 bg-border border border-border-strong flex items-center justify-center">
+						<User class="w-4 h-4 text-txt-secondary" />
 					</div>
 					<span>{t("sidebar.account")}</span>
 				</button>
 
 				<Show when={isUserMenuOpen()}>
-					<div class="absolute bottom-full left-3 right-3 mb-2 bg-[#111] border border-[#222] py-1 z-50">
+					<div class="absolute bottom-full left-3 right-3 mb-2 bg-th-surface border border-border py-1 z-50">
 						<button
 							type="button"
 							onClick={() => {
 								setIsUserMenuOpen(false);
 								props.onOpenSettings();
 							}}
-							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-[#888] hover:text-[#e0e0e0] hover:bg-[#0a0a0a] transition-colors"
+							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-txt-secondary hover:text-txt-primary hover:bg-th-base transition-colors"
 						>
 							<Settings class="w-4 h-4" />
 							{t("sidebar.settings")}
@@ -135,16 +135,16 @@ export default function Sidebar(props: SidebarProps) {
 								openUrl("https://voxfusion.io/privacy");
 								setIsUserMenuOpen(false);
 							}}
-							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-[#888] hover:text-[#e0e0e0] hover:bg-[#0a0a0a] transition-colors"
+							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-txt-secondary hover:text-txt-primary hover:bg-th-base transition-colors"
 						>
 							<Shield class="w-4 h-4" />
 							{t("sidebar.privacy")}
 						</button>
-						<div class="border-t border-[#222] my-1" />
+						<div class="border-t border-border my-1" />
 						<button
 							type="button"
 							onClick={handleLogout}
-							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-[#ff3e00] hover:bg-[#0a0a0a] transition-colors"
+							class="flex items-center gap-3 w-full px-4 py-2 font-mono uppercase tracking-wider text-xs text-ac hover:bg-th-base transition-colors"
 						>
 							<LogOut class="w-4 h-4" />
 							{t("sidebar.logout")}

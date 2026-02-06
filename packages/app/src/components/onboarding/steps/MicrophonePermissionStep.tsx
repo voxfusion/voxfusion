@@ -1,5 +1,5 @@
-import { createSignal, onMount, Show } from "solid-js";
-import { Mic, Check, AlertCircle } from "lucide-solid";
+import { AlertCircle, Check, Mic } from "lucide-solid";
+import { Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../../../i18n";
 
 interface MicrophonePermissionStepProps {
@@ -46,39 +46,37 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 	return (
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
-			<div class="font-mono text-[#ff3e00] text-sm mb-8 tracking-wider">
-				[STEP_02] &gt; MIC_PERMISSION
-			</div>
+			<div class="font-mono text-ac text-sm mb-8 tracking-wider">[STEP_02] &gt; MIC_PERMISSION</div>
 
 			{/* Card container */}
-			<div class="border border-[#222] bg-[#111] p-8">
-				<div class="w-16 h-16 border border-[#333] flex items-center justify-center mx-auto mb-6">
-					<Mic class="w-8 h-8 text-[#ff3e00]" />
+			<div class="border border-border bg-th-surface p-8">
+				<div class="w-16 h-16 border border-border-strong flex items-center justify-center mx-auto mb-6">
+					<Mic class="w-8 h-8 text-ac" />
 				</div>
 
-				<h2 class="font-mono text-xl uppercase tracking-wider text-[#e0e0e0] mb-3">
+				<h2 class="font-mono text-xl uppercase tracking-wider text-txt-primary mb-3">
 					{t("onboarding.micPermissionTitle")}
 				</h2>
 
-				<p class="font-mono text-sm text-[#888] mb-8">
+				<p class="font-mono text-sm text-txt-secondary mb-8">
 					{t("onboarding.micPermissionDescription")}
 				</p>
 
 				<div class="mb-6">
 					<Show when={isGranted() === null}>
-						<div class="flex items-center justify-center gap-2 font-mono text-sm text-[#666]">
-							<div class="w-4 h-4 border-2 border-[#666] border-t-transparent rounded-full animate-spin" />
+						<div class="flex items-center justify-center gap-2 font-mono text-sm text-txt-muted">
+							<div class="w-4 h-4 border-2 border-txt-muted border-t-transparent rounded-full animate-spin" />
 							<span>{t("onboarding.checkingPermission")}</span>
 						</div>
 					</Show>
 					<Show when={isGranted() === true}>
-						<div class="flex items-center justify-center gap-2 font-mono text-sm text-[#00ff88]">
+						<div class="flex items-center justify-center gap-2 font-mono text-sm text-success">
 							<Check class="w-5 h-5" />
 							<span>{t("onboarding.micPermissionGranted")}</span>
 						</div>
 					</Show>
 					<Show when={isGranted() === false}>
-						<div class="flex items-center justify-center gap-2 font-mono text-sm text-[#ff3e00]">
+						<div class="flex items-center justify-center gap-2 font-mono text-sm text-ac">
 							<AlertCircle class="w-5 h-5" />
 							<span>{t("onboarding.micPermissionNotGranted")}</span>
 						</div>
@@ -90,9 +88,11 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 						type="button"
 						onClick={handleRequest}
 						disabled={isRequesting() || isGranted() === null}
-						class="px-6 py-3 bg-[#ff3e00] text-black font-mono font-bold uppercase tracking-wider text-sm hover:bg-[#ff5722] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+						class="px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 					>
-						{isRequesting() ? t("onboarding.checkingPermission") : t("onboarding.grantMicPermission")}
+						{isRequesting()
+							? t("onboarding.checkingPermission")
+							: t("onboarding.grantMicPermission")}
 					</button>
 				</Show>
 			</div>

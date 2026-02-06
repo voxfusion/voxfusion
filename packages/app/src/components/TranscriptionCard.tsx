@@ -1,6 +1,6 @@
-import { createSignal, Show } from "solid-js";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Copy, Check } from "lucide-solid";
+import { Check, Copy } from "lucide-solid";
+import { Show, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
 
 type Transcription = {
@@ -46,15 +46,15 @@ export default function TranscriptionCard(props: Props) {
 
 	return (
 		<div
-			class="group relative p-3 hover:bg-[#1a1a1a] transition-colors"
+			class="group relative p-3 hover:bg-th-hover transition-colors"
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
 		>
-			<p class="text-[#e0e0e0] font-mono text-sm leading-relaxed mb-2">
+			<p class="text-txt-primary font-mono text-sm leading-relaxed mb-2">
 				{truncateText(props.transcription.text)}
 			</p>
 
-			<div class="flex items-center gap-3 text-[#666] font-mono text-xs">
+			<div class="flex items-center gap-3 text-txt-muted font-mono text-xs">
 				<span>{formatTime(props.transcription.createdAt)}</span>
 				<span>{formatProcessingTime(props.transcription.processingTimeMs)}</span>
 			</div>
@@ -63,11 +63,11 @@ export default function TranscriptionCard(props: Props) {
 				<button
 					type="button"
 					onClick={handleCopy}
-					class="absolute top-2 right-2 p-1.5 bg-[#0a0a0a] border border-[#333] hover:border-[#ff3e00] text-[#888] transition-colors"
+					class="absolute top-2 right-2 p-1.5 bg-th-base border border-border-strong hover:border-ac text-txt-secondary transition-colors"
 					title={copied() ? t("transcription.copied") : t("transcription.copy")}
 				>
 					<Show when={copied()} fallback={<Copy class="w-3.5 h-3.5" />}>
-						<Check class="w-3.5 h-3.5 text-[#00ff88]" />
+						<Check class="w-3.5 h-3.5 text-success" />
 					</Show>
 				</button>
 			</Show>

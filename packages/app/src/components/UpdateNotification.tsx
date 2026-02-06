@@ -1,7 +1,7 @@
-import { createSignal, onMount, Show } from "solid-js";
-import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { type Update, check } from "@tauri-apps/plugin-updater";
 import { Download } from "lucide-solid";
+import { Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 
 export default function UpdateNotification() {
@@ -53,27 +53,27 @@ export default function UpdateNotification() {
 	return (
 		<Show when={isVisible() && update()}>
 			<div class="fixed bottom-4 right-4 z-50 max-w-sm">
-				<div class="bg-[#111] border border-[#222] overflow-hidden">
+				<div class="bg-th-surface border border-border overflow-hidden">
 					<div class="p-4">
 						<div class="flex items-start gap-3">
-							<div class="flex-shrink-0 w-10 h-10 bg-[#ff3e00]/10 border border-[#ff3e00] flex items-center justify-center">
-								<Download class="h-5 w-5 text-[#ff3e00]" />
+							<div class="flex-shrink-0 w-10 h-10 bg-ac-bg border border-ac flex items-center justify-center">
+								<Download class="h-5 w-5 text-ac" />
 							</div>
 							<div class="flex-1 min-w-0">
 								<div class="flex items-start justify-between gap-2">
-									<h3 class="text-sm font-mono uppercase tracking-wider text-[#e0e0e0]">
+									<h3 class="text-sm font-mono uppercase tracking-wider text-txt-primary">
 										{t("update.available")}
 									</h3>
 									<button
 										type="button"
 										onClick={handleIgnore}
 										disabled={isDownloading()}
-										class="font-mono text-[#666] hover:text-[#ff3e00] transition-colors disabled:opacity-50"
+										class="font-mono text-txt-muted hover:text-ac transition-colors disabled:opacity-50"
 									>
 										[X]
 									</button>
 								</div>
-								<p class="mt-1 text-sm font-mono text-[#888]">
+								<p class="mt-1 text-sm font-mono text-txt-secondary">
 									{t("update.newVersion")} {update()?.version}
 								</p>
 							</div>
@@ -81,15 +81,13 @@ export default function UpdateNotification() {
 
 						<Show when={isDownloading()}>
 							<div class="mt-3">
-								<div class="w-full h-1.5 bg-[#222] overflow-hidden">
+								<div class="w-full h-1.5 bg-border overflow-hidden">
 									<div
-										class="h-full bg-[#ff3e00] transition-all duration-300"
+										class="h-full bg-ac transition-all duration-300"
 										style={{ width: `${Math.min(downloadProgress() / 10, 100)}%` }}
 									/>
 								</div>
-								<p class="mt-1.5 text-xs font-mono text-[#888]">
-									{t("update.downloading")}
-								</p>
+								<p class="mt-1.5 text-xs font-mono text-txt-secondary">{t("update.downloading")}</p>
 							</div>
 						</Show>
 
@@ -98,14 +96,14 @@ export default function UpdateNotification() {
 								<button
 									type="button"
 									onClick={handleIgnore}
-									class="flex-1 px-3 py-2 text-sm font-mono bg-[#0a0a0a] border border-[#333] text-[#888] hover:border-[#666] transition-colors"
+									class="flex-1 px-3 py-2 text-sm font-mono bg-th-base border border-border-strong text-txt-secondary hover:border-txt-muted transition-colors"
 								>
 									{t("update.ignore")}
 								</button>
 								<button
 									type="button"
 									onClick={handleDownloadAndRestart}
-									class="flex-1 px-3 py-2 text-sm font-mono uppercase bg-[#ff3e00] text-black hover:bg-[#ff3e00]/90 transition-colors"
+									class="flex-1 px-3 py-2 text-sm font-mono uppercase bg-ac text-ac-on hover:bg-ac-hover transition-colors"
 								>
 									{t("update.downloadAndRestart")}
 								</button>

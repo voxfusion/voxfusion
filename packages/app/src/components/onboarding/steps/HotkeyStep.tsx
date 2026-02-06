@@ -12,28 +12,26 @@ export default function HotkeyStep() {
 	return (
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
-			<div class="font-mono text-[#ff3e00] text-sm mb-8 tracking-wider">
-				[STEP_05] &gt; HOTKEY_CONFIG
-			</div>
+			<div class="font-mono text-ac text-sm mb-8 tracking-wider">[STEP_05] &gt; HOTKEY_CONFIG</div>
 
 			{/* Card container */}
-			<div class="border border-[#222] bg-[#111] p-8">
-				<div class="w-16 h-16 border border-[#333] flex items-center justify-center mx-auto mb-6">
-					<Keyboard class="w-8 h-8 text-[#ff3e00]" />
+			<div class="border border-border bg-th-surface p-8">
+				<div class="w-16 h-16 border border-border-strong flex items-center justify-center mx-auto mb-6">
+					<Keyboard class="w-8 h-8 text-ac" />
 				</div>
 
-				<h2 class="font-mono text-xl uppercase tracking-wider text-[#e0e0e0] mb-3">
+				<h2 class="font-mono text-xl uppercase tracking-wider text-txt-primary mb-3">
 					{t("onboarding.hotkeyTitle")}
 				</h2>
 
-				<p class="font-mono text-sm text-[#888] mb-8">{t("onboarding.hotkeyDescription")}</p>
+				<p class="font-mono text-sm text-txt-secondary mb-8">{t("onboarding.hotkeyDescription")}</p>
 
 				<div class="space-y-4">
 					<div
 						class={`px-6 py-4 border font-mono text-lg ${
 							isRecording()
-								? "border-[#ff3e00] bg-[#ff3e00]/10 text-[#ff3e00]"
-								: "border-[#333] bg-[#0a0a0a] text-[#e0e0e0]"
+								? "border-ac bg-ac-bg text-ac"
+								: "border-border-strong bg-th-base text-txt-primary"
 						}`}
 					>
 						{isRecording()
@@ -46,8 +44,8 @@ export default function HotkeyStep() {
 						onClick={toggleRecording}
 						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors ${
 							isRecording()
-								? "border border-[#333] text-[#888] hover:border-[#ff3e00] hover:text-[#e0e0e0] bg-transparent"
-								: "bg-[#ff3e00] text-black hover:bg-[#ff5722]"
+								? "border border-border-strong text-txt-secondary hover:border-ac hover:text-txt-primary bg-transparent"
+								: "bg-ac text-ac-on hover:bg-ac-hover"
 						}`}
 					>
 						{isRecording() ? t("settings.cancel") : t("onboarding.recordHotkey")}

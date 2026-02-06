@@ -1,13 +1,13 @@
-import { createSignal, Show } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { useI18n } from "../../i18n";
 import { updateOnboardingStep } from "../../lib/settingsStore";
 import StepIndicator from "./StepIndicator";
-import MicrophonePermissionStep from "./steps/MicrophonePermissionStep";
 import AccessibilityPermissionStep from "./steps/AccessibilityPermissionStep";
-import MicrophoneStep from "./steps/MicrophoneStep";
+import CompletionStep from "./steps/CompletionStep";
 import HotkeyStep from "./steps/HotkeyStep";
 import LanguageStep from "./steps/LanguageStep";
-import CompletionStep from "./steps/CompletionStep";
+import MicrophonePermissionStep from "./steps/MicrophonePermissionStep";
+import MicrophoneStep from "./steps/MicrophoneStep";
 
 interface OnboardingWizardProps {
 	initialStep: number;
@@ -66,13 +66,13 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 	const formatStep = (step: number) => step.toString().padStart(2, "0");
 
 	return (
-		<div class="fixed inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center p-8">
+		<div class="fixed inset-0 bg-th-base flex flex-col items-center justify-center p-8">
 			{/* Grid overlay background */}
 			<div
-				class="absolute inset-0 opacity-[0.03] pointer-events-none"
+				class="absolute inset-0 pointer-events-none"
 				style={{
 					"background-image":
-						"linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)",
+						"linear-gradient(var(--color-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px)",
 					"background-size": "40px 40px",
 				}}
 			/>
@@ -80,7 +80,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 
 			{/* Progress fraction */}
-			<div class="absolute top-8 right-8 font-mono text-[#666] text-sm tracking-wider">
+			<div class="absolute top-8 right-8 font-mono text-txt-muted text-sm tracking-wider">
 				{formatStep(currentStep())}/{formatStep(TOTAL_STEPS)}
 			</div>
 
@@ -124,7 +124,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 					<button
 						type="button"
 						onClick={goToPrevious}
-						class="px-6 py-3 font-mono text-[#888] hover:text-[#e0e0e0] transition-colors uppercase tracking-wider text-sm border border-[#333] hover:border-[#ff3e00]"
+						class="px-6 py-3 font-mono text-txt-secondary hover:text-txt-primary transition-colors uppercase tracking-wider text-sm border border-border-strong hover:border-ac"
 					>
 						{t("onboarding.back")}
 					</button>
@@ -136,7 +136,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 						<button
 							type="button"
 							onClick={handleComplete}
-							class="px-8 py-3 bg-[#ff3e00] text-black font-mono font-bold uppercase tracking-wider text-sm hover:bg-[#ff5722] transition-colors"
+							class="px-8 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors"
 						>
 							{t("onboarding.getStarted")}
 						</button>
@@ -146,7 +146,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 						type="button"
 						onClick={goToNext}
 						disabled={!canProceed()}
-						class="px-8 py-3 bg-[#ff3e00] text-black font-mono font-bold uppercase tracking-wider text-sm hover:bg-[#ff5722] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+						class="px-8 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 					>
 						{t("onboarding.next")}
 					</button>

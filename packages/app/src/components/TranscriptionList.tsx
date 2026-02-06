@@ -159,17 +159,17 @@ export default function TranscriptionList() {
 		<div class="space-y-6">
 			<Show when={initialLoading()}>
 				<div class="flex items-center justify-center py-12">
-					<Loader class="w-6 h-6 animate-spin text-[#ff3e00]" />
+					<Loader class="w-6 h-6 animate-spin text-ac" />
 				</div>
 			</Show>
 
 			<Show when={error()}>
 				<div class="text-center py-8 font-mono">
-					<p class="text-[#ff3e00] mb-2">[ERROR] {error()}</p>
+					<p class="text-ac mb-2">[ERROR] {error()}</p>
 					<button
 						type="button"
 						onClick={() => fetchTranscriptions()}
-						class="text-[#ff3e00] hover:underline"
+						class="text-ac hover:underline"
 					>
 						[RETRY]
 					</button>
@@ -178,8 +178,8 @@ export default function TranscriptionList() {
 
 			<Show when={!initialLoading() && !error() && transcriptions().length === 0}>
 				<div class="text-center py-12 font-mono">
-					<p class="text-[#888] mb-2">[INFO] NO_TRANSCRIPTIONS</p>
-					<p class="text-[#666] text-sm">{t("transcriptionList.useCommandToRecord")}</p>
+					<p class="text-txt-secondary mb-2">[INFO] NO_TRANSCRIPTIONS</p>
+					<p class="text-txt-muted text-sm">{t("transcriptionList.useCommandToRecord")}</p>
 				</div>
 			</Show>
 
@@ -187,8 +187,10 @@ export default function TranscriptionList() {
 				<For each={groupedTranscriptions()}>
 					{(group) => (
 						<div>
-							<h3 class="text-[#ff3e00] font-mono text-xs uppercase tracking-wider mb-2 px-1">{group.label}</h3>
-							<div class="bg-[#111] border border-[#222] divide-y divide-[#222]">
+							<h3 class="text-ac font-mono text-xs uppercase tracking-wider mb-2 px-1">
+								{group.label}
+							</h3>
+							<div class="bg-th-surface border border-border divide-y divide-border">
 								<For each={group.transcriptions}>
 									{(transcription) => <TranscriptionCard transcription={transcription} />}
 								</For>
@@ -201,12 +203,14 @@ export default function TranscriptionList() {
 
 				<Show when={loading() && transcriptions().length > 0}>
 					<div class="flex items-center justify-center py-4">
-						<Loader class="w-5 h-5 animate-spin text-[#ff3e00]" />
+						<Loader class="w-5 h-5 animate-spin text-ac" />
 					</div>
 				</Show>
 
 				<Show when={!hasMore() && transcriptions().length > 0}>
-					<p class="text-center text-[#666] font-mono text-xs py-4">{t("transcriptionList.noMore")}</p>
+					<p class="text-center text-txt-muted font-mono text-xs py-4">
+						{t("transcriptionList.noMore")}
+					</p>
 				</Show>
 			</Show>
 		</div>

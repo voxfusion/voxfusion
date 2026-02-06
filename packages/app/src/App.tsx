@@ -1,20 +1,25 @@
-import { createEffect, createSignal, onCleanup, onMount, type ParentProps, Show } from "solid-js";
+import { useStore } from "@nanostores/solid";
+import { useNavigate } from "@solidjs/router";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
-import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { useNavigate } from "@solidjs/router";
-import { useStore } from "@nanostores/solid";
-import { authClient } from "./lib/authClient";
-import { tokenManager } from "./lib/tokenManager";
-import { initSettings, useSettings, markOnboardingComplete, updateMicrophone } from "./lib/settingsStore";
+import { type ParentProps, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import appIcon from "../src-tauri/icons/icon.svg";
 import tauriconf from "../src-tauri/tauri.conf.json";
 import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
-import OnboardingWizard from "./components/onboarding/OnboardingWizard";
 import UpdateNotification from "./components/UpdateNotification";
-import appIcon from "../src-tauri/icons/icon.svg";
+import OnboardingWizard from "./components/onboarding/OnboardingWizard";
+import { authClient } from "./lib/authClient";
+import {
+	initSettings,
+	markOnboardingComplete,
+	updateMicrophone,
+	useSettings,
+} from "./lib/settingsStore";
+import { tokenManager } from "./lib/tokenManager";
 
 const FORCE_SHOW_ONBOARDING =
 	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
@@ -39,9 +44,9 @@ function waitForTauriIPC(): Promise<void> {
 }
 
 const handleDeepLinkUrls = async (urls: string[]) => {
-  await tokenManager.init();
+	await tokenManager.init();
 
-  for (const urlString of urls) {
+	for (const urlString of urls) {
 		try {
 			const url = new URL(urlString);
 			console.log(url);
@@ -132,7 +137,7 @@ function App(props: ParentProps) {
 		window.addEventListener("keydown", handleKeyDown);
 		onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
 
-		const voicecontrolWindow = tauriconf.app.windows.find(w => w.label === "voice-control");
+		const voicecontrolWindow = tauriconf.app.windows.find((w) => w.label === "voice-control");
 		if (!voicecontrolWindow) {
 			console.error("Voice control window not found");
 			throw new Error("Voice control window not found");
@@ -140,7 +145,7 @@ function App(props: ParentProps) {
 
 		const windowWidth = voicecontrolWindow.width;
 		const windowHeight = voicecontrolWindow.height;
-		const bottomPadding = 20
+		const bottomPadding = 20;
 
 		const monitor = await primaryMonitor();
 		if (!monitor) {
@@ -167,12 +172,12 @@ function App(props: ParentProps) {
 	});
 
 	return (
-		<div class="relative min-h-screen h-full w-full bg-[#0a0a0a] transition-colors">
+		<div class="relative min-h-screen h-full w-full bg-th-base transition-colors">
 			{/* Grid overlay pattern */}
 			<div
 				class="pointer-events-none absolute inset-0 z-0"
 				style={{
-					"background-image": "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+					"background-image": `linear-gradient(var(--color-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px)`,
 					"background-size": "40px 40px",
 				}}
 			/>
@@ -180,8 +185,8 @@ function App(props: ParentProps) {
 			<Show when={!isSessionChecked() || session()?.isPending}>
 				<div class="h-full flex flex-col items-center justify-center">
 					<img src={appIcon} alt="VoxFusion" class="w-16 h-16 mb-8" />
-					<div class="w-48 h-1 bg-[#222] overflow-hidden">
-						<div class="w-1/4 h-full bg-[#ff3e00] animate-slide" />
+					<div class="w-48 h-1 bg-border overflow-hidden">
+						<div class="w-1/4 h-full bg-ac animate-slide" />
 					</div>
 				</div>
 			</Show>
@@ -196,7 +201,12 @@ function App(props: ParentProps) {
 				>
 					<Show
 						when={!shouldShowOnboarding()}
-						fallback={<OnboardingWizard initialStep={settings().onboardingStep} onComplete={() => markOnboardingComplete()} />}
+						fallback={
+							<OnboardingWizard
+								initialStep={settings().onboardingStep}
+								onComplete={() => markOnboardingComplete()}
+							/>
+						}
 					>
 						<div class="flex h-full">
 							<Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
