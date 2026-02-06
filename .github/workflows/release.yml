@@ -14,7 +14,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: warp-macos-15-arm64-12x
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -133,7 +133,7 @@ jobs:
           path: release-artifacts/
 
   publish:
-    runs-on: tenki-standard-autoscale
+    runs-on: warp-ubuntu-latest-x64-2x
     needs: build
     steps:
       - name: Download build artifacts
