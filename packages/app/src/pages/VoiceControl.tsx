@@ -160,6 +160,11 @@ export default function VoiceControl() {
 
 			const res = await eden.api.transcribe.post({ file: audioFile });
 
+			if (res.status === 403) {
+				emit("transcription-created");
+				return;
+			}
+
 			let body: { text?: string };
 			if (res.data instanceof Response) {
 				body = await res.data.json();

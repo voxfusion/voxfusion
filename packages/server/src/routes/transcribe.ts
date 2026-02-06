@@ -1,9 +1,8 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import { auth } from "../auth";
-import { checkUserRateLimit } from "../middleware/rateLimit";
 import { db } from "../providers/db";
 import { dictionaryWords, transcriptions } from "../providers/db/schema";
 import { groq } from "../providers/groq";
@@ -31,6 +30,21 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	} finally {
 		(await Bun.file(tempFile).exists()) && (await Bun.$`rm ${tempFile}`);
 	}
+}
+
+const MONTHLY_WORD_LIMIT = 10_000;
+
+function getMonthStart(): Date {
+	const now = new Date();
+	return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+async function getMonthlyWordCount(userId: string): Promise<number> {
+	const result = await db
+		.select({ total: sql<number>`coalesce(sum(${transcriptions.wordCount}), 0)` })
+		.from(transcriptions)
+		.where(and(eq(transcriptions.userId, userId), gte(transcriptions.createdAt, getMonthStart())));
+	return Number(result[0]?.total ?? 0);
 }
 
 function countWords(text: string): number {
@@ -84,6 +98,17 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			const session = (ctx as any).session as Session;
 
 			try {
+				const wordsUsedBefore = await getMonthlyWordCount(session.user.id);
+				if (wordsUsedBefore >= MONTHLY_WORD_LIMIT) {
+					return status(403, {
+						error: "Monthly transcription limit reached",
+						usage: {
+							wordsUsed: wordsUsedBefore,
+							wordLimit: MONTHLY_WORD_LIMIT,
+						},
+					});
+				}
+
 				const fileBuffer = await file.arrayBuffer();
 
 				const userWords = await db
@@ -93,7 +118,8 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					.orderBy(desc(dictionaryWords.updatedAt))
 					.limit(50);
 
-				let prompt = "User can possible also speak russian. But not mixup languages in one transcription.";
+				let prompt =
+					"User can possible also speak russian. But not mixup languages in one transcription.";
 				if (userWords.length > 0) {
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
@@ -122,12 +148,13 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					processingTimeMs,
 					fileBuffer,
 				};
+				const wordsUsedAfter = wordsUsedBefore + wordCount;
 				return {
 					text: transcriptionText,
 					wordCount,
 					usage: {
-						wordsUsed: 0,
-						wordsRemaining: 1000000,
+						wordsUsed: wordsUsedAfter,
+						wordsRemaining: Math.max(0, MONTHLY_WORD_LIMIT - wordsUsedAfter),
 						plan: "free",
 					},
 				} satisfies TranscriptionResult;
@@ -179,6 +206,14 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			},
 		}
 	)
+	.get("/usage", async (ctx) => {
+		const session = (ctx as any).session as Session;
+		const wordsUsed = await getMonthlyWordCount(session.user.id);
+		return {
+			wordsUsed,
+			wordLimit: MONTHLY_WORD_LIMIT,
+		};
+	})
 	.get(
 		"/",
 		async (ctx) => {

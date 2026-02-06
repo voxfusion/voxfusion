@@ -1,10 +1,11 @@
 import { A, useLocation } from "@solidjs/router";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { BookOpen, Home, LogOut, Settings, Shield, User } from "lucide-solid";
-import { Show, createSignal } from "solid-js";
+import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import { authClient } from "../lib/authClient";
+import eden from "../lib/eden";
 import { tokenManager } from "../lib/tokenManager";
 
 interface SidebarProps {
@@ -15,8 +16,30 @@ export default function Sidebar(props: SidebarProps) {
 	const [t] = useI18n();
 	const location = useLocation();
 	const [isUserMenuOpen, setIsUserMenuOpen] = createSignal(false);
+	const [wordsUsed, setWordsUsed] = createSignal(0);
+	const [wordLimit, setWordLimit] = createSignal(10_000);
 
 	const isActive = (path: string) => location.pathname === path;
+
+	const fetchUsage = async () => {
+		try {
+			const res = await eden.api.transcribe.usage.get();
+			const data = res.data as { wordsUsed: number; wordLimit: number } | null;
+			if (data) {
+				setWordsUsed(data.wordsUsed);
+				setWordLimit(data.wordLimit);
+			}
+		} catch {}
+	};
+
+	onMount(async () => {
+		await fetchUsage();
+		const unlisten = await listen("transcription-created", fetchUsage);
+		onCleanup(unlisten);
+	});
+
+	const usagePercent = () => Math.min(100, (wordsUsed() / wordLimit()) * 100);
+	const isLimitReached = () => wordsUsed() >= wordLimit();
 
 	const handleLogout = async () => {
 		await authClient.signOut();
@@ -51,6 +74,35 @@ export default function Sidebar(props: SidebarProps) {
 					<span>02 {t("sidebar.dictionary")}</span>
 				</A>
 			</nav>
+
+			<div class="px-3 pb-3">
+				<div class="px-3 py-2">
+					<div class="flex items-center justify-between mb-1.5">
+						<span class="font-mono uppercase tracking-wider text-[10px] text-[#666]">
+							{t("sidebar.wordsUsed")}
+						</span>
+					</div>
+					<div class="font-mono text-xs tabular-nums mb-1.5">
+						<Show
+							when={!isLimitReached()}
+							fallback={<span class="text-[#ff3e00]">{t("sidebar.limitReached")}</span>}
+						>
+							<span class="text-[#e0e0e0]">{wordsUsed().toLocaleString()}</span>
+							<span class="text-[#666]"> / {wordLimit().toLocaleString()}</span>
+						</Show>
+					</div>
+					<div class="w-full h-1 bg-[#222] overflow-hidden">
+						<div
+							class="h-full transition-all duration-300"
+							style={{
+								width: `${usagePercent()}%`,
+								"background-color": isLimitReached() ? "#ff3e00" : "#ff3e00",
+								opacity: isLimitReached() ? 1 : 0.7,
+							}}
+						/>
+					</div>
+				</div>
+			</div>
 
 			<div class="p-3 border-t border-[#222] relative">
 				<button

@@ -65,6 +65,8 @@ export type Translations = {
 		settings: string;
 		privacy: string;
 		logout: string;
+		wordsUsed: string;
+		limitReached: string;
 	};
 	dictionary: {
 		title: string;
@@ -176,8 +178,7 @@ export const en: Translations = {
 		failedToFetch: "Failed to fetch transcriptions",
 		errorOccurred: "An error occurred",
 		noTranscriptions: "No transcriptions yet",
-		useCommandToRecord:
-			"Use Command+; to start recording and create your first transcription",
+		useCommandToRecord: "Use Command+; to start recording and create your first transcription",
 		tryAgain: "Try again",
 		noMore: "No more transcriptions",
 		today: "Today",
@@ -190,6 +191,8 @@ export const en: Translations = {
 		settings: "Settings",
 		privacy: "Privacy",
 		logout: "Log out",
+		wordsUsed: "Words used",
+		limitReached: "Limit reached",
 	},
 	dictionary: {
 		title: "Dictionary",
