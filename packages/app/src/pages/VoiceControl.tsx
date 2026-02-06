@@ -79,9 +79,15 @@ export default function VoiceControl() {
 
 		if (isModifierOnlyShortcut(shortcut)) {
 			// Use our custom CGEventTap-based modifier shortcut
-			await invoke("register_modifier_shortcut", { shortcut });
-			setCurrentShortcut(shortcut);
-			setIsCurrentModifierOnly(true);
+			console.log("[VoiceControl] Registering modifier-only shortcut:", shortcut);
+			try {
+				await invoke("register_modifier_shortcut", { shortcut });
+				setCurrentShortcut(shortcut);
+				setIsCurrentModifierOnly(true);
+				console.log("[VoiceControl] Modifier shortcut registered successfully");
+			} catch (e) {
+				console.error("[VoiceControl] Failed to register modifier shortcut:", e);
+			}
 		} else {
 			// Use the standard Tauri global-shortcut plugin
 			try {

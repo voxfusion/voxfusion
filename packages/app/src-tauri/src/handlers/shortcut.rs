@@ -6,7 +6,9 @@ mod macos {
         CGEventType, EventField,
     };
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::mpsc;
     use std::sync::{Arc, Mutex, OnceLock};
+    use std::time::Duration;
 
     // macOS virtual keycodes for modifier keys
     pub const KC_LEFT_COMMAND: u16 = 55;
@@ -122,10 +124,17 @@ mod macos {
         })
     }
 
-    fn start_event_tap(state: Arc<ShortcutState>) {
+    /// Start the CGEventTap on a background thread.
+    /// Returns Ok(()) if the tap was created successfully, or an error message.
+    /// If the tap is already running, returns Ok(()) immediately.
+    fn start_event_tap(state: Arc<ShortcutState>) -> Result<(), String> {
         if state.running.swap(true, Ordering::SeqCst) {
-            return; // Already running
+            return Ok(()); // Already running
         }
+
+        // Use a channel so the background thread can report whether the tap
+        // was created successfully before we return to the caller.
+        let (tx, rx) = mpsc::channel::<Result<(), String>>();
 
         std::thread::spawn(move || {
             let state_for_tap = state.clone();
@@ -255,28 +264,52 @@ mod macos {
                         .expect("Failed to create run loop source for CGEventTap");
                     CFRunLoop::get_current().add_source(&loop_source, kCFRunLoopCommonModes);
                     tap.enable();
+
+                    // Signal success before entering the run loop (which blocks forever)
+                    let _ = tx.send(Ok(()));
+
                     CFRunLoop::run_current();
                 },
                 Err(e) => {
-                    eprintln!(
-                        "Failed to create CGEventTap for modifier shortcuts: {:?}",
+                    let msg = format!(
+                        "Failed to create CGEventTap: {:?}. \
+                         Make sure Accessibility permissions are granted in \
+                         System Settings > Privacy & Security > Accessibility.",
                         e
                     );
+                    eprintln!("{}", msg);
                     state.running.store(false, Ordering::SeqCst);
+                    let _ = tx.send(Err(msg));
                 }
             }
         });
+
+        // Wait for the background thread to report success or failure.
+        // Use a timeout so we don't block the IPC thread indefinitely.
+        match rx.recv_timeout(Duration::from_secs(5)) {
+            Ok(result) => result,
+            Err(_) => {
+                // Timeout — the thread probably hung or panicked
+                Err("Timed out waiting for CGEventTap to start".to_string())
+            }
+        }
     }
 
     fn fire_shortcut(state: &ShortcutState) {
         if let Ok(handle) = state.app_handle.lock() {
             if let Some(ref app) = *handle {
                 use tauri::Emitter;
-                let _ = app.emit(
+                if let Err(e) = app.emit(
                     "modifier-shortcut-triggered",
                     serde_json::json!({ "state": "Pressed" }),
-                );
+                ) {
+                    eprintln!("Failed to emit modifier-shortcut-triggered: {:?}", e);
+                }
+            } else {
+                eprintln!("fire_shortcut: app_handle is None");
             }
+        } else {
+            eprintln!("fire_shortcut: failed to lock app_handle mutex");
         }
     }
 
@@ -298,10 +331,9 @@ mod macos {
         state.was_fully_active.store(false, Ordering::SeqCst);
         state.contaminated.store(false, Ordering::SeqCst);
 
-        // Start the event tap if not already running
-        start_event_tap(state.clone());
-
-        Ok(())
+        // Start the event tap if not already running.
+        // This now blocks until the tap is confirmed running or fails.
+        start_event_tap(state.clone())
     }
 
     pub fn unregister() {
