@@ -141,7 +141,7 @@ mod macos {
 
             // Listen for FlagsChanged (modifier press/release) and KeyDown (contamination)
             let tap_result = CGEventTap::new(
-                CGEventTapLocation::HID,
+                CGEventTapLocation::Session,
                 CGEventTapPlacement::HeadInsertEventTap,
                 CGEventTapOptions::ListenOnly,
                 vec![CGEventType::FlagsChanged, CGEventType::KeyDown],

@@ -22,7 +22,7 @@ pub fn check_accessibility_probe() -> bool {
 
     // Try a passive event tap first (won't trigger a system permission prompt)
     let tap_result = CGEventTap::new(
-        CGEventTapLocation::HID,
+        CGEventTapLocation::Session,
         CGEventTapPlacement::HeadInsertEventTap,
         CGEventTapOptions::ListenOnly,
         vec![CGEventType::KeyDown],
