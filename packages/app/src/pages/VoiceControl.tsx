@@ -16,6 +16,7 @@ export default function VoiceControl() {
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
 	const [isCurrentModifierOnly, setIsCurrentModifierOnly] = createSignal(false);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
+	const [audioQuality, setAudioQuality] = createSignal<string>("high");
 	const [audioLevel, setAudioLevel] = createSignal(0);
 	const [isAuthenticated, setIsAuthenticated] = createSignal(false);
 	const [isOnboardingComplete, setIsOnboardingComplete] = createSignal(false);
@@ -103,6 +104,7 @@ export default function VoiceControl() {
 		const settings = await loadSettings();
 		await registerShortcut(settings.hotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
+		setAudioQuality(settings.audioQuality);
 		setIsOnboardingComplete(settings.onboardingComplete);
 
 		const unlistenAuth = await listen("auth-changed", async () => {
@@ -126,6 +128,7 @@ export default function VoiceControl() {
 				await registerShortcut(newSettings.hotkey);
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
+			setAudioQuality(newSettings.audioQuality);
 			setIsOnboardingComplete(newSettings.onboardingComplete);
 		});
 
@@ -160,7 +163,10 @@ export default function VoiceControl() {
 
 			setLoading(true);
 
-			const audioBytes = await invoke<number[]>("read_audio_file", { path: filePath });
+			const audioBytes = await invoke<number[]>("process_audio_file", {
+				path: filePath,
+				quality: audioQuality(),
+			});
 			const audioBlob = new Blob([new Uint8Array(audioBytes)], { type: "audio/wav" });
 			const audioFile = new File([audioBlob], "recording.wav", { type: "audio/wav" });
 

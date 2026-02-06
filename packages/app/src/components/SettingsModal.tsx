@@ -5,8 +5,10 @@ import { type Locale, useI18n } from "../i18n";
 import { hotkeyDisplayName } from "../lib/hotkeyUtils";
 import {
 	type AudioDevice,
+	type AudioQuality,
 	type Theme,
 	getAudioInputDevices,
+	updateAudioQuality,
 	updateLanguage,
 	updateMicrophone,
 	updateTheme,
@@ -265,6 +267,39 @@ export default function SettingsModal(props: SettingsModalProps) {
 											{t("settings.microphoneDescription")}
 										</p>
 									</div>
+
+									{/* Audio Quality Preset */}
+									<div>
+										<label class="font-mono text-[#666] text-xs uppercase tracking-wider block mb-4">
+											AUDIO_QUALITY
+										</label>
+										<div class="grid grid-cols-3 gap-4">
+											<QualityOption
+												value="high"
+												label={t("settings.audioQualityHigh")}
+												description={t("settings.audioQualityHighDescription")}
+												isSelected={settings().audioQuality === "high"}
+												onClick={() => updateAudioQuality("high")}
+											/>
+											<QualityOption
+												value="medium"
+												label={t("settings.audioQualityMedium")}
+												description={t("settings.audioQualityMediumDescription")}
+												isSelected={settings().audioQuality === "medium"}
+												onClick={() => updateAudioQuality("medium")}
+											/>
+											<QualityOption
+												value="low"
+												label={t("settings.audioQualityLow")}
+												description={t("settings.audioQualityLowDescription")}
+												isSelected={settings().audioQuality === "low"}
+												onClick={() => updateAudioQuality("low")}
+											/>
+										</div>
+										<p class="mt-3 font-mono text-xs text-[#444]">
+											{t("settings.audioQualityDescription")}
+										</p>
+									</div>
 								</div>
 							</Show>
 
@@ -414,6 +449,67 @@ function ThemeOption(props: ThemeOptionProps) {
 			>
 				{props.label}
 			</span>
+			<Show when={props.isSelected}>
+				<div class="absolute top-2 right-2 font-mono text-[#ff3e00] text-xs">[*]</div>
+			</Show>
+		</button>
+	);
+}
+
+interface QualityOptionProps {
+	value: AudioQuality;
+	label: string;
+	description: string;
+	isSelected: boolean;
+	onClick: () => void;
+}
+
+function QualityOption(props: QualityOptionProps) {
+	return (
+		<button
+			type="button"
+			onClick={props.onClick}
+			class={`relative p-4 border transition-all text-left ${
+				props.isSelected
+					? "border-[#ff3e00] bg-[#1a0a00]"
+					: "border-[#333] bg-[#111] hover:border-[#444]"
+			}`}
+		>
+			<div class="mb-2">
+				<div
+					class={`w-full h-8 border flex items-end justify-center gap-[2px] px-2 pb-1 ${
+						props.isSelected ? "border-[#ff3e00]/30 bg-[#111]" : "border-[#333] bg-[#0a0a0a]"
+					}`}
+				>
+					<Show when={props.value === "high"}>
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-6 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-5 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+					</Show>
+					<Show when={props.value === "medium"}>
+						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+					</Show>
+					<Show when={props.value === "low"}>
+						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-[#ff3e00]" : "bg-[#444]"}`} />
+					</Show>
+				</div>
+			</div>
+			<span
+				class={`font-mono text-xs uppercase tracking-wider block ${props.isSelected ? "text-[#ff3e00]" : "text-[#888]"}`}
+			>
+				{props.label}
+			</span>
+			<span class="font-mono text-[10px] text-[#555] block mt-1">{props.description}</span>
 			<Show when={props.isSelected}>
 				<div class="absolute top-2 right-2 font-mono text-[#ff3e00] text-xs">[*]</div>
 			</Show>

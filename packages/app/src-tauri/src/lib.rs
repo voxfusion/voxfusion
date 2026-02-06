@@ -6,7 +6,7 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Listener, Manager};
 
 use handlers::{
-    check_accessibility_probe, list_audio_devices, read_audio_file,
+    check_accessibility_probe, list_audio_devices, process_audio_file, read_audio_file,
     register_modifier_shortcut, start_recording_with_device, stop_recording_with_device, type_text,
     unregister_modifier_shortcut,
 };
@@ -134,6 +134,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             type_text,
             read_audio_file,
+            process_audio_file,
             check_accessibility_probe,
             list_audio_devices,
             start_recording_with_device,

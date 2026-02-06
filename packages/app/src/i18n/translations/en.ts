@@ -33,6 +33,14 @@ export type Translations = {
 		microphone: string;
 		defaultMicrophone: string;
 		microphoneDescription: string;
+		audioQuality: string;
+		audioQualityDescription: string;
+		audioQualityHigh: string;
+		audioQualityHighDescription: string;
+		audioQualityMedium: string;
+		audioQualityMediumDescription: string;
+		audioQualityLow: string;
+		audioQualityLowDescription: string;
 		recordingHotkey: string;
 		pressHotkey: string;
 		hotkeyDescription: string;
@@ -159,6 +167,15 @@ export const en: Translations = {
 		microphone: "Microphone",
 		defaultMicrophone: "System Default",
 		microphoneDescription: "Select the microphone to use for voice recording.",
+		audioQuality: "Audio Quality",
+		audioQualityDescription:
+			"Lower quality reduces file size for faster uploads and transcriptions.",
+		audioQualityHigh: "High",
+		audioQualityHighDescription: "Original quality, largest file size",
+		audioQualityMedium: "Medium",
+		audioQualityMediumDescription: "16kHz mono, ~10x smaller",
+		audioQualityLow: "Low",
+		audioQualityLowDescription: "8kHz mono, ~20x smaller",
 		recordingHotkey: "Recording Hotkey",
 		pressHotkey: "Press a key combination...",
 		hotkeyDescription: "Press this key combination to start or stop recording.",

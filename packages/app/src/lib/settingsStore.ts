@@ -4,12 +4,14 @@ import { createSignal } from "solid-js";
 import type { Locale } from "../i18n";
 
 export type Theme = "dark" | "light" | "system";
+export type AudioQuality = "high" | "medium" | "low";
 
 export interface Settings {
 	theme: Theme;
 	hotkey: string;
 	selectedMicrophoneId: string | null;
 	language: Locale;
+	audioQuality: AudioQuality;
 	onboardingComplete: boolean;
 	onboardingStep: number;
 }
@@ -19,6 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
 	hotkey: "Command+;",
 	selectedMicrophoneId: null,
 	language: "en",
+	audioQuality: "high",
 	onboardingComplete: false,
 	onboardingStep: 1,
 };
@@ -35,6 +38,7 @@ async function getStore() {
 				hotkey: DEFAULT_SETTINGS.hotkey,
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
+				audioQuality: DEFAULT_SETTINGS.audioQuality,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
 				onboardingStep: DEFAULT_SETTINGS.onboardingStep,
 			},
@@ -50,6 +54,7 @@ export async function loadSettings(): Promise<Settings> {
 	const hotkey = await store.get<string>("hotkey");
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
+	const audioQuality = await store.get<AudioQuality>("audioQuality");
 	const onboardingComplete = await store.get<boolean>("onboardingComplete");
 	const onboardingStep = await store.get<number>("onboardingStep");
 
@@ -58,6 +63,7 @@ export async function loadSettings(): Promise<Settings> {
 		hotkey: hotkey ?? DEFAULT_SETTINGS.hotkey,
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
+		audioQuality: audioQuality ?? DEFAULT_SETTINGS.audioQuality,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
 		onboardingStep: onboardingStep ?? DEFAULT_SETTINGS.onboardingStep,
 	};
@@ -68,8 +74,7 @@ export async function saveTheme(theme: Theme): Promise<void> {
 	await store.set("theme", theme);
 	try {
 		localStorage.setItem("voxfusion-theme", theme);
-	} catch (e) {
-	}
+	} catch (e) {}
 }
 
 export async function saveHotkey(hotkey: string): Promise<void> {
@@ -85,6 +90,11 @@ export async function saveMicrophone(microphoneId: string | null): Promise<void>
 export async function saveLanguage(language: Locale): Promise<void> {
 	const store = await getStore();
 	await store.set("language", language);
+}
+
+export async function saveAudioQuality(quality: AudioQuality): Promise<void> {
+	const store = await getStore();
+	await store.set("audioQuality", quality);
 }
 
 export interface AudioDevice {
@@ -118,8 +128,7 @@ export async function initSettings(): Promise<void> {
 	applyTheme(loaded.theme);
 	try {
 		localStorage.setItem("voxfusion-theme", loaded.theme);
-	} catch (e) {
-	}
+	} catch (e) {}
 }
 
 export async function updateTheme(theme: Theme): Promise<void> {
@@ -147,6 +156,12 @@ export async function updateLanguage(
 	await saveLanguage(language);
 	setSettingsInternal((prev) => ({ ...prev, language }));
 	setLocale(language);
+}
+
+export async function updateAudioQuality(quality: AudioQuality): Promise<void> {
+	await saveAudioQuality(quality);
+	setSettingsInternal((prev) => ({ ...prev, audioQuality: quality }));
+	await emit("settings-changed");
 }
 
 function applyTheme(theme: Theme): void {
