@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
 	hotkey: "Command+;",
 	selectedMicrophoneId: null,
 	language: "en",
-	audioQuality: "high",
+	audioQuality: "medium",
 	onboardingComplete: false,
 	onboardingStep: 1,
 };
