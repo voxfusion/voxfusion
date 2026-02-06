@@ -133,7 +133,7 @@ jobs:
           path: release-artifacts/
 
   publish:
-    runs-on: ubuntu-latest
+    runs-on: tenki-standard-small-2c-4g
     needs: build
     steps:
       - name: Download build artifacts
