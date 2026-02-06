@@ -4,16 +4,17 @@ import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import eden from "../lib/eden";
+import { isModifierOnlyShortcut } from "../lib/hotkeyUtils";
 import { loadSettings } from "../lib/settingsStore";
 import { tokenManager } from "../lib/tokenManager";
 
-const NUM_BARS = 12;
 const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
 
 export default function VoiceControl() {
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [loading, setLoading] = createSignal(false);
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
+	const [isCurrentModifierOnly, setIsCurrentModifierOnly] = createSignal(false);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
 	const [audioLevel, setAudioLevel] = createSignal(0);
 	const [isAuthenticated, setIsAuthenticated] = createSignal(false);
@@ -21,15 +22,12 @@ export default function VoiceControl() {
 	let isStopping = false;
 	let isStarting = false;
 
-	const handleShortcut = (evt: { state: string }) => {
-		if (evt.state !== "Pressed") return;
-		console.log("shortcut pressed");
-
+	const toggleRecording = () => {
 		if (!isAuthenticated() || !isOnboardingComplete()) {
 			return;
 		}
-
 		if (isStarting || isStopping) return;
+
 		if (isRecording()) {
 			stopRecording();
 		} else {
@@ -37,20 +35,62 @@ export default function VoiceControl() {
 		}
 	};
 
-	const registerShortcut = async (shortcut: string) => {
+	const handlePluginShortcut = (evt: { state: string }) => {
+		if (evt.state !== "Pressed") return;
+		console.log("plugin shortcut pressed");
+		toggleRecording();
+	};
+
+	const handleModifierShortcut = (evt: { payload: { state: string } }) => {
+		if (evt.payload?.state !== "Pressed") return;
+		console.log("modifier shortcut pressed");
+		toggleRecording();
+	};
+
+	/**
+	 * Unregister whatever shortcut is currently active (plugin or modifier-only).
+	 */
+	const unregisterCurrentShortcut = async () => {
 		const current = currentShortcut();
-		if (current) {
+		if (!current) return;
+
+		if (isCurrentModifierOnly()) {
+			try {
+				await invoke("unregister_modifier_shortcut");
+			} catch (e) {
+				console.error("Failed to unregister modifier shortcut:", e);
+			}
+		} else {
 			try {
 				await unregister(current);
 			} catch {}
 		}
 
-		try {
-			await unregister(shortcut);
-		} catch {}
+		setCurrentShortcut(null);
+		setIsCurrentModifierOnly(false);
+	};
 
-		await register(shortcut, handleShortcut);
-		setCurrentShortcut(shortcut);
+	/**
+	 * Register a shortcut, automatically choosing the right mechanism.
+	 */
+	const registerShortcut = async (shortcut: string) => {
+		// Unregister any existing shortcut first
+		await unregisterCurrentShortcut();
+
+		if (isModifierOnlyShortcut(shortcut)) {
+			// Use our custom CGEventTap-based modifier shortcut
+			await invoke("register_modifier_shortcut", { shortcut });
+			setCurrentShortcut(shortcut);
+			setIsCurrentModifierOnly(true);
+		} else {
+			// Use the standard Tauri global-shortcut plugin
+			try {
+				await unregister(shortcut);
+			} catch {}
+			await register(shortcut, handlePluginShortcut);
+			setCurrentShortcut(shortcut);
+			setIsCurrentModifierOnly(false);
+		}
 	};
 
 	onMount(async () => {
@@ -71,6 +111,9 @@ export default function VoiceControl() {
 		// reads to fail.
 		await emit("auth-request");
 
+		// Listen for modifier-only shortcut triggers from the Rust side
+		const unlistenModifier = await listen("modifier-shortcut-triggered", handleModifierShortcut);
+
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
 			if (newSettings.hotkey !== currentShortcut()) {
@@ -88,6 +131,7 @@ export default function VoiceControl() {
 			unlistenSettings();
 			unlistenAudio();
 			unlistenAuth();
+			unlistenModifier();
 		});
 	});
 
@@ -95,10 +139,7 @@ export default function VoiceControl() {
 		if (isRecording()) {
 			await stopRecording();
 		}
-		const current = currentShortcut();
-		if (current) {
-			await unregister(current);
-		}
+		await unregisterCurrentShortcut();
 	});
 
 	const stopRecording = async () => {

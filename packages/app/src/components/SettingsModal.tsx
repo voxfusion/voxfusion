@@ -1,15 +1,16 @@
-import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
 import { ChevronDown, RefreshCw } from "lucide-solid";
-import { useI18n, type Locale } from "../i18n";
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { useHotkeyRecorder } from "../hooks/useHotkeyRecorder";
+import { type Locale, useI18n } from "../i18n";
+import { hotkeyDisplayName } from "../lib/hotkeyUtils";
 import {
-	useSettings,
-	updateTheme,
-	updateHotkey,
-	updateMicrophone,
-	updateLanguage,
-	getAudioInputDevices,
-	type Theme,
 	type AudioDevice,
+	type Theme,
+	getAudioInputDevices,
+	updateLanguage,
+	updateMicrophone,
+	updateTheme,
+	useSettings,
 } from "../lib/settingsStore";
 
 interface SettingsModalProps {
@@ -82,9 +83,7 @@ function Select(props: SelectProps) {
 									setIsOpen(false);
 								}}
 								class={`flex items-center justify-between w-full px-4 py-2.5 text-left hover:bg-[#1a1a1a] transition-colors font-mono text-sm ${
-									option.value === props.value
-										? "text-[#ff3e00] bg-[#1a1a1a]"
-										: "text-[#e0e0e0]"
+									option.value === props.value ? "text-[#ff3e00] bg-[#1a1a1a]" : "text-[#e0e0e0]"
 								}`}
 							>
 								<span class="truncate">{option.label}</span>
@@ -105,8 +104,11 @@ export default function SettingsModal(props: SettingsModalProps) {
 	const settings = useSettings();
 	const [activeSection, setActiveSection] = createSignal<SettingsSection>("audio");
 	const [audioDevices, setAudioDevices] = createSignal<AudioDevice[]>([]);
-	const [isRecordingHotkey, setIsRecordingHotkey] = createSignal(false);
-	const [pendingHotkey, setPendingHotkey] = createSignal<string>("");
+	const {
+		isRecording: isRecordingHotkey,
+		pendingHotkey,
+		toggleRecording: toggleHotkeyRecording,
+	} = useHotkeyRecorder();
 	const [isLoadingDevices, setIsLoadingDevices] = createSignal(false);
 
 	const fetchAudioDevices = async () => {
@@ -138,53 +140,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 
 		window.addEventListener("keydown", handleEscape);
 		return () => window.removeEventListener("keydown", handleEscape);
-	});
-
-	const handleKeyDown = (e: KeyboardEvent) => {
-		if (!isRecordingHotkey()) return;
-
-		e.preventDefault();
-		e.stopPropagation();
-
-		const modifiers: string[] = [];
-		if (e.metaKey) modifiers.push("Command");
-		if (e.ctrlKey) modifiers.push("Control");
-		if (e.altKey) modifiers.push("Alt");
-		if (e.shiftKey) modifiers.push("Shift");
-
-		const key = e.key;
-		if (["Meta", "Control", "Alt", "Shift"].includes(key)) {
-			return;
-		}
-
-		const hotkeyString = [...modifiers, key.length === 1 ? key.toUpperCase() : key].join("+");
-		setPendingHotkey(hotkeyString);
-	};
-
-	const handleKeyUp = async (_e: KeyboardEvent) => {
-		if (!isRecordingHotkey()) return;
-
-		const pending = pendingHotkey();
-		if (pending && pending.includes("+")) {
-			await updateHotkey(pending);
-			setIsRecordingHotkey(false);
-			setPendingHotkey("");
-		}
-	};
-
-	createEffect(() => {
-		if (isRecordingHotkey()) {
-			window.addEventListener("keydown", handleKeyDown);
-			window.addEventListener("keyup", handleKeyUp);
-		} else {
-			window.removeEventListener("keydown", handleKeyDown);
-			window.removeEventListener("keyup", handleKeyUp);
-		}
-	});
-
-	onCleanup(() => {
-		window.removeEventListener("keydown", handleKeyDown);
-		window.removeEventListener("keyup", handleKeyUp);
 	});
 
 	const sidebarItems = [
@@ -330,14 +285,11 @@ export default function SettingsModal(props: SettingsModalProps) {
 											>
 												{isRecordingHotkey()
 													? pendingHotkey() || "_ WAITING FOR INPUT _"
-													: settings().hotkey}
+													: hotkeyDisplayName(settings().hotkey)}
 											</div>
 											<button
 												type="button"
-												onClick={() => {
-													setIsRecordingHotkey(!isRecordingHotkey());
-													setPendingHotkey("");
-												}}
+												onClick={() => toggleHotkeyRecording()}
 												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors ${
 													isRecordingHotkey()
 														? "bg-[#222] text-[#888] hover:bg-[#333]"
@@ -463,9 +415,7 @@ function ThemeOption(props: ThemeOptionProps) {
 				{props.label}
 			</span>
 			<Show when={props.isSelected}>
-				<div class="absolute top-2 right-2 font-mono text-[#ff3e00] text-xs">
-					[*]
-				</div>
+				<div class="absolute top-2 right-2 font-mono text-[#ff3e00] text-xs">[*]</div>
 			</Show>
 		</button>
 	);

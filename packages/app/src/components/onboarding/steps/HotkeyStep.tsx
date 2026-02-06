@@ -1,6 +1,7 @@
 import { Keyboard } from "lucide-solid";
-import { useI18n } from "../../../i18n";
 import { useHotkeyRecorder } from "../../../hooks/useHotkeyRecorder";
+import { useI18n } from "../../../i18n";
+import { hotkeyDisplayName } from "../../../lib/hotkeyUtils";
 import { useSettings } from "../../../lib/settingsStore";
 
 export default function HotkeyStep() {
@@ -25,9 +26,7 @@ export default function HotkeyStep() {
 					{t("onboarding.hotkeyTitle")}
 				</h2>
 
-				<p class="font-mono text-sm text-[#888] mb-8">
-					{t("onboarding.hotkeyDescription")}
-				</p>
+				<p class="font-mono text-sm text-[#888] mb-8">{t("onboarding.hotkeyDescription")}</p>
 
 				<div class="space-y-4">
 					<div
@@ -39,7 +38,7 @@ export default function HotkeyStep() {
 					>
 						{isRecording()
 							? pendingHotkey() || t("onboarding.pressKeys")
-							: settings().hotkey}
+							: hotkeyDisplayName(settings().hotkey)}
 					</div>
 
 					<button
