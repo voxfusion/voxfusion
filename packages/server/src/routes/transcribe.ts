@@ -93,8 +93,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					.orderBy(desc(dictionaryWords.updatedAt))
 					.limit(50);
 
-				let prompt =
-					"If necessary, use both languages, English and Russian, in final transcription. It does not mean that transcription 100% will have mixed up languages. ";
+				let prompt = "";
 				if (userWords.length > 0) {
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
