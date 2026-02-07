@@ -7,6 +7,7 @@
  * Think concrete architecture meets command-line interfaces.
  */
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
+import YandexMetrika from "../components/YandexMetrika.astro";
 
 const lang = defaultLang;
 const t = useTranslations(lang);
@@ -54,11 +55,11 @@ const t = useTranslations(lang);
 				</h1>
 				<p class="hero-description">{t("hero.subtitle")}</p>
 				<div class="hero-actions">
-					<a href={getLocalizedPath("/download", lang)} class="btn-primary">
+					<a href={getLocalizedPath("/download", lang)} class="btn-primary" data-ym-goal="hero_download_click">
 						<span class="btn-icon">↓</span>
 						<span>{t("hero.cta.download")}</span>
 					</a>
-					<a href="#demo" class="btn-secondary">
+					<a href="#demo" class="btn-secondary" data-ym-goal="hero_demo_click">
 						<span class="btn-icon">▶</span>
 						<span>{t("hero.cta.watchDemo")}</span>
 					</a>
@@ -117,7 +118,7 @@ const t = useTranslations(lang);
 		</div>
 	</header>
 
-	<section id="features" class="features">
+	<section id="features" class="features" data-ym-view="view_features">
 		<div class="section-header">
 			<span class="section-number">01</span>
 			<h2 class="section-title">{t("features.tag")}</h2>
@@ -190,7 +191,7 @@ const t = useTranslations(lang);
 		</div>
 	</section>
 
-	<section id="demo" class="demo">
+	<section id="demo" class="demo" data-ym-view="view_demo">
 		<div class="section-header">
 			<span class="section-number">02</span>
 			<h2 class="section-title">{t("demo.tag")}</h2>
@@ -205,7 +206,7 @@ const t = useTranslations(lang);
 				<div class="video-frame">
 					<div class="video-scanlines"></div>
 					<div class="video-placeholder">
-						<button class="play-btn">▶</button>
+						<button class="play-btn" data-ym-goal="demo_play_click">▶</button>
 						<span class="video-duration">2:34</span>
 					</div>
 				</div>
@@ -236,7 +237,7 @@ const t = useTranslations(lang);
 		</div>
 	</section>
 
-	<section id="pricing" class="pricing">
+	<section id="pricing" class="pricing" data-ym-view="view_pricing">
 		<div class="section-header">
 			<span class="section-number">03</span>
 			<h2 class="section-title">{t("pricing.tag")}</h2>
@@ -263,7 +264,7 @@ const t = useTranslations(lang);
 					<li><span class="bullet">→</span> {t("pricing.free.feature4")}</li>
 					<li><span class="bullet">→</span> {t("pricing.free.feature5")}</li>
 				</ul>
-				<a href={getLocalizedPath("/download", lang)} class="plan-cta">{t("pricing.free.cta")}</a>
+				<a href={getLocalizedPath("/download", lang)} class="plan-cta" data-ym-goal="pricing_free_click">{t("pricing.free.cta")}</a>
 			</div>
 			<div class="pricing-card featured">
 				<div class="featured-badge">{t("pricing.pro.badge")}</div>
@@ -281,7 +282,7 @@ const t = useTranslations(lang);
 					<li><span class="bullet">→</span> {t("pricing.pro.feature3")}</li>
 					<li><span class="bullet">→</span> {t("pricing.pro.feature4")}</li>
 				</ul>
-				<a href={getLocalizedPath("/download", lang)} class="plan-cta primary">{t("pricing.pro.cta")}</a>
+				<a href={getLocalizedPath("/download", lang)} class="plan-cta primary" data-ym-goal="pricing_pro_click">{t("pricing.pro.cta")}</a>
 			</div>
 		</div>
 		<p class="pricing-note">{t("pricing.faq")} <a href="mailto:hello@voxfusion.com">hello@voxfusion.com</a> {t("pricing.faq.suffix")}</p>
@@ -291,7 +292,7 @@ const t = useTranslations(lang);
 		<div class="cta-inner">
 			<h2>{t("cta.title")}</h2>
 			<p>{t("cta.description")}</p>
-			<a href={getLocalizedPath("/download", lang)} class="cta-btn">
+			<a href={getLocalizedPath("/download", lang)} class="cta-btn" data-ym-goal="bottom_cta_click">
 				<span>↓</span> {t("cta.button")}
 			</a>
 		</div>
@@ -336,6 +337,7 @@ const t = useTranslations(lang);
 			<span class="status"><span class="status-dot"></span> {t("footer.status")}</span>
 		</div>
 	</footer>
+	<YandexMetrika />
 </body>
 </html>
 
