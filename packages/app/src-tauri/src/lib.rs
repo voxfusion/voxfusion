@@ -7,8 +7,7 @@ use tauri::{Emitter, Listener, Manager};
 
 use handlers::{
     check_accessibility_probe, list_audio_devices, process_audio_file, read_audio_file,
-    register_modifier_shortcut, start_recording_with_device, stop_recording_with_device, type_text,
-    unregister_modifier_shortcut,
+    start_recording_with_device, stop_recording_with_device, type_text,
 };
 
 #[cfg(target_os = "macos")]
@@ -138,9 +137,7 @@ pub fn run() {
             check_accessibility_probe,
             list_audio_devices,
             start_recording_with_device,
-            stop_recording_with_device,
-            register_modifier_shortcut,
-            unregister_modifier_shortcut
+            stop_recording_with_device
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())

@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import { isModifierCode, modifierCodeToDisplay, modifierCodeToName } from "../lib/hotkeyUtils";
+import { isModifierCode, modifierCodeToDisplay } from "../lib/hotkeyUtils";
 import { updateHotkey } from "../lib/settingsStore";
 
 /**
@@ -44,47 +44,11 @@ export function useHotkeyRecorder() {
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [pendingHotkey, setPendingHotkey] = createSignal("");
 
-	// Track if a non-modifier key was pressed (contaminates modifier-only detection)
-	let nonModifierPressed = false;
 	// Track all currently held modifier codes for combo shortcuts
 	let heldModifierCodes = new Set<string>();
-	// Track the peak set of modifiers held simultaneously (for multi-modifier shortcuts)
-	let peakModifierCodes = new Set<string>();
 
 	const resetTracking = () => {
-		nonModifierPressed = false;
 		heldModifierCodes = new Set<string>();
-		peakModifierCodes = new Set<string>();
-	};
-
-	/**
-	 * Build the modifier-only shortcut string from the peak set of held modifiers.
-	 * For a single modifier: "RightCommand", "LeftShift", etc.
-	 * For multiple modifiers: "Control+Shift" (using generic names, consistent order).
-	 */
-	const buildModifierOnlyString = (codes: Set<string>): string | null => {
-		if (codes.size === 0) return null;
-
-		if (codes.size === 1) {
-			// Single modifier — use the specific left/right name
-			const first = codes.values().next();
-			if (first.done) return null;
-			return modifierCodeToName(first.value) ?? null;
-		}
-
-		// Multiple modifiers — use generic names in consistent order, deduped
-		const modifiers: string[] = [];
-		const added = new Set<string>();
-		for (const mc of MOD_ORDER) {
-			if (codes.has(mc)) {
-				const generic = codeToComboModifier(mc);
-				if (generic && !added.has(generic)) {
-					modifiers.push(generic);
-					added.add(generic);
-				}
-			}
-		}
-		return modifiers.length >= 2 ? modifiers.join("+") : null;
 	};
 
 	/**
@@ -115,22 +79,11 @@ export function useHotkeyRecorder() {
 		const code = e.code;
 
 		if (isModifierCode(code)) {
-			// A modifier key was pressed
+			// A modifier key was pressed — show current modifier state
 			heldModifierCodes.add(code);
-			// Update peak: track maximum simultaneous modifiers
-			if (heldModifierCodes.size > peakModifierCodes.size) {
-				peakModifierCodes = new Set(heldModifierCodes);
-			}
-
-			if (!nonModifierPressed) {
-				// Show current modifier state
-				setPendingHotkey(buildModifierDisplay(heldModifierCodes));
-			}
+			setPendingHotkey(buildModifierDisplay(heldModifierCodes));
 		} else {
-			// A non-modifier key was pressed
-			nonModifierPressed = true;
-
-			// Build a standard combo shortcut string using the held modifiers
+			// A non-modifier key was pressed — build a standard combo shortcut string
 			const modifiers: string[] = [];
 			const addedModifiers = new Set<string>();
 
@@ -159,23 +112,12 @@ export function useHotkeyRecorder() {
 		if (isModifierCode(code)) {
 			heldModifierCodes.delete(code);
 
-			// When all modifiers are released and no non-modifier key was pressed,
-			// save as modifier-only shortcut (single or multi)
-			if (heldModifierCodes.size === 0 && !nonModifierPressed && peakModifierCodes.size > 0) {
-				const modString = buildModifierOnlyString(peakModifierCodes);
-				if (modString) {
-					await updateHotkey(modString);
-					setIsRecording(false);
-					setPendingHotkey("");
-					resetTracking();
-					return;
-				}
-			}
-
-			// If all modifiers released without a valid shortcut, reset for next attempt
+			// When all modifiers are released without a combo, just reset display
 			if (heldModifierCodes.size === 0) {
-				resetTracking();
 				setPendingHotkey("");
+			} else {
+				// Update display with remaining modifiers
+				setPendingHotkey(buildModifierDisplay(heldModifierCodes));
 			}
 		} else {
 			// A non-modifier key was released — check if we have a valid combo shortcut

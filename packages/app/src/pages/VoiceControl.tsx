@@ -4,9 +4,22 @@ import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import eden from "../lib/eden";
-import { isModifierOnlyShortcut } from "../lib/hotkeyUtils";
-import { loadSettings } from "../lib/settingsStore";
+import { loadSettings, updateHotkey } from "../lib/settingsStore";
 import { tokenManager } from "../lib/tokenManager";
+
+const DEFAULT_HOTKEY = "Command+;";
+
+/**
+ * Check if a hotkey string is a valid combo shortcut (modifier + non-modifier key).
+ * Modifier-only shortcuts (e.g., "RightCommand", "Control+Shift") are no longer supported.
+ */
+function isValidComboHotkey(hotkey: string): boolean {
+	if (!hotkey.includes("+")) return false;
+	const parts = hotkey.split("+");
+	const modifierNames = new Set(["Command", "Control", "Alt", "Shift", "CapsLock", "Fn"]);
+	// At least one part must NOT be a modifier
+	return parts.some((part) => !modifierNames.has(part));
+}
 
 const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
 
@@ -14,7 +27,6 @@ export default function VoiceControl() {
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [loading, setLoading] = createSignal(false);
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
-	const [isCurrentModifierOnly, setIsCurrentModifierOnly] = createSignal(false);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
 	const [audioQuality, setAudioQuality] = createSignal<string>("high");
 	const [audioLevel, setAudioLevel] = createSignal(0);
@@ -36,79 +48,49 @@ export default function VoiceControl() {
 		}
 	};
 
-	const handlePluginShortcut = (evt: { state: string }) => {
+	const handleShortcut = (evt: { state: string }) => {
 		if (evt.state !== "Pressed") return;
-		console.log("plugin shortcut pressed");
-		toggleRecording();
-	};
-
-	const handleModifierShortcut = (evt: { payload: { state: string } }) => {
-		if (evt.payload?.state !== "Pressed") return;
-		console.log("modifier shortcut pressed");
+		console.log("shortcut pressed");
 		toggleRecording();
 	};
 
 	/**
-	 * Unregister whatever shortcut is currently active (plugin or modifier-only).
+	 * Unregister the currently active shortcut.
 	 */
 	const unregisterCurrentShortcut = async () => {
 		const current = currentShortcut();
 		if (!current) return;
 
-		if (isCurrentModifierOnly()) {
-			try {
-				await invoke("unregister_modifier_shortcut");
-			} catch (e) {
-				console.error("Failed to unregister modifier shortcut:", e);
-			}
-		} else {
-			try {
-				await unregister(current);
-			} catch {}
-		}
+		try {
+			await unregister(current);
+		} catch {}
 
 		setCurrentShortcut(null);
-		setIsCurrentModifierOnly(false);
 	};
 
 	/**
-	 * Register a shortcut, automatically choosing the right mechanism.
+	 * Register a global shortcut.
 	 */
 	const registerShortcut = async (shortcut: string) => {
 		// Unregister any existing shortcut first
 		await unregisterCurrentShortcut();
 
-		if (isModifierOnlyShortcut(shortcut)) {
-			// Use our custom CGEventTap-based modifier shortcut
-			console.log("[VoiceControl] Registering modifier-only shortcut:", shortcut);
-			try {
-				await invoke("register_modifier_shortcut", { shortcut });
-				setCurrentShortcut(shortcut);
-				setIsCurrentModifierOnly(true);
-				console.log("[VoiceControl] Modifier shortcut registered successfully");
-			} catch (e) {
-				console.error("[VoiceControl] Failed to register modifier shortcut:", e);
-				// Notify the main window about the accessibility permission issue
-				// so it can show a prompt to the user
-				const errorMsg = String(e);
-				if (errorMsg.includes("Accessibility")) {
-					await emit("accessibility-permission-needed");
-				}
-			}
-		} else {
-			// Use the standard Tauri global-shortcut plugin
-			try {
-				await unregister(shortcut);
-			} catch {}
-			await register(shortcut, handlePluginShortcut);
-			setCurrentShortcut(shortcut);
-			setIsCurrentModifierOnly(false);
-		}
+		try {
+			await unregister(shortcut);
+		} catch {}
+		await register(shortcut, handleShortcut);
+		setCurrentShortcut(shortcut);
 	};
 
 	onMount(async () => {
 		const settings = await loadSettings();
-		await registerShortcut(settings.hotkey);
+		// Migrate: if a modifier-only hotkey was stored from a previous version, reset to default
+		let hotkey = settings.hotkey;
+		if (!isValidComboHotkey(hotkey)) {
+			hotkey = DEFAULT_HOTKEY;
+			await updateHotkey(hotkey);
+		}
+		await registerShortcut(hotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 		setAudioQuality(settings.audioQuality);
 		setIsOnboardingComplete(settings.onboardingComplete);
@@ -125,13 +107,13 @@ export default function VoiceControl() {
 		// reads to fail.
 		await emit("auth-request");
 
-		// Listen for modifier-only shortcut triggers from the Rust side
-		const unlistenModifier = await listen("modifier-shortcut-triggered", handleModifierShortcut);
-
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
-			if (newSettings.hotkey !== currentShortcut()) {
-				await registerShortcut(newSettings.hotkey);
+			const newHotkey = isValidComboHotkey(newSettings.hotkey)
+				? newSettings.hotkey
+				: DEFAULT_HOTKEY;
+			if (newHotkey !== currentShortcut()) {
+				await registerShortcut(newHotkey);
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
 			setAudioQuality(newSettings.audioQuality);
@@ -146,7 +128,6 @@ export default function VoiceControl() {
 			unlistenSettings();
 			unlistenAudio();
 			unlistenAuth();
-			unlistenModifier();
 		});
 	});
 
