@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import deeplinkDevHtml from "../templates/deeplink-dev.html" with { type: "text" };
 import deeplinkProductionHtml from "../templates/deeplink-production.html" with { type: "text" };
+import deeplinkErrorHtml from "../templates/deeplink-error.html" with { type: "text" };
 import { auth } from "../auth";
 
 export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
@@ -9,8 +10,9 @@ export const deeplinkRoutes = new Elysia().all("/deeplink", async (ctx) => {
 	});
 
 	if (!session) {
-		return new Response("No session found. Please try logging in again.", {
+		return new Response(deeplinkErrorHtml as unknown as string, {
 			status: 401,
+			headers: { "Content-Type": "text/html" },
 		});
 	}
 
