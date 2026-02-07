@@ -16,11 +16,14 @@ function Auth() {
 		setIsLoading(true);
 		capture("login_started", { provider: "google" });
 		try {
+			console.log("Starting Google login...");
 			const data = await authClient.signIn.social({
 				provider: "google",
 				callbackURL: `${API_BASE_URL}/api/deeplink`,
 				disableRedirect: true,
 			});
+
+			console.log("Auth response:", data);
 
 			if (data.error) {
 				console.error("Auth error:", data.error);
@@ -28,14 +31,13 @@ function Auth() {
 			}
 
 			if (data.data?.url) {
+				console.log("Opening URL:", data.data.url);
 				await openUrl(data.data.url);
 			} else {
 				console.error("No URL returned from auth server");
 			}
 		} catch (error) {
 			console.error("Google login failed:", error);
-		} finally {
-			setIsLoading(false);
 		}
 	};
 
@@ -80,7 +82,7 @@ function Auth() {
 						<span class="text-txt-primary font-mono text-sm uppercase tracking-wider">
 							AUTH_REQUIRED
 						</span>
-						<span class="ml-auto text-txt-muted font-mono text-xs">v0.1.0</span>
+						<span class="ml-auto text-txt-muted font-mono text-xs">v1.0.0</span>
 					</div>
 				</div>
 

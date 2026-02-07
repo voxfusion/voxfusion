@@ -4,6 +4,7 @@ import { useI18n } from "../i18n";
 import eden from "../lib/eden";
 import { capture } from "../lib/posthog";
 
+
 type DictionaryWord = {
 	id: string;
 	word: string;
@@ -62,14 +63,9 @@ export default function Dictionary() {
 	};
 
 	const handleDelete = async (id: string) => {
-		const previousWords = words();
 		capture("dictionary_word_deleted");
-		setWords(previousWords.filter((w) => w.id !== id));
-		try {
-			await eden.api.dictionary({ id }).delete();
-		} catch {
-			setWords(previousWords);
-		}
+		setWords(words().filter((w) => w.id !== id));
+		await eden.api.dictionary({ id }).delete();
 	};
 
 	const startEdit = (word: DictionaryWord) => {
@@ -86,17 +82,12 @@ export default function Dictionary() {
 		const word = editingWord().trim();
 		if (!word) return;
 
-		const previousWords = words();
 		capture("dictionary_word_edited");
-		setWords(previousWords.map((w) => (w.id === id ? { ...w, word } : w)));
+		setWords(words().map((w) => (w.id === id ? { ...w, word } : w)));
 		setEditingId(null);
 		setEditingWord("");
 
-		try {
-			await eden.api.dictionary({ id }).patch({ word });
-		} catch {
-			setWords(previousWords);
-		}
+		await eden.api.dictionary({ id }).patch({ word });
 	};
 
 	const handleEditKeyDown = (e: KeyboardEvent, id: string) => {

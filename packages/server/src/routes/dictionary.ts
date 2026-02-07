@@ -1,13 +1,29 @@
 import { and, desc, eq } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
-import { requireAuth } from "../middleware/auth";
+import { auth } from "../auth";
 import { db } from "../providers/db";
 import { dictionaryWords } from "../providers/db/schema";
 
+type Session = {
+	user: {
+		id: string;
+		email: string;
+		name?: string | null;
+	};
+};
+
 export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
-	.use(requireAuth)
+	.derive(async ({ request }) => {
+		const session = await auth.api.getSession({
+			headers: request.headers,
+		});
+		if (!session?.user) {
+			return status(401, { error: "Unauthorized" });
+		}
+		return { session };
+	})
 	.get("/", async (ctx) => {
-		const session = (ctx as any).userSession;
+		const session = (ctx as any).session as Session;
 		const words = await db
 			.select()
 			.from(dictionaryWords)
@@ -19,7 +35,7 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 	.post(
 		"/",
 		async (ctx) => {
-			const session = (ctx as any).userSession;
+			const session = (ctx as any).session as Session;
 			const { word } = ctx.body;
 
 			const id = crypto.randomUUID();
@@ -43,7 +59,7 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 	.patch(
 		"/:id",
 		async (ctx) => {
-			const session = (ctx as any).userSession;
+			const session = (ctx as any).session as Session;
 			const { id } = ctx.params;
 			const { word } = ctx.body;
 
@@ -77,7 +93,7 @@ export const dictionaryRoutes = new Elysia({ prefix: "/dictionary" })
 	.delete(
 		"/:id",
 		async (ctx) => {
-			const session = (ctx as any).userSession;
+			const session = (ctx as any).session as Session;
 			const { id } = ctx.params;
 
 			await db

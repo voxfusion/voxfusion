@@ -1,13 +1,10 @@
 import { onMount } from "solid-js";
 import TranscriptionList from "../components/TranscriptionList";
 import { useI18n } from "../i18n";
-import { hotkeyDisplayName } from "../lib/hotkeyUtils";
 import { capture } from "../lib/posthog";
-import { useSettings } from "../lib/settingsStore";
 
 export default function Home() {
 	const [t] = useI18n();
-	const settings = useSettings();
 
 	onMount(() => {
 		capture("$pageview", { $current_url: "/" });
@@ -27,9 +24,7 @@ export default function Home() {
 				</div>
 
 				{/* Subtitle */}
-				<p class="text-txt-muted font-mono text-xs mb-8">
-					{t("home.pressToRecord", { hotkey: hotkeyDisplayName(settings().hotkey) })}
-				</p>
+				<p class="text-txt-muted font-mono text-xs mb-8">{t("home.pressToRecord")}</p>
 
 				<TranscriptionList />
 			</div>

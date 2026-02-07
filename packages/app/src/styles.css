@@ -115,9 +115,3 @@ body {
 .animate-slide {
 	animation: slide 1.5s ease-in-out infinite;
 }
-
-.grid-overlay {
-	background-image: linear-gradient(var(--color-grid-line) 1px, transparent 1px),
-		linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px);
-	background-size: 40px 40px;
-}

@@ -1,19 +1,6 @@
 import { Elysia, status } from "elysia";
 import { auth } from "../auth";
 
-export type AuthSession = {
-	user: {
-		id: string;
-		email: string;
-		name?: string | null;
-	};
-	session: {
-		id: string;
-		token: string;
-		expiresAt: Date;
-	};
-};
-
 export const requireAuth = new Elysia({ name: "requireAuth" }).derive(async ({ request }) => {
 	const session = await auth.api.getSession({
 		headers: request.headers,
@@ -21,5 +8,5 @@ export const requireAuth = new Elysia({ name: "requireAuth" }).derive(async ({ r
 	if (!session?.user) {
 		return status(401, { error: "Unauthorized" });
 	}
-	return { userSession: session as unknown as AuthSession };
+	return { session };
 });

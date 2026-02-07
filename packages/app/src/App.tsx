@@ -8,8 +8,8 @@ import { type ParentProps, Show, createEffect, createSignal, onCleanup, onMount 
 import appIcon from "../src-tauri/icons/icon.svg";
 import tauriconf from "../src-tauri/tauri.conf.json";
 import Auth from "./components/Auth";
+import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
-import Sidebar from "./components/Sidebar";
 import UpdateNotification from "./components/UpdateNotification";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
 import { authClient } from "./lib/authClient";
@@ -50,10 +50,12 @@ const handleDeepLinkUrls = async (urls: string[]) => {
 	for (const urlString of urls) {
 		try {
 			const url = new URL(urlString);
+			console.log(url);
 			const token = url.searchParams.get("token");
 
 			if (token) {
 				await tokenManager.storeToken(token);
+				console.log("freshawait tokenManager.getToken()", await tokenManager.getToken());
 				await authClient.useSession.get().refetch();
 
 				break;
@@ -72,6 +74,7 @@ function App(props: ParentProps) {
 	const [isSessionChecked, setIsSessionChecked] = createSignal(false);
 
 	createEffect(() => {
+		console.log("session", session());
 		const s = session();
 		if (s?.data?.user) {
 			identifyUser(s.data.user.id, {
@@ -95,6 +98,7 @@ function App(props: ParentProps) {
 
 		try {
 			const storedToken = await tokenManager.getToken();
+			console.log("storedToken", storedToken);
 			if (storedToken) {
 				await authClient.useSession.get().refetch();
 			}
@@ -114,6 +118,7 @@ function App(props: ParentProps) {
 
 		const initialUrls = await getCurrent();
 		if (initialUrls) {
+			console.log("initialUrls", initialUrls);
 			await handleDeepLinkUrls(initialUrls);
 		}
 
@@ -187,7 +192,13 @@ function App(props: ParentProps) {
 	return (
 		<div class="relative min-h-screen h-full w-full bg-th-base transition-colors">
 			{/* Grid overlay pattern */}
-			<div class="pointer-events-none absolute inset-0 z-0 grid-overlay" />
+			<div
+				class="pointer-events-none absolute inset-0 z-0"
+				style={{
+					"background-image": `linear-gradient(var(--color-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px)`,
+					"background-size": "40px 40px",
+				}}
+			/>
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 			<Show when={!isSessionChecked() || session()?.isPending}>
 				<div class="h-full flex flex-col items-center justify-center">

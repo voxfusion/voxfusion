@@ -165,7 +165,7 @@ export async function updateAudioQuality(quality: AudioQuality): Promise<void> {
 	await emit("settings-changed");
 }
 
-export function applyTheme(theme: Theme): void {
+function applyTheme(theme: Theme): void {
 	const root = document.documentElement;
 
 	if (theme === "system") {

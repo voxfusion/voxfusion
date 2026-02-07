@@ -24,6 +24,8 @@
 	"dependencies": {
 		"@elysiajs/eden": "^1.4.6",
 		"better-auth": "^1.4.9",
-		"groq-sdk": "^0.37.0"
+		"groq-sdk": "^0.37.0",
+		"neverthrow": "^8.2.0",
+		"zod": "^4.2.1"
 	}
 }
