@@ -10,302 +10,150 @@ const t = useTranslations(lang);
 ---
 
 <footer class="footer">
-	<div class="container">
-		<div class="footer-main">
-			<div class="footer-brand">
-				<a href="/" class="footer-logo">
-					<svg width="32" height="32" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-						<defs>
-							<linearGradient id="logo-wg-ft" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF6B4A"/><stop offset="50%" stop-color="#E55A3A"/><stop offset="100%" stop-color="#14919B"/></linearGradient>
-							<linearGradient id="logo-wg2-ft" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF8C69"/><stop offset="100%" stop-color="#1DB9C3"/></linearGradient>
-							<linearGradient id="logo-wg3-ft" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#1DB9C3"/><stop offset="100%" stop-color="#14919B"/></linearGradient>
-						</defs>
-						<rect x="5" y="5" width="190" height="190" rx="38" ry="38" fill="#0A1628"/>
-						<rect x="25" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3-ft)" opacity="0.7"/>
-						<rect x="42" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2-ft)" opacity="0.8"/>
-						<rect x="59" y="70" width="8" height="55" rx="4" fill="url(#logo-wg-ft)" opacity="0.9"/>
-						<rect x="76" y="85" width="8" height="60" rx="4" fill="url(#logo-wg-ft)"/>
-						<rect x="96" y="110" width="8" height="55" rx="4" fill="url(#logo-wg-ft)"/>
-						<rect x="116" y="85" width="8" height="60" rx="4" fill="url(#logo-wg-ft)"/>
-						<rect x="133" y="70" width="8" height="55" rx="4" fill="url(#logo-wg-ft)" opacity="0.9"/>
-						<rect x="150" y="55" width="8" height="50" rx="4" fill="url(#logo-wg2-ft)" opacity="0.8"/>
-						<rect x="167" y="45" width="8" height="35" rx="4" fill="url(#logo-wg3-ft)" opacity="0.7"/>
-					</svg>
-					<span>VoxFusion</span>
-				</a>
-				<p class="footer-tagline">{t("footer.tagline")}</p>
-				<div class="footer-social">
-					<a href="#" aria-label="Twitter">
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-						</svg>
-					</a>
-					<a href="#" aria-label="GitHub">
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-						</svg>
-					</a>
-					<a href="#" aria-label="Discord">
-						<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/>
-						</svg>
-					</a>
-				</div>
-			</div>
-
-			<div class="footer-links">
-				<div class="footer-column">
-					<h4>{t("footer.product")}</h4>
-					<a href="#features">{t("nav.features")}</a>
-					<a href="#pricing">{t("nav.pricing")}</a>
-					<a href="#demo">{t("nav.demo")}</a>
-					<a href="#">{t("footer.changelog")}</a>
-				</div>
-				<div class="footer-column">
-					<h4>{t("footer.company")}</h4>
-					<a href="#">{t("footer.about")}</a>
-					<a href="#">{t("footer.blog")}</a>
-					<a href="#">{t("footer.careers")}</a>
-					<a href="mailto:hello@voxfusion.com">{t("footer.contact")}</a>
-				</div>
-				<div class="footer-column">
-					<h4>{t("footer.legal")}</h4>
-					<a href="#">{t("footer.privacy")}</a>
-					<a href="#">{t("footer.terms")}</a>
-					<a href="#">{t("footer.security")}</a>
-				</div>
-			</div>
+	<div class="footer-grid">
+		<div class="footer-brand">
+			<span class="footer-logo">[VOX<span>FUSION</span>]</span>
+			<p>{t("footer.tagline")}</p>
 		</div>
-
-		<div class="footer-bottom">
-			<p class="footer-copy">&copy; 2025 {t("footer.copyright")}</p>
-			<div class="footer-status">
-				<span class="status-dot"></span>
-				<span>{t("footer.status")}</span>
+		<div class="footer-links">
+			<div class="link-group">
+				<h4>{t("footer.product")}</h4>
+				<a href="/#features">{t("nav.features")}</a>
+				<a href="/#pricing">{t("nav.pricing")}</a>
+				<a href="/#demo">{t("nav.demo")}</a>
+				<a href="#">{t("footer.changelog")}</a>
+			</div>
+			<div class="link-group">
+				<h4>{t("footer.legal")}</h4>
+				<a href="/privacy">{t("footer.privacy")}</a>
+				<a href="/terms">{t("footer.terms")}</a>
+				<a href="/security">{t("footer.security")}</a>
 			</div>
 		</div>
 	</div>
-
-	<div class="footer-waveform">
-		<svg class="waveform-svg" viewBox="0 0 1200 80" preserveAspectRatio="none">
-			<defs>
-				<linearGradient id="footer-wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-					<stop offset="0%" stop-color="#FF6B4A" stop-opacity="0"/>
-					<stop offset="30%" stop-color="#FF6B4A" stop-opacity="0.3"/>
-					<stop offset="50%" stop-color="#FF8C69" stop-opacity="0.4"/>
-					<stop offset="70%" stop-color="#FF6B4A" stop-opacity="0.3"/>
-					<stop offset="100%" stop-color="#FF6B4A" stop-opacity="0"/>
-				</linearGradient>
-			</defs>
-			<path class="wave-line wave-1" stroke="url(#footer-wave-gradient)" fill="none" stroke-width="2">
-				<animate
-					attributeName="d"
-					dur="4s"
-					repeatCount="indefinite"
-					values="
-						M0,40 Q100,20 200,40 T400,40 T600,40 T800,40 T1000,40 T1200,40;
-						M0,40 Q100,60 200,40 T400,40 T600,40 T800,40 T1000,40 T1200,40;
-						M0,40 Q100,20 200,40 T400,40 T600,40 T800,40 T1000,40 T1200,40
-					"
-				/>
-			</path>
-			<path class="wave-line wave-2" stroke="url(#footer-wave-gradient)" fill="none" stroke-width="1.5" opacity="0.5">
-				<animate
-					attributeName="d"
-					dur="5s"
-					repeatCount="indefinite"
-					values="
-						M0,40 Q150,25 300,40 T600,40 T900,40 T1200,40;
-						M0,40 Q150,55 300,40 T600,40 T900,40 T1200,40;
-						M0,40 Q150,25 300,40 T600,40 T900,40 T1200,40
-					"
-				/>
-			</path>
-			<path class="wave-line wave-3" stroke="url(#footer-wave-gradient)" fill="none" stroke-width="1" opacity="0.3">
-				<animate
-					attributeName="d"
-					dur="6s"
-					repeatCount="indefinite"
-					values="
-						M0,40 Q200,30 400,40 T800,40 T1200,40;
-						M0,40 Q200,50 400,40 T800,40 T1200,40;
-						M0,40 Q200,30 400,40 T800,40 T1200,40
-					"
-				/>
-			</path>
-		</svg>
+	<div class="footer-bottom">
+		<span>&copy; 2025 {t("footer.copyright")}</span>
+		<span class="footer-status"><span class="status-dot"></span> {t("footer.status")}</span>
 	</div>
 </footer>
 
 <style>
 	.footer {
-		position: relative;
-		background: var(--color-bg);
-		padding-top: 48px;
-		padding-bottom: 100px;
+		border-top: 1px solid #222;
+		padding: 60px 32px 40px;
+		max-width: 1400px;
+		margin: 0 auto;
+		font-family: "JetBrains Mono", "Space Mono", monospace;
 	}
 
-	.footer-main {
+	.footer a {
+		text-decoration: none;
+		color: inherit;
+	}
+
+	.footer-grid {
 		display: grid;
 		grid-template-columns: 1fr 2fr;
 		gap: 80px;
-		padding-bottom: 48px;
-		border-bottom: 1px solid var(--color-border);
-	}
-
-	.footer-brand {
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
+		margin-bottom: 48px;
 	}
 
 	.footer-logo {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		font-size: 20px;
+		font-size: 18px;
 		font-weight: 700;
+		letter-spacing: 0.1em;
 	}
 
-	.footer-tagline {
-		font-size: 15px;
-		color: var(--color-text-secondary);
+	.footer-logo span {
+		color: #666;
+	}
+
+	.footer-brand p {
+		font-size: 13px;
+		color: #666;
+		margin-top: 16px;
 		line-height: 1.6;
 	}
 
-	.footer-social {
+	.social-links {
 		display: flex;
-		align-items: center;
 		gap: 16px;
-		margin-top: 8px;
+		margin-top: 24px;
 	}
 
-	.footer-social a {
+	.social-links a {
+		width: 36px;
+		height: 36px;
+		border: 1px solid #333;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 40px;
-		height: 40px;
-		border-radius: 10px;
-		background: var(--color-bg-card);
-		color: var(--color-text-secondary);
-		transition: all 0.2s ease;
+		font-size: 11px;
+		color: #666;
+		transition: all 0.2s;
 	}
 
-	.footer-social a:hover {
-		background: var(--color-primary);
-		color: white;
-		transform: translateY(-2px);
+	.social-links a:hover {
+		border-color: #ff3e00;
+		color: #ff3e00;
 	}
 
 	.footer-links {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 48px;
-	}
-
-	.footer-column {
 		display: flex;
-		flex-direction: column;
-		gap: 16px;
+		justify-content: flex-end;
+		gap: 40px;
 	}
 
-	.footer-column h4 {
-		font-size: 14px;
-		font-weight: 600;
-		color: var(--color-text);
+	.link-group h4 {
+		font-size: 11px;
+		color: #666;
 		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		margin-bottom: 4px;
+		letter-spacing: 0.1em;
+		margin-bottom: 20px;
 	}
 
-	.footer-column a {
-		font-size: 15px;
-		color: var(--color-text-secondary);
-		transition: color 0.2s ease;
+	.link-group a {
+		display: block;
+		font-size: 13px;
+		color: #888;
+		margin-bottom: 12px;
+		transition: color 0.2s;
 	}
 
-	.footer-column a:hover {
-		color: var(--color-primary);
+	.link-group a:hover {
+		color: #ff3e00;
 	}
 
 	.footer-bottom {
 		display: flex;
-		align-items: center;
 		justify-content: space-between;
-		padding: 24px 0;
-	}
-
-	.footer-copy {
-		font-size: 14px;
-		color: var(--color-text-muted);
+		padding-top: 24px;
+		border-top: 1px solid #222;
+		font-size: 12px;
+		color: #666;
 	}
 
 	.footer-status {
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		font-size: 13px;
-		color: var(--color-text-muted);
 	}
 
 	.status-dot {
 		width: 8px;
 		height: 8px;
+		background: #00ff88;
 		border-radius: 50%;
-		background: #22c55e;
-		animation: status-pulse 2s ease-in-out infinite;
 	}
 
-	@keyframes status-pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.5; }
-	}
-
-	.footer-waveform {
-		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		height: 80px;
-		pointer-events: none;
-	}
-
-	.waveform-svg {
-		width: 100%;
-		height: 100%;
-	}
-
-	@media (max-width: 900px) {
-		.footer-main {
+	@media (max-width: 768px) {
+		.footer-grid {
 			grid-template-columns: 1fr;
 			gap: 48px;
 		}
 
 		.footer-links {
-			grid-template-columns: repeat(3, 1fr);
-		}
-	}
-
-	@media (max-width: 600px) {
-		.footer {
-			padding-top: 32px;
-			padding-bottom: 80px;
-		}
-
-		.footer-links {
 			grid-template-columns: repeat(2, 1fr);
-			gap: 32px;
-		}
-
-		.footer-bottom {
-			flex-direction: column;
-			gap: 16px;
-			text-align: center;
-		}
-
-		.footer-waveform {
-			height: 60px;
 		}
 	}
 </style>

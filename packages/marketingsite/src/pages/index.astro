@@ -7,6 +7,7 @@
  * Think concrete architecture meets command-line interfaces.
  */
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
+import Footer from "../components/Footer.astro";
 import YandexMetrika from "../components/YandexMetrika.astro";
 
 const lang = defaultLang;
@@ -102,18 +103,18 @@ const t = useTranslations(lang);
 		</div>
 		<div class="hero-stats">
 			<div class="stat">
-				<span class="stat-value">25K</span>
-				<span class="stat-label">words/month FREE</span>
+				<span class="stat-value">{t("hero.stat.words.value")}</span>
+				<span class="stat-label">{t("hero.stat.words.label")}</span>
 			</div>
 			<div class="stat-divider">/</div>
 			<div class="stat">
-				<span class="stat-value">2</span>
-				<span class="stat-label">languages</span>
+				<span class="stat-value">{t("hero.stat.languages.value")}</span>
+				<span class="stat-label">{t("hero.stat.languages.label")}</span>
 			</div>
 			<div class="stat-divider">/</div>
 			<div class="stat">
-				<span class="stat-value">∞</span>
-				<span class="stat-label">applications</span>
+				<span class="stat-value">{t("hero.stat.apps.value")}</span>
+				<span class="stat-label">{t("hero.stat.apps.label")}</span>
 			</div>
 		</div>
 	</header>
@@ -300,45 +301,7 @@ const t = useTranslations(lang);
 		</div>
 	</section>
 
-	<footer class="footer">
-		<div class="footer-grid">
-			<div class="footer-brand">
-				<span class="footer-logo">[VOX<span>FUSION</span>]</span>
-				<p>{t("footer.tagline")}</p>
-				<div class="social-links">
-					<a href="#">X</a>
-					<a href="#">GH</a>
-					<a href="#">DC</a>
-				</div>
-			</div>
-			<div class="footer-links">
-				<div class="link-group">
-					<h4>{t("footer.product")}</h4>
-					<a href="#features">{t("nav.features")}</a>
-					<a href="#pricing">{t("nav.pricing")}</a>
-					<a href="#demo">{t("nav.demo")}</a>
-					<a href="#">{t("footer.changelog")}</a>
-				</div>
-				<div class="link-group">
-					<h4>{t("footer.company")}</h4>
-					<a href="#">{t("footer.about")}</a>
-					<a href="#">{t("footer.blog")}</a>
-					<a href="#">{t("footer.careers")}</a>
-					<a href="mailto:hello@voxfusion.com">{t("footer.contact")}</a>
-				</div>
-				<div class="link-group">
-					<h4>{t("footer.legal")}</h4>
-					<a href="#">{t("footer.privacy")}</a>
-					<a href="#">{t("footer.terms")}</a>
-					<a href="#">{t("footer.security")}</a>
-				</div>
-			</div>
-		</div>
-		<div class="footer-bottom">
-			<span>&copy; 2025 {t("footer.copyright")}</span>
-			<span class="status"><span class="status-dot"></span> {t("footer.status")}</span>
-		</div>
-	</footer>
+	<Footer lang={lang} />
 	<YandexMetrika />
 
 </body>
@@ -1087,109 +1050,6 @@ const t = useTranslations(lang);
 		background: #fff;
 	}
 
-	/* Footer */
-	.footer {
-		border-top: 1px solid #222;
-		padding: 60px 32px 40px;
-		max-width: 1400px;
-		margin: 0 auto;
-	}
-
-	.footer-grid {
-		display: grid;
-		grid-template-columns: 1fr 2fr;
-		gap: 80px;
-		margin-bottom: 48px;
-	}
-
-	.footer-logo {
-		font-size: 18px;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-	}
-
-	.footer-logo span {
-		color: #666;
-	}
-
-	.footer-brand p {
-		font-size: 13px;
-		color: #666;
-		margin-top: 16px;
-		line-height: 1.6;
-	}
-
-	.social-links {
-		display: flex;
-		gap: 16px;
-		margin-top: 24px;
-	}
-
-	.social-links a {
-		width: 36px;
-		height: 36px;
-		border: 1px solid #333;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 11px;
-		color: #666;
-		transition: all 0.2s;
-	}
-
-	.social-links a:hover {
-		border-color: #ff3e00;
-		color: #ff3e00;
-	}
-
-	.footer-links {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 40px;
-	}
-
-	.link-group h4 {
-		font-size: 11px;
-		color: #666;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		margin-bottom: 20px;
-	}
-
-	.link-group a {
-		display: block;
-		font-size: 13px;
-		color: #888;
-		margin-bottom: 12px;
-		transition: color 0.2s;
-	}
-
-	.link-group a:hover {
-		color: #ff3e00;
-	}
-
-	.footer-bottom {
-		display: flex;
-		justify-content: space-between;
-		padding-top: 24px;
-		border-top: 1px solid #222;
-		font-size: 12px;
-		color: #666;
-	}
-
-	.status {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.status-dot {
-		width: 8px;
-		height: 8px;
-		background: #00ff88;
-		border-radius: 50%;
-	}
-
 	/* Responsive */
 	@media (max-width: 1024px) {
 		.hero-grid {
@@ -1217,15 +1077,6 @@ const t = useTranslations(lang);
 
 		.pricing-grid {
 			grid-template-columns: 1fr;
-		}
-
-		.footer-grid {
-			grid-template-columns: 1fr;
-			gap: 48px;
-		}
-
-		.footer-links {
-			grid-template-columns: repeat(2, 1fr);
 		}
 
 		.hero-stats {

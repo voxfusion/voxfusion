@@ -48,22 +48,6 @@ const baseUrl = "https://github.com/gregor-tokarev/voxfusion-releases/releases/l
 						<span>.dmg</span>
 					</a>
 				</div>
-
-				<div class="download-card">
-					<div class="card-index">02</div>
-					<div class="card-content">
-						<h3 class="card-title">{t("downloads.macos.universal")}</h3>
-						<p class="card-description">{t("downloads.macos.universal.description")}</p>
-					</div>
-					<div class="card-terminal">
-						<span class="terminal-prompt">$</span>
-						<span class="terminal-command">download --arch=universal</span>
-					</div>
-					<a href={`${baseUrl}/VoxFusion-universal.dmg`} class="download-btn" data-ym-goal="download_dmg" data-ym-params='{"variant":"universal"}'>
-						<span class="btn-icon">↓</span>
-						<span>.dmg</span>
-					</a>
-				</div>
 			</div>
 		</div>
 
@@ -190,7 +174,7 @@ const baseUrl = "https://github.com/gregor-tokarev/voxfusion-releases/releases/l
 
 	.download-grid {
 		display: grid;
-		grid-template-columns: repeat(2, 1fr);
+		grid-template-columns: 1fr;
 		gap: 1px;
 		background: #222;
 		border: 1px solid #222;
