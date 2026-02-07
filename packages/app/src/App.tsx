@@ -13,6 +13,7 @@ import SettingsModal from "./components/SettingsModal";
 import UpdateNotification from "./components/UpdateNotification";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
 import { authClient } from "./lib/authClient";
+import { capture, identifyUser } from "./lib/posthog";
 import {
 	initSettings,
 	markOnboardingComplete,
@@ -74,6 +75,13 @@ function App(props: ParentProps) {
 
 	createEffect(() => {
 		console.log("session", session());
+		const s = session();
+		if (s?.data?.user) {
+			identifyUser(s.data.user.id, {
+				email: s.data.user.email,
+				name: s.data.user.name,
+			});
+		}
 	});
 
 	const shouldShowOnboarding = () => {
@@ -82,6 +90,8 @@ function App(props: ParentProps) {
 	};
 
 	onMount(async () => {
+		capture("app_opened");
+
 		await waitForTauriIPC();
 		await tokenManager.init();
 		await initSettings();
@@ -212,7 +222,10 @@ function App(props: ParentProps) {
 						fallback={
 							<OnboardingWizard
 								initialStep={settings().onboardingStep}
-								onComplete={() => markOnboardingComplete()}
+								onComplete={() => {
+									capture("onboarding_completed");
+									markOnboardingComplete();
+								}}
 							/>
 						}
 					>

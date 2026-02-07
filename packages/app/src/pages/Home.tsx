@@ -1,8 +1,14 @@
+import { onMount } from "solid-js";
 import TranscriptionList from "../components/TranscriptionList";
 import { useI18n } from "../i18n";
+import { capture } from "../lib/posthog";
 
 export default function Home() {
 	const [t] = useI18n();
+
+	onMount(() => {
+		capture("$pageview", { $current_url: "/" });
+	});
 
 	return (
 		<div class="min-h-screen px-6 py-8">

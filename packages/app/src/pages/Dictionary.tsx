@@ -2,6 +2,8 @@ import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import eden from "../lib/eden";
+import { capture } from "../lib/posthog";
+
 
 type DictionaryWord = {
 	id: string;
@@ -33,6 +35,7 @@ export default function Dictionary() {
 	};
 
 	onMount(() => {
+		capture("$pageview", { $current_url: "/dictionary" });
 		fetchWords();
 	});
 
@@ -44,6 +47,7 @@ export default function Dictionary() {
 		try {
 			const response = await eden.api.dictionary.post({ word });
 			if (!response.error) {
+				capture("dictionary_word_added");
 				await fetchWords();
 				setNewWord("");
 			}
@@ -59,6 +63,7 @@ export default function Dictionary() {
 	};
 
 	const handleDelete = async (id: string) => {
+		capture("dictionary_word_deleted");
 		setWords(words().filter((w) => w.id !== id));
 		await eden.api.dictionary({ id }).delete();
 	};
@@ -77,6 +82,7 @@ export default function Dictionary() {
 		const word = editingWord().trim();
 		if (!word) return;
 
+		capture("dictionary_word_edited");
 		setWords(words().map((w) => (w.id === id ? { ...w, word } : w)));
 		setEditingId(null);
 		setEditingWord("");

@@ -2,6 +2,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Check, Copy } from "lucide-solid";
 import { Show, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
+import { capture } from "../lib/posthog";
 
 type Transcription = {
 	id: string;
@@ -24,6 +25,10 @@ export default function TranscriptionCard(props: Props) {
 
 	const handleCopy = async () => {
 		await writeText(props.transcription.text);
+		capture("transcription_copied", {
+			transcription_id: props.transcription.id,
+			text_length: props.transcription.text.length,
+		});
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
 	};
