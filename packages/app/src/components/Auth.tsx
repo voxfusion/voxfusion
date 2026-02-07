@@ -1,6 +1,7 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Loader } from "lucide-solid";
-import { Show, createSignal } from "solid-js";
+import { Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import { GoogleIcon } from "../icons/GoogleIcon";
 import { API_BASE_URL, authClient } from "../lib/authClient";
@@ -11,6 +12,11 @@ function Auth() {
 	const [t] = useI18n();
 	const [devToken, setDevToken] = createSignal("");
 	const [isLoading, setIsLoading] = createSignal(false);
+	const [appVersion, setAppVersion] = createSignal("");
+
+	onMount(() => {
+		getVersion().then(setAppVersion);
+	});
 
 	const handleGoogleLogin = async () => {
 		setIsLoading(true);
@@ -82,7 +88,9 @@ function Auth() {
 						<span class="text-txt-primary font-mono text-sm uppercase tracking-wider">
 							AUTH_REQUIRED
 						</span>
-						<span class="ml-auto text-txt-muted font-mono text-xs">v1.0.0</span>
+						<Show when={appVersion()}>
+							<span class="ml-auto text-txt-muted font-mono text-xs">v{appVersion()}</span>
+						</Show>
 					</div>
 				</div>
 

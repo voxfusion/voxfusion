@@ -1,4 +1,6 @@
-import { ChevronDown, RefreshCw } from "lucide-solid";
+import { getVersion } from "@tauri-apps/api/app";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { Check, ChevronDown, Copy, RefreshCw } from "lucide-solid";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { useHotkeyRecorder } from "../hooks/useHotkeyRecorder";
 import { type Locale, useI18n } from "../i18n";
@@ -113,6 +115,15 @@ export default function SettingsModal(props: SettingsModalProps) {
 		toggleRecording: toggleHotkeyRecording,
 	} = useHotkeyRecorder();
 	const [isLoadingDevices, setIsLoadingDevices] = createSignal(false);
+	const [appVersion, setAppVersion] = createSignal<string>("");
+	const [versionCopied, setVersionCopied] = createSignal(false);
+
+	const handleCopyVersion = async () => {
+		if (versionCopied()) return;
+		await writeText(appVersion());
+		setVersionCopied(true);
+		setTimeout(() => setVersionCopied(false), 1500);
+	};
 
 	const fetchAudioDevices = async () => {
 		setIsLoadingDevices(true);
@@ -129,6 +140,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 	createEffect(() => {
 		if (props.isOpen) {
 			fetchAudioDevices();
+			getVersion().then(setAppVersion);
 		}
 	});
 
@@ -214,6 +226,25 @@ export default function SettingsModal(props: SettingsModalProps) {
 								)}
 							</For>
 						</nav>
+						<Show when={appVersion()}>
+							<div class="px-4 py-3 border-t border-border">
+								<button
+									type="button"
+									onClick={handleCopyVersion}
+									class="group flex items-center gap-1.5 font-mono text-[10px] text-txt-faint hover:text-txt-muted transition-all active:scale-95 cursor-pointer"
+								>
+									<span>v{appVersion()}</span>
+									<Show
+										when={versionCopied()}
+										fallback={
+											<Copy class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+										}
+									>
+										<Check class="w-3 h-3 text-ac" />
+									</Show>
+								</button>
+							</div>
+						</Show>
 					</div>
 
 					{/* Content */}
