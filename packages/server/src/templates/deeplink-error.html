@@ -3,19 +3,24 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<title>VoxFusion — Auth Redirect (Dev)</title>
+	<title>VoxFusion — Auth Error</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet" />
 	<style>
 		@keyframes blink {
 			0%, 50% { opacity: 1; }
 			51%, 100% { opacity: 0; }
 		}
 
-		@keyframes pulse-dot {
-			0%, 100% { opacity: 0.4; transform: scale(1); }
-			50% { opacity: 1; transform: scale(1.3); }
+		@keyframes pulse {
+			0%, 100% { opacity: 0.4; }
+			50% { opacity: 1; }
+		}
+
+		@keyframes fade-in {
+			from { opacity: 0; transform: translateY(6px); }
+			to { opacity: 1; transform: translateY(0); }
 		}
 
 		@keyframes scanline-move {
@@ -23,14 +28,11 @@
 			100% { top: 100%; }
 		}
 
-		@keyframes fade-in {
-			from { opacity: 0; transform: translateY(8px); }
-			to { opacity: 1; transform: translateY(0); }
-		}
-
-		@keyframes spin {
-			from { transform: rotate(0deg); }
-			to { transform: rotate(360deg); }
+		@keyframes glitch {
+			0%, 100% { transform: translateX(0); opacity: 0; }
+			10% { transform: translateX(var(--offset)); opacity: 0.4; }
+			20% { transform: translateX(calc(var(--offset) * -0.5)); opacity: 0.2; }
+			30% { transform: translateX(0); opacity: 0; }
 		}
 
 		* {
@@ -54,7 +56,6 @@
 			overflow: hidden;
 		}
 
-		/* Grid overlay */
 		.grid-overlay {
 			position: fixed;
 			inset: 0;
@@ -66,7 +67,6 @@
 			z-index: 0;
 		}
 
-		/* Scanline */
 		.scanline {
 			position: fixed;
 			inset: 0;
@@ -85,7 +85,6 @@
 			animation: scanline-move 4s linear infinite;
 		}
 
-		/* Nav */
 		.nav {
 			position: fixed;
 			top: 0;
@@ -103,7 +102,6 @@
 			padding: 16px 32px;
 			display: flex;
 			align-items: center;
-			justify-content: space-between;
 		}
 
 		.logo {
@@ -117,25 +115,6 @@
 		.logo-bracket { color: #ff3e00; }
 		.logo-accent { color: #666; }
 
-		.nav-status {
-			display: flex;
-			align-items: center;
-			gap: 8px;
-			font-size: 11px;
-			color: #666;
-			text-transform: uppercase;
-			letter-spacing: 0.08em;
-		}
-
-		.nav-status-dot {
-			width: 6px;
-			height: 6px;
-			background: #00ff88;
-			border-radius: 50%;
-			animation: pulse-dot 2s ease-in-out infinite;
-		}
-
-		/* Main */
 		.main {
 			flex: 1;
 			display: flex;
@@ -147,12 +126,12 @@
 		}
 
 		.container {
-			max-width: 520px;
+			max-width: 480px;
 			width: 100%;
+			position: relative;
 			animation: fade-in 0.4s ease-out;
 		}
 
-		/* Terminal block */
 		.terminal {
 			border: 1px solid #333;
 			background: #111;
@@ -202,75 +181,54 @@
 		.prompt { color: #ff3e00; }
 		.command { color: #fff; }
 		.output { color: #666; }
-
-		.status-ok { color: #00ff88; }
-		.status-tag {
-			color: #ff3e00;
-		}
+		.status-tag { color: #ff3e00; }
+		.status-err { color: #ff3e00; animation: pulse 2s ease-in-out infinite; }
 
 		.cursor {
 			animation: blink 1s infinite;
 			color: #ff3e00;
 		}
 
-		.timestamp-line {
+		.timestamp {
 			font-size: 11px;
 			color: #444;
 		}
 
-		/* Content section */
 		.content {
 			border: 1px solid #333;
 			border-top: 0;
 			background: #0a0a0a;
 			padding: 32px 24px;
+			text-align: center;
 		}
 
-		.section-label {
+		.error-code {
+			font-size: clamp(48px, 10vw, 72px);
+			font-weight: 800;
+			line-height: 1;
+			color: transparent;
+			-webkit-text-stroke: 2px #ff3e00;
+			letter-spacing: -0.04em;
+			margin-bottom: 20px;
+		}
+
+		.error-title {
 			font-size: 11px;
+			font-weight: 700;
 			text-transform: uppercase;
-			letter-spacing: 0.15em;
-			color: #555;
-			margin-bottom: 6px;
-		}
-
-		.section-value {
-			font-size: 14px;
-			color: #e0e0e0;
-			margin-bottom: 24px;
-		}
-
-		.section-value .accent { color: #ff3e00; }
-
-		/* Spinner */
-		.spinner-row {
-			display: flex;
-			align-items: center;
-			gap: 12px;
-			margin-bottom: 24px;
-		}
-
-		.spinner {
-			width: 16px;
-			height: 16px;
-			border: 2px solid #333;
-			border-top-color: #ff3e00;
-			border-radius: 50%;
-			animation: spin 0.8s linear infinite;
-			flex-shrink: 0;
-		}
-
-		.spinner-text {
-			font-size: 13px;
+			letter-spacing: 0.2em;
 			color: #888;
+			margin-bottom: 12px;
 		}
 
-		.spinner-text .countdown {
-			color: #ff3e00;
-			font-weight: 600;
+		.error-description {
+			font-size: 13px;
+			color: #555;
+			line-height: 1.7;
+			max-width: 360px;
+			margin: 0 auto 28px;
 		}
 
-		/* Buttons */
 		.btn {
 			display: block;
 			width: 100%;
@@ -294,77 +252,12 @@
 			color: #0a0a0a;
 		}
 
-		.btn-row {
-			margin-top: 12px;
-		}
-
-		/* Dev section */
-		.dev-section {
-			border-top: 1px solid #222;
-			margin-top: 24px;
-			padding-top: 20px;
-		}
-
-		.dev-label {
-			font-size: 11px;
-			text-transform: uppercase;
-			letter-spacing: 0.12em;
-			color: #555;
-			margin-bottom: 4px;
-		}
-
-		.dev-hint {
-			font-size: 12px;
-			color: #444;
-			margin-bottom: 16px;
-		}
-
-		.dev-hint .accent { color: #ff3e00; }
-
-		.btn-ghost {
-			display: block;
-			width: 100%;
-			padding: 12px 24px;
-			font-family: "JetBrains Mono", monospace;
-			font-size: 12px;
-			font-weight: 500;
-			text-transform: uppercase;
-			letter-spacing: 0.1em;
-			text-decoration: none;
-			text-align: center;
-			cursor: pointer;
-			border: 1px solid #333;
-			background: transparent;
-			color: #888;
-			transition: all 0.15s ease;
-		}
-
-		.btn-ghost:hover {
-			border-color: #ff3e00;
-			color: #ff3e00;
-		}
-
-		.copy-success {
-			display: none;
-			align-items: center;
-			justify-content: center;
-			gap: 8px;
-			margin-top: 12px;
-			font-size: 12px;
-			color: #00ff88;
-		}
-
-		.copy-success.visible { display: flex; }
-
-		/* Footer bar */
 		.footer {
 			border: 1px solid #333;
 			border-top: 0;
 			background: #0a0a0a;
 			padding: 10px 16px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
+			text-align: center;
 		}
 
 		.footer-text {
@@ -379,7 +272,26 @@
 			color: #ff3e00;
 		}
 
-		/* Bottom footer */
+		/* Glitch lines */
+		.glitch-lines {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			overflow: hidden;
+		}
+
+		.glitch-line {
+			position: absolute;
+			top: 50%;
+			left: -10%;
+			right: -10%;
+			height: 2px;
+			background: linear-gradient(90deg, transparent, #ff3e00, transparent);
+			opacity: 0;
+			animation: glitch 5s ease-in-out infinite;
+			animation-delay: var(--delay);
+		}
+
 		.page-footer {
 			border-top: 1px solid #222;
 			padding: 20px 32px;
@@ -405,11 +317,11 @@
 		.page-footer-dot {
 			width: 6px;
 			height: 6px;
-			background: #00ff88;
+			background: #ff3e00;
 			border-radius: 50%;
+			animation: pulse 2s ease-in-out infinite;
 		}
 
-		/* Responsive */
 		@media (max-width: 600px) {
 			.main { padding: 80px 16px 40px; }
 			.nav-inner { padding: 14px 20px; }
@@ -418,33 +330,6 @@
 			.page-footer-inner { flex-direction: column; gap: 8px; align-items: center; }
 		}
 	</style>
-	<script>
-		var countdown = 3;
-		function tick() {
-			countdown--;
-			var el = document.getElementById('countdown');
-			if (el) el.textContent = countdown;
-			if (countdown <= 0) {
-				window.location.href = "{{DEEP_LINK}}";
-			} else {
-				setTimeout(tick, 1000);
-			}
-		}
-		setTimeout(tick, 1000);
-
-		function copyToken() {
-			navigator.clipboard.writeText("{{SESSION_TOKEN}}").then(function() {
-				var btn = document.getElementById('copyBtn');
-				var msg = document.getElementById('copySuccess');
-				btn.textContent = '> Copied';
-				msg.classList.add('visible');
-				setTimeout(function() {
-					btn.textContent = '> Copy session token';
-					msg.classList.remove('visible');
-				}, 2500);
-			});
-		}
-	</script>
 </head>
 <body>
 	<div class="grid-overlay"></div>
@@ -455,16 +340,11 @@
 			<a href="/" class="logo">
 				<span class="logo-bracket">[</span>VOX<span class="logo-accent">FUSION</span><span class="logo-bracket">]</span>
 			</a>
-			<div class="nav-status">
-				<span class="nav-status-dot"></span>
-				<span>Dev mode</span>
-			</div>
 		</div>
 	</nav>
 
 	<main class="main">
 		<div class="container">
-			<!-- Terminal -->
 			<div class="terminal">
 				<div class="terminal-header">
 					<span class="terminal-path"><span class="terminal-path-accent">~</span> auth/deeplink</span>
@@ -478,14 +358,10 @@
 						<span class="command">auth --verify-session</span>
 					</div>
 					<div class="terminal-line output">
-						<span class="status-tag">[OK]</span>&nbsp;
-						<span class="status-ok">SESSION_VALID</span>
+						<span class="status-tag">[ERROR]</span>&nbsp;
+						<span class="status-err">NO_SESSION_FOUND</span>
 					</div>
-					<div class="terminal-line output">
-						<span class="status-tag">[INFO]</span>&nbsp;
-						<span>Redirecting to desktop client...</span>
-					</div>
-					<div class="terminal-line output timestamp-line">
+					<div class="terminal-line output timestamp">
 						<span>[<script>document.write(new Date().toISOString().slice(0,19).replace('T',' '))</script>]</span>
 					</div>
 					<div class="terminal-line">
@@ -495,38 +371,25 @@
 				</div>
 			</div>
 
-			<!-- Content -->
 			<div class="content">
-				<p class="section-label">// Status</p>
-				<p class="section-value">
-					<span class="accent">&gt;</span> Authentication successful
+				<div class="error-code">401</div>
+				<h1 class="error-title">Session not found</h1>
+				<p class="error-description">
+					Your session has expired or is invalid. Please try logging in again from the desktop app.
 				</p>
-
-				<div class="spinner-row">
-					<div class="spinner"></div>
-					<p class="spinner-text">Opening VoxFusion in <span class="countdown" id="countdown">3</span>s</p>
-				</div>
-
-				<a href="{{DEEP_LINK}}" class="btn">
-					&gt; Open VoxFusion app
+				<a href="/" class="btn">
+					&larr; Return to VoxFusion
 				</a>
-
-				<!-- Dev tools -->
-				<div class="dev-section">
-					<p class="dev-label">// Dev_mode</p>
-					<p class="dev-hint"><span class="accent">&gt;</span> If the app doesn't open, copy the token manually</p>
-					<button type="button" onclick="copyToken()" id="copyBtn" class="btn-ghost">
-						&gt; Copy session token
-					</button>
-					<div id="copySuccess" class="copy-success">
-						<span>&#10003;</span> Token copied to clipboard
-					</div>
-				</div>
 			</div>
 
-			<!-- Footer bar -->
 			<div class="footer">
-				<span class="footer-text">Awaiting redirect<span class="footer-cursor">_</span></span>
+				<span class="footer-text">Auth failed<span class="footer-cursor">_</span></span>
+			</div>
+
+			<div class="glitch-lines">
+				<div class="glitch-line" style="--delay: 0s; --offset: 12px"></div>
+				<div class="glitch-line" style="--delay: 0.3s; --offset: -8px"></div>
+				<div class="glitch-line" style="--delay: 0.6s; --offset: 15px"></div>
 			</div>
 		</div>
 	</main>
@@ -534,7 +397,7 @@
 	<footer class="page-footer">
 		<div class="page-footer-inner">
 			<span>&copy; 2025 VoxFusion</span>
-			<span class="page-footer-status"><span class="page-footer-dot"></span> All systems operational</span>
+			<span class="page-footer-status"><span class="page-footer-dot"></span> Auth error</span>
 		</div>
 	</footer>
 </body>
