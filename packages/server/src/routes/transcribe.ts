@@ -88,9 +88,11 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 		if (!session?.user) {
 			return status(401, { error: "Unauthorized" });
 		}
-		return { session };
+		return {
+			session,
+			transcriptionMetadata: null as TranscriptionMetadata | null,
+		};
 	})
-	.state("transcriptionMetadata", null as TranscriptionMetadata | null)
 	.post(
 		"/",
 		async (ctx) => {
@@ -118,8 +120,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					.orderBy(desc(dictionaryWords.updatedAt))
 					.limit(50);
 
-				let prompt =
-					"";
+				let prompt = "";
 				if (userWords.length > 0) {
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
@@ -141,12 +142,13 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				const transcriptionText = transcription.text.trim();
 				const wordCount = countWords(transcriptionText);
 
-				ctx.store.transcriptionMetadata = {
+				(ctx as any).transcriptionMetadata = {
 					text: transcriptionText,
 					wordCount,
 					processingTimeMs,
 					fileBuffer,
 				};
+
 				const wordsUsedAfter = wordsUsedBefore + wordCount;
 				return {
 					text: transcriptionText,
@@ -170,7 +172,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			}),
 			afterResponse: async (ctx) => {
 				const session = (ctx as any).session as Session | undefined;
-				const metadata = ctx.store.transcriptionMetadata;
+				const metadata = (ctx as any).transcriptionMetadata as TranscriptionMetadata | null;
 
 				if (!session || !metadata) {
 					return;
