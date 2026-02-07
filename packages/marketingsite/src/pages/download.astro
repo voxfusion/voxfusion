@@ -1,6 +1,7 @@
 ---
 import Downloads from "../components/Downloads.astro";
 import Footer from "../components/Footer.astro";
+import YandexMetrika from "../components/YandexMetrika.astro";
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
 
 const lang = defaultLang;
@@ -48,6 +49,7 @@ const t = useTranslations(lang);
 
 	<Downloads lang={lang} />
 	<Footer lang={lang} />
+	<YandexMetrika />
 </body>
 </html>
 
