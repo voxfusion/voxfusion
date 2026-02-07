@@ -3,6 +3,7 @@ import { Loader } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import eden from "../lib/eden";
+import { capture } from "../lib/posthog";
 import TranscriptionCard from "./TranscriptionCard";
 
 type Transcription = {
@@ -123,6 +124,7 @@ export default function TranscriptionList() {
 		fetchTranscriptions();
 
 		unlisten = await listen("transcription-created", () => {
+			capture("transcription_created");
 			fetchTranscriptions();
 		});
 	});

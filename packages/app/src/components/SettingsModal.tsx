@@ -3,6 +3,7 @@ import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { useHotkeyRecorder } from "../hooks/useHotkeyRecorder";
 import { type Locale, useI18n } from "../i18n";
 import { hotkeyDisplayName } from "../lib/hotkeyUtils";
+import { capture } from "../lib/posthog";
 import {
 	type AudioDevice,
 	type AudioQuality,
@@ -258,6 +259,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 											value={settings().selectedMicrophoneId ?? "default"}
 											options={microphoneOptions()}
 											onChange={(value) => {
+												capture("settings_microphone_changed");
 												updateMicrophone(value === "default" ? null : value);
 											}}
 										/>
@@ -277,21 +279,30 @@ export default function SettingsModal(props: SettingsModalProps) {
 												label={t("settings.audioQualityHigh")}
 												description={t("settings.audioQualityHighDescription")}
 												isSelected={settings().audioQuality === "high"}
-												onClick={() => updateAudioQuality("high")}
+												onClick={() => {
+													capture("settings_audio_quality_changed", { quality: "high" });
+													updateAudioQuality("high");
+												}}
 											/>
 											<QualityOption
 												value="medium"
 												label={t("settings.audioQualityMedium")}
 												description={t("settings.audioQualityMediumDescription")}
 												isSelected={settings().audioQuality === "medium"}
-												onClick={() => updateAudioQuality("medium")}
+												onClick={() => {
+													capture("settings_audio_quality_changed", { quality: "medium" });
+													updateAudioQuality("medium");
+												}}
 											/>
 											<QualityOption
 												value="low"
 												label={t("settings.audioQualityLow")}
 												description={t("settings.audioQualityLowDescription")}
 												isSelected={settings().audioQuality === "low"}
-												onClick={() => updateAudioQuality("low")}
+												onClick={() => {
+													capture("settings_audio_quality_changed", { quality: "low" });
+													updateAudioQuality("low");
+												}}
 											/>
 										</div>
 										<p class="mt-3 font-mono text-xs text-txt-faint">
@@ -351,19 +362,28 @@ export default function SettingsModal(props: SettingsModalProps) {
 												value="light"
 												label="LIGHT"
 												isSelected={settings().theme === "light"}
-												onClick={() => updateTheme("light")}
+												onClick={() => {
+													capture("settings_theme_changed", { theme: "light" });
+													updateTheme("light");
+												}}
 											/>
 											<ThemeOption
 												value="dark"
 												label="DARK"
 												isSelected={settings().theme === "dark"}
-												onClick={() => updateTheme("dark")}
+												onClick={() => {
+													capture("settings_theme_changed", { theme: "dark" });
+													updateTheme("dark");
+												}}
 											/>
 											<ThemeOption
 												value="system"
 												label="SYSTEM"
 												isSelected={settings().theme === "system"}
-												onClick={() => updateTheme("system")}
+												onClick={() => {
+													capture("settings_theme_changed", { theme: "system" });
+													updateTheme("system");
+												}}
 											/>
 										</div>
 									</div>
@@ -381,6 +401,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 											value={locale()}
 											options={languageOptions}
 											onChange={(value) => {
+												capture("settings_language_changed", { language: value });
 												updateLanguage(value as Locale, setLocale);
 											}}
 										/>

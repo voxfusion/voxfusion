@@ -4,6 +4,7 @@ import { Show, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
 import { GoogleIcon } from "../icons/GoogleIcon";
 import { API_BASE_URL, authClient } from "../lib/authClient";
+import { capture } from "../lib/posthog";
 import { tokenManager } from "../lib/tokenManager";
 
 function Auth() {
@@ -13,6 +14,7 @@ function Auth() {
 
 	const handleGoogleLogin = async () => {
 		setIsLoading(true);
+		capture("login_started", { provider: "google" });
 		try {
 			console.log("Starting Google login...");
 			const data = await authClient.signIn.social({

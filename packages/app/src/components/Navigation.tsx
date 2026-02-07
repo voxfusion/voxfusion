@@ -6,6 +6,7 @@ import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import { authClient } from "../lib/authClient";
 import eden from "../lib/eden";
+import { capture, resetUser } from "../lib/posthog";
 import { tokenManager } from "../lib/tokenManager";
 
 interface SidebarProps {
@@ -42,8 +43,10 @@ export default function Sidebar(props: SidebarProps) {
 	const isLimitReached = () => wordsUsed() >= wordLimit();
 
 	const handleLogout = async () => {
+		capture("logout");
 		await authClient.signOut();
 		await tokenManager.deleteToken();
+		resetUser();
 		await emit("auth-changed");
 		setIsUserMenuOpen(false);
 	};

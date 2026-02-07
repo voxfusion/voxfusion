@@ -1,5 +1,6 @@
 import { Show, createSignal } from "solid-js";
 import { useI18n } from "../../i18n";
+import { capture } from "../../lib/posthog";
 import { updateOnboardingStep } from "../../lib/settingsStore";
 import StepIndicator from "./StepIndicator";
 import AccessibilityPermissionStep from "./steps/AccessibilityPermissionStep";
@@ -28,6 +29,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 
 	const goToNext = () => {
 		if (currentStep() < TOTAL_STEPS) {
+			capture("onboarding_step_completed", { step: currentStep() });
 			setAnimationDirection("forward");
 			setIsAnimating(true);
 			setTimeout(() => {

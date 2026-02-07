@@ -6,6 +6,9 @@ import About from "./pages/About";
 import Dictionary from "./pages/Dictionary";
 import App from "./App";
 import { I18nCtx, createAppI18n, getStoredLocale } from "./i18n";
+import { initPostHog } from "./lib/posthog";
+
+initPostHog();
 
 const root = document.getElementById("root");
 
