@@ -1,3 +1,4 @@
 import { Groq } from "groq-sdk";
+import { env } from "../../env";
 
-export const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+export const groq = new Groq({ apiKey: env.GROQ_API_KEY });

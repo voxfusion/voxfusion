@@ -1,7 +1,7 @@
+import { flatten, resolveTemplate, translator } from "@solid-primitives/i18n";
 import { createContext, useContext } from "solid-js";
-import { flatten, translator, resolveTemplate } from "@solid-primitives/i18n";
 import { createSignal } from "solid-js";
-import { en, type Translations } from "./translations/en";
+import { type Translations, en } from "./translations/en";
 import { ru } from "./translations/ru";
 
 export type Locale = "en" | "ru";
@@ -48,7 +48,7 @@ export function getStoredLocale(): Locale {
 	if (stored === "en" || stored === "ru") {
 		return stored;
 	}
-	return "ru";
+	return "en";
 }
 
 export function setStoredLocale(locale: Locale) {

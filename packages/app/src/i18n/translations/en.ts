@@ -141,7 +141,7 @@ export const en: Translations = {
 	},
 	home: {
 		yourTranscriptions: "Your Transcriptions",
-		pressToRecord: "Press Command+; to start a new recording",
+		pressToRecord: "Press {{hotkey}} to start a new recording",
 	},
 	about: {
 		title: "About",
@@ -195,7 +195,7 @@ export const en: Translations = {
 		failedToFetch: "Failed to fetch transcriptions",
 		errorOccurred: "An error occurred",
 		noTranscriptions: "No transcriptions yet",
-		useCommandToRecord: "Use Command+; to start recording and create your first transcription",
+		useCommandToRecord: "Use {{hotkey}} to start recording and create your first transcription",
 		tryAgain: "Try again",
 		noMore: "No more transcriptions",
 		today: "Today",

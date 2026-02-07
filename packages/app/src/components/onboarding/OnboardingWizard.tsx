@@ -1,5 +1,6 @@
 import { Show, createSignal } from "solid-js";
 import { useI18n } from "../../i18n";
+import { formatStep } from "../../lib/format";
 import { capture } from "../../lib/posthog";
 import { updateOnboardingStep } from "../../lib/settingsStore";
 import StepIndicator from "./StepIndicator";
@@ -65,19 +66,10 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 		return true;
 	};
 
-	const formatStep = (step: number) => step.toString().padStart(2, "0");
-
 	return (
 		<div class="fixed inset-0 bg-th-base flex flex-col items-center justify-center p-8">
 			{/* Grid overlay background */}
-			<div
-				class="absolute inset-0 pointer-events-none"
-				style={{
-					"background-image":
-						"linear-gradient(var(--color-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px)",
-					"background-size": "40px 40px",
-				}}
-			/>
+			<div class="absolute inset-0 pointer-events-none grid-overlay" />
 
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 

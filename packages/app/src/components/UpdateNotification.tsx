@@ -9,7 +9,8 @@ export default function UpdateNotification() {
 	const [update, setUpdate] = createSignal<Update | null>(null);
 	const [isVisible, setIsVisible] = createSignal(false);
 	const [isDownloading, setIsDownloading] = createSignal(false);
-	const [downloadProgress, setDownloadProgress] = createSignal(0);
+	const [downloadedBytes, setDownloadedBytes] = createSignal(0);
+	const [totalBytes, setTotalBytes] = createSignal(0);
 
 	onMount(async () => {
 		try {
@@ -31,12 +32,12 @@ export default function UpdateNotification() {
 		try {
 			await updateInfo.downloadAndInstall((event) => {
 				if (event.event === "Started" && event.data.contentLength) {
-					setDownloadProgress(0);
+					setTotalBytes(event.data.contentLength);
+					setDownloadedBytes(0);
 				} else if (event.event === "Progress") {
-					const progress = downloadProgress() + event.data.chunkLength;
-					setDownloadProgress(progress);
+					setDownloadedBytes((prev) => prev + event.data.chunkLength);
 				} else if (event.event === "Finished") {
-					setDownloadProgress(100);
+					setDownloadedBytes(totalBytes());
 				}
 			});
 			await relaunch();
@@ -84,7 +85,9 @@ export default function UpdateNotification() {
 								<div class="w-full h-1.5 bg-border overflow-hidden">
 									<div
 										class="h-full bg-ac transition-all duration-300"
-										style={{ width: `${Math.min(downloadProgress() / 10, 100)}%` }}
+										style={{
+											width: `${totalBytes() > 0 ? Math.min((downloadedBytes() / totalBytes()) * 100, 100) : 0}%`,
+										}}
 									/>
 								</div>
 								<p class="mt-1.5 text-xs font-mono text-txt-secondary">{t("update.downloading")}</p>

@@ -1,4 +1,5 @@
 import { For } from "solid-js";
+import { formatStep } from "../../lib/format";
 
 interface StepIndicatorProps {
 	currentStep: number;
@@ -6,8 +7,6 @@ interface StepIndicatorProps {
 }
 
 export default function StepIndicator(props: StepIndicatorProps) {
-	const formatStep = (step: number) => step.toString().padStart(2, "0");
-
 	return (
 		<div class="flex items-center gap-4 font-mono">
 			<For each={Array.from({ length: props.totalSteps }, (_, i) => i + 1)}>

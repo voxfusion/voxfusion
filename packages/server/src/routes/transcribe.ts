@@ -2,7 +2,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
-import { auth } from "../auth";
+import { env } from "../env";
+import { requireAuth } from "../middleware/auth";
 import { db } from "../providers/db";
 import { dictionaryWords, transcriptions } from "../providers/db/schema";
 import { groq } from "../providers/groq";
@@ -28,7 +29,10 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 		console.error("Failed to get audio duration:", err);
 		return null;
 	} finally {
-		(await Bun.file(tempFile).exists()) && (await Bun.$`rm ${tempFile}`);
+		if (await Bun.file(tempFile).exists()) {
+			const { unlink } = await import("node:fs/promises");
+			await unlink(tempFile);
+		}
 	}
 }
 
@@ -65,14 +69,6 @@ type TranscriptionResult = {
 	};
 };
 
-type Session = {
-	user: {
-		id: string;
-		email: string;
-		name?: string | null;
-	};
-};
-
 type TranscriptionMetadata = {
 	text: string;
 	wordCount: number;
@@ -81,21 +77,13 @@ type TranscriptionMetadata = {
 };
 
 export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
-	.derive(async ({ request }) => {
-		const session = await auth.api.getSession({
-			headers: request.headers,
-		});
-		if (!session?.user) {
-			return status(401, { error: "Unauthorized" });
-		}
-		return { session };
-	})
+	.use(requireAuth)
 	.state("transcriptionMetadata", null as TranscriptionMetadata | null)
 	.post(
 		"/",
 		async (ctx) => {
 			const file = ctx.body.file;
-			const session = (ctx as any).session as Session;
+			const session = (ctx as any).userSession;
 
 			try {
 				const wordsUsedBefore = await getMonthlyWordCount(session.user.id);
@@ -118,8 +106,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					.orderBy(desc(dictionaryWords.updatedAt))
 					.limit(50);
 
-				let prompt =
-					"";
+				let prompt = "";
 				if (userWords.length > 0) {
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
@@ -166,10 +153,21 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 		},
 		{
 			body: t.Object({
-				file: t.File(),
+				file: t.File({
+					maxSize: "25m",
+					type: [
+						"audio/wav",
+						"audio/webm",
+						"audio/mp3",
+						"audio/mpeg",
+						"audio/ogg",
+						"audio/mp4",
+						"audio/x-wav",
+					],
+				}),
 			}),
 			afterResponse: async (ctx) => {
-				const session = (ctx as any).session as Session | undefined;
+				const session = (ctx as any).userSession;
 				const metadata = ctx.store.transcriptionMetadata;
 
 				if (!session || !metadata) {
@@ -182,10 +180,10 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					const fileName = `${crypto.randomUUID()}.webm`;
 					const s3Path = `uploads/recordings/${fileName}`;
 					await Bun.s3.write(s3Path, new Blob([metadata.fileBuffer], { type: "audio/webm" }), {
-						acl: "public-read",
+						acl: "private",
 					});
 
-					const fileUrl = `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET}/${s3Path}`;
+					const fileUrl = `${env.S3_ENDPOINT}/${env.S3_BUCKET}/${s3Path}`;
 
 					const transcriptionId = crypto.randomUUID();
 					await db.insert(transcriptions).values({
@@ -197,7 +195,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 						processingTimeMs: metadata.processingTimeMs,
 						audioDurationMs,
 						provider: "groq",
-						model: "whisper-large-v3-turbo",
+						model: "whisper-large-v3",
 					});
 				} catch (error) {
 					console.error("Failed to save transcription:", error);
@@ -206,7 +204,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 		}
 	)
 	.get("/usage", async (ctx) => {
-		const session = (ctx as any).session as Session;
+		const session = (ctx as any).userSession;
 		const wordsUsed = await getMonthlyWordCount(session.user.id);
 		return {
 			wordsUsed,
@@ -216,7 +214,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 	.get(
 		"/",
 		async (ctx) => {
-			const session = (ctx as any).session as Session | undefined;
+			const session = (ctx as any).userSession;
 
 			if (!session?.user) {
 				return {
@@ -271,7 +269,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 	.get(
 		"/:id",
 		async (ctx) => {
-			const session = (ctx as any).session as Session;
+			const session = (ctx as any).userSession;
 			const result = await db
 				.select()
 				.from(transcriptions)
@@ -298,7 +296,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 	.patch(
 		"/:id/rating",
 		async (ctx) => {
-			const session = (ctx as any).session as Session;
+			const session = (ctx as any).userSession;
 			const { id } = ctx.params;
 			const { rating } = ctx.body;
 

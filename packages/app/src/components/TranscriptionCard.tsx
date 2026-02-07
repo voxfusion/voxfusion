@@ -3,16 +3,7 @@ import { Check, Copy } from "lucide-solid";
 import { Show, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
 import { capture } from "../lib/posthog";
-
-type Transcription = {
-	id: string;
-	text: string;
-	fileUrl: string;
-	processingTimeMs: number;
-	audioDurationMs: number | null;
-	rating: string | null;
-	createdAt: Date;
-};
+import type { Transcription } from "../types";
 
 type Props = {
 	transcription: Transcription;

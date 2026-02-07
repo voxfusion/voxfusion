@@ -4,42 +4,6 @@ export default {
 	theme: {
 		extend: {
 			colors: {
-				primary: {
-					50: "#FFF5F2",
-					100: "#FFE8E2",
-					200: "#FFD1C5",
-					300: "#FFB09D",
-					400: "#FF8C69",
-					500: "#FF6B4A",
-					600: "#E55A3A",
-					700: "#CC4A2D",
-					800: "#A33B24",
-					900: "#7A2C1B",
-				},
-				midnight: {
-					50: "#E8EDF4",
-					100: "#C5D1E3",
-					200: "#9FB5D1",
-					300: "#6B8DB5",
-					400: "#4A6D99",
-					500: "#2A4D7D",
-					600: "#1E3A5F",
-					700: "#142337",
-					800: "#0F1E32",
-					900: "#0A1628",
-				},
-				accent: {
-					50: "#E6F7F8",
-					100: "#B3E8EB",
-					200: "#80D9DE",
-					300: "#4DCAD1",
-					400: "#1DB9C3",
-					500: "#14919B",
-					600: "#0D7377",
-					700: "#095558",
-					800: "#063739",
-					900: "#03191A",
-				},
 				// Semantic theme-aware colors via CSS custom properties
 				th: {
 					base: "var(--color-bg-base)",

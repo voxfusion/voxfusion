@@ -3,21 +3,11 @@ import { Loader } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import eden from "../lib/eden";
+import { hotkeyDisplayName } from "../lib/hotkeyUtils";
 import { capture } from "../lib/posthog";
+import { useSettings } from "../lib/settingsStore";
+import type { Transcription } from "../types";
 import TranscriptionCard from "./TranscriptionCard";
-
-type Transcription = {
-	id: string;
-	text: string;
-	fileUrl: string;
-	processingTimeMs: number;
-	audioDurationMs: number | null;
-	rating: string | null;
-	createdAt: Date;
-	userId: string;
-	provider: string;
-	model: string;
-};
 
 type GroupedTranscriptions = {
 	label: string;
@@ -26,6 +16,7 @@ type GroupedTranscriptions = {
 
 export default function TranscriptionList() {
 	const [t, { locale }] = useI18n();
+	const settings = useSettings();
 	const [transcriptions, setTranscriptions] = createSignal<Transcription[]>([]);
 	const [loading, setLoading] = createSignal(false);
 	const [initialLoading, setInitialLoading] = createSignal(true);
@@ -181,7 +172,11 @@ export default function TranscriptionList() {
 			<Show when={!initialLoading() && !error() && transcriptions().length === 0}>
 				<div class="text-center py-12 font-mono">
 					<p class="text-txt-secondary mb-2">[INFO] NO_TRANSCRIPTIONS</p>
-					<p class="text-txt-muted text-sm">{t("transcriptionList.useCommandToRecord")}</p>
+					<p class="text-txt-muted text-sm">
+						{t("transcriptionList.useCommandToRecord", {
+							hotkey: hotkeyDisplayName(settings().hotkey),
+						})}
+					</p>
 				</div>
 			</Show>
 

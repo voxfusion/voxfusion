@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { bearer } from "better-auth/plugins/bearer";
 import { jwt } from "better-auth/plugins/jwt";
+import { env } from "./env";
 import { db } from "./providers/db";
 import * as schema from "./providers/db/schema";
 
@@ -14,17 +15,17 @@ const betterAuthSchema = {
 };
 
 export const auth = betterAuth({
-	baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+	baseURL: env.BETTER_AUTH_URL,
 	basePath: "/api/auth",
-	secret: process.env.BETTER_AUTH_SECRET!,
+	secret: env.BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, {
 		provider: "pg",
 		schema: betterAuthSchema,
 	}),
 	socialProviders: {
 		google: {
-			clientId: process.env.GOOGLE_CLIENT_ID!,
-			clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+			clientId: env.GOOGLE_CLIENT_ID,
+			clientSecret: env.GOOGLE_CLIENT_SECRET,
 			scope: ["openid", "email", "profile"],
 		},
 	},
@@ -39,7 +40,7 @@ export const auth = betterAuth({
 		bearer(),
 		jwt({
 			jwt: {
-				issuer: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+				issuer: env.BETTER_AUTH_URL,
 				audience: "voxfusion",
 				expirationTime: "400d",
 			},
@@ -52,5 +53,5 @@ export const auth = betterAuth({
 			secure: true,
 		},
 	},
-	trustedOrigins: ["voxfusion://", process.env.BETTER_AUTH_URL || "http://localhost:3000"],
+	trustedOrigins: ["voxfusion://", env.BETTER_AUTH_URL],
 });

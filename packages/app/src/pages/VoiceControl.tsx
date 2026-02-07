@@ -50,7 +50,6 @@ export default function VoiceControl() {
 
 	const handleShortcut = (evt: { state: string }) => {
 		if (evt.state !== "Pressed") return;
-		console.log("shortcut pressed");
 		toggleRecording();
 	};
 

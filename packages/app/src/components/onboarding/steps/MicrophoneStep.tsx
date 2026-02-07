@@ -1,87 +1,9 @@
-import { Check, ChevronDown, Mic, RefreshCw } from "lucide-solid";
-import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { Mic, RefreshCw } from "lucide-solid";
+import { createEffect } from "solid-js";
 import { useAudioDevices } from "../../../hooks/useAudioDevices";
 import { useI18n } from "../../../i18n";
 import { updateMicrophone, useSettings } from "../../../lib/settingsStore";
-
-interface SelectOption {
-	value: string;
-	label: string;
-}
-
-interface SelectProps {
-	value: string;
-	options: SelectOption[];
-	onChange: (value: string) => void;
-	placeholder?: string;
-}
-
-function Select(props: SelectProps) {
-	const [isOpen, setIsOpen] = createSignal(false);
-	let containerRef: HTMLDivElement | undefined;
-
-	const selectedLabel = () => {
-		const option = props.options.find((o) => o.value === props.value);
-		return option?.label ?? props.placeholder ?? "";
-	};
-
-	const handleClickOutside = (e: MouseEvent) => {
-		if (containerRef && !containerRef.contains(e.target as Node)) {
-			setIsOpen(false);
-		}
-	};
-
-	createEffect(() => {
-		if (isOpen()) {
-			document.addEventListener("click", handleClickOutside);
-		} else {
-			document.removeEventListener("click", handleClickOutside);
-		}
-	});
-
-	onCleanup(() => {
-		document.removeEventListener("click", handleClickOutside);
-	});
-
-	return (
-		<div ref={containerRef} class="relative">
-			<button
-				type="button"
-				onClick={() => setIsOpen(!isOpen())}
-				class="flex items-center justify-between w-full px-4 py-3 bg-th-base border border-border-strong text-txt-primary hover:border-ac focus:outline-none focus:border-ac transition-colors font-mono text-sm"
-			>
-				<span class="truncate">{selectedLabel()}</span>
-				<ChevronDown
-					class={`w-5 h-5 ml-2 text-txt-muted transition-transform ${isOpen() ? "rotate-180" : ""}`}
-				/>
-			</button>
-
-			<Show when={isOpen()}>
-				<div class="absolute z-50 w-full mt-1 bg-th-surface border border-border-strong max-h-60 overflow-auto">
-					<For each={props.options}>
-						{(option) => (
-							<button
-								type="button"
-								onClick={() => {
-									props.onChange(option.value);
-									setIsOpen(false);
-								}}
-								class={`flex items-center justify-between w-full px-4 py-3 text-left hover:bg-th-hover transition-colors font-mono text-sm ${
-									option.value === props.value ? "bg-ac-bg text-ac" : "text-txt-primary"
-								}`}
-							>
-								<span class="truncate">{option.label}</span>
-								<Show when={option.value === props.value}>
-									<Check class="w-4 h-4 text-ac" />
-								</Show>
-							</button>
-						)}
-					</For>
-				</div>
-			</Show>
-		</div>
-	);
-}
+import Select, { type SelectOption } from "../../Select";
 
 export default function MicrophoneStep() {
 	const [t] = useI18n();
