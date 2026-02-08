@@ -22,28 +22,21 @@ function Auth() {
 		setIsLoading(true);
 		capture("login_started", { provider: "google" });
 		try {
-			console.log("Starting Google login...");
 			const data = await authClient.signIn.social({
 				provider: "google",
 				callbackURL: `${API_BASE_URL}/api/deeplink`,
 				disableRedirect: true,
 			});
 
-			console.log("Auth response:", data);
-
 			if (data.error) {
-				console.error("Auth error:", data.error);
 				return;
 			}
 
 			if (data.data?.url) {
-				console.log("Opening URL:", data.data.url);
 				await openUrl(data.data.url);
-			} else {
-				console.error("No URL returned from auth server");
 			}
-		} catch (error) {
-			console.error("Google login failed:", error);
+		} catch {
+			// Google login failed
 		}
 	};
 

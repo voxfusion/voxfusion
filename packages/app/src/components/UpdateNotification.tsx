@@ -18,8 +18,8 @@ export default function UpdateNotification() {
 				setUpdate(available);
 				setIsVisible(true);
 			}
-		} catch (error) {
-			console.error("Failed to check for updates:", error);
+		} catch {
+			// Update check failed
 		}
 	});
 
@@ -40,8 +40,7 @@ export default function UpdateNotification() {
 				}
 			});
 			await relaunch();
-		} catch (error) {
-			console.error("Failed to download and install update:", error);
+		} catch {
 			setIsDownloading(false);
 		}
 	};

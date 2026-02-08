@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { getAudioInputDevices, type AudioDevice } from "../lib/settingsStore";
+import { type AudioDevice, getAudioInputDevices } from "../lib/settingsStore";
 
 export function useAudioDevices() {
 	const [devices, setDevices] = createSignal<AudioDevice[]>([]);
@@ -12,8 +12,7 @@ export function useAudioDevices() {
 		try {
 			const fetchedDevices = await getAudioInputDevices();
 			setDevices(fetchedDevices);
-		} catch (err) {
-			console.error("Failed to fetch audio devices:", err);
+		} catch {
 			setError("Failed to fetch audio devices");
 		} finally {
 			setIsLoading(false);

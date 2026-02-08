@@ -1,6 +1,6 @@
+import { appDataDir } from "@tauri-apps/api/path";
 import type { Client } from "@tauri-apps/plugin-stronghold";
 import { Stronghold } from "@tauri-apps/plugin-stronghold";
-import { appDataDir } from "@tauri-apps/api/path";
 
 const TOKEN_KEY = "auth_token";
 const CLIENT_NAME = "voxfusion_client";
@@ -40,8 +40,7 @@ export const tokenManager = {
 			const data = await store.get(TOKEN_KEY);
 			if (!data) return null;
 			return new TextDecoder().decode(new Uint8Array(data));
-		} catch (error) {
-			console.error("Failed to get token from vault:", error);
+		} catch {
 			return null;
 		}
 	},

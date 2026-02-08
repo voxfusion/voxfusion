@@ -10,7 +10,7 @@ name = "voxfusion_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-default = ["devtools"]
+default = []
 devtools = ["tauri/devtools"]
 
 [build-dependencies]
@@ -52,8 +52,11 @@ opt-level = 3
 strip = true
 lto = true
 codegen-units = 1
-opt-level = "z"
+opt-level = "s"
+panic = "abort"
+overflow-checks = false
 
 [profile.release.package.wry]
 debug = false
 debug-assertions = false
+overflow-checks = false

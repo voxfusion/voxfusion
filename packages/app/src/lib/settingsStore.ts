@@ -110,8 +110,7 @@ export async function getAudioInputDevices(): Promise<AudioDevice[]> {
 			name: device.name,
 			isDefault: device.is_default,
 		}));
-	} catch (error) {
-		console.error("Failed to enumerate audio devices:", error);
+	} catch {
 		return [];
 	}
 }

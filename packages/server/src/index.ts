@@ -25,6 +25,4 @@ const app = new Elysia({ prefix: "/api", adapter: BunAdapter })
 	.get("/health", () => ({ status: "ok" }))
 	.listen(3000);
 
-console.log(`🦊 VoxFusion server running at ${app.server?.hostname}:${app.server?.port}`);
-
 export type App = typeof app;

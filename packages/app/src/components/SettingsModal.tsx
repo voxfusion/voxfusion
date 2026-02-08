@@ -130,8 +130,8 @@ export default function SettingsModal(props: SettingsModalProps) {
 		try {
 			const devices = await getAudioInputDevices();
 			setAudioDevices(devices);
-		} catch (error) {
-			console.error("Failed to fetch audio devices:", error);
+		} catch {
+			// Failed to fetch audio devices
 		} finally {
 			setIsLoadingDevices(false);
 		}

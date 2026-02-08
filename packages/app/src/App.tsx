@@ -50,18 +50,16 @@ const handleDeepLinkUrls = async (urls: string[]) => {
 	for (const urlString of urls) {
 		try {
 			const url = new URL(urlString);
-			console.log(url);
 			const token = url.searchParams.get("token");
 
 			if (token) {
 				await tokenManager.storeToken(token);
-				console.log("freshawait tokenManager.getToken()", await tokenManager.getToken());
 				await authClient.useSession.get().refetch();
 
 				break;
 			}
-		} catch (error) {
-			console.error("Failed to handle deep link:", error);
+		} catch {
+			// Deep link handling failed silently
 		}
 	}
 };
@@ -74,7 +72,6 @@ function App(props: ParentProps) {
 	const [isSessionChecked, setIsSessionChecked] = createSignal(false);
 
 	createEffect(() => {
-		console.log("session", session());
 		const s = session();
 		if (s?.data?.user) {
 			identifyUser(s.data.user.id, {
@@ -98,12 +95,11 @@ function App(props: ParentProps) {
 
 		try {
 			const storedToken = await tokenManager.getToken();
-			console.log("storedToken", storedToken);
 			if (storedToken) {
 				await authClient.useSession.get().refetch();
 			}
-		} catch (error) {
-			console.error("Failed to restore session:", error);
+		} catch {
+			// Session restoration failed silently
 		}
 		setIsSessionChecked(true);
 
@@ -118,12 +114,11 @@ function App(props: ParentProps) {
 
 		const initialUrls = await getCurrent();
 		if (initialUrls) {
-			console.log("initialUrls", initialUrls);
 			await handleDeepLinkUrls(initialUrls);
 		}
 
 		const unlistenDeepLink = await onOpenUrl((urls) => {
-			handleDeepLinkUrls(urls).catch(console.error);
+			handleDeepLinkUrls(urls).catch(() => {});
 		});
 		onCleanup(() => unlistenDeepLink());
 
@@ -157,7 +152,6 @@ function App(props: ParentProps) {
 
 		const voicecontrolWindow = tauriconf.app.windows.find((w) => w.label === "voice-control");
 		if (!voicecontrolWindow) {
-			console.error("Voice control window not found");
 			throw new Error("Voice control window not found");
 		}
 
@@ -167,14 +161,12 @@ function App(props: ParentProps) {
 
 		const monitor = await primaryMonitor();
 		if (!monitor) {
-			console.error("No primary monitor found");
 			return;
 		}
 
 		const allWindows = await getAllWebviewWindows();
 		const voiceWindow = allWindows.find((w) => w.label === "voice-control");
 		if (!voiceWindow) {
-			console.error("Voice control window not found");
 			return;
 		}
 

@@ -112,7 +112,6 @@ export default function TranscriptionList() {
 			setNextCursor(data.nextCursor ?? null);
 			setHasMore(data.hasMore ?? false);
 		} catch (err) {
-			console.error("Fetch error:", err);
 			setError(err instanceof Error ? err.message : t("transcriptionList.errorOccurred"));
 		} finally {
 			setLoading(false);

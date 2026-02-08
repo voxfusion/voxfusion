@@ -50,7 +50,6 @@ export default function VoiceControl() {
 
 	const handleShortcut = (evt: { state: string }) => {
 		if (evt.state !== "Pressed") return;
-		console.log("shortcut pressed");
 		toggleRecording();
 	};
 
@@ -177,8 +176,8 @@ export default function VoiceControl() {
 			setTimeout(() => {
 				emit("transcription-created");
 			}, 1000);
-		} catch (err) {
-			console.error("Transcription failed:", err);
+		} catch {
+			// Transcription failed
 		} finally {
 			setLoading(false);
 			isStopping = false;
@@ -191,8 +190,8 @@ export default function VoiceControl() {
 				if (evt.state !== "Pressed") return;
 				cancelRecording();
 			});
-		} catch (err) {
-			console.error("Failed to register Escape shortcut:", err);
+		} catch {
+			// Escape shortcut registration failed
 		}
 	};
 
@@ -212,8 +211,8 @@ export default function VoiceControl() {
 
 		try {
 			await invoke<string>("stop_recording_with_device");
-		} catch (err) {
-			console.error("Cancel recording failed:", err);
+		} catch {
+			// Cancel recording failed
 		} finally {
 			isStopping = false;
 		}
@@ -232,8 +231,7 @@ export default function VoiceControl() {
 			setIsRecording(true);
 			isStarting = false;
 			await registerEscapeShortcut();
-		} catch (err) {
-			console.error("Failed to start recording:", err);
+		} catch {
 			isStopping = false;
 			isStarting = false;
 		}

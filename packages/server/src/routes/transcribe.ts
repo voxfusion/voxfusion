@@ -24,8 +24,7 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 			return Math.round(duration * 1000);
 		}
 		return null;
-	} catch (err) {
-		console.error("Failed to get audio duration:", err);
+	} catch {
 		return null;
 	} finally {
 		(await Bun.file(tempFile).exists()) && (await Bun.$`rm ${tempFile}`);
@@ -201,8 +200,8 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 						provider: "groq",
 						model: "whisper-large-v3-turbo",
 					});
-				} catch (error) {
-					console.error("Failed to save transcription:", error);
+				} catch {
+					// Transcription save failed
 				}
 			},
 		}
@@ -236,7 +235,6 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				const cleanCursor = cursor.replace(/^"|"$/g, "");
 				cursorDate = new Date(cleanCursor);
 				if (Number.isNaN(cursorDate.getTime())) {
-					console.error("Invalid cursor received:", cursor, typeof cursor);
 					return status(400, { error: `Invalid cursor date format: ${cursor}` });
 				}
 			}
