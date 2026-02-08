@@ -1,5 +1,6 @@
 {
     "scripts": {
-        "setup": "bun install && ([ -f \"$CONDUCTOR_ROOT_PATH/.env\" ] && [ ! -f \".env\" ] && cp \"$CONDUCTOR_ROOT_PATH/.env\" .env || true) && for pkg in \"$CONDUCTOR_ROOT_PATH\"/packages/*/; do pkg_name=$(basename \"$pkg\"); [ -f \"$pkg/.env\" ] && [ ! -f \"packages/$pkg_name/.env\" ] && cp \"$pkg/.env\" \"packages/$pkg_name/.env\" || true; [ -f \"$pkg/.env.example\" ] && [ ! -f \"packages/$pkg_name/.env\" ] && cp \"$pkg/.env.example\" \"packages/$pkg_name/.env\" || true; done && ([ -n \"$DATABASE_URL\" ] && cd packages/server && bun run db:migrate || true)"
+        "setup": "bun install && ([ -f \"$CONDUCTOR_ROOT_PATH/.env\" ] && [ ! -f \".env\" ] && cp \"$CONDUCTOR_ROOT_PATH/.env\" .env || true) && for pkg in \"$CONDUCTOR_ROOT_PATH\"/packages/*/; do pkg_name=$(basename \"$pkg\"); [ -f \"$pkg/.env\" ] && [ ! -f \"packages/$pkg_name/.env\" ] && cp \"$pkg/.env\" \"packages/$pkg_name/.env\" || true; [ -f \"$pkg/.env.example\" ] && [ ! -f \"packages/$pkg_name/.env\" ] && cp \"$pkg/.env.example\" \"packages/$pkg_name/.env\" || true; done && ([ -n \"$DATABASE_URL\" ] && cd packages/server && bun run db:migrate || true)",
+        "run": "bun run dev"
     }
 }

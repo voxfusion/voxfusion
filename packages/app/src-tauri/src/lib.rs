@@ -69,7 +69,7 @@ fn show_or_create_main_window(app: &tauri::AppHandle) {
     } else {
         // Window was closed, recreate it
         use tauri::WebviewWindowBuilder;
-        if let Ok(window) = WebviewWindowBuilder::new(
+        let mut builder = WebviewWindowBuilder::new(
             app,
             "main",
             tauri::WebviewUrl::App("/".into()),
@@ -78,12 +78,17 @@ fn show_or_create_main_window(app: &tauri::AppHandle) {
         .inner_size(1360.0, 850.0)
         .resizable(true)
         .decorations(true)
-        .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true)
         .fullscreen(false)
-        .center()
-        .build()
+        .center();
+
+        #[cfg(target_os = "macos")]
         {
+            builder = builder
+                .title_bar_style(tauri::TitleBarStyle::Overlay)
+                .hidden_title(true);
+        }
+
+        if let Ok(window) = builder.build() {
             let _ = window.show();
             let _ = window.set_focus();
         }
@@ -141,7 +146,6 @@ pub fn run() {
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_keychain::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -149,6 +153,9 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.handle().plugin(tauri_plugin_macos_permissions::init())?;
+
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
@@ -206,10 +213,16 @@ pub fn run() {
                 let tray_icon_bytes = include_bytes!("../icons/tray-icon.png");
                 let tray_image = tauri::image::Image::from_bytes(tray_icon_bytes)
                     .expect("Failed to load tray icon");
-                let _tray = TrayIconBuilder::new()
+                let mut tray_builder = TrayIconBuilder::new()
                     .icon(tray_image)
-                    .icon_as_template(true)
-                    .menu(&menu)
+                    .menu(&menu);
+
+                #[cfg(target_os = "macos")]
+                {
+                    tray_builder = tray_builder.icon_as_template(true);
+                }
+
+                let _tray = tray_builder
                     .show_menu_on_left_click(true)
                     .on_menu_event(move |app, event| {
                         let id = event.id().as_ref();
@@ -223,7 +236,7 @@ pub fn run() {
                                 } else {
                                     // Window was closed, recreate it with same settings as tauri.conf.json
                                     use tauri::WebviewWindowBuilder;
-                                    if let Ok(window) = WebviewWindowBuilder::new(
+                                    let mut builder = WebviewWindowBuilder::new(
                                         app,
                                         "main",
                                         tauri::WebviewUrl::App("/".into()),
@@ -232,11 +245,17 @@ pub fn run() {
                                     .inner_size(1360.0, 850.0)
                                     .resizable(true)
                                     .decorations(true)
-                                    .title_bar_style(tauri::TitleBarStyle::Overlay)
-                                    .hidden_title(true)
                                     .fullscreen(false)
-                                    .center()
-                                    .build()
+                                    .center();
+
+                                    #[cfg(target_os = "macos")]
+                                    {
+                                        builder = builder
+                                            .title_bar_style(tauri::TitleBarStyle::Overlay)
+                                            .hidden_title(true);
+                                    }
+
+                                    if let Ok(window) = builder.build()
                                     {
                                         let _ = window.show();
                                         let _ = window.set_focus();

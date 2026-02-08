@@ -9,7 +9,6 @@
 		"core:event:allow-listen",
 		"core:event:allow-emit",
 		"core:event:default",
-		"macos-permissions:default",
 		"clipboard-manager:default",
 		"clipboard-manager:allow-write-text",
 		"store:default"

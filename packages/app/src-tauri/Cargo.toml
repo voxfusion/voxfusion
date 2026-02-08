@@ -21,7 +21,6 @@ tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-pn
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
-tauri-plugin-macos-permissions = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-keychain = "2"
 serde = { version = "1", features = ["derive"] }
@@ -44,6 +43,7 @@ sha2 = "0.10"
 core-graphics = "0.24"
 core-foundation = "0.10"
 core-foundation-sys = "0.8"
+tauri-plugin-macos-permissions = "2"
 
 [profile.dev.package.scrypt]
 opt-level = 3

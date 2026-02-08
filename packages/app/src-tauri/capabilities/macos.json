@@ -1,0 +1,8 @@
+{
+	"identifier": "macos-capability",
+	"platforms": ["macOS"],
+	"windows": ["main", "voice-control"],
+	"permissions": [
+		"macos-permissions:default"
+	]
+}

@@ -2,8 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
 import { AlertCircle, Check, ExternalLink, Shield } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
-import { requestAccessibilityPermission } from "tauri-plugin-macos-permissions-api";
 import { useI18n } from "../../../i18n";
+
+const isMacOS = navigator.userAgent.includes("Macintosh");
 
 interface AccessibilityPermissionStepProps {
 	onPermissionChange: (granted: boolean) => void;
@@ -68,6 +69,13 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 	};
 
 	onMount(async () => {
+		if (!isMacOS) {
+			// Accessibility permissions are not needed on Windows/Linux
+			setIsGranted(true);
+			props.onPermissionChange(true);
+			return;
+		}
+
 		await checkPermission();
 
 		if (!isGranted()) {
@@ -94,6 +102,9 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 	const handleOpenSettings = async () => {
 		setIsRequesting(true);
 		try {
+			const { requestAccessibilityPermission } = await import(
+				"tauri-plugin-macos-permissions-api"
+			);
 			await requestAccessibilityPermission();
 		} catch {
 			// ignore - settings may still open

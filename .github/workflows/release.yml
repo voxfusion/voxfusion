@@ -13,7 +13,7 @@ env:
   RELEASES_REPO: gregor-tokarev/voxfusion-releases
 
 jobs:
-  build:
+  build-macos:
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -33,7 +33,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './packages/app/src-tauri -> target'
-          shared-key: 'release-build'
+          shared-key: 'release-build-macos'
           save-if: ${{ github.ref_type == 'tag' }}
 
       - name: Install dependencies
@@ -79,9 +79,6 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: bun run tauri build --target universal-apple-darwin
 
       - name: Find build artifacts
@@ -129,17 +126,104 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts
+          name: release-artifacts-macos
+          path: release-artifacts/
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.3'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app/src-tauri -> target'
+          shared-key: 'release-build-windows'
+          save-if: ${{ github.ref_type == 'tag' }}
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Sync version from git tag
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Setting version to $VERSION"
+          cd packages/app/src-tauri
+          jq --arg v "$VERSION" '.version = $v' tauri.conf.json > tmp.json && mv tmp.json tauri.conf.json
+          echo "Updated tauri.conf.json:"
+          grep '"version"' tauri.conf.json
+
+      - name: Build Tauri app
+        working-directory: packages/app
+        env:
+          VITE_API_URL: https://voxfusion-production.up.railway.app
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bun run tauri build
+
+      - name: Find build artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          echo "Searching for artifacts..."
+
+          NSIS_PATH=$(find packages/app/src-tauri/target -name "*.exe" -path "*/nsis/*" -type f | head -1)
+          if [ -z "$NSIS_PATH" ]; then
+            echo "Error: No NSIS installer found"
+            find packages/app/src-tauri/target -type f -name "*.exe" || true
+            exit 1
+          fi
+          echo "Found NSIS installer: $NSIS_PATH"
+          echo "NSIS_PATH=$NSIS_PATH" >> $GITHUB_OUTPUT
+
+          NSIS_SIG="${NSIS_PATH}.sig"
+          if [ -f "$NSIS_SIG" ]; then
+            echo "Found NSIS signature: $NSIS_SIG"
+            cat "$NSIS_SIG"
+          else
+            echo "Error: No NSIS signature file found at $NSIS_SIG"
+            find packages/app/src-tauri/target -name "*.sig" -type f || true
+            exit 1
+          fi
+          echo "NSIS_SIG=$NSIS_SIG" >> $GITHUB_OUTPUT
+
+      - name: Prepare artifacts for upload
+        shell: bash
+        run: |
+          mkdir -p release-artifacts
+          cp "${{ steps.artifacts.outputs.NSIS_PATH }}" release-artifacts/VoxFusion-setup.exe
+          cp "${{ steps.artifacts.outputs.NSIS_SIG }}" release-artifacts/VoxFusion-setup.exe.sig
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-windows
           path: release-artifacts/
 
   publish:
     runs-on: tenki-standard-small-2c-4g
-    needs: build
+    needs: [build-macos, build-windows]
     steps:
-      - name: Download build artifacts
+      - name: Download macOS build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-artifacts
+          name: release-artifacts-macos
+          path: release-artifacts/
+
+      - name: Download Windows build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts-windows
           path: release-artifacts/
 
       - name: Get version from tag
@@ -149,22 +233,27 @@ jobs:
       - name: Generate latest.json
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
-          DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
+          MAC_SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
+          MAC_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
+          WIN_SIGNATURE=$(cat release-artifacts/VoxFusion-setup.exe.sig)
+          WIN_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion-setup.exe"
 
           jq -n \
             --arg version "$VERSION" \
-            --arg signature "$SIGNATURE" \
-            --arg url "$DOWNLOAD_URL" \
+            --arg mac_signature "$MAC_SIGNATURE" \
+            --arg mac_url "$MAC_URL" \
+            --arg win_signature "$WIN_SIGNATURE" \
+            --arg win_url "$WIN_URL" \
             --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
               version: $version,
               notes: "See release notes on GitHub",
               pub_date: $pub_date,
               platforms: {
-                "darwin-universal": { signature: $signature, url: $url },
-                "darwin-x86_64": { signature: $signature, url: $url },
-                "darwin-aarch64": { signature: $signature, url: $url }
+                "darwin-universal": { signature: $mac_signature, url: $mac_url },
+                "darwin-x86_64": { signature: $mac_signature, url: $mac_url },
+                "darwin-aarch64": { signature: $mac_signature, url: $mac_url },
+                "windows-x86_64": { signature: $win_signature, url: $win_url }
               }
             }' > latest.json
 
@@ -183,9 +272,8 @@ jobs:
             ## VoxFusion ${{ github.ref_name }}
 
             ### Download
-            Download the DMG file below and drag VoxFusion to your Applications folder.
-
-            This release is signed and notarized by Apple.
+            - **macOS**: Download the DMG file and drag VoxFusion to your Applications folder.
+            - **Windows**: Download the setup .exe installer and run it.
 
             ---
             Existing users will receive this update automatically.
@@ -195,4 +283,5 @@ jobs:
             release-artifacts/VoxFusion.dmg
             release-artifacts/VoxFusion-latest.dmg
             release-artifacts/VoxFusion.app.tar.gz
+            release-artifacts/VoxFusion-setup.exe
             latest.json

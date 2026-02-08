@@ -17,7 +17,6 @@
 		"core:event:allow-listen",
 		"core:event:default",
 		"core:path:default",
-		"store:default",
-		"macos-permissions:default"
+		"store:default"
 	]
 }
