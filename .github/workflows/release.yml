@@ -130,10 +130,15 @@ jobs:
           path: release-artifacts/
 
   build-windows:
-    runs-on: windows-latest
+    runs-on: tenki-standard-small-2c-4g
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nsis llvm clang lld libwebkit2gtk-4.1-dev
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -142,6 +147,11 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install cargo-xwin
+        run: cargo install cargo-xwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -154,7 +164,6 @@ jobs:
         run: bun install
 
       - name: Sync version from git tag
-        shell: bash
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "Setting version to $VERSION"
@@ -169,11 +178,11 @@ jobs:
           VITE_API_URL: https://voxfusion-production.up.railway.app
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: bun run tauri build
+          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: lld-link
+        run: bun run tauri build --target x86_64-pc-windows-msvc
 
       - name: Find build artifacts
         id: artifacts
-        shell: bash
         run: |
           echo "Searching for artifacts..."
 
@@ -198,7 +207,6 @@ jobs:
           echo "NSIS_SIG=$NSIS_SIG" >> $GITHUB_OUTPUT
 
       - name: Prepare artifacts for upload
-        shell: bash
         run: |
           mkdir -p release-artifacts
           cp "${{ steps.artifacts.outputs.NSIS_PATH }}" release-artifacts/VoxFusion-setup.exe
