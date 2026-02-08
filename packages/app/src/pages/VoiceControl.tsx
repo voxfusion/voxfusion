@@ -133,8 +133,9 @@ export default function VoiceControl() {
 
 	onCleanup(async () => {
 		if (isRecording()) {
-			await stopRecording();
+			await cancelRecording();
 		}
+		await unregisterEscapeShortcut();
 		await unregisterCurrentShortcut();
 	});
 
@@ -144,6 +145,7 @@ export default function VoiceControl() {
 
 		isStopping = true;
 		setIsRecording(false);
+		await unregisterEscapeShortcut();
 
 		try {
 			const filePath = await invoke<string>("stop_recording_with_device");
@@ -183,6 +185,40 @@ export default function VoiceControl() {
 		}
 	};
 
+	const registerEscapeShortcut = async () => {
+		try {
+			await register("Escape", (evt) => {
+				if (evt.state !== "Pressed") return;
+				cancelRecording();
+			});
+		} catch (err) {
+			console.error("Failed to register Escape shortcut:", err);
+		}
+	};
+
+	const unregisterEscapeShortcut = async () => {
+		try {
+			await unregister("Escape");
+		} catch {}
+	};
+
+	const cancelRecording = async () => {
+		if (isStopping) return;
+		if (!isRecording()) return;
+
+		isStopping = true;
+		setIsRecording(false);
+		await unregisterEscapeShortcut();
+
+		try {
+			await invoke<string>("stop_recording_with_device");
+		} catch (err) {
+			console.error("Cancel recording failed:", err);
+		} finally {
+			isStopping = false;
+		}
+	};
+
 	const startRecording = async () => {
 		try {
 			if (isRecording()) return;
@@ -195,6 +231,7 @@ export default function VoiceControl() {
 			});
 			setIsRecording(true);
 			isStarting = false;
+			await registerEscapeShortcut();
 		} catch (err) {
 			console.error("Failed to start recording:", err);
 			isStopping = false;
