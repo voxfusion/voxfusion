@@ -18,7 +18,7 @@ export default function Sidebar(props: SidebarProps) {
 	const location = useLocation();
 	const [isUserMenuOpen, setIsUserMenuOpen] = createSignal(false);
 	const [wordsUsed, setWordsUsed] = createSignal(0);
-	const [wordLimit, setWordLimit] = createSignal(10_000);
+	const [wordLimit, setWordLimit] = createSignal(1_000);
 
 	const isActive = (path: string) => location.pathname === path;
 

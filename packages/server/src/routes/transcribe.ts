@@ -4,7 +4,7 @@ import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import { auth } from "../auth";
 import { db } from "../providers/db";
-import { dictionaryWords, transcriptions } from "../providers/db/schema";
+import { dictionaryWords, subscriptions, transcriptions } from "../providers/db/schema";
 import { groq } from "../providers/groq";
 
 async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
@@ -31,7 +31,23 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	}
 }
 
-const MONTHLY_WORD_LIMIT = 10_000;
+const MONTHLY_WORD_LIMITS = {
+	free: 1_000,
+	pro: 1_000_000,
+} as const;
+
+async function getUserPlan(userId: string): Promise<"free" | "pro"> {
+	const result = await db
+		.select({ plan: subscriptions.plan, currentPeriodEnd: subscriptions.currentPeriodEnd })
+		.from(subscriptions)
+		.where(eq(subscriptions.userId, userId))
+		.limit(1);
+	const sub = result[0];
+	if (sub?.plan === "pro" && sub.currentPeriodEnd && sub.currentPeriodEnd > new Date()) {
+		return "pro";
+	}
+	return "free";
+}
 
 function getMonthStart(): Date {
 	const now = new Date();
@@ -99,13 +115,15 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			const session = (ctx as any).session as Session;
 
 			try {
+				const plan = await getUserPlan(session.user.id);
+				const wordLimit = MONTHLY_WORD_LIMITS[plan];
 				const wordsUsedBefore = await getMonthlyWordCount(session.user.id);
-				if (wordsUsedBefore >= MONTHLY_WORD_LIMIT) {
+				if (wordsUsedBefore >= wordLimit) {
 					return status(403, {
 						error: "Monthly transcription limit reached",
 						usage: {
 							wordsUsed: wordsUsedBefore,
-							wordLimit: MONTHLY_WORD_LIMIT,
+							wordLimit,
 						},
 					});
 				}
@@ -154,8 +172,8 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					wordCount,
 					usage: {
 						wordsUsed: wordsUsedAfter,
-						wordsRemaining: Math.max(0, MONTHLY_WORD_LIMIT - wordsUsedAfter),
-						plan: "free",
+						wordsRemaining: Math.max(0, wordLimit - wordsUsedAfter),
+						plan,
 					},
 				} satisfies TranscriptionResult;
 			} catch (error) {
@@ -208,10 +226,13 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 	)
 	.get("/usage", async (ctx) => {
 		const session = (ctx as any).session as Session;
+		const plan = await getUserPlan(session.user.id);
+		const wordLimit = MONTHLY_WORD_LIMITS[plan];
 		const wordsUsed = await getMonthlyWordCount(session.user.id);
 		return {
 			wordsUsed,
-			wordLimit: MONTHLY_WORD_LIMIT,
+			wordLimit,
+			plan,
 		};
 	})
 	.get(

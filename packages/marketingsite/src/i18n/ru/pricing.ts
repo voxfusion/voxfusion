@@ -8,7 +8,7 @@ export const pricing = {
 	"pricing.free.period": "навсегда",
 	"pricing.free.description":
 		"Идеально для знакомства с голосовой диктовкой",
-	"pricing.free.feature1": "10 000 слов в месяц",
+	"pricing.free.feature1": "1 000 слов в месяц",
 	"pricing.free.feature2": "Точная транскрипция",
 	"pricing.free.feature3": "Свой словарь (50 терминов)",
 	"pricing.free.feature4": "История транскрипций",
