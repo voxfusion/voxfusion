@@ -104,7 +104,7 @@ export default function Dictionary() {
 				{/* Header */}
 				<div class="mb-8">
 					<div class="flex items-center justify-between">
-						<h1 class="font-mono text-txt-primary text-lg">
+						<h1 class="font-mono text-txt-primary text-sm">
 							<span class="text-ac">[DICTIONARY]</span>
 							<span class="text-txt-muted"> {">"} </span>
 							<span class="text-txt-secondary">CUSTOM_TERMS</span>
