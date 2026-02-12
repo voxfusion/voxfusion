@@ -19,16 +19,22 @@ export default function Sidebar(props: SidebarProps) {
 	const [isUserMenuOpen, setIsUserMenuOpen] = createSignal(false);
 	const [wordsUsed, setWordsUsed] = createSignal(0);
 	const [wordLimit, setWordLimit] = createSignal(10_000);
+	const [plan, setPlan] = createSignal<"free" | "pro">("free");
 
 	const isActive = (path: string) => location.pathname === path;
 
 	const fetchUsage = async () => {
 		try {
 			const res = await eden.api.transcribe.usage.get();
-			const data = res.data as { wordsUsed: number; wordLimit: number } | null;
+			const data = res.data as {
+				wordsUsed: number;
+				wordLimit: number;
+				plan?: "free" | "pro";
+			} | null;
 			if (data) {
 				setWordsUsed(data.wordsUsed);
 				setWordLimit(data.wordLimit);
+				if (data.plan) setPlan(data.plan);
 			}
 		} catch {}
 	};
@@ -39,8 +45,9 @@ export default function Sidebar(props: SidebarProps) {
 		onCleanup(unlisten);
 	});
 
+	const isPro = () => plan() === "pro";
 	const usagePercent = () => Math.min(100, (wordsUsed() / wordLimit()) * 100);
-	const isLimitReached = () => wordsUsed() >= wordLimit();
+	const isLimitReached = () => !isPro() && wordsUsed() >= wordLimit();
 
 	const handleLogout = async () => {
 		capture("logout");
@@ -80,30 +87,46 @@ export default function Sidebar(props: SidebarProps) {
 
 			<div class="px-3 pb-3">
 				<div class="px-3 py-2">
-					<div class="flex items-center justify-between mb-1.5">
-						<span class="font-mono uppercase tracking-wider text-[10px] text-txt-muted">
-							{t("sidebar.wordsUsed")}
-						</span>
-					</div>
-					<div class="font-mono text-xs tabular-nums mb-1.5">
-						<Show
-							when={!isLimitReached()}
-							fallback={<span class="text-ac">{t("sidebar.limitReached")}</span>}
-						>
-							<span class="text-txt-primary">{wordsUsed().toLocaleString()}</span>
-							<span class="text-txt-muted"> / {wordLimit().toLocaleString()}</span>
-						</Show>
-					</div>
-					<div class="w-full h-1 bg-border overflow-hidden">
-						<div
-							class="h-full transition-all duration-300"
-							style={{
-								width: `${usagePercent()}%`,
-								"background-color": "var(--color-accent)",
-								opacity: isLimitReached() ? 1 : 0.7,
-							}}
-						/>
-					</div>
+					<Show
+						when={!isPro()}
+						fallback={
+							<>
+								<div class="flex items-center justify-between mb-1.5">
+									<span class="font-mono uppercase tracking-wider text-[10px] text-txt-muted">
+										{t("sidebar.proPlan")}
+									</span>
+								</div>
+								<div class="font-mono text-xs tabular-nums">
+									<span class="text-ac">{t("sidebar.unlimited")}</span>
+								</div>
+							</>
+						}
+					>
+						<div class="flex items-center justify-between mb-1.5">
+							<span class="font-mono uppercase tracking-wider text-[10px] text-txt-muted">
+								{t("sidebar.wordsUsed")}
+							</span>
+						</div>
+						<div class="font-mono text-xs tabular-nums mb-1.5">
+							<Show
+								when={!isLimitReached()}
+								fallback={<span class="text-ac">{t("sidebar.limitReached")}</span>}
+							>
+								<span class="text-txt-primary">{wordsUsed().toLocaleString()}</span>
+								<span class="text-txt-muted"> / {wordLimit().toLocaleString()}</span>
+							</Show>
+						</div>
+						<div class="w-full h-1 bg-border overflow-hidden">
+							<div
+								class="h-full transition-all duration-300"
+								style={{
+									width: `${usagePercent()}%`,
+									"background-color": "var(--color-accent)",
+									opacity: isLimitReached() ? 1 : 0.7,
+								}}
+							/>
+						</div>
+					</Show>
 				</div>
 			</div>
 

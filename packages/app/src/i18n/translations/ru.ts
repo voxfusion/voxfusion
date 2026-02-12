@@ -80,6 +80,8 @@ export const ru: Translations = {
 		logout: "Выйти",
 		wordsUsed: "Слов использовано",
 		limitReached: "Лимит достигнут",
+		proPlan: "Про план",
+		unlimited: "Безлимитно",
 	},
 	dictionary: {
 		title: "Словарь",

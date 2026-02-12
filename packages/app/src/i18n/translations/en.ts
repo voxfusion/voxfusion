@@ -75,6 +75,8 @@ export type Translations = {
 		logout: string;
 		wordsUsed: string;
 		limitReached: string;
+		proPlan: string;
+		unlimited: string;
 	};
 	dictionary: {
 		title: string;
@@ -210,6 +212,8 @@ export const en: Translations = {
 		logout: "Log out",
 		wordsUsed: "Words used",
 		limitReached: "Limit reached",
+		proPlan: "Pro plan",
+		unlimited: "Unlimited",
 	},
 	dictionary: {
 		title: "Dictionary",
