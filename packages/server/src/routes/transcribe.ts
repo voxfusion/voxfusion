@@ -38,9 +38,13 @@ const MONTHLY_WORD_LIMITS = {
 
 async function getUserPlan(userId: string): Promise<"free" | "pro"> {
 	const result = await db
-		.select({ plan: subscriptions.plan, currentPeriodEnd: subscriptions.currentPeriodEnd })
+		.select({
+			plan: subscriptions.plan,
+			status: subscriptions.status,
+			currentPeriodEnd: subscriptions.currentPeriodEnd,
+		})
 		.from(subscriptions)
-		.where(eq(subscriptions.userId, userId))
+		.where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, "active")))
 		.limit(1);
 	const sub = result[0];
 	if (sub?.plan === "pro" && sub.currentPeriodEnd && sub.currentPeriodEnd > new Date()) {
@@ -60,15 +64,6 @@ async function getMonthlyWordCount(userId: string): Promise<number> {
 		.from(transcriptions)
 		.where(and(eq(transcriptions.userId, userId), gte(transcriptions.createdAt, getMonthStart())));
 	return Number(result[0]?.total ?? 0);
-}
-
-async function getUserPlan(userId: string): Promise<"free" | "pro"> {
-	const result = await db
-		.select({ plan: subscriptions.plan })
-		.from(subscriptions)
-		.where(and(eq(subscriptions.userId, userId), eq(subscriptions.status, "active")))
-		.limit(1);
-	return result[0]?.plan === "pro" ? "pro" : "free";
 }
 
 function countWords(text: string): number {
@@ -128,14 +123,14 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					getMonthlyWordCount(session.user.id),
 					getUserPlan(session.user.id),
 				]);
-				if (plan === "free" && wordsUsedBefore >= MONTHLY_WORD_LIMIT) {
-					return status(403, {
-						error: "Monthly transcription limit reached",
-						usage: {
-							wordsUsed: wordsUsedBefore,
-							wordLimit,
-						},
-					});
+			if (plan === "free" && wordsUsedBefore >= MONTHLY_WORD_LIMITS[plan]) {
+				return status(403, {
+					error: "Monthly transcription limit reached",
+					usage: {
+						wordsUsed: wordsUsedBefore,
+						wordLimit: MONTHLY_WORD_LIMITS[plan],
+					},
+				});
 				}
 
 				const fileBuffer = await file.arrayBuffer();
@@ -183,7 +178,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					usage: {
 						wordsUsed: wordsUsedAfter,
 						wordsRemaining:
-							plan === "pro" ? null : Math.max(0, MONTHLY_WORD_LIMIT - wordsUsedAfter),
+							plan === "pro" ? null : Math.max(0, MONTHLY_WORD_LIMITS[plan] - wordsUsedAfter),
 						plan,
 					},
 				} satisfies TranscriptionResult;
@@ -243,7 +238,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 		]);
 		return {
 			wordsUsed,
-			wordLimit: MONTHLY_WORD_LIMIT,
+			wordLimit: MONTHLY_WORD_LIMITS[plan],
 			plan,
 		};
 	})
