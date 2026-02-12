@@ -31,7 +31,23 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	}
 }
 
-const MONTHLY_WORD_LIMIT = 10_000;
+const MONTHLY_WORD_LIMITS = {
+	free: 1_000,
+	pro: 1_000_000,
+} as const;
+
+async function getUserPlan(userId: string): Promise<"free" | "pro"> {
+	const result = await db
+		.select({ plan: subscriptions.plan, currentPeriodEnd: subscriptions.currentPeriodEnd })
+		.from(subscriptions)
+		.where(eq(subscriptions.userId, userId))
+		.limit(1);
+	const sub = result[0];
+	if (sub?.plan === "pro" && sub.currentPeriodEnd && sub.currentPeriodEnd > new Date()) {
+		return "pro";
+	}
+	return "free";
+}
 
 function getMonthStart(): Date {
 	const now = new Date();
@@ -117,7 +133,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 						error: "Monthly transcription limit reached",
 						usage: {
 							wordsUsed: wordsUsedBefore,
-							wordLimit: MONTHLY_WORD_LIMIT,
+							wordLimit,
 						},
 					});
 				}
