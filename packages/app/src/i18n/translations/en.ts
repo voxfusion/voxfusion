@@ -27,6 +27,16 @@ export type Translations = {
 		language: string;
 		english: string;
 		russian: string;
+		spanish: string;
+		chinese: string;
+		japanese: string;
+		korean: string;
+		german: string;
+		french: string;
+		italian: string;
+		swedish: string;
+		hindi: string;
+		ukrainian: string;
 		audio: string;
 		hotkey: string;
 		appearance: string;
@@ -176,6 +186,16 @@ export const en: Translations = {
 		language: "Language",
 		english: "English",
 		russian: "Russian",
+		spanish: "Spanish",
+		chinese: "Chinese",
+		japanese: "Japanese",
+		korean: "Korean",
+		german: "German",
+		french: "French",
+		italian: "Italian",
+		swedish: "Swedish",
+		hindi: "Hindi",
+		ukrainian: "Ukrainian",
 		audio: "Audio",
 		hotkey: "Hotkey",
 		appearance: "Appearance",
