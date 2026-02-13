@@ -8,7 +8,7 @@ export default function CompletionStep() {
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
 			<div class="font-mono text-success text-sm mb-8 tracking-wider">
-				[STEP_06] &gt; SETUP_COMPLETE
+				[STEP_07] &gt; SETUP_COMPLETE
 			</div>
 
 			{/* Card container */}

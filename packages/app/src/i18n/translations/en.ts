@@ -122,6 +122,19 @@ export type Translations = {
 		accessibilityNotGranted: string;
 		openSystemPreferences: string;
 		accessibilityInstructions: string;
+		learningTitle: string;
+		learningDescription: string;
+		learningStep1Prefix: string;
+		learningStep1Suffix: string;
+		learningStep2: string;
+		learningStep3Prefix: string;
+		learningStep3Suffix: string;
+		learningStep4: string;
+		learningReady: string;
+		learningRecording: string;
+		learningProcessing: string;
+		learningPlaceholder: string;
+		learningError: string;
 	};
 	update: {
 		available: string;
@@ -265,6 +278,19 @@ export const en: Translations = {
 		openSystemPreferences: "Open System Preferences",
 		accessibilityInstructions:
 			"Click the lock icon to make changes, then check VoxFusion in the list.",
+		learningTitle: "Try It Out",
+		learningDescription: "Test the voice-to-text flow before you start.",
+		learningStep1Prefix: "Press",
+		learningStep1Suffix: "to start recording",
+		learningStep2: "Speak into your microphone",
+		learningStep3Prefix: "Press",
+		learningStep3Suffix: "again to stop",
+		learningStep4: "See your transcription appear",
+		learningReady: "Ready",
+		learningRecording: "Recording",
+		learningProcessing: "Processing",
+		learningPlaceholder: "Your transcriptions will appear here",
+		learningError: "Transcription failed. Try again.",
 	},
 	update: {
 		available: "Update Available",
