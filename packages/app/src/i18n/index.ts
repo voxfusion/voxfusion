@@ -3,17 +3,49 @@ import { flatten, translator, resolveTemplate } from "@solid-primitives/i18n";
 import { createSignal } from "solid-js";
 import { en, type Translations } from "./translations/en";
 import { ru } from "./translations/ru";
+import { es } from "./translations/es";
+import { zh } from "./translations/zh";
+import { ja } from "./translations/ja";
+import { ko } from "./translations/ko";
+import { de } from "./translations/de";
+import { fr } from "./translations/fr";
+import { it } from "./translations/it";
+import { sv } from "./translations/sv";
+import { hi } from "./translations/hi";
+import { uk } from "./translations/uk";
 
-export type Locale = "en" | "ru";
+export type Locale = "en" | "ru" | "es" | "zh" | "ja" | "ko" | "de" | "fr" | "it" | "sv" | "hi" | "uk";
+
+const ALL_LOCALES: Locale[] = ["en", "ru", "es", "zh", "ja", "ko", "de", "fr", "it", "sv", "hi", "uk"];
 
 const dictionaries: Record<Locale, Translations> = {
 	en,
 	ru,
+	es,
+	zh,
+	ja,
+	ko,
+	de,
+	fr,
+	it,
+	sv,
+	hi,
+	uk,
 };
 
 const flattenedDictionaries = {
 	en: flatten(en),
 	ru: flatten(ru),
+	es: flatten(es),
+	zh: flatten(zh),
+	ja: flatten(ja),
+	ko: flatten(ko),
+	de: flatten(de),
+	fr: flatten(fr),
+	it: flatten(it),
+	sv: flatten(sv),
+	hi: flatten(hi),
+	uk: flatten(uk),
 };
 
 export function createAppI18n(initialLocale: Locale = "en") {
@@ -45,8 +77,8 @@ export function useI18n() {
 
 export function getStoredLocale(): Locale {
 	const stored = localStorage.getItem("locale");
-	if (stored === "en" || stored === "ru") {
-		return stored;
+	if (stored && ALL_LOCALES.includes(stored as Locale)) {
+		return stored as Locale;
 	}
 	return "ru";
 }
