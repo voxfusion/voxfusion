@@ -32,11 +32,12 @@ export default function VoiceControl() {
 	const [audioLevel, setAudioLevel] = createSignal(0);
 	const [isAuthenticated, setIsAuthenticated] = createSignal(false);
 	const [isOnboardingComplete, setIsOnboardingComplete] = createSignal(false);
+	const [isLearningActive, setIsLearningActive] = createSignal(false);
 	let isStopping = false;
 	let isStarting = false;
 
 	const toggleRecording = () => {
-		if (!isAuthenticated() || !isOnboardingComplete()) {
+		if (!isAuthenticated() || (!isOnboardingComplete() && !isLearningActive())) {
 			return;
 		}
 		if (isStarting || isStopping) return;
@@ -111,7 +112,9 @@ export default function VoiceControl() {
 			const newHotkey = isValidComboHotkey(newSettings.hotkey)
 				? newSettings.hotkey
 				: DEFAULT_HOTKEY;
-			if (newHotkey !== currentShortcut()) {
+			const wasOnboarding = !isOnboardingComplete();
+			const nowComplete = newSettings.onboardingComplete;
+			if (newHotkey !== currentShortcut() || (wasOnboarding && nowComplete)) {
 				await registerShortcut(newHotkey);
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
@@ -123,10 +126,15 @@ export default function VoiceControl() {
 			setAudioLevel(event.payload);
 		});
 
+		const unlistenLearning = await listen<boolean>("learning-step-active", (event) => {
+			setIsLearningActive(event.payload);
+		});
+
 		onCleanup(() => {
 			unlistenSettings();
 			unlistenAudio();
 			unlistenAuth();
+			unlistenLearning();
 		});
 	});
 
