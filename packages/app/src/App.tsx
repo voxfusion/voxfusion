@@ -2,11 +2,9 @@ import { useStore } from "@nanostores/solid";
 import { useNavigate } from "@solidjs/router";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
-import { LogicalPosition, primaryMonitor } from "@tauri-apps/api/window";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { type ParentProps, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import appIcon from "../src-tauri/icons/icon.svg";
-import tauriconf from "../src-tauri/tauri.conf.json";
 import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
@@ -150,35 +148,11 @@ function App(props: ParentProps) {
 		window.addEventListener("keydown", handleKeyDown);
 		onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
 
-		const voicecontrolWindow = tauriconf.app.windows.find((w) => w.label === "voice-control");
-		if (!voicecontrolWindow) {
-			throw new Error("Voice control window not found");
-		}
-
-		const windowWidth = voicecontrolWindow.width;
-		const windowHeight = voicecontrolWindow.height;
-		const bottomPadding = 20;
-
-		const monitor = await primaryMonitor();
-		if (!monitor) {
-			return;
-		}
-
 		const allWindows = await getAllWebviewWindows();
 		const voiceWindow = allWindows.find((w) => w.label === "voice-control");
-		if (!voiceWindow) {
-			return;
+		if (voiceWindow) {
+			await voiceWindow.show();
 		}
-
-		const position = monitor.position.toLogical(monitor.scaleFactor);
-		const size = monitor.size.toLogical(monitor.scaleFactor);
-
-		const x = position.x + (size.width - windowWidth) / 2;
-		const y = position.y + size.height - windowHeight - bottomPadding;
-
-		await voiceWindow.setPosition(new LogicalPosition(x, y));
-
-		await voiceWindow.show();
 	});
 
 	return (

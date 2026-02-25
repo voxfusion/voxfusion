@@ -1,5 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
+import {
+	LogicalPosition,
+	cursorPosition,
+	getCurrentWindow,
+	monitorFromPoint,
+} from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
@@ -22,6 +28,31 @@ function isValidComboHotkey(hotkey: string): boolean {
 }
 
 const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
+
+const WINDOW_WIDTH = 100;
+const WINDOW_HEIGHT = 20;
+const BOTTOM_PADDING = 20;
+
+let lastMonitorX = 0;
+let lastMonitorY = 0;
+
+async function repositionToCurrentMonitor() {
+	const cursor = await cursorPosition();
+	const monitor = await monitorFromPoint(cursor.x, cursor.y);
+	if (!monitor) return;
+
+	const pos = monitor.position.toLogical(monitor.scaleFactor);
+	const size = monitor.size.toLogical(monitor.scaleFactor);
+
+	if (pos.x === lastMonitorX && pos.y === lastMonitorY) return;
+	lastMonitorX = pos.x;
+	lastMonitorY = pos.y;
+
+	const x = pos.x + (size.width - WINDOW_WIDTH) / 2;
+	const y = pos.y + size.height - WINDOW_HEIGHT - BOTTOM_PADDING;
+
+	await getCurrentWindow().setPosition(new LogicalPosition(x, y));
+}
 
 export default function VoiceControl() {
 	const [isRecording, setIsRecording] = createSignal(false);
@@ -83,6 +114,10 @@ export default function VoiceControl() {
 	};
 
 	onMount(async () => {
+		await repositionToCurrentMonitor();
+		const repositionInterval = setInterval(repositionToCurrentMonitor, 1000);
+		onCleanup(() => clearInterval(repositionInterval));
+
 		const settings = await loadSettings();
 		// Migrate: if a modifier-only hotkey was stored from a previous version, reset to default
 		let hotkey = settings.hotkey;
