@@ -25,6 +25,7 @@
 		"drizzle-orm": "^0.38.3",
 		"elysia": "^1.2.10",
 		"groq-sdk": "^0.37.0",
+		"pino": "^10.3.1",
 		"postgres": "^3.4.5"
 	},
 	"devDependencies": {

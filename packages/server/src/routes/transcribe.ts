@@ -3,9 +3,12 @@ import { join } from "node:path";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
 import { auth } from "../auth";
+import { logger as rootLogger } from "../logger";
 import { db } from "../providers/db";
 import { dictionaryWords, subscriptions, transcriptions } from "../providers/db/schema";
 import { groq } from "../providers/groq";
+
+const log = rootLogger.child({ module: "transcribe" });
 
 async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	const tempFile = join(tmpdir(), `audio-${crypto.randomUUID()}.webm`);
@@ -101,12 +104,15 @@ type TranscriptionMetadata = {
 
 export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 	.derive(async ({ request }) => {
+		log.info({ method: request.method, url: request.url }, "incoming request");
 		const session = await auth.api.getSession({
 			headers: request.headers,
 		});
 		if (!session?.user) {
+			log.warn("unauthorized request — no valid session");
 			return status(401, { error: "Unauthorized" });
 		}
+		log.info({ userId: session.user.id }, "authenticated user");
 		return {
 			session,
 			transcriptionMetadata: null as TranscriptionMetadata | null,
@@ -118,12 +124,17 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			const file = ctx.body.file;
 			const session = (ctx as any).session as Session;
 
+			log.info({ userId: session.user.id, fileName: file.name, fileSize: file.size }, "POST /transcribe");
+
 			try {
 				const [wordsUsedBefore, plan] = await Promise.all([
 					getMonthlyWordCount(session.user.id),
 					getUserPlan(session.user.id),
 				]);
+				log.info({ plan, wordsUsedBefore }, "fetched user plan and usage");
+
 			if (plan === "free" && wordsUsedBefore >= MONTHLY_WORD_LIMITS[plan]) {
+				log.warn({ userId: session.user.id, wordsUsedBefore }, "monthly limit reached");
 				return status(403, {
 					error: "Monthly transcription limit reached",
 					usage: {
@@ -134,6 +145,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				}
 
 				const fileBuffer = await file.arrayBuffer();
+				log.info({ bufferSize: fileBuffer.byteLength }, "read file buffer");
 
 				const userWords = await db
 					.select({ word: dictionaryWords.word })
@@ -147,8 +159,10 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
 				}
+				log.info({ dictionaryWords: userWords.length, promptLength: prompt.length }, "built prompt");
 
 				const startTime = performance.now();
+				log.info("sending to Groq whisper-large-v3");
 
 				const transcription = await groq.audio.transcriptions.create({
 					model: "whisper-large-v3",
@@ -160,6 +174,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 
 				const endTime = performance.now();
 				const processingTimeMs = Math.round(endTime - startTime);
+				log.info({ processingTimeMs, textLength: transcription.text.length }, "groq response received");
 
 				const transcriptionText = transcription.text.trim();
 				const wordCount = countWords(transcriptionText);
@@ -172,6 +187,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				};
 
 				const wordsUsedAfter = wordsUsedBefore + wordCount;
+				log.info({ wordCount, wordsUsedAfter }, "transcription succeeded");
 				return {
 					text: transcriptionText,
 					wordCount,
@@ -183,6 +199,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					},
 				} satisfies TranscriptionResult;
 			} catch (error) {
+				log.error({ err: error }, "transcription failed");
 				return status(500, {
 					error: "Transcription failed",
 					details: error instanceof Error ? error.message : error,
@@ -198,17 +215,20 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				const metadata = (ctx as any).transcriptionMetadata as TranscriptionMetadata | null;
 
 				if (!session || !metadata) {
+					log.debug("afterResponse skipped — no session or metadata");
 					return;
 				}
 
 				try {
 					const audioDurationMs = await getAudioDuration(metadata.fileBuffer);
+					log.info({ audioDurationMs }, "computed audio duration");
 
 					const fileName = `${crypto.randomUUID()}.webm`;
 					const s3Path = `uploads/recordings/${fileName}`;
 					await Bun.s3.write(s3Path, new Blob([metadata.fileBuffer], { type: "audio/webm" }), {
 						acl: "public-read",
 					});
+					log.info({ s3Path }, "uploaded recording to S3");
 
 					const fileUrl = `${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET}/${s3Path}`;
 
@@ -224,8 +244,9 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 						provider: "groq",
 						model: "whisper-large-v3-turbo",
 					});
-				} catch {
-					// Transcription save failed
+					log.info({ transcriptionId, userId: session.user.id }, "saved transcription to DB");
+				} catch (error) {
+					log.error({ err: error }, "afterResponse failed — could not save transcription");
 				}
 			},
 		}
