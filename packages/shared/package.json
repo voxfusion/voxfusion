@@ -1,0 +1,9 @@
+{
+	"name": "@voxfusion/shared",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"exports": {
+		"./subscriptionPlans": "./src/subscriptionPlans.ts"
+	}
+}

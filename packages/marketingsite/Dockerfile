@@ -4,10 +4,12 @@ WORKDIR /app
 
 COPY package.json bun.lock* turbo.json tsconfig.json ./
 COPY packages/marketingsite/package.json ./packages/marketingsite/
+COPY packages/shared/package.json ./packages/shared/
 
 RUN bun install
 
 COPY packages/marketingsite/ ./packages/marketingsite/
+COPY packages/shared/ ./packages/shared/
 
 WORKDIR /app/packages/marketingsite
 RUN bun run build

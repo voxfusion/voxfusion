@@ -5,6 +5,8 @@ WORKDIR /app
 RUN bun add -g turbo@^2.7.2
 
 COPY package.json bun.lock* turbo.json ./
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/shared/src ./packages/shared/src/
 COPY packages/server/package.json ./packages/server/
 COPY packages/server/tsconfig.json ./packages/server/
 COPY packages/server/drizzle.config.ts ./packages/server/

@@ -1,4 +1,4 @@
-import { MONTHLY_TRANSCRIPTION_WORD_LIMITS } from "../../../../shared/src/subscriptionPlans";
+import { MONTHLY_TRANSCRIPTION_WORD_LIMITS } from "@voxfusion/shared/subscriptionPlans";
 
 const freePlanWordLimit = MONTHLY_TRANSCRIPTION_WORD_LIMITS.free.toLocaleString("ru-RU");
 

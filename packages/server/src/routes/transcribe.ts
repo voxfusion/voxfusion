@@ -5,7 +5,7 @@ import { Elysia, status, t } from "elysia";
 import {
 	MONTHLY_TRANSCRIPTION_WORD_LIMITS,
 	type SubscriptionPlan,
-} from "../../../shared/src/subscriptionPlans";
+} from "@voxfusion/shared/subscriptionPlans";
 import { auth } from "../auth";
 import { logger as rootLogger } from "../logger";
 import { db } from "../providers/db";
