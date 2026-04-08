@@ -1,3 +1,7 @@
+import { MONTHLY_TRANSCRIPTION_WORD_LIMITS } from "../../../../shared/src/subscriptionPlans";
+
+const freePlanWordLimit = MONTHLY_TRANSCRIPTION_WORD_LIMITS.free.toLocaleString("ru-RU");
+
 export const pricing = {
 	"pricing.tag": "Цены",
 	"pricing.title": "Начните бесплатно, обновляйтесь по необходимости",
@@ -8,7 +12,7 @@ export const pricing = {
 	"pricing.free.period": "навсегда",
 	"pricing.free.description":
 		"Идеально для знакомства с голосовой диктовкой",
-	"pricing.free.feature1": "1 000 слов в месяц",
+	"pricing.free.feature1": `${freePlanWordLimit} слов в месяц`,
 	"pricing.free.feature2": "Точная транскрипция",
 	"pricing.free.feature3": "Свой словарь (50 терминов)",
 	"pricing.free.feature4": "История транскрипций",

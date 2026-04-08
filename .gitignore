@@ -38,3 +38,6 @@ target
 
 # Conductor workspace
 .context
+
+# Local OpenCode workspace
+.opencode/

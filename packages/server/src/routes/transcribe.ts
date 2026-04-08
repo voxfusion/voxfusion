@@ -2,6 +2,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { Elysia, status, t } from "elysia";
+import {
+	MONTHLY_TRANSCRIPTION_WORD_LIMITS,
+	type SubscriptionPlan,
+} from "../../../shared/src/subscriptionPlans";
 import { auth } from "../auth";
 import { logger as rootLogger } from "../logger";
 import { db } from "../providers/db";
@@ -34,12 +38,7 @@ async function getAudioDuration(buffer: ArrayBuffer): Promise<number | null> {
 	}
 }
 
-const MONTHLY_WORD_LIMITS = {
-	free: 1_000,
-	pro: 1_000_000,
-} as const;
-
-async function getUserPlan(userId: string): Promise<"free" | "pro"> {
+async function getUserPlan(userId: string): Promise<SubscriptionPlan> {
 	const result = await db
 		.select({
 			plan: subscriptions.plan,
@@ -133,13 +132,13 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				]);
 				log.info({ plan, wordsUsedBefore }, "fetched user plan and usage");
 
-			if (plan === "free" && wordsUsedBefore >= MONTHLY_WORD_LIMITS[plan]) {
+			if (plan === "free" && wordsUsedBefore >= MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan]) {
 				log.warn({ userId: session.user.id, wordsUsedBefore }, "monthly limit reached");
 				return status(403, {
 					error: "Monthly transcription limit reached",
 					usage: {
 						wordsUsed: wordsUsedBefore,
-						wordLimit: MONTHLY_WORD_LIMITS[plan],
+						wordLimit: MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan],
 					},
 				});
 				}
@@ -194,7 +193,9 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					usage: {
 						wordsUsed: wordsUsedAfter,
 						wordsRemaining:
-							plan === "pro" ? null : Math.max(0, MONTHLY_WORD_LIMITS[plan] - wordsUsedAfter),
+							plan === "pro"
+								? null
+								: Math.max(0, MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan] - wordsUsedAfter),
 						plan,
 					},
 				} satisfies TranscriptionResult;
@@ -259,7 +260,7 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 		]);
 		return {
 			wordsUsed,
-			wordLimit: MONTHLY_WORD_LIMITS[plan],
+			wordLimit: MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan],
 			plan,
 		};
 	})

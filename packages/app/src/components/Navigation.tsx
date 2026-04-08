@@ -3,6 +3,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { BookOpen, Home, LogOut, Settings, Shield, User } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
+import { MONTHLY_TRANSCRIPTION_WORD_LIMITS } from "../../../shared/src/subscriptionPlans";
 import { useI18n } from "../i18n";
 import { authClient } from "../lib/authClient";
 import eden from "../lib/eden";
@@ -18,7 +19,7 @@ export default function Sidebar(props: SidebarProps) {
 	const location = useLocation();
 	const [isUserMenuOpen, setIsUserMenuOpen] = createSignal(false);
 	const [wordsUsed, setWordsUsed] = createSignal(0);
-	const [wordLimit, setWordLimit] = createSignal(10_000);
+	const [wordLimit, setWordLimit] = createSignal<number>(MONTHLY_TRANSCRIPTION_WORD_LIMITS.free);
 	const [plan, setPlan] = createSignal<"free" | "pro">("free");
 
 	const isActive = (path: string) => location.pathname === path;
