@@ -1,22 +1,47 @@
-import { createContext, useContext } from "solid-js";
-import { flatten, translator, resolveTemplate } from "@solid-primitives/i18n";
+import { flatten, resolveTemplate, translator } from "@solid-primitives/i18n";
 import { createSignal } from "solid-js";
-import { en, type Translations } from "./translations/en";
-import { ru } from "./translations/ru";
+import { createContext, useContext } from "solid-js";
+import { de } from "./translations/de";
+import { type Translations, en } from "./translations/en";
 import { es } from "./translations/es";
-import { zh } from "./translations/zh";
+import { fr } from "./translations/fr";
+import { hi } from "./translations/hi";
+import { it } from "./translations/it";
 import { ja } from "./translations/ja";
 import { ko } from "./translations/ko";
-import { de } from "./translations/de";
-import { fr } from "./translations/fr";
-import { it } from "./translations/it";
+import { ru } from "./translations/ru";
 import { sv } from "./translations/sv";
-import { hi } from "./translations/hi";
 import { uk } from "./translations/uk";
+import { zh } from "./translations/zh";
 
-export type Locale = "en" | "ru" | "es" | "zh" | "ja" | "ko" | "de" | "fr" | "it" | "sv" | "hi" | "uk";
+export type Locale =
+	| "en"
+	| "ru"
+	| "es"
+	| "zh"
+	| "ja"
+	| "ko"
+	| "de"
+	| "fr"
+	| "it"
+	| "sv"
+	| "hi"
+	| "uk";
 
-const ALL_LOCALES: Locale[] = ["en", "ru", "es", "zh", "ja", "ko", "de", "fr", "it", "sv", "hi", "uk"];
+const ALL_LOCALES: Locale[] = [
+	"en",
+	"ru",
+	"es",
+	"zh",
+	"ja",
+	"ko",
+	"de",
+	"fr",
+	"it",
+	"sv",
+	"hi",
+	"uk",
+];
 
 const dictionaries: Record<Locale, Translations> = {
 	en,
@@ -80,7 +105,7 @@ export function getStoredLocale(): Locale {
 	if (stored && ALL_LOCALES.includes(stored as Locale)) {
 		return stored as Locale;
 	}
-	return "ru";
+	return "en";
 }
 
 export function setStoredLocale(locale: Locale) {
