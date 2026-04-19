@@ -174,7 +174,7 @@ class YooKassaClient {
 	async createSubscriptionPayment(
 		userId: string,
 		returnUrl: string,
-		description = "Подписка VoxFusion Pro"
+		description = "VoxFusion Pro Subscription"
 	): Promise<YooKassaPayment> {
 		return this.createPayment(
 			{
@@ -208,7 +208,7 @@ class YooKassaClient {
 				},
 				capture: true,
 				payment_method_id: paymentMethodId,
-				description: "Продление подписки VoxFusion Pro",
+				description: "VoxFusion Pro Subscription Renewal",
 				metadata: {
 					user_id: userId,
 					type: "subscription_renewal",

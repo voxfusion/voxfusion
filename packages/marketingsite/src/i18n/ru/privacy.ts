@@ -1,35 +1,54 @@
 export const privacy = {
-	"privacy.title": "Политика конфиденциальности",
-	"privacy.lastUpdated": "Последнее обновление: 7 февраля 2026 г.",
-	"privacy.intro": "Настоящая Политика конфиденциальности (далее — «Политика») определяет порядок обработки и защиты персональных данных пользователей сервиса VoxFusion (далее — «Сервис»), разработанного в соответствии с Федеральным законом от 27.07.2006 № 152-ФЗ «О персональных данных» и иными нормативными правовыми актами Российской Федерации.",
-	"privacy.section1.title": "1. Общие положения",
-	"privacy.section1.p1": "1.1. Оператором персональных данных является ИП Токарев Григорий Алексеевич (далее — «Оператор»).",
-	"privacy.section1.p2": "1.2. Настоящая Политика действует в отношении всех персональных данных, которые Оператор может получить от Пользователя во время использования Сервиса.",
-	"privacy.section1.p3": "1.3. Использование Сервиса означает безоговорочное согласие Пользователя с настоящей Политикой и указанными в ней условиями обработки персональных данных.",
-	"privacy.section2.title": "2. Какие данные мы собираем",
-	"privacy.section2.p1": "2.1. Аудиоданные: голосовые записи, которые вы диктуете через приложение. Аудио передаётся на серверы распознавания речи для транскрибации и не хранится после обработки.",
-	"privacy.section2.p2": "2.2. Технические данные: тип и версия операционной системы, идентификатор устройства, версия приложения, язык системы, сведения об ошибках и сбоях.",
-	"privacy.section2.p3": "2.3. Данные об использовании: количество транскрибированных слов, частота использования, выбранный тарифный план.",
-	"privacy.section2.p4": "2.4. Платёжные данные: при оформлении подписки обработка платежей осуществляется сторонним платёжным провайдером. Мы не храним данные банковских карт.",
-	"privacy.section3.title": "3. Цели обработки данных",
-	"privacy.section3.p1": "3.1. Предоставление функциональности Сервиса — преобразование голоса в текст.",
-	"privacy.section3.p2": "3.2. Улучшение качества Сервиса и исправление ошибок.",
-	"privacy.section3.p3": "3.3. Обеспечение технической поддержки пользователей.",
-	"privacy.section3.p4": "3.4. Выполнение обязательств по тарифным планам и управление подписками.",
-	"privacy.section3.p5": "3.5. Соблюдение требований законодательства Российской Федерации.",
-	"privacy.section4.title": "4. Правовые основания обработки",
-	"privacy.section4.p1": "4.1. Обработка персональных данных осуществляется на основании: согласия субъекта персональных данных (ст. 6 п. 1 пп. 1 ФЗ-152); исполнения договора (ст. 6 п. 1 пп. 5 ФЗ-152); законных интересов оператора (ст. 6 п. 1 пп. 7 ФЗ-152).",
-	"privacy.section5.title": "5. Передача данных третьим лицам",
-	"privacy.section5.p1": "5.1. Аудиоданные могут передаваться стороннему провайдеру распознавания речи исключительно для целей транскрибации.",
-	"privacy.section5.p2": "5.2. Мы не продаём, не обмениваем и не передаём персональные данные третьим лицам в маркетинговых целях.",
-	"privacy.section5.p3": "5.3. Данные могут быть раскрыты по запросу уполномоченных государственных органов в случаях, предусмотренных законодательством РФ.",
-	"privacy.section6.title": "6. Хранение и защита данных",
-	"privacy.section6.p1": "6.1. Аудиозаписи не хранятся после завершения транскрибации. Текстовый результат хранится локально на устройстве пользователя.",
-	"privacy.section6.p2": "6.2. Технические данные хранятся в течение 12 месяцев с момента последнего использования Сервиса.",
-	"privacy.section6.p3": "6.3. Оператор принимает необходимые организационные и технические меры для защиты персональных данных от неправомерного доступа, уничтожения, изменения, блокирования, копирования и распространения.",
-	"privacy.section7.title": "7. Права пользователя",
-	"privacy.section7.p1": "7.1. Пользователь имеет право: получить информацию об обработке своих персональных данных; потребовать уточнения, блокирования или уничтожения персональных данных; отозвать согласие на обработку персональных данных.",
-	"privacy.section7.p2": "7.2. Для реализации указанных прав обратитесь по адресу: hello@voxfusion.com.",
-	"privacy.section8.title": "8. Изменение Политики",
-	"privacy.section8.p1": "8.1. Оператор вправе вносить изменения в настоящую Политику. Актуальная версия размещается на данной странице с указанием даты последнего обновления.",
+	"privacy.title": "Privacy Policy",
+	"privacy.lastUpdated": "Last updated: February 7, 2026",
+	"privacy.intro":
+		"This Privacy Policy (the “Policy”) defines how personal data of VoxFusion users (the “Service”) is processed and protected in accordance with Federal Law No. 152-FZ dated July 27, 2006 “On Personal Data” and other applicable laws of the Russian Federation.",
+	"privacy.section1.title": "1. General provisions",
+	"privacy.section1.p1":
+		"1.1. The personal data operator is Individual Entrepreneur Grigoriy Alekseevich Tokarev (the “Operator”).",
+	"privacy.section1.p2":
+		"1.2. This Policy applies to all personal data the Operator may receive from the User while the User uses the Service.",
+	"privacy.section1.p3":
+		"1.3. Use of the Service constitutes the User’s unconditional acceptance of this Policy and the personal data processing terms described in it.",
+	"privacy.section2.title": "2. What data we collect",
+	"privacy.section2.p1":
+		"2.1. Audio data: voice recordings you dictate through the app. Audio is sent to speech recognition servers for transcription and is not stored after processing.",
+	"privacy.section2.p2":
+		"2.2. Technical data: operating system type and version, device identifier, app version, system language, and information about errors and crashes.",
+	"privacy.section2.p3":
+		"2.3. Usage data: the number of transcribed words, usage frequency, and the selected subscription plan.",
+	"privacy.section2.p4":
+		"2.4. Payment data: when you purchase a subscription, payments are processed by a third-party payment provider. We do not store bank card details.",
+	"privacy.section3.title": "3. Purposes of processing",
+	"privacy.section3.p1":
+		"3.1. Providing Service functionality, including converting voice to text.",
+	"privacy.section3.p2": "3.2. Improving Service quality and fixing errors.",
+	"privacy.section3.p3": "3.3. Providing technical support to users.",
+	"privacy.section3.p4":
+		"3.4. Fulfilling subscription plan obligations and managing subscriptions.",
+	"privacy.section3.p5": "3.5. Complying with legal requirements of the Russian Federation.",
+	"privacy.section4.title": "4. Legal bases for processing",
+	"privacy.section4.p1":
+		"4.1. Personal data is processed on the basis of: the data subject’s consent (Article 6, Clause 1, Subclause 1 of Federal Law No. 152-FZ); performance of a contract (Article 6, Clause 1, Subclause 5 of Federal Law No. 152-FZ); and the operator’s legitimate interests (Article 6, Clause 1, Subclause 7 of Federal Law No. 152-FZ).",
+	"privacy.section5.title": "5. Transfer of data to third parties",
+	"privacy.section5.p1":
+		"5.1. Audio data may be transferred to a third-party speech recognition provider solely for transcription purposes.",
+	"privacy.section5.p2":
+		"5.2. We do not sell, exchange, or share personal data with third parties for marketing purposes.",
+	"privacy.section5.p3":
+		"5.3. Data may be disclosed upon request from authorized government authorities in cases required by Russian law.",
+	"privacy.section6.title": "6. Data retention and protection",
+	"privacy.section6.p1":
+		"6.1. Audio recordings are not stored after transcription is complete. The text result is stored locally on the user’s device.",
+	"privacy.section6.p2":
+		"6.2. Technical data is retained for 12 months from the user’s last use of the Service.",
+	"privacy.section6.p3":
+		"6.3. The Operator takes the necessary organizational and technical measures to protect personal data from unauthorized access, destruction, modification, blocking, copying, and distribution.",
+	"privacy.section7.title": "7. User rights",
+	"privacy.section7.p1":
+		"7.1. The User has the right to receive information about the processing of their personal data, request clarification, blocking, or deletion of personal data, and withdraw consent to personal data processing.",
+	"privacy.section7.p2": "7.2. To exercise these rights, contact us at hello@voxfusion.com.",
+	"privacy.section8.title": "8. Policy changes",
+	"privacy.section8.p1":
+		"8.1. The Operator may amend this Policy. The current version is published on this page with the date of the latest update.",
 } as const;

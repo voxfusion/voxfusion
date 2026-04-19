@@ -1,33 +1,30 @@
 export const features = {
-	"features.tag": "Возможности",
-	"features.title":
-		"Простая и быстрая диктовка везде",
-	"features.description":
-		"Без переключения приложений. Без копирования. Просто говорите.",
-	"features.globalHotkey.title": "Глобальная горячая клавиша",
+	"features.tag": "Features",
+	"features.title": "Fast, simple dictation everywhere",
+	"features.description": "No app switching. No copy and paste. Just speak.",
+	"features.globalHotkey.title": "Global hotkey",
 	"features.globalHotkey.description":
-		"Нажмите Cmd+; в любом месте на Mac для диктовки. Работает везде - почта, документы, чаты, редакторы кода.",
-	"features.instantTranscription.title": "Мгновенная транскрипция",
+		"Press Cmd+; anywhere on your Mac to dictate. It works in email, documents, chats, and code editors.",
+	"features.instantTranscription.title": "Instant transcription",
 	"features.instantTranscription.description":
-		"Точность распознавания значительно выше, чем у встроенной диктовки macOS. Текст появляется за секунды.",
-	"features.customDictionary.title": "Свой словарь",
+		"Recognition is far more accurate than the built-in macOS dictation. Text appears in seconds.",
+	"features.customDictionary.title": "Custom dictionary",
 	"features.customDictionary.description":
-		"Добавьте до 50 специальных терминов, имен или технических слов для лучшей точности.",
-	"features.history.title": "История транскрипций",
+		"Add up to 50 specialized terms, names, or technical words for better accuracy.",
+	"features.history.title": "Transcription history",
 	"features.history.description":
-		"Просматривайте прошлые транскрипции с временными метками. Копируйте в буфер или оценивайте точность.",
-	"features.languages.title": "Английский и русский",
+		"Review past transcriptions with timestamps. Copy them or rate their accuracy.",
+	"features.languages.title": "English and Russian",
 	"features.languages.description":
-		"Полная поддержка диктовки на английском и русском с оптимизацией для каждого языка.",
-	"features.simpleSetup.title": "Простая настройка",
+		"Full dictation support for English and Russian with tuning for each language.",
+	"features.simpleSetup.title": "Simple setup",
 	"features.simpleSetup.description":
-		"Скачайте, дайте доступ к микрофону и начните диктовать. Никакой сложной настройки.",
-	"features.highlight.tag": "Почему VoxFusion?",
-	"features.highlight.title":
-		"Диктуйте в любое приложение без переключения окон.",
+		"Download it, grant microphone access, and start dictating. No complicated setup.",
+	"features.highlight.tag": "Why VoxFusion?",
+	"features.highlight.title": "Dictate into any app without switching windows.",
 	"features.highlight.description":
-		"Обычные приложения для диктовки заставляют копировать и вставлять. VoxFusion вставляет текст прямо туда, где курсор - в любом приложении, любом текстовом поле.",
-	"features.highlight.list1": "Работает в любом приложении Mac - браузеры, редакторы, почта",
-	"features.highlight.list2": "Настраиваемая горячая клавиша (по умолчанию Cmd+;)",
-	"features.highlight.list3": "Свои термины для имен и технической лексики",
+		"Most dictation apps make you copy and paste. VoxFusion inserts text directly at the cursor in any app and any text field.",
+	"features.highlight.list1": "Works in any Mac app: browsers, editors, and email",
+	"features.highlight.list2": "Customizable hotkey (Cmd+; by default)",
+	"features.highlight.list3": "Custom terms for names and technical vocabulary",
 } as const;
