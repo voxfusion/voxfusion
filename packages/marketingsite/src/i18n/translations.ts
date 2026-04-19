@@ -1,21 +1,21 @@
 import { common } from "./ru/common";
-import { hero } from "./ru/hero";
-import { features } from "./ru/features";
 import { demo } from "./ru/demo";
-import { pricing } from "./ru/pricing";
 import { downloads } from "./ru/downloads";
+import { features } from "./ru/features";
+import { hero } from "./ru/hero";
+import { pricing } from "./ru/pricing";
 import { privacy } from "./ru/privacy";
-import { terms } from "./ru/terms";
 import { security } from "./ru/security";
+import { terms } from "./ru/terms";
 
 export const languages = {
-	ru: "Русский",
+	en: "English",
 };
 
-export const defaultLang = "ru";
+export const defaultLang = "en";
 
 export const translations = {
-	ru: {
+	en: {
 		...common,
 		...hero,
 		...features,
@@ -28,4 +28,4 @@ export const translations = {
 	},
 } as const;
 
-export type TranslationKey = keyof (typeof translations)["ru"];
+export type TranslationKey = keyof (typeof translations)["en"];

@@ -191,7 +191,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 
 	const languageOptions: SelectOption[] = [
 		{ value: "en", label: "ENGLISH" },
-		{ value: "ru", label: "РУССКИЙ" },
+		{ value: "ru", label: "RUSSIAN" },
 		{ value: "es", label: "ESPAÑOL" },
 		{ value: "zh", label: "中文" },
 		{ value: "ja", label: "日本語" },
@@ -201,7 +201,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 		{ value: "it", label: "ITALIANO" },
 		{ value: "sv", label: "SVENSKA" },
 		{ value: "hi", label: "हिन्दी" },
-		{ value: "uk", label: "УКРАЇНСЬКА" },
+		{ value: "uk", label: "UKRAINIAN" },
 	];
 
 	return (

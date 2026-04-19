@@ -1,17 +1,14 @@
 export const downloads = {
-	"downloads.title": "Скачать",
-	"downloads.subtitle":
-		"Скачайте VoxFusion для вашей платформы.",
+	"downloads.title": "Download",
+	"downloads.subtitle": "Download VoxFusion for your platform.",
 	"downloads.macos.title": "macOS",
 	"downloads.macos.latest": "macOS (latest)",
-	"downloads.macos.latest.description":
-		"Для Mac с Apple Silicon (M1, M2, M3, M4)",
+	"downloads.macos.latest.description": "For Macs with Apple Silicon (M1, M2, M3, M4)",
 	"downloads.macos.universal": "macOS Universal",
-	"downloads.macos.universal.description":
-		"Для Mac с Intel и Apple Silicon",
+	"downloads.macos.universal.description": "For Intel Macs and Apple Silicon Macs",
 	"downloads.windows.title": "Windows",
 	"downloads.windows.warning":
-		"Сборки для Windows нестабильны и не протестированы. Используйте на свой риск.",
-	"downloads.windows.download": "Скачать для Windows",
+		"Windows builds are unstable and untested. Use them at your own risk.",
+	"downloads.windows.download": "Download for Windows",
 	"downloads.windows.description": "Windows 10/11 (x64)",
 } as const;

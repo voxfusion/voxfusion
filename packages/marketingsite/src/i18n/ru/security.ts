@@ -1,33 +1,51 @@
 export const security = {
-	"security.title": "Безопасность",
-	"security.lastUpdated": "Последнее обновление: 7 февраля 2026 г.",
-	"security.intro": "Безопасность данных наших пользователей — приоритет VoxFusion. Настоящий документ описывает меры, принимаемые для защиты информации в соответствии с требованиями Федерального закона от 27.07.2006 № 149-ФЗ «Об информации, информационных технологиях и о защите информации» и приказа ФСТЭК России от 18.02.2013 № 21.",
-	"security.section1.title": "1. Архитектура безопасности",
-	"security.section1.p1": "1.1. Аудиоданные передаются по зашифрованному каналу (TLS 1.3) и не сохраняются на серверах после завершения транскрибации.",
-	"security.section1.p2": "1.2. Результаты транскрибации хранятся исключительно локально на устройстве пользователя. Серверная часть не хранит текстовые результаты.",
-	"security.section1.p3": "1.3. Приложение запрашивает только необходимые разрешения: доступ к микрофону и службы универсального доступа (Accessibility) для вставки текста.",
-	"security.section2.title": "2. Защита данных при передаче",
-	"security.section2.p1": "2.1. Все сетевые соединения используют протокол TLS 1.3 с современными наборами шифров.",
-	"security.section2.p2": "2.2. Реализована привязка сертификатов (certificate pinning) для предотвращения атак типа «человек посередине» (MITM).",
-	"security.section2.p3": "2.3. API-ключи и токены аутентификации хранятся в системной связке ключей macOS (Keychain).",
-	"security.section3.title": "3. Защита данных при хранении",
-	"security.section3.p1": "3.1. Локальная база данных с историей транскрипций защищена средствами шифрования macOS.",
-	"security.section3.p2": "3.2. Пользовательский словарь и настройки хранятся в зашифрованном хранилище приложения.",
-	"security.section3.p3": "3.3. Временные аудиофайлы удаляются сразу после завершения транскрибации.",
-	"security.section4.title": "4. Инфраструктурная безопасность",
-	"security.section4.p1": "4.1. Серверная инфраструктура размещена в дата-центрах с сертификацией ISO 27001.",
-	"security.section4.p2": "4.2. Доступ к серверам ограничен и контролируется с использованием многофакторной аутентификации.",
-	"security.section4.p3": "4.3. Ведётся журналирование всех действий администраторов и критических системных событий.",
-	"security.section5.title": "5. Безопасность приложения",
-	"security.section5.p1": "5.1. Приложение подписано сертификатом разработчика Apple и прошло нотаризацию (Apple Notarization).",
-	"security.section5.p2": "5.2. Автоматические обновления доставляются по защищённому каналу с проверкой цифровой подписи.",
-	"security.section5.p3": "5.3. Приложение работает в песочнице macOS (App Sandbox) с минимальными привилегиями.",
-	"security.section6.title": "6. Реагирование на инциденты",
-	"security.section6.p1": "6.1. При обнаружении уязвимости безопасности просим сообщить на security@voxfusion.com.",
-	"security.section6.p2": "6.2. Мы обязуемся: подтвердить получение сообщения в течение 24 часов; предоставить оценку уязвимости в течение 72 часов; выпустить исправление для критических уязвимостей в кратчайшие сроки.",
-	"security.section6.p3": "6.3. В случае утечки персональных данных уведомление пользователей и уполномоченных органов будет произведено в порядке, предусмотренном ст. 21 ФЗ-152.",
-	"security.section7.title": "7. Соответствие требованиям",
-	"security.section7.p1": "7.1. Обработка персональных данных осуществляется в соответствии с ФЗ-152 «О персональных данных».",
-	"security.section7.p2": "7.2. Организационные и технические меры защиты соответствуют требованиям приказа ФСТЭК России № 21.",
-	"security.section7.p3": "7.3. Контактные данные по вопросам безопасности: security@voxfusion.com.",
+	"security.title": "Security",
+	"security.lastUpdated": "Last updated: February 7, 2026",
+	"security.intro":
+		"Protecting our users’ data is a priority for VoxFusion. This document describes the measures we take to protect information in accordance with Federal Law No. 149-FZ dated July 27, 2006 “On Information, Information Technologies, and Information Protection” and Order No. 21 of the Federal Service for Technical and Export Control of Russia dated February 18, 2013.",
+	"security.section1.title": "1. Security architecture",
+	"security.section1.p1":
+		"1.1. Audio data is transmitted over an encrypted channel (TLS 1.3) and is not stored on servers after transcription is complete.",
+	"security.section1.p2":
+		"1.2. Transcription results are stored only on the user’s device. The server side does not store text results.",
+	"security.section1.p3":
+		"1.3. The app requests only the permissions it needs: microphone access and Accessibility services for text insertion.",
+	"security.section2.title": "2. Data protection in transit",
+	"security.section2.p1": "2.1. All network connections use TLS 1.3 with modern cipher suites.",
+	"security.section2.p2":
+		"2.2. Certificate pinning is implemented to mitigate man-in-the-middle (MITM) attacks.",
+	"security.section2.p3":
+		"2.3. API keys and authentication tokens are stored in the macOS Keychain.",
+	"security.section3.title": "3. Data protection at rest",
+	"security.section3.p1":
+		"3.1. The local database containing transcription history is protected by macOS encryption mechanisms.",
+	"security.section3.p2":
+		"3.2. The custom dictionary and app settings are stored in encrypted application storage.",
+	"security.section3.p3":
+		"3.3. Temporary audio files are deleted immediately after transcription completes.",
+	"security.section4.title": "4. Infrastructure security",
+	"security.section4.p1":
+		"4.1. Server infrastructure is hosted in ISO 27001-certified data centers.",
+	"security.section4.p2":
+		"4.2. Server access is restricted and controlled with multi-factor authentication.",
+	"security.section4.p3": "4.3. All administrator actions and critical system events are logged.",
+	"security.section5.title": "5. Application security",
+	"security.section5.p1":
+		"5.1. The app is signed with an Apple developer certificate and notarized by Apple.",
+	"security.section5.p2":
+		"5.2. Automatic updates are delivered over a secure channel with digital signature verification.",
+	"security.section5.p3": "5.3. The app runs inside the macOS sandbox with minimal privileges.",
+	"security.section6.title": "6. Incident response",
+	"security.section6.p1":
+		"6.1. If you discover a security vulnerability, please report it to security@voxfusion.com.",
+	"security.section6.p2":
+		"6.2. We commit to confirming receipt within 24 hours, providing an assessment within 72 hours, and issuing fixes for critical vulnerabilities as quickly as possible.",
+	"security.section6.p3":
+		"6.3. In the event of a personal data breach, users and authorized authorities will be notified in accordance with Article 21 of Federal Law No. 152-FZ.",
+	"security.section7.title": "7. Compliance",
+	"security.section7.p1":
+		"7.1. Personal data is processed in accordance with Federal Law No. 152-FZ “On Personal Data.”",
+	"security.section7.p2":
+		"7.2. Organizational and technical safeguards comply with the requirements of FSTEC Russia Order No. 21.",
+	"security.section7.p3": "7.3. Security contact: security@voxfusion.com.",
 } as const;

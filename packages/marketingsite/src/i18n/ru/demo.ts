@@ -1,16 +1,15 @@
 export const demo = {
-	"demo.tag": "Демо",
-	"demo.title": "Посмотрите VoxFusion в действии",
-	"demo.description":
-		"Три простых шага для диктовки в любом месте на Mac.",
-	"demo.videoLabel": "Демонстрация продукта",
-	"demo.step1.title": "Нажмите горячую клавишу",
+	"demo.tag": "Demo",
+	"demo.title": "See VoxFusion in action",
+	"demo.description": "Three simple steps to dictate anywhere on your Mac.",
+	"demo.videoLabel": "Product demo",
+	"demo.step1.title": "Press the hotkey",
 	"demo.step1.description":
-		"Нажмите Cmd+; откуда угодно на Mac. Индикатор покажет, что VoxFusion слушает.",
-	"demo.step2.title": "Говорите естественно",
+		"Press Cmd+; anywhere on your Mac. The indicator shows that VoxFusion is listening.",
+	"demo.step2.title": "Speak naturally",
 	"demo.step2.description":
-		"Говорите в обычном темпе. VoxFusion распознает речь с высокой точностью.",
-	"demo.step3.title": "Текст появляется мгновенно",
+		"Speak at a normal pace. VoxFusion transcribes speech with high accuracy.",
+	"demo.step3.title": "Text appears instantly",
 	"demo.step3.description":
-		"Ваши слова вставляются прямо туда, где был курсор. Без копирования.",
+		"Your words are inserted exactly where the cursor was. No copy and paste.",
 } as const;
