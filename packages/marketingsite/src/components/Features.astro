@@ -16,20 +16,14 @@ const featureIcons = [
 	// Custom Dictionary - book icon
 	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>`,
 	// Transcription History - clock/history icon
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-	// English & Russian - globe icon
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>`,
-	// Simple Setup - play/start icon
-	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`
+	`<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`
 ];
 
 const featureKeys = [
 	{ title: "features.globalHotkey.title", description: "features.globalHotkey.description" },
 	{ title: "features.instantTranscription.title", description: "features.instantTranscription.description" },
 	{ title: "features.customDictionary.title", description: "features.customDictionary.description" },
-	{ title: "features.history.title", description: "features.history.description" },
-	{ title: "features.languages.title", description: "features.languages.description" },
-	{ title: "features.simpleSetup.title", description: "features.simpleSetup.description" }
+	{ title: "features.history.title", description: "features.history.description" }
 ] as const;
 ---
 
@@ -159,7 +153,7 @@ const featureKeys = [
 
 	.features-grid {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(2, 1fr);
 		gap: 24px;
 		margin-bottom: 80px;
 	}
@@ -398,10 +392,6 @@ const featureKeys = [
 	}
 
 	@media (max-width: 1024px) {
-		.features-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
-
 		.features-highlight {
 			grid-template-columns: 1fr;
 			gap: 48px;

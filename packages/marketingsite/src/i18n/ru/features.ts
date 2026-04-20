@@ -14,12 +14,6 @@ export const features = {
 	"features.history.title": "Transcription history",
 	"features.history.description":
 		"Review past transcriptions with timestamps. Copy them or rate their accuracy.",
-	"features.languages.title": "English and Russian",
-	"features.languages.description":
-		"Full dictation support for English and Russian with tuning for each language.",
-	"features.simpleSetup.title": "Simple setup",
-	"features.simpleSetup.description":
-		"Download it, grant microphone access, and start dictating. No complicated setup.",
 	"features.highlight.tag": "Why VoxFusion?",
 	"features.highlight.title": "Dictate into any app without switching windows.",
 	"features.highlight.description":
