@@ -1,5 +1,4 @@
 import { common } from "./ru/common";
-import { demo } from "./ru/demo";
 import { downloads } from "./ru/downloads";
 import { features } from "./ru/features";
 import { hero } from "./ru/hero";
@@ -19,7 +18,6 @@ export const translations = {
 		...common,
 		...hero,
 		...features,
-		...demo,
 		...pricing,
 		...downloads,
 		...privacy,

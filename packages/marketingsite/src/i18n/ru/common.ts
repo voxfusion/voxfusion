@@ -4,7 +4,6 @@ export const common = {
 		"VoxFusion - Press a hotkey, speak, and text appears wherever you type. Fast, accurate dictation for Mac.",
 
 	"nav.features": "Features",
-	"nav.demo": "Demo",
 	"nav.pricing": "Pricing",
 	"nav.download": "Download",
 

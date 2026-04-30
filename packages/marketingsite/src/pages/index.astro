@@ -36,8 +36,7 @@ const t = useTranslations(lang);
 			</a>
 			<div class="nav-links">
 				<a href="#features" class="nav-link"><span class="link-index">01</span>{t("nav.features")}</a>
-				<a href="#demo" class="nav-link"><span class="link-index">02</span>{t("nav.demo")}</a>
-				<a href="#pricing" class="nav-link"><span class="link-index">03</span>{t("nav.pricing")}</a>
+				<a href="#pricing" class="nav-link"><span class="link-index">02</span>{t("nav.pricing")}</a>
 			</div>
 			<a href={getLocalizedPath("/download", lang)} class="nav-cta">{t("nav.download")} →</a>
 		</div>
@@ -59,10 +58,6 @@ const t = useTranslations(lang);
 					<a href={getLocalizedPath("/download", lang)} class="btn-primary" data-ym-goal="hero_download_click">
 						<span class="btn-icon">↓</span>
 						<span>{t("hero.cta.download")}</span>
-					</a>
-					<a href="#demo" class="btn-secondary" data-ym-goal="hero_demo_click">
-						<span class="btn-icon">▶</span>
-						<span>{t("hero.cta.watchDemo")}</span>
 					</a>
 				</div>
 			</div>
@@ -176,57 +171,9 @@ const t = useTranslations(lang);
 		</div>
 	</section>
 
-	<section id="demo" class="demo" data-ym-view="view_demo">
-		<div class="section-header">
-			<span class="section-number">02</span>
-			<h2 class="section-title">{t("demo.tag")}</h2>
-			<div class="section-line"></div>
-		</div>
-		<div class="section-intro">
-			<h3>{t("demo.title")}</h3>
-			<p>{t("demo.description")}</p>
-		</div>
-		<div class="demo-content">
-			<div class="demo-video">
-				<div class="video-frame">
-					<iframe
-						src="https://www.youtube.com/embed/D_ENkSg2NQk?rel=0"
-						title="VoxFusion Demo"
-						allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-						allowfullscreen
-						loading="lazy"
-					></iframe>
-				</div>
-			</div>
-			<div class="demo-steps">
-				<div class="step">
-					<div class="step-number">01</div>
-					<div class="step-content">
-						<h4>{t("demo.step1.title")}</h4>
-						<p>{t("demo.step1.description")}</p>
-					</div>
-				</div>
-				<div class="step">
-					<div class="step-number">02</div>
-					<div class="step-content">
-						<h4>{t("demo.step2.title")}</h4>
-						<p>{t("demo.step2.description")}</p>
-					</div>
-				</div>
-				<div class="step">
-					<div class="step-number">03</div>
-					<div class="step-content">
-						<h4>{t("demo.step3.title")}</h4>
-						<p>{t("demo.step3.description")}</p>
-					</div>
-				</div>
-			</div>
-		</div>
-	</section>
-
 	<section id="pricing" class="pricing" data-ym-view="view_pricing">
 		<div class="section-header">
-			<span class="section-number">03</span>
+			<span class="section-number">02</span>
 			<h2 class="section-title">{t("pricing.tag")}</h2>
 			<div class="section-line"></div>
 		</div>
@@ -653,7 +600,7 @@ const t = useTranslations(lang);
 	}
 
 	/* Sections */
-	.features, .demo, .pricing {
+	.features, .pricing {
 		padding: 120px 32px;
 		max-width: 1400px;
 		margin: 0 auto;
@@ -797,70 +744,6 @@ const t = useTranslations(lang);
 		font-family: monospace;
 	}
 
-	/* Demo Section */
-	.demo {
-		background: #0d0d0d;
-	}
-
-	.demo-content {
-		display: grid;
-		grid-template-columns: 2fr 1fr;
-		gap: 48px;
-	}
-
-	.video-frame {
-		aspect-ratio: 16/9;
-		width: 100%;
-		background: #111;
-		border: 1px solid #333;
-		position: relative;
-		overflow: hidden;
-	}
-
-	.video-frame iframe {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		border: none;
-	}
-
-	.demo-steps {
-		display: flex;
-		flex-direction: column;
-		gap: 24px;
-	}
-
-	.step {
-		display: flex;
-		gap: 20px;
-		padding: 24px;
-		background: #111;
-		border: 1px solid #222;
-		transition: border-color 0.3s;
-	}
-
-	.step:hover {
-		border-color: #ff3e00;
-	}
-
-	.step-number {
-		font-size: 12px;
-		color: #ff3e00;
-		font-weight: 700;
-	}
-
-	.step-content h4 {
-		font-size: 14px;
-		font-weight: 600;
-		margin-bottom: 8px;
-	}
-
-	.step-content p {
-		font-size: 13px;
-		color: #666;
-		line-height: 1.6;
-	}
 
 	/* Pricing */
 	.pricing-grid {
@@ -1043,10 +926,6 @@ const t = useTranslations(lang);
 
 		.features-grid {
 			grid-template-columns: repeat(2, 1fr);
-		}
-
-		.demo-content {
-			grid-template-columns: 1fr;
 		}
 	}
 

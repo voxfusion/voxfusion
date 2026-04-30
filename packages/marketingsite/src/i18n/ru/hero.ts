@@ -11,5 +11,4 @@ export const hero = {
 	"hero.stat.apps.value": "∞",
 	"hero.stat.apps.label": "apps",
 	"hero.cta.download": "Download for Mac",
-	"hero.cta.watchDemo": "Watch demo",
 } as const;
