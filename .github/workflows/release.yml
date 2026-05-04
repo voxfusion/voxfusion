@@ -173,9 +173,8 @@ jobs:
 
       - name: Create release in public repository
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
         with:
+          token: ${{ secrets.RELEASES_GITHUB_TOKEN }}
           repository: ${{ env.RELEASES_REPO }}
           tag_name: ${{ github.ref_name }}
           name: VoxFusion ${{ github.ref_name }}
