@@ -7,10 +7,7 @@
 		"active": true,
 		"createUpdaterArtifacts": true,
 		"targets": ["dmg", "app"],
-		"icon": [
-			"icons/icon.icns",
-			"icons/icon.png"
-		],
+		"icon": ["icons/icon.icns", "icons/icon.png"],
 		"macOS": {
 			"entitlements": "entitlements.plist",
 			"minimumSystemVersion": "10.15",

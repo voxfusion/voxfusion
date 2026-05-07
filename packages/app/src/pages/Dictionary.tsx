@@ -4,7 +4,6 @@ import { useI18n } from "../i18n";
 import eden from "../lib/eden";
 import { capture } from "../lib/posthog";
 
-
 type DictionaryWord = {
 	id: string;
 	word: string;

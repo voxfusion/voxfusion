@@ -15,7 +15,8 @@ export const hi: Translations = {
 	},
 	about: {
 		title: "बारे में",
-		welcomeDescription: "VoxFusion में आपका स्वागत है - SolidJS और Tauri के साथ निर्मित एक आधुनिक डेस्कटॉप एप्लिकेशन।",
+		welcomeDescription:
+			"VoxFusion में आपका स्वागत है - SolidJS और Tauri के साथ निर्मित एक आधुनिक डेस्कटॉप एप्लिकेशन।",
 		navigationDescription: "यह एप्लिकेशन पेज नेविगेशन और रूटिंग कार्यक्षमता प्रदर्शित करता है।",
 	},
 	settings: {
@@ -100,7 +101,8 @@ export const hi: Translations = {
 		edit: "संपादित करें",
 		delete: "हटाएं",
 		emptyState: "अभी कोई शब्द नहीं",
-		emptyStateDescription: "विशेष शब्दों, नामों या अक्सर उपयोग किए जाने वाले वाक्यांशों की ट्रांसक्रिप्शन सटीकता बेहतर करने के लिए शब्द जोड़ें।",
+		emptyStateDescription:
+			"विशेष शब्दों, नामों या अक्सर उपयोग किए जाने वाले वाक्यांशों की ट्रांसक्रिप्शन सटीकता बेहतर करने के लिए शब्द जोड़ें।",
 		wordCount: "{count} शब्द",
 	},
 	onboarding: {
@@ -110,7 +112,8 @@ export const hi: Translations = {
 		back: "पीछे",
 		getStarted: "शुरू करें",
 		microphoneTitle: "अपना माइक्रोफोन चुनें",
-		microphoneDescription: "VoxFusion वॉइस रिकॉर्डिंग के लिए कौन सा माइक्रोफोन उपयोग करेगा चुनें। आप इसे बाद में सेटिंग्स में बदल सकते हैं।",
+		microphoneDescription:
+			"VoxFusion वॉइस रिकॉर्डिंग के लिए कौन सा माइक्रोफोन उपयोग करेगा चुनें। आप इसे बाद में सेटिंग्स में बदल सकते हैं।",
 		selectMicrophone: "माइक्रोफोन चुनें",
 		refreshDevices: "डिवाइस रिफ्रेश करें",
 		hotkeyTitle: "अपनी हॉटकी सेट करें",
@@ -123,13 +126,15 @@ export const hi: Translations = {
 		completionTitle: "सब तैयार है!",
 		completionDescription: "VoxFusion वॉइस ट्रांसक्रिप्शन में आपकी मदद करने के लिए तैयार है।",
 		micPermissionTitle: "माइक्रोफोन एक्सेस",
-		micPermissionDescription: "VoxFusion को आपकी आवाज़ रिकॉर्ड करने और ट्रांसक्राइब करने के लिए माइक्रोफोन एक्सेस चाहिए।",
+		micPermissionDescription:
+			"VoxFusion को आपकी आवाज़ रिकॉर्ड करने और ट्रांसक्राइब करने के लिए माइक्रोफोन एक्सेस चाहिए।",
 		micPermissionGranted: "माइक्रोफोन एक्सेस दी गई",
 		micPermissionNotGranted: "माइक्रोफोन एक्सेस आवश्यक",
 		grantMicPermission: "माइक्रोफोन एक्सेस दें",
 		checkingPermission: "जाँच हो रही है...",
 		accessibilityTitle: "एक्सेसिबिलिटी एक्सेस",
-		accessibilityDescription: "VoxFusion को किसी भी एप्लिकेशन में ट्रांसक्राइब किया हुआ टेक्स्ट टाइप करने के लिए एक्सेसिबिलिटी एक्सेस चाहिए।",
+		accessibilityDescription:
+			"VoxFusion को किसी भी एप्लिकेशन में ट्रांसक्राइब किया हुआ टेक्स्ट टाइप करने के लिए एक्सेसिबिलिटी एक्सेस चाहिए।",
 		accessibilityGranted: "एक्सेसिबिलिटी एक्सेस दी गई",
 		accessibilityNotGranted: "एक्सेसिबिलिटी एक्सेस आवश्यक",
 		openSystemPreferences: "सिस्टम प्राथमिकताएं खोलें",

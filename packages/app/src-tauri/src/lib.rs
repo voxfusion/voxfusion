@@ -1,4 +1,5 @@
 mod handlers;
+mod listeners;
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, Submenu};
@@ -10,55 +11,6 @@ use handlers::{
     start_recording_with_device, stop_recording_with_device, type_text,
 };
 
-#[cfg(target_os = "macos")]
-mod accessibility_watcher {
-    use std::os::raw::c_void;
-    use std::sync::OnceLock;
-
-    use core_foundation::base::TCFType;
-    use core_foundation::string::CFString;
-    use core_foundation_sys::dictionary::CFDictionaryRef;
-    use core_foundation_sys::notification_center::{
-        CFNotificationCenterAddObserver, CFNotificationCenterGetDistributedCenter,
-        CFNotificationCenterRef, CFNotificationName,
-        CFNotificationSuspensionBehaviorDeliverImmediately,
-    };
-    use tauri::Emitter;
-
-    static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
-
-    extern "C" fn on_accessibility_changed(
-        _center: CFNotificationCenterRef,
-        _observer: *mut c_void,
-        _name: CFNotificationName,
-        _object: *const c_void,
-        _user_info: CFDictionaryRef,
-    ) {
-        if let Some(handle) = APP_HANDLE.get() {
-            let _ = handle.emit("accessibility-changed", ());
-        }
-    }
-
-    pub fn setup(app_handle: &tauri::AppHandle) {
-        APP_HANDLE.set(app_handle.clone()).ok();
-
-        unsafe {
-            let center = CFNotificationCenterGetDistributedCenter();
-            let name = CFString::new("com.apple.accessibility.api");
-            CFNotificationCenterAddObserver(
-                center,
-                std::ptr::null(),
-                on_accessibility_changed,
-                name.as_concrete_TypeRef(),
-                std::ptr::null(),
-                CFNotificationSuspensionBehaviorDeliverImmediately,
-            );
-            // The observer retains the name, but we must keep it alive
-            std::mem::forget(name);
-        }
-    }
-}
-
 /// Shows the main window if it exists, or creates a new one if it was closed.
 /// Used for macOS reopen events (dock click, Spotlight activation) and single-instance handling.
 #[cfg(desktop)]
@@ -69,20 +21,17 @@ fn show_or_create_main_window(app: &tauri::AppHandle) {
     } else {
         // Window was closed, recreate it
         use tauri::WebviewWindowBuilder;
-        if let Ok(window) = WebviewWindowBuilder::new(
-            app,
-            "main",
-            tauri::WebviewUrl::App("/".into()),
-        )
-        .title("VoxFusion")
-        .inner_size(1360.0, 850.0)
-        .resizable(true)
-        .decorations(true)
-        .title_bar_style(tauri::TitleBarStyle::Overlay)
-        .hidden_title(true)
-        .fullscreen(false)
-        .center()
-        .build()
+        if let Ok(window) =
+            WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
+                .title("VoxFusion")
+                .inner_size(1360.0, 850.0)
+                .resizable(true)
+                .decorations(true)
+                .title_bar_style(tauri::TitleBarStyle::Overlay)
+                .hidden_title(true)
+                .fullscreen(false)
+                .center()
+                .build()
         {
             let _ = window.show();
             let _ = window.set_focus();
@@ -91,7 +40,11 @@ fn show_or_create_main_window(app: &tauri::AppHandle) {
 }
 
 #[cfg(desktop)]
-fn build_microphone_submenu(app: &tauri::AppHandle, selected_mic: Option<String>, devices: Vec<handlers::audio::AudioDevice>) -> Result<Submenu<tauri::Wry>, Box<dyn std::error::Error>> {
+fn build_microphone_submenu(
+    app: &tauri::AppHandle,
+    selected_mic: Option<String>,
+    devices: Vec<handlers::audio::AudioDevice>,
+) -> Result<Submenu<tauri::Wry>, Box<dyn std::error::Error>> {
     let submenu = Submenu::with_id(app, "microphone", "Microphone", true)?;
 
     for device in devices {
@@ -158,11 +111,11 @@ pub fn run() {
             }
 
             #[cfg(target_os = "macos")]
-            accessibility_watcher::setup(app.handle());
+            {
+                listeners::accessibility_watcher::setup(app.handle());
+                listeners::system_key_watcher::setup(app.handle());
+            }
 
-            Ok(())
-        })
-        .setup(|app| {
             #[cfg(desktop)]
             let _ = app
                 .handle()
@@ -170,9 +123,6 @@ pub fn run() {
                     show_or_create_main_window(app);
                 }));
 
-            Ok(())
-        })
-        .setup(|app| {
             #[cfg(desktop)]
             {
                 use tauri_plugin_store::StoreExt;
@@ -250,12 +200,14 @@ pub fn run() {
                                 let device_name = id.strip_prefix("mic_").unwrap_or("").to_string();
 
                                 // Update checkmarks in submenu
-                                let devices = handlers::audio::list_audio_devices().unwrap_or_default();
+                                let devices =
+                                    handlers::audio::list_audio_devices().unwrap_or_default();
                                 for device in &devices {
                                     let mic_id = format!("mic_{}", device.name);
                                     if let Some(item) = mic_submenu_for_menu.get(&mic_id) {
                                         if let Some(check_item) = item.as_check_menuitem() {
-                                            let _ = check_item.set_checked(device.name == device_name);
+                                            let _ =
+                                                check_item.set_checked(device.name == device_name);
                                         }
                                     }
                                 }
@@ -285,11 +237,12 @@ pub fn run() {
                     // Fetch devices and update menu
                     // This is safe to call here as it only happens after user interaction
                     let devices = handlers::audio::list_audio_devices().unwrap_or_default();
-                    
+
                     for device in &devices {
                         let mic_id = format!("mic_{}", device.name);
-                        let is_selected = selected_mic.as_ref().map_or(false, |s| s == &device.name);
-                        
+                        let is_selected =
+                            selected_mic.as_ref().map_or(false, |s| s == &device.name);
+
                         // Try to update existing item, or add new one
                         if let Some(item) = mic_submenu_for_listener.get(&mic_id) {
                             if let Some(check_item) = item.as_check_menuitem() {
@@ -302,7 +255,14 @@ pub fn run() {
                             } else {
                                 device.name.clone()
                             };
-                            if let Ok(item) = CheckMenuItem::with_id(&app_handle, &mic_id, &label, true, is_selected, None::<&str>) {
+                            if let Ok(item) = CheckMenuItem::with_id(
+                                &app_handle,
+                                &mic_id,
+                                &label,
+                                true,
+                                is_selected,
+                                None::<&str>,
+                            ) {
                                 let _ = mic_submenu_for_listener.append(&item);
                             }
                         }

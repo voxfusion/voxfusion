@@ -15,8 +15,10 @@ export const ja: Translations = {
 	},
 	about: {
 		title: "アプリについて",
-		welcomeDescription: "VoxFusion へようこそ - SolidJS と Tauri で構築されたモダンなデスクトップアプリケーションです。",
-		navigationDescription: "このアプリケーションはページナビゲーションとルーティング機能を実演しています。",
+		welcomeDescription:
+			"VoxFusion へようこそ - SolidJS と Tauri で構築されたモダンなデスクトップアプリケーションです。",
+		navigationDescription:
+			"このアプリケーションはページナビゲーションとルーティング機能を実演しています。",
 	},
 	settings: {
 		title: "設定",
@@ -46,7 +48,8 @@ export const ja: Translations = {
 		defaultMicrophone: "システムデフォルト",
 		microphoneDescription: "音声録音に使用するマイクを選択してください。",
 		audioQuality: "音声品質",
-		audioQualityDescription: "低品質はファイルサイズを削減し、アップロードと文字起こしを高速化します。",
+		audioQualityDescription:
+			"低品質はファイルサイズを削減し、アップロードと文字起こしを高速化します。",
 		audioQualityHigh: "高",
 		audioQualityHighDescription: "オリジナル品質、最大ファイルサイズ",
 		audioQualityMedium: "中",
@@ -100,7 +103,8 @@ export const ja: Translations = {
 		edit: "編集",
 		delete: "削除",
 		emptyState: "まだ単語がありません",
-		emptyStateDescription: "専門用語、名前、よく使うフレーズの文字起こし精度を向上させるために単語を追加してください。",
+		emptyStateDescription:
+			"専門用語、名前、よく使うフレーズの文字起こし精度を向上させるために単語を追加してください。",
 		wordCount: "{count} 語",
 	},
 	onboarding: {
@@ -110,11 +114,13 @@ export const ja: Translations = {
 		back: "戻る",
 		getStarted: "始めましょう",
 		microphoneTitle: "マイクを選択",
-		microphoneDescription: "VoxFusion が音声録音に使用するマイクを選択してください。設定で後から変更できます。",
+		microphoneDescription:
+			"VoxFusion が音声録音に使用するマイクを選択してください。設定で後から変更できます。",
 		selectMicrophone: "マイクを選択",
 		refreshDevices: "デバイスを更新",
 		hotkeyTitle: "ホットキーを設定",
-		hotkeyDescription: "このキーボードショートカットで Mac のどこからでも音声録音を開始・停止できます。",
+		hotkeyDescription:
+			"このキーボードショートカットで Mac のどこからでも音声録音を開始・停止できます。",
 		currentHotkey: "現在のホットキー",
 		recordHotkey: "新しいホットキーを録音",
 		pressKeys: "希望のキーの組み合わせを押してください...",
@@ -129,11 +135,13 @@ export const ja: Translations = {
 		grantMicPermission: "マイクへのアクセスを許可",
 		checkingPermission: "確認中...",
 		accessibilityTitle: "アクセシビリティアクセス",
-		accessibilityDescription: "VoxFusion は文字起こしテキストを任意のアプリケーションに入力するためにアクセシビリティアクセスが必要です。",
+		accessibilityDescription:
+			"VoxFusion は文字起こしテキストを任意のアプリケーションに入力するためにアクセシビリティアクセスが必要です。",
 		accessibilityGranted: "アクセシビリティアクセスが許可されました",
 		accessibilityNotGranted: "アクセシビリティアクセスが必要です",
 		openSystemPreferences: "システム環境設定を開く",
-		accessibilityInstructions: "ロックアイコンをクリックして変更を行い、リストで VoxFusion にチェックを入れてください。",
+		accessibilityInstructions:
+			"ロックアイコンをクリックして変更を行い、リストで VoxFusion にチェックを入れてください。",
 		learningTitle: "試してみましょう",
 		learningDescription: "始める前に音声テキスト変換のフローをテストしましょう。",
 		learningStep1Prefix: "",

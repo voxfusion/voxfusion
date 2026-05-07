@@ -15,8 +15,10 @@ export const de: Translations = {
 	},
 	about: {
 		title: "Über",
-		welcomeDescription: "Willkommen bei VoxFusion - einer modernen Desktop-Anwendung, erstellt mit SolidJS und Tauri.",
-		navigationDescription: "Diese Anwendung demonstriert Seitennavigation und Routing-Funktionalität.",
+		welcomeDescription:
+			"Willkommen bei VoxFusion - einer modernen Desktop-Anwendung, erstellt mit SolidJS und Tauri.",
+		navigationDescription:
+			"Diese Anwendung demonstriert Seitennavigation und Routing-Funktionalität.",
 	},
 	settings: {
 		title: "Einstellungen",
@@ -46,7 +48,8 @@ export const de: Translations = {
 		defaultMicrophone: "Systemstandard",
 		microphoneDescription: "Wählen Sie das Mikrofon für Sprachaufnahmen aus.",
 		audioQuality: "Audioqualität",
-		audioQualityDescription: "Niedrigere Qualität reduziert die Dateigröße für schnellere Uploads und Transkriptionen.",
+		audioQualityDescription:
+			"Niedrigere Qualität reduziert die Dateigröße für schnellere Uploads und Transkriptionen.",
 		audioQualityHigh: "Hoch",
 		audioQualityHighDescription: "Originalqualität, größte Dateigröße",
 		audioQualityMedium: "Mittel",
@@ -55,7 +58,8 @@ export const de: Translations = {
 		audioQualityLowDescription: "8kHz Mono, ~20x kleiner",
 		recordingHotkey: "Aufnahme-Tastenkürzel",
 		pressHotkey: "Drücken Sie eine Tastenkombination...",
-		hotkeyDescription: "Drücken Sie diese Tastenkombination, um die Aufnahme zu starten oder zu stoppen.",
+		hotkeyDescription:
+			"Drücken Sie diese Tastenkombination, um die Aufnahme zu starten oder zu stoppen.",
 		change: "Ändern",
 		cancel: "Abbrechen",
 	},
@@ -72,7 +76,8 @@ export const de: Translations = {
 		failedToFetch: "Transkriptionen konnten nicht abgerufen werden",
 		errorOccurred: "Ein Fehler ist aufgetreten",
 		noTranscriptions: "Noch keine Transkriptionen",
-		useCommandToRecord: "Verwenden Sie Command+; um eine Aufnahme zu starten und Ihre erste Transkription zu erstellen",
+		useCommandToRecord:
+			"Verwenden Sie Command+; um eine Aufnahme zu starten und Ihre erste Transkription zu erstellen",
 		tryAgain: "Erneut versuchen",
 		noMore: "Keine weiteren Transkriptionen",
 		today: "Heute",
@@ -92,7 +97,8 @@ export const de: Translations = {
 	},
 	dictionary: {
 		title: "Wörterbuch",
-		description: "Fügen Sie benutzerdefinierte Wörter hinzu, um die Transkriptionsgenauigkeit zu verbessern",
+		description:
+			"Fügen Sie benutzerdefinierte Wörter hinzu, um die Transkriptionsgenauigkeit zu verbessern",
 		addWord: "Hinzufügen",
 		wordPlaceholder: "Wort oder Phrase eingeben...",
 		save: "Speichern",
@@ -100,7 +106,8 @@ export const de: Translations = {
 		edit: "Bearbeiten",
 		delete: "Löschen",
 		emptyState: "Noch keine Wörter",
-		emptyStateDescription: "Fügen Sie Wörter hinzu, um die Transkriptionsgenauigkeit für Fachbegriffe, Namen oder häufig verwendete Phrasen zu verbessern.",
+		emptyStateDescription:
+			"Fügen Sie Wörter hinzu, um die Transkriptionsgenauigkeit für Fachbegriffe, Namen oder häufig verwendete Phrasen zu verbessern.",
 		wordCount: "{count} Wörter",
 	},
 	onboarding: {
@@ -110,11 +117,13 @@ export const de: Translations = {
 		back: "Zurück",
 		getStarted: "Loslegen",
 		microphoneTitle: "Wählen Sie Ihr Mikrofon",
-		microphoneDescription: "Wählen Sie das Mikrofon, das VoxFusion für Sprachaufnahmen verwenden soll. Sie können dies später in den Einstellungen ändern.",
+		microphoneDescription:
+			"Wählen Sie das Mikrofon, das VoxFusion für Sprachaufnahmen verwenden soll. Sie können dies später in den Einstellungen ändern.",
 		selectMicrophone: "Mikrofon auswählen",
 		refreshDevices: "Geräte aktualisieren",
 		hotkeyTitle: "Legen Sie Ihr Tastenkürzel fest",
-		hotkeyDescription: "Dieses Tastenkürzel startet und stoppt die Sprachaufnahme von überall auf Ihrem Mac.",
+		hotkeyDescription:
+			"Dieses Tastenkürzel startet und stoppt die Sprachaufnahme von überall auf Ihrem Mac.",
 		currentHotkey: "Aktuelles Tastenkürzel",
 		recordHotkey: "Neues Tastenkürzel aufnehmen",
 		pressKeys: "Drücken Sie die gewünschte Tastenkombination...",
@@ -123,17 +132,20 @@ export const de: Translations = {
 		completionTitle: "Alles bereit!",
 		completionDescription: "VoxFusion ist bereit, Ihnen bei der Sprachtranskription zu helfen.",
 		micPermissionTitle: "Mikrofonzugriff",
-		micPermissionDescription: "VoxFusion benötigt Zugriff auf Ihr Mikrofon, um Ihre Stimme aufzunehmen und zu transkribieren.",
+		micPermissionDescription:
+			"VoxFusion benötigt Zugriff auf Ihr Mikrofon, um Ihre Stimme aufzunehmen und zu transkribieren.",
 		micPermissionGranted: "Mikrofonzugriff gewährt",
 		micPermissionNotGranted: "Mikrofonzugriff erforderlich",
 		grantMicPermission: "Mikrofonzugriff gewähren",
 		checkingPermission: "Überprüfung...",
 		accessibilityTitle: "Bedienungshilfen",
-		accessibilityDescription: "VoxFusion benötigt Bedienungshilfen-Zugriff, um transkribierten Text in jede Anwendung einzugeben.",
+		accessibilityDescription:
+			"VoxFusion benötigt Bedienungshilfen-Zugriff, um transkribierten Text in jede Anwendung einzugeben.",
 		accessibilityGranted: "Bedienungshilfen-Zugriff gewährt",
 		accessibilityNotGranted: "Bedienungshilfen-Zugriff erforderlich",
 		openSystemPreferences: "Systemeinstellungen öffnen",
-		accessibilityInstructions: "Klicken Sie auf das Schloss-Symbol, um Änderungen vorzunehmen, und aktivieren Sie dann VoxFusion in der Liste.",
+		accessibilityInstructions:
+			"Klicken Sie auf das Schloss-Symbol, um Änderungen vorzunehmen, und aktivieren Sie dann VoxFusion in der Liste.",
 		learningTitle: "Probieren Sie es aus",
 		learningDescription: "Testen Sie den Sprache-zu-Text-Ablauf, bevor Sie beginnen.",
 		learningStep1Prefix: "Drücken Sie",

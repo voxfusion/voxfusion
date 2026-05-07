@@ -13,4 +13,3 @@ export const sessions = pgTable("sessions", {
 	createdAt: timestamp("created_at").notNull().defaultNow(),
 	updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
-

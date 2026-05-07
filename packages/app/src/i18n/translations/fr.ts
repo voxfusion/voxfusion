@@ -15,8 +15,10 @@ export const fr: Translations = {
 	},
 	about: {
 		title: "À propos",
-		welcomeDescription: "Bienvenue sur VoxFusion - une application de bureau moderne créée avec SolidJS et Tauri.",
-		navigationDescription: "Cette application démontre la navigation entre pages et les fonctionnalités de routage.",
+		welcomeDescription:
+			"Bienvenue sur VoxFusion - une application de bureau moderne créée avec SolidJS et Tauri.",
+		navigationDescription:
+			"Cette application démontre la navigation entre pages et les fonctionnalités de routage.",
 	},
 	settings: {
 		title: "Paramètres",
@@ -46,7 +48,8 @@ export const fr: Translations = {
 		defaultMicrophone: "Par défaut du système",
 		microphoneDescription: "Sélectionnez le microphone à utiliser pour l'enregistrement vocal.",
 		audioQuality: "Qualité audio",
-		audioQualityDescription: "Une qualité inférieure réduit la taille du fichier pour des téléchargements et transcriptions plus rapides.",
+		audioQualityDescription:
+			"Une qualité inférieure réduit la taille du fichier pour des téléchargements et transcriptions plus rapides.",
 		audioQualityHigh: "Haute",
 		audioQualityHighDescription: "Qualité originale, plus grande taille de fichier",
 		audioQualityMedium: "Moyenne",
@@ -55,7 +58,8 @@ export const fr: Translations = {
 		audioQualityLowDescription: "8kHz mono, ~20x plus petit",
 		recordingHotkey: "Raccourci d'enregistrement",
 		pressHotkey: "Appuyez sur une combinaison de touches...",
-		hotkeyDescription: "Appuyez sur cette combinaison de touches pour démarrer ou arrêter l'enregistrement.",
+		hotkeyDescription:
+			"Appuyez sur cette combinaison de touches pour démarrer ou arrêter l'enregistrement.",
 		change: "Modifier",
 		cancel: "Annuler",
 	},
@@ -72,7 +76,8 @@ export const fr: Translations = {
 		failedToFetch: "Échec du chargement des transcriptions",
 		errorOccurred: "Une erreur est survenue",
 		noTranscriptions: "Pas encore de transcriptions",
-		useCommandToRecord: "Utilisez Command+; pour démarrer l'enregistrement et créer votre première transcription",
+		useCommandToRecord:
+			"Utilisez Command+; pour démarrer l'enregistrement et créer votre première transcription",
 		tryAgain: "Réessayer",
 		noMore: "Plus de transcriptions",
 		today: "Aujourd'hui",
@@ -100,7 +105,8 @@ export const fr: Translations = {
 		edit: "Modifier",
 		delete: "Supprimer",
 		emptyState: "Pas encore de mots",
-		emptyStateDescription: "Ajoutez des mots pour améliorer la précision de transcription des termes spécialisés, noms ou expressions que vous utilisez souvent.",
+		emptyStateDescription:
+			"Ajoutez des mots pour améliorer la précision de transcription des termes spécialisés, noms ou expressions que vous utilisez souvent.",
 		wordCount: "{count} mots",
 	},
 	onboarding: {
@@ -110,11 +116,13 @@ export const fr: Translations = {
 		back: "Retour",
 		getStarted: "Commencer",
 		microphoneTitle: "Sélectionnez votre microphone",
-		microphoneDescription: "Choisissez le microphone que VoxFusion utilisera pour l'enregistrement vocal. Vous pourrez le modifier plus tard dans les Paramètres.",
+		microphoneDescription:
+			"Choisissez le microphone que VoxFusion utilisera pour l'enregistrement vocal. Vous pourrez le modifier plus tard dans les Paramètres.",
 		selectMicrophone: "Sélectionner le microphone",
 		refreshDevices: "Actualiser les appareils",
 		hotkeyTitle: "Définissez votre raccourci",
-		hotkeyDescription: "Ce raccourci clavier démarrera et arrêtera l'enregistrement vocal depuis n'importe où sur votre Mac.",
+		hotkeyDescription:
+			"Ce raccourci clavier démarrera et arrêtera l'enregistrement vocal depuis n'importe où sur votre Mac.",
 		currentHotkey: "Raccourci actuel",
 		recordHotkey: "Enregistrer un nouveau raccourci",
 		pressKeys: "Appuyez sur la combinaison de touches souhaitée...",
@@ -123,17 +131,20 @@ export const fr: Translations = {
 		completionTitle: "Tout est prêt !",
 		completionDescription: "VoxFusion est prêt à vous aider avec la transcription vocale.",
 		micPermissionTitle: "Accès au microphone",
-		micPermissionDescription: "VoxFusion a besoin d'accéder à votre microphone pour enregistrer et transcrire votre voix.",
+		micPermissionDescription:
+			"VoxFusion a besoin d'accéder à votre microphone pour enregistrer et transcrire votre voix.",
 		micPermissionGranted: "Accès au microphone accordé",
 		micPermissionNotGranted: "Accès au microphone requis",
 		grantMicPermission: "Accorder l'accès au microphone",
 		checkingPermission: "Vérification...",
 		accessibilityTitle: "Accès d'accessibilité",
-		accessibilityDescription: "VoxFusion a besoin de l'accès d'accessibilité pour saisir le texte transcrit dans n'importe quelle application.",
+		accessibilityDescription:
+			"VoxFusion a besoin de l'accès d'accessibilité pour saisir le texte transcrit dans n'importe quelle application.",
 		accessibilityGranted: "Accès d'accessibilité accordé",
 		accessibilityNotGranted: "Accès d'accessibilité requis",
 		openSystemPreferences: "Ouvrir les Préférences Système",
-		accessibilityInstructions: "Cliquez sur l'icône du cadenas pour effectuer des modifications, puis cochez VoxFusion dans la liste.",
+		accessibilityInstructions:
+			"Cliquez sur l'icône du cadenas pour effectuer des modifications, puis cochez VoxFusion dans la liste.",
 		learningTitle: "Essayez",
 		learningDescription: "Testez le flux voix-vers-texte avant de commencer.",
 		learningStep1Prefix: "Appuyez sur",

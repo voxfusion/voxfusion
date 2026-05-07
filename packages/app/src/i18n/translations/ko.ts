@@ -15,7 +15,8 @@ export const ko: Translations = {
 	},
 	about: {
 		title: "정보",
-		welcomeDescription: "VoxFusion에 오신 것을 환영합니다 - SolidJS와 Tauri로 만든 최신 데스크탑 애플리케이션입니다.",
+		welcomeDescription:
+			"VoxFusion에 오신 것을 환영합니다 - SolidJS와 Tauri로 만든 최신 데스크탑 애플리케이션입니다.",
 		navigationDescription: "이 애플리케이션은 페이지 네비게이션과 라우팅 기능을 시연합니다.",
 	},
 	settings: {
@@ -100,7 +101,8 @@ export const ko: Translations = {
 		edit: "편집",
 		delete: "삭제",
 		emptyState: "아직 단어가 없습니다",
-		emptyStateDescription: "자주 사용하는 전문 용어, 이름 또는 구문의 전사 정확도를 향상시키기 위해 단어를 추가하세요.",
+		emptyStateDescription:
+			"자주 사용하는 전문 용어, 이름 또는 구문의 전사 정확도를 향상시키기 위해 단어를 추가하세요.",
 		wordCount: "{count}개 단어",
 	},
 	onboarding: {
@@ -110,7 +112,8 @@ export const ko: Translations = {
 		back: "뒤로",
 		getStarted: "시작하기",
 		microphoneTitle: "마이크를 선택하세요",
-		microphoneDescription: "VoxFusion이 음성 녹음에 사용할 마이크를 선택하세요. 나중에 설정에서 변경할 수 있습니다.",
+		microphoneDescription:
+			"VoxFusion이 음성 녹음에 사용할 마이크를 선택하세요. 나중에 설정에서 변경할 수 있습니다.",
 		selectMicrophone: "마이크 선택",
 		refreshDevices: "장치 새로고침",
 		hotkeyTitle: "단축키를 설정하세요",
@@ -123,17 +126,20 @@ export const ko: Translations = {
 		completionTitle: "모든 준비가 완료되었습니다!",
 		completionDescription: "VoxFusion이 음성 전사를 도와드릴 준비가 되었습니다.",
 		micPermissionTitle: "마이크 접근 권한",
-		micPermissionDescription: "VoxFusion은 음성을 녹음하고 전사하기 위해 마이크 접근 권한이 필요합니다.",
+		micPermissionDescription:
+			"VoxFusion은 음성을 녹음하고 전사하기 위해 마이크 접근 권한이 필요합니다.",
 		micPermissionGranted: "마이크 접근 권한이 허용되었습니다",
 		micPermissionNotGranted: "마이크 접근 권한이 필요합니다",
 		grantMicPermission: "마이크 접근 권한 허용",
 		checkingPermission: "확인 중...",
 		accessibilityTitle: "접근성 권한",
-		accessibilityDescription: "VoxFusion은 전사된 텍스트를 모든 애플리케이션에 입력하기 위해 접근성 권한이 필요합니다.",
+		accessibilityDescription:
+			"VoxFusion은 전사된 텍스트를 모든 애플리케이션에 입력하기 위해 접근성 권한이 필요합니다.",
 		accessibilityGranted: "접근성 권한이 허용되었습니다",
 		accessibilityNotGranted: "접근성 권한이 필요합니다",
 		openSystemPreferences: "시스템 환경설정 열기",
-		accessibilityInstructions: "잠금 아이콘을 클릭하여 변경한 다음, 목록에서 VoxFusion을 체크하세요.",
+		accessibilityInstructions:
+			"잠금 아이콘을 클릭하여 변경한 다음, 목록에서 VoxFusion을 체크하세요.",
 		learningTitle: "사용해 보세요",
 		learningDescription: "시작하기 전에 음성-텍스트 변환 흐름을 테스트하세요.",
 		learningStep1Prefix: "",

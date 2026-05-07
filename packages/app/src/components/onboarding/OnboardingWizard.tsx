@@ -93,7 +93,9 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 				<StepIndicator currentStep={currentStep()} totalSteps={TOTAL_STEPS} />
 			</div>
 
-			<div class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}>
+			<div
+				class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
+			>
 				<div
 					class={`w-full transition-all duration-200 ${
 						isAnimating()
@@ -127,7 +129,9 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 				</div>
 			</div>
 
-			<div class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}>
+			<div
+				class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
+			>
 				<Show when={currentStep() > 1} fallback={<div />}>
 					<button
 						type="button"

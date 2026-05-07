@@ -15,8 +15,10 @@ export const sv: Translations = {
 	},
 	about: {
 		title: "Om",
-		welcomeDescription: "Välkommen till VoxFusion - en modern skrivbordsapplikation byggd med SolidJS och Tauri.",
-		navigationDescription: "Denna applikation demonstrerar sidnavigering och routingfunktionalitet.",
+		welcomeDescription:
+			"Välkommen till VoxFusion - en modern skrivbordsapplikation byggd med SolidJS och Tauri.",
+		navigationDescription:
+			"Denna applikation demonstrerar sidnavigering och routingfunktionalitet.",
 	},
 	settings: {
 		title: "Inställningar",
@@ -46,7 +48,8 @@ export const sv: Translations = {
 		defaultMicrophone: "Systemstandard",
 		microphoneDescription: "Välj mikrofon för röstinspelning.",
 		audioQuality: "Ljudkvalitet",
-		audioQualityDescription: "Lägre kvalitet minskar filstorleken för snabbare uppladdningar och transkriptioner.",
+		audioQualityDescription:
+			"Lägre kvalitet minskar filstorleken för snabbare uppladdningar och transkriptioner.",
 		audioQualityHigh: "Hög",
 		audioQualityHighDescription: "Originalkvalitet, största filstorlek",
 		audioQualityMedium: "Medium",
@@ -72,7 +75,8 @@ export const sv: Translations = {
 		failedToFetch: "Kunde inte hämta transkriptioner",
 		errorOccurred: "Ett fel uppstod",
 		noTranscriptions: "Inga transkriptioner ännu",
-		useCommandToRecord: "Använd Command+; för att starta inspelning och skapa din första transkription",
+		useCommandToRecord:
+			"Använd Command+; för att starta inspelning och skapa din första transkription",
 		tryAgain: "Försök igen",
 		noMore: "Inga fler transkriptioner",
 		today: "Idag",
@@ -100,7 +104,8 @@ export const sv: Translations = {
 		edit: "Redigera",
 		delete: "Ta bort",
 		emptyState: "Inga ord ännu",
-		emptyStateDescription: "Lägg till ord för att förbättra transkriptionsnoggrannheten för specialtermer, namn eller fraser du ofta använder.",
+		emptyStateDescription:
+			"Lägg till ord för att förbättra transkriptionsnoggrannheten för specialtermer, namn eller fraser du ofta använder.",
 		wordCount: "{count} ord",
 	},
 	onboarding: {
@@ -110,11 +115,13 @@ export const sv: Translations = {
 		back: "Tillbaka",
 		getStarted: "Kom igång",
 		microphoneTitle: "Välj din mikrofon",
-		microphoneDescription: "Välj vilken mikrofon VoxFusion ska använda för röstinspelning. Du kan ändra detta senare i Inställningar.",
+		microphoneDescription:
+			"Välj vilken mikrofon VoxFusion ska använda för röstinspelning. Du kan ändra detta senare i Inställningar.",
 		selectMicrophone: "Välj mikrofon",
 		refreshDevices: "Uppdatera enheter",
 		hotkeyTitle: "Ställ in din snabbtangent",
-		hotkeyDescription: "Denna tangentbordsgenväg startar och stoppar röstinspelning från var som helst på din Mac.",
+		hotkeyDescription:
+			"Denna tangentbordsgenväg startar och stoppar röstinspelning från var som helst på din Mac.",
 		currentHotkey: "Nuvarande snabbtangent",
 		recordHotkey: "Spela in ny snabbtangent",
 		pressKeys: "Tryck önskad tangentkombination...",
@@ -123,17 +130,20 @@ export const sv: Translations = {
 		completionTitle: "Allt är klart!",
 		completionDescription: "VoxFusion är redo att hjälpa dig med rösttranskription.",
 		micPermissionTitle: "Mikrofonåtkomst",
-		micPermissionDescription: "VoxFusion behöver åtkomst till din mikrofon för att spela in och transkribera din röst.",
+		micPermissionDescription:
+			"VoxFusion behöver åtkomst till din mikrofon för att spela in och transkribera din röst.",
 		micPermissionGranted: "Mikrofonåtkomst beviljad",
 		micPermissionNotGranted: "Mikrofonåtkomst krävs",
 		grantMicPermission: "Bevilja mikrofonåtkomst",
 		checkingPermission: "Kontrollerar...",
 		accessibilityTitle: "Tillgänglighetsåtkomst",
-		accessibilityDescription: "VoxFusion behöver tillgänglighetsåtkomst för att skriva transkriberad text i valfri applikation.",
+		accessibilityDescription:
+			"VoxFusion behöver tillgänglighetsåtkomst för att skriva transkriberad text i valfri applikation.",
 		accessibilityGranted: "Tillgänglighetsåtkomst beviljad",
 		accessibilityNotGranted: "Tillgänglighetsåtkomst krävs",
 		openSystemPreferences: "Öppna Systeminställningar",
-		accessibilityInstructions: "Klicka på låsikonen för att göra ändringar och markera sedan VoxFusion i listan.",
+		accessibilityInstructions:
+			"Klicka på låsikonen för att göra ändringar och markera sedan VoxFusion i listan.",
 		learningTitle: "Prova",
 		learningDescription: "Testa röst-till-text-flödet innan du börjar.",
 		learningStep1Prefix: "Tryck",

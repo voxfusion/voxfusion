@@ -15,8 +15,10 @@ export const es: Translations = {
 	},
 	about: {
 		title: "Acerca de",
-		welcomeDescription: "Bienvenido a VoxFusion - una aplicación de escritorio moderna creada con SolidJS y Tauri.",
-		navigationDescription: "Esta aplicación demuestra la navegación de páginas y la funcionalidad de enrutamiento.",
+		welcomeDescription:
+			"Bienvenido a VoxFusion - una aplicación de escritorio moderna creada con SolidJS y Tauri.",
+		navigationDescription:
+			"Esta aplicación demuestra la navegación de páginas y la funcionalidad de enrutamiento.",
 	},
 	settings: {
 		title: "Configuración",
@@ -46,7 +48,8 @@ export const es: Translations = {
 		defaultMicrophone: "Predeterminado del sistema",
 		microphoneDescription: "Selecciona el micrófono para la grabación de voz.",
 		audioQuality: "Calidad de audio",
-		audioQualityDescription: "Una calidad más baja reduce el tamaño del archivo para cargas y transcripciones más rápidas.",
+		audioQualityDescription:
+			"Una calidad más baja reduce el tamaño del archivo para cargas y transcripciones más rápidas.",
 		audioQualityHigh: "Alta",
 		audioQualityHighDescription: "Calidad original, mayor tamaño de archivo",
 		audioQualityMedium: "Media",
@@ -100,7 +103,8 @@ export const es: Translations = {
 		edit: "Editar",
 		delete: "Eliminar",
 		emptyState: "Aún no hay palabras",
-		emptyStateDescription: "Agrega palabras para mejorar la precisión de transcripción de términos especializados, nombres o frases que uses con frecuencia.",
+		emptyStateDescription:
+			"Agrega palabras para mejorar la precisión de transcripción de términos especializados, nombres o frases que uses con frecuencia.",
 		wordCount: "{count} palabras",
 	},
 	onboarding: {
@@ -110,11 +114,13 @@ export const es: Translations = {
 		back: "Atrás",
 		getStarted: "Comenzar",
 		microphoneTitle: "Selecciona tu micrófono",
-		microphoneDescription: "Elige qué micrófono usará VoxFusion para la grabación de voz. Puedes cambiarlo después en Configuración.",
+		microphoneDescription:
+			"Elige qué micrófono usará VoxFusion para la grabación de voz. Puedes cambiarlo después en Configuración.",
 		selectMicrophone: "Seleccionar micrófono",
 		refreshDevices: "Actualizar dispositivos",
 		hotkeyTitle: "Configura tu atajo de teclado",
-		hotkeyDescription: "Este atajo de teclado iniciará y detendrá la grabación de voz desde cualquier lugar en tu Mac.",
+		hotkeyDescription:
+			"Este atajo de teclado iniciará y detendrá la grabación de voz desde cualquier lugar en tu Mac.",
 		currentHotkey: "Atajo actual",
 		recordHotkey: "Grabar nuevo atajo",
 		pressKeys: "Presiona la combinación de teclas deseada...",
@@ -123,17 +129,20 @@ export const es: Translations = {
 		completionTitle: "¡Todo listo!",
 		completionDescription: "VoxFusion está listo para ayudarte con la transcripción de voz.",
 		micPermissionTitle: "Acceso al micrófono",
-		micPermissionDescription: "VoxFusion necesita acceso a tu micrófono para grabar y transcribir tu voz.",
+		micPermissionDescription:
+			"VoxFusion necesita acceso a tu micrófono para grabar y transcribir tu voz.",
 		micPermissionGranted: "Acceso al micrófono concedido",
 		micPermissionNotGranted: "Se requiere acceso al micrófono",
 		grantMicPermission: "Conceder acceso al micrófono",
 		checkingPermission: "Verificando...",
 		accessibilityTitle: "Acceso de accesibilidad",
-		accessibilityDescription: "VoxFusion necesita acceso de accesibilidad para escribir texto transcrito en cualquier aplicación.",
+		accessibilityDescription:
+			"VoxFusion necesita acceso de accesibilidad para escribir texto transcrito en cualquier aplicación.",
 		accessibilityGranted: "Acceso de accesibilidad concedido",
 		accessibilityNotGranted: "Se requiere acceso de accesibilidad",
 		openSystemPreferences: "Abrir Preferencias del Sistema",
-		accessibilityInstructions: "Haz clic en el icono del candado para hacer cambios, luego marca VoxFusion en la lista.",
+		accessibilityInstructions:
+			"Haz clic en el icono del candado para hacer cambios, luego marca VoxFusion en la lista.",
 		learningTitle: "Pruébalo",
 		learningDescription: "Prueba el flujo de voz a texto antes de empezar.",
 		learningStep1Prefix: "Presiona",

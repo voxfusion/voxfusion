@@ -123,7 +123,10 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 			const file = ctx.body.file;
 			const session = (ctx as any).session as Session;
 
-			log.info({ userId: session.user.id, fileName: file.name, fileSize: file.size }, "POST /transcribe");
+			log.info(
+				{ userId: session.user.id, fileName: file.name, fileSize: file.size },
+				"POST /transcribe"
+			);
 
 			try {
 				const [wordsUsedBefore, plan] = await Promise.all([
@@ -132,15 +135,15 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 				]);
 				log.info({ plan, wordsUsedBefore }, "fetched user plan and usage");
 
-			if (plan === "free" && wordsUsedBefore >= MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan]) {
-				log.warn({ userId: session.user.id, wordsUsedBefore }, "monthly limit reached");
-				return status(403, {
-					error: "Monthly transcription limit reached",
-					usage: {
-						wordsUsed: wordsUsedBefore,
-						wordLimit: MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan],
-					},
-				});
+				if (plan === "free" && wordsUsedBefore >= MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan]) {
+					log.warn({ userId: session.user.id, wordsUsedBefore }, "monthly limit reached");
+					return status(403, {
+						error: "Monthly transcription limit reached",
+						usage: {
+							wordsUsed: wordsUsedBefore,
+							wordLimit: MONTHLY_TRANSCRIPTION_WORD_LIMITS[plan],
+						},
+					});
 				}
 
 				const fileBuffer = await file.arrayBuffer();
@@ -158,7 +161,10 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 					const wordList = userWords.map((w) => w.word).join(", ");
 					prompt += ` Specialized terms: ${wordList}.`;
 				}
-				log.info({ dictionaryWords: userWords.length, promptLength: prompt.length }, "built prompt");
+				log.info(
+					{ dictionaryWords: userWords.length, promptLength: prompt.length },
+					"built prompt"
+				);
 
 				const startTime = performance.now();
 				log.info("sending to Groq whisper-large-v3");
@@ -173,7 +179,10 @@ export const transcribeRoutes = new Elysia({ prefix: "/transcribe" })
 
 				const endTime = performance.now();
 				const processingTimeMs = Math.round(endTime - startTime);
-				log.info({ processingTimeMs, textLength: transcription.text.length }, "groq response received");
+				log.info(
+					{ processingTimeMs, textLength: transcription.text.length },
+					"groq response received"
+				);
 
 				const transcriptionText = transcription.text.trim();
 				const wordCount = countWords(transcriptionText);

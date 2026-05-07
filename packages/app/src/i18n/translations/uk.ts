@@ -15,8 +15,10 @@ export const uk: Translations = {
 	},
 	about: {
 		title: "Про додаток",
-		welcomeDescription: "Ласкаво просимо до VoxFusion - сучасного десктопного додатку, створеного з SolidJS та Tauri.",
-		navigationDescription: "Цей додаток демонструє навігацію сторінками та функціональність маршрутизації.",
+		welcomeDescription:
+			"Ласкаво просимо до VoxFusion - сучасного десктопного додатку, створеного з SolidJS та Tauri.",
+		navigationDescription:
+			"Цей додаток демонструє навігацію сторінками та функціональність маршрутизації.",
 	},
 	settings: {
 		title: "Налаштування",
@@ -46,7 +48,8 @@ export const uk: Translations = {
 		defaultMicrophone: "Системний за замовчуванням",
 		microphoneDescription: "Оберіть мікрофон для запису голосу.",
 		audioQuality: "Якість аудіо",
-		audioQualityDescription: "Нижча якість зменшує розмір файлу для швидшого завантаження та транскрипції.",
+		audioQualityDescription:
+			"Нижча якість зменшує розмір файлу для швидшого завантаження та транскрипції.",
 		audioQualityHigh: "Висока",
 		audioQualityHighDescription: "Оригінальна якість, найбільший розмір файлу",
 		audioQualityMedium: "Середня",
@@ -72,7 +75,8 @@ export const uk: Translations = {
 		failedToFetch: "Не вдалося завантажити транскрипції",
 		errorOccurred: "Сталася помилка",
 		noTranscriptions: "Транскрипцій поки немає",
-		useCommandToRecord: "Використовуйте Command+; щоб розпочати запис і створити першу транскрипцію",
+		useCommandToRecord:
+			"Використовуйте Command+; щоб розпочати запис і створити першу транскрипцію",
 		tryAgain: "Спробувати знову",
 		noMore: "Більше немає транскрипцій",
 		today: "Сьогодні",
@@ -100,7 +104,8 @@ export const uk: Translations = {
 		edit: "Редагувати",
 		delete: "Видалити",
 		emptyState: "Слів поки немає",
-		emptyStateDescription: "Додайте слова для покращення точності транскрипції спеціальних термінів, імен або фраз, які ви часто використовуєте.",
+		emptyStateDescription:
+			"Додайте слова для покращення точності транскрипції спеціальних термінів, імен або фраз, які ви часто використовуєте.",
 		wordCount: "{count} слів",
 	},
 	onboarding: {
@@ -110,11 +115,13 @@ export const uk: Translations = {
 		back: "Назад",
 		getStarted: "Розпочати",
 		microphoneTitle: "Оберіть мікрофон",
-		microphoneDescription: "Оберіть мікрофон, який VoxFusion використовуватиме для запису голосу. Ви можете змінити це пізніше в Налаштуваннях.",
+		microphoneDescription:
+			"Оберіть мікрофон, який VoxFusion використовуватиме для запису голосу. Ви можете змінити це пізніше в Налаштуваннях.",
 		selectMicrophone: "Оберіть мікрофон",
 		refreshDevices: "Оновити пристрої",
 		hotkeyTitle: "Налаштуйте гарячу клавішу",
-		hotkeyDescription: "Ця комбінація клавіш запускатиме та зупинятиме запис голосу з будь-якого місця на вашому Mac.",
+		hotkeyDescription:
+			"Ця комбінація клавіш запускатиме та зупинятиме запис голосу з будь-якого місця на вашому Mac.",
 		currentHotkey: "Поточна гаряча клавіша",
 		recordHotkey: "Записати нову клавішу",
 		pressKeys: "Натисніть бажану комбінацію клавіш...",
@@ -123,17 +130,20 @@ export const uk: Translations = {
 		completionTitle: "Все готово!",
 		completionDescription: "VoxFusion готовий допомогти вам з транскрипцією голосу.",
 		micPermissionTitle: "Доступ до мікрофона",
-		micPermissionDescription: "VoxFusion потребує доступу до мікрофона для запису та транскрипції голосу.",
+		micPermissionDescription:
+			"VoxFusion потребує доступу до мікрофона для запису та транскрипції голосу.",
 		micPermissionGranted: "Доступ до мікрофона надано",
 		micPermissionNotGranted: "Потрібен доступ до мікрофона",
 		grantMicPermission: "Надати доступ до мікрофона",
 		checkingPermission: "Перевірка...",
 		accessibilityTitle: "Доступ до спеціальних можливостей",
-		accessibilityDescription: "VoxFusion потребує доступу до спеціальних можливостей для введення тексту в будь-який додаток.",
+		accessibilityDescription:
+			"VoxFusion потребує доступу до спеціальних можливостей для введення тексту в будь-який додаток.",
 		accessibilityGranted: "Доступ до спеціальних можливостей надано",
 		accessibilityNotGranted: "Потрібен доступ до спеціальних можливостей",
 		openSystemPreferences: "Відкрити Системні налаштування",
-		accessibilityInstructions: "Натисніть на замок для внесення змін, потім позначте VoxFusion у списку.",
+		accessibilityInstructions:
+			"Натисніть на замок для внесення змін, потім позначте VoxFusion у списку.",
 		learningTitle: "Спробуйте",
 		learningDescription: "Протестуйте голосовий введення перед початком роботи.",
 		learningStep1Prefix: "Натисніть",
