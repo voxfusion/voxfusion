@@ -4,7 +4,7 @@ import { Check, ChevronDown, Copy, RefreshCw } from "lucide-solid";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { useHotkeyRecorder } from "../hooks/useHotkeyRecorder";
 import { type Locale, useI18n } from "../i18n";
-import { hotkeyDisplayName } from "../lib/hotkeyUtils";
+import { hotkeyDisplayName, validateHoldToSpeakHotkey, validateHandsFreeHotkey } from "../lib/hotkeyUtils";
 import { capture } from "../lib/posthog";
 import {
 	type AudioDevice,
@@ -113,13 +113,22 @@ export default function SettingsModal(props: SettingsModalProps) {
 	const {
 		isRecording: isRecordingHotkey,
 		pendingHotkey,
+		error: hotkeyError,
 		toggleRecording: toggleHotkeyRecording,
-	} = useHotkeyRecorder();
+	} = useHotkeyRecorder({
+		validator: validateHandsFreeHotkey,
+		recorderId: "settings-handsfree",
+	});
 	const {
 		isRecording: isRecordingHoldToSpeakHotkey,
 		pendingHotkey: pendingHoldToSpeakHotkey,
+		error: holdToSpeakHotkeyError,
 		toggleRecording: toggleHoldToSpeakHotkeyRecording,
-	} = useHotkeyRecorder({ onHotkeyRecorded: updateHoldToSpeakHotkey });
+	} = useHotkeyRecorder({
+		onHotkeyRecorded: updateHoldToSpeakHotkey,
+		validator: validateHoldToSpeakHotkey,
+		recorderId: "settings-holdtospeak",
+	});
 	const [isLoadingDevices, setIsLoadingDevices] = createSignal(false);
 	const [appVersion, setAppVersion] = createSignal<string>("");
 	const [versionCopied, setVersionCopied] = createSignal(false);
@@ -379,7 +388,8 @@ export default function SettingsModal(props: SettingsModalProps) {
 											<button
 												type="button"
 												onClick={() => toggleHotkeyRecording()}
-												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors ${
+												disabled={holdToSpeakHotkeyError() !== null || (isRecordingHoldToSpeakHotkey() && !isRecordingHotkey())}
+												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
 													isRecordingHotkey()
 														? "bg-border text-txt-secondary hover:bg-border-strong"
 														: "bg-ac text-ac-on hover:bg-ac-hover"
@@ -388,6 +398,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 												{isRecordingHotkey() ? "[CANCEL]" : "[CHANGE]"}
 											</button>
 										</div>
+										{hotkeyError() && <div class="font-mono text-xs text-red-500">{hotkeyError()}</div>}
 										<p class="mt-3 font-mono text-xs text-txt-faint">
 											{t("settings.hotkeyDescription")}
 										</p>
@@ -411,7 +422,8 @@ export default function SettingsModal(props: SettingsModalProps) {
 											<button
 												type="button"
 												onClick={() => toggleHoldToSpeakHotkeyRecording()}
-												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors ${
+												disabled={hotkeyError() !== null || (isRecordingHotkey() && !isRecordingHoldToSpeakHotkey())}
+												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
 													isRecordingHoldToSpeakHotkey()
 														? "bg-border text-txt-secondary hover:bg-border-strong"
 														: "bg-ac text-ac-on hover:bg-ac-hover"
@@ -420,6 +432,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 												{isRecordingHoldToSpeakHotkey() ? "[CANCEL]" : "[CHANGE]"}
 											</button>
 										</div>
+										{holdToSpeakHotkeyError() && <div class="font-mono text-xs text-red-500">{holdToSpeakHotkeyError()}</div>}
 										<p class="mt-3 font-mono text-xs text-txt-faint">
 											{t("settings.holdToSpeakHotkeyDescription")}
 										</p>

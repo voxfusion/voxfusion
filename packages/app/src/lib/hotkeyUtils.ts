@@ -331,3 +331,23 @@ export function hotkeyDisplayName(hotkey: string): string {
 		.replace(/Alt/g, "\u2325")
 		.replace(/Shift/g, "\u21E7");
 }
+
+/**
+ * Check if a hotkey is valid for hands-free (press) mode.
+ * Returns null if valid, error message string if invalid.
+ */
+export function validateHandsFreeHotkey(_hotkey: string): string | null {
+	return null;
+}
+
+/**
+ * Check if a hotkey is valid for hold-to-speak mode.
+ * FN alone is not allowed as it conflicts with system functionality.
+ * Returns null if valid, error message string if invalid.
+ */
+export function validateHoldToSpeakHotkey(hotkey: string): string | null {
+	if (hotkey === "Fn") {
+		return "FN cannot be used as hold-to-speak hotkey";
+	}
+	return null;
+}

@@ -9,6 +9,8 @@ import {
 } from "../lib/hotkeyUtils";
 import { updateHotkey } from "../lib/settingsStore";
 
+let activeRecordingId: string | null = null;
+
 type SystemKey =
 	| "fn"
 	| "leftControl"
@@ -63,11 +65,15 @@ const MOD_ORDER = [
 
 interface UseHotkeyRecorderOptions {
 	onHotkeyRecorded?: (hotkey: string) => Promise<void>;
+	validator?: (hotkey: string) => string | null;
+	recorderId?: string;
 }
 
 export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
+	const recorderId = options.recorderId || Math.random().toString(36);
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [pendingHotkey, setPendingHotkey] = createSignal("");
+	const [error, setError] = createSignal<string | null>(null);
 
 	// Track all currently held modifier codes for combo shortcuts
 	let heldModifierCodes = new Set<string>();
@@ -82,8 +88,20 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 		emit("hotkey-recorder-active", { active }).catch(() => {});
 	};
 
-	const saveRecordedHotkey = (hotkey: string) =>
-		options.onHotkeyRecorded?.(hotkey) ?? updateHotkey(hotkey);
+	const saveRecordedHotkey = async (hotkey: string) => {
+		const validationError = options.validator?.(hotkey);
+		if (validationError) {
+			setError(validationError);
+			return false;
+		}
+		setError(null);
+		try {
+			await (options.onHotkeyRecorded?.(hotkey) ?? updateHotkey(hotkey));
+			return true;
+		} catch {
+			return false;
+		}
+	};
 
 	/**
 	 * Build a display string for currently held modifiers.
@@ -151,11 +169,13 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 			}
 
 			if (heldModifierCodes.size === 1 && heldModifierCodes.has(code) && systemHotkey) {
-				await saveRecordedHotkey(systemHotkey);
-				setIsRecording(false);
-				setPendingHotkey("");
-				resetTracking();
-				setRecorderActive(false);
+				const success = await saveRecordedHotkey(systemHotkey);
+				if (success) {
+					setIsRecording(false);
+					setPendingHotkey("");
+					resetTracking();
+					setRecorderActive(false);
+				}
 				return;
 			}
 
@@ -172,11 +192,13 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 			// A non-modifier key was released — check if we have a valid combo shortcut
 			const pending = pendingHotkey();
 			if (pending?.includes("+")) {
-				await saveRecordedHotkey(pending);
-				setIsRecording(false);
-				setPendingHotkey("");
-				resetTracking();
-				setRecorderActive(false);
+				const success = await saveRecordedHotkey(pending);
+				if (success) {
+					setIsRecording(false);
+					setPendingHotkey("");
+					resetTracking();
+					setRecorderActive(false);
+				}
 			}
 		}
 	};
@@ -197,11 +219,13 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 
 		const hotkey = pendingSystemHotkey;
 		saveRecordedHotkey(hotkey)
-			.then(() => {
-				setIsRecording(false);
-				setPendingHotkey("");
-				resetTracking();
-				setRecorderActive(false);
+			.then((success) => {
+				if (success) {
+					setIsRecording(false);
+					setPendingHotkey("");
+					resetTracking();
+					setRecorderActive(false);
+				}
 			})
 			.catch(() => {});
 	});
@@ -220,6 +244,9 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 	onCleanup(() => {
 		window.removeEventListener("keydown", handleKeyDown);
 		window.removeEventListener("keyup", handleKeyUp);
+		if (activeRecordingId === recorderId) {
+			activeRecordingId = null;
+		}
 		setRecorderActive(false);
 		unlistenSystemPressedPromise.then((unlisten) => unlisten()).catch(() => {});
 		unlistenSystemReleasedPromise.then((unlisten) => unlisten()).catch(() => {});
@@ -228,27 +255,48 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 	return {
 		isRecording,
 		pendingHotkey,
+		error,
 		startRecording: () => {
+			if (activeRecordingId !== null && activeRecordingId !== recorderId) {
+				setError("Another hotkey is being recorded. Please finish or cancel it first.");
+				return;
+			}
+			activeRecordingId = recorderId;
 			setIsRecording(true);
 			setPendingHotkey("");
+			setError(null);
 			resetTracking();
 			setRecorderActive(true);
 		},
 		stopRecording: () => {
+			if (activeRecordingId === recorderId) {
+				activeRecordingId = null;
+			}
 			setIsRecording(false);
 			setPendingHotkey("");
+			setError(null);
 			resetTracking();
 			setRecorderActive(false);
 		},
 		toggleRecording: () => {
 			if (isRecording()) {
+				if (activeRecordingId === recorderId) {
+					activeRecordingId = null;
+				}
 				setIsRecording(false);
 				setPendingHotkey("");
+				setError(null);
 				resetTracking();
 				setRecorderActive(false);
 			} else {
+				if (activeRecordingId !== null && activeRecordingId !== recorderId) {
+					setError("Another hotkey is being recorded. Please finish or cancel it first.");
+					return;
+				}
+				activeRecordingId = recorderId;
 				setIsRecording(true);
 				setPendingHotkey("");
+				setError(null);
 				resetTracking();
 				setRecorderActive(true);
 			}

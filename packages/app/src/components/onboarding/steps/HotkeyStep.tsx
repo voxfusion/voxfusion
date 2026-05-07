@@ -1,18 +1,26 @@
 import { Keyboard } from "lucide-solid";
 import { useHotkeyRecorder } from "../../../hooks/useHotkeyRecorder";
 import { useI18n } from "../../../i18n";
-import { hotkeyDisplayName } from "../../../lib/hotkeyUtils";
+import { hotkeyDisplayName, validateHoldToSpeakHotkey, validateHandsFreeHotkey } from "../../../lib/hotkeyUtils";
 import { updateHoldToSpeakHotkey, useSettings } from "../../../lib/settingsStore";
 
 export default function HotkeyStep() {
 	const [t] = useI18n();
 	const settings = useSettings();
-	const { isRecording, pendingHotkey, toggleRecording } = useHotkeyRecorder();
+	const { isRecording, pendingHotkey, error, toggleRecording } = useHotkeyRecorder({
+		validator: validateHandsFreeHotkey,
+		recorderId: "handsfree",
+	});
 	const {
 		isRecording: isRecordingHoldToSpeak,
 		pendingHotkey: pendingHoldToSpeakHotkey,
+		error: holdToSpeakError,
 		toggleRecording: toggleHoldToSpeakRecording,
-	} = useHotkeyRecorder({ onHotkeyRecorded: updateHoldToSpeakHotkey });
+	} = useHotkeyRecorder({
+		onHotkeyRecorded: updateHoldToSpeakHotkey,
+		validator: validateHoldToSpeakHotkey,
+		recorderId: "holdtospeak",
+	});
 
 	return (
 		<div class="text-center max-w-md mx-auto">
@@ -50,7 +58,8 @@ export default function HotkeyStep() {
 					<button
 						type="button"
 						onClick={toggleRecording}
-						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors ${
+						disabled={holdToSpeakError() !== null || (isRecordingHoldToSpeak() && !isRecording())}
+						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
 							isRecording()
 								? "border border-border-strong text-txt-secondary hover:border-ac hover:text-txt-primary bg-transparent"
 								: "bg-ac text-ac-on hover:bg-ac-hover"
@@ -58,6 +67,7 @@ export default function HotkeyStep() {
 					>
 						{isRecording() ? t("settings.cancel") : t("onboarding.recordHotkey")}
 					</button>
+					{error() && <div class="font-mono text-xs text-red-500">{error()}</div>}
 
 					<div class="font-mono text-xs text-txt-muted uppercase tracking-wider text-left pt-4">
 						{t("onboarding.holdToSpeakHotkey")}
@@ -77,7 +87,8 @@ export default function HotkeyStep() {
 					<button
 						type="button"
 						onClick={toggleHoldToSpeakRecording}
-						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors ${
+						disabled={error() !== null || (isRecording() && !isRecordingHoldToSpeak())}
+						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
 							isRecordingHoldToSpeak()
 								? "border border-border-strong text-txt-secondary hover:border-ac hover:text-txt-primary bg-transparent"
 								: "bg-ac text-ac-on hover:bg-ac-hover"
@@ -87,6 +98,7 @@ export default function HotkeyStep() {
 							? t("settings.cancel")
 							: t("onboarding.recordHoldToSpeakHotkey")}
 					</button>
+					{holdToSpeakError() && <div class="font-mono text-xs text-red-500">{holdToSpeakError()}</div>}
 				</div>
 			</div>
 		</div>
