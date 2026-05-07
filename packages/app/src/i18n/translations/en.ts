@@ -51,6 +51,8 @@ export type Translations = {
 		audioQualityMediumDescription: string;
 		audioQualityLow: string;
 		audioQualityLowDescription: string;
+		muteMediaWhileRecording: string;
+		muteMediaWhileRecordingDescription: string;
 		recordingHotkey: string;
 		pressHotkey: string;
 		hotkeyDescription: string;
@@ -217,6 +219,9 @@ export const en: Translations = {
 		audioQualityMediumDescription: "16kHz mono, ~10x smaller",
 		audioQualityLow: "Low",
 		audioQualityLowDescription: "8kHz mono, ~20x smaller",
+		muteMediaWhileRecording: "Mute Media During Recording",
+		muteMediaWhileRecordingDescription:
+			"Temporarily mute system audio while recording and restore it afterward.",
 		recordingHotkey: "Recording Hotkey",
 		pressHotkey: "Press a key combination...",
 		hotkeyDescription: "Press this key combination to start or stop recording.",

@@ -56,6 +56,9 @@ export const ru: Translations = {
 		audioQualityMediumDescription: "16 кГц моно, ~10x меньше",
 		audioQualityLow: "Низкое",
 		audioQualityLowDescription: "8 кГц моно, ~20x меньше",
+		muteMediaWhileRecording: "Отключать медиа во время записи",
+		muteMediaWhileRecordingDescription:
+			"Временно отключать системный звук во время записи и восстанавливать его после.",
 		recordingHotkey: "Горячая клавиша записи",
 		pressHotkey: "Нажмите комбинацию клавиш...",
 		hotkeyDescription: "Нажмите эту комбинацию клавиш для начала или остановки записи.",

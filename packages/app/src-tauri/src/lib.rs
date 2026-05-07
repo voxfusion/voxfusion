@@ -7,8 +7,9 @@ use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Listener, Manager};
 
 use handlers::{
-    check_accessibility_probe, list_audio_devices, process_audio_file, read_audio_file,
-    start_recording_with_device, stop_recording_with_device, type_text,
+    check_accessibility_probe, list_audio_devices, mute_media_for_recording, process_audio_file,
+    read_audio_file, restore_media_after_recording, start_recording_with_device,
+    stop_recording_with_device, type_text,
 };
 
 /// Shows the main window if it exists, or creates a new one if it was closed.
@@ -89,6 +90,8 @@ pub fn run() {
             process_audio_file,
             check_accessibility_probe,
             list_audio_devices,
+            mute_media_for_recording,
+            restore_media_after_recording,
             start_recording_with_device,
             stop_recording_with_device
         ])
@@ -102,7 +105,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 if let Err(e) = app.deep_link().register("voxfusion") {

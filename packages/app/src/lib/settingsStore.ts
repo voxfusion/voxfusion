@@ -13,6 +13,7 @@ export interface Settings {
 	selectedMicrophoneId: string | null;
 	language: Locale;
 	audioQuality: AudioQuality;
+	muteMediaWhileRecording: boolean;
 	onboardingComplete: boolean;
 	onboardingStep: number;
 }
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS: Settings = {
 	selectedMicrophoneId: null,
 	language: "en",
 	audioQuality: "medium",
+	muteMediaWhileRecording: false,
 	onboardingComplete: false,
 	onboardingStep: 1,
 };
@@ -42,6 +44,7 @@ async function getStore() {
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
 				audioQuality: DEFAULT_SETTINGS.audioQuality,
+				muteMediaWhileRecording: DEFAULT_SETTINGS.muteMediaWhileRecording,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
 				onboardingStep: DEFAULT_SETTINGS.onboardingStep,
 			},
@@ -59,6 +62,7 @@ export async function loadSettings(): Promise<Settings> {
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
 	const audioQuality = await store.get<AudioQuality>("audioQuality");
+	const muteMediaWhileRecording = await store.get<boolean>("muteMediaWhileRecording");
 	const onboardingComplete = await store.get<boolean>("onboardingComplete");
 	const onboardingStep = await store.get<number>("onboardingStep");
 
@@ -69,6 +73,7 @@ export async function loadSettings(): Promise<Settings> {
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
 		audioQuality: audioQuality ?? DEFAULT_SETTINGS.audioQuality,
+		muteMediaWhileRecording: muteMediaWhileRecording ?? DEFAULT_SETTINGS.muteMediaWhileRecording,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
 		onboardingStep: onboardingStep ?? DEFAULT_SETTINGS.onboardingStep,
 	};
@@ -105,6 +110,11 @@ export async function saveLanguage(language: Locale): Promise<void> {
 export async function saveAudioQuality(quality: AudioQuality): Promise<void> {
 	const store = await getStore();
 	await store.set("audioQuality", quality);
+}
+
+export async function saveMuteMediaWhileRecording(enabled: boolean): Promise<void> {
+	const store = await getStore();
+	await store.set("muteMediaWhileRecording", enabled);
 }
 
 export interface AudioDevice {
@@ -177,6 +187,12 @@ export async function updateLanguage(
 export async function updateAudioQuality(quality: AudioQuality): Promise<void> {
 	await saveAudioQuality(quality);
 	setSettingsInternal((prev) => ({ ...prev, audioQuality: quality }));
+	await emit("settings-changed");
+}
+
+export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<void> {
+	await saveMuteMediaWhileRecording(enabled);
+	setSettingsInternal((prev) => ({ ...prev, muteMediaWhileRecording: enabled }));
 	await emit("settings-changed");
 }
 
