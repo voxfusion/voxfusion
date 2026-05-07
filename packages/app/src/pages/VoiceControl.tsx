@@ -10,22 +10,15 @@ import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import eden from "../lib/eden";
+import {
+	isValidHotkey,
+	registerDictationHotkey,
+	unregisterDictationHotkey,
+} from "../lib/hotkeyUtils";
 import { loadSettings, updateHotkey } from "../lib/settingsStore";
 import { tokenManager } from "../lib/tokenManager";
 
 const DEFAULT_HOTKEY = "Command+;";
-
-/**
- * Check if a hotkey string is a valid combo shortcut (modifier + non-modifier key).
- * Modifier-only shortcuts (e.g., "RightCommand", "Control+Shift") are no longer supported.
- */
-function isValidComboHotkey(hotkey: string): boolean {
-	if (!hotkey.includes("+")) return false;
-	const parts = hotkey.split("+");
-	const modifierNames = new Set(["Command", "Control", "Alt", "Shift", "CapsLock", "Fn"]);
-	// At least one part must NOT be a modifier
-	return parts.some((part) => !modifierNames.has(part));
-}
 
 const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
 
@@ -80,36 +73,11 @@ export default function VoiceControl() {
 		}
 	};
 
-	const handleShortcut = (evt: { state: string }) => {
-		if (evt.state !== "Pressed") return;
-		toggleRecording();
-	};
-
 	/**
-	 * Unregister the currently active shortcut.
-	 */
-	const unregisterCurrentShortcut = async () => {
-		const current = currentShortcut();
-		if (!current) return;
-
-		try {
-			await unregister(current);
-		} catch {}
-
-		setCurrentShortcut(null);
-	};
-
-	/**
-	 * Register a global shortcut.
+	 * Register a dictation shortcut through the matching backend.
 	 */
 	const registerShortcut = async (shortcut: string) => {
-		// Unregister any existing shortcut first
-		await unregisterCurrentShortcut();
-
-		try {
-			await unregister(shortcut);
-		} catch {}
-		await register(shortcut, handleShortcut);
+		await registerDictationHotkey(shortcut, toggleRecording);
 		setCurrentShortcut(shortcut);
 	};
 
@@ -119,9 +87,8 @@ export default function VoiceControl() {
 		onCleanup(() => clearInterval(repositionInterval));
 
 		const settings = await loadSettings();
-		// Migrate: if a modifier-only hotkey was stored from a previous version, reset to default
 		let hotkey = settings.hotkey;
-		if (!isValidComboHotkey(hotkey)) {
+		if (!isValidHotkey(hotkey)) {
 			hotkey = DEFAULT_HOTKEY;
 			await updateHotkey(hotkey);
 		}
@@ -144,9 +111,7 @@ export default function VoiceControl() {
 
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
-			const newHotkey = isValidComboHotkey(newSettings.hotkey)
-				? newSettings.hotkey
-				: DEFAULT_HOTKEY;
+			const newHotkey = isValidHotkey(newSettings.hotkey) ? newSettings.hotkey : DEFAULT_HOTKEY;
 			const wasOnboarding = !isOnboardingComplete();
 			const nowComplete = newSettings.onboardingComplete;
 			if (newHotkey !== currentShortcut() || (wasOnboarding && nowComplete)) {
@@ -178,7 +143,8 @@ export default function VoiceControl() {
 			await cancelRecording();
 		}
 		await unregisterEscapeShortcut();
-		await unregisterCurrentShortcut();
+		await unregisterDictationHotkey();
+		setCurrentShortcut(null);
 	});
 
 	const stopRecording = async () => {

@@ -8,11 +8,10 @@ use core_graphics::event::{
     CGEventTapProxy, CGEventType, EventField, KeyCode,
 };
 use serde::Serialize;
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PRESSED_KEYS: OnceLock<Mutex<BTreeSet<SystemKey>>> = OnceLock::new();
-const VOICE_CONTROL_WINDOW_LABEL: &str = "voice-control";
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +29,14 @@ enum SystemKey {
 #[serde(rename_all = "camelCase")]
 struct SystemKeyPressedPayload {
     key: SystemKey,
+    pressed_keys: Vec<SystemKey>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SystemKeyReleasedPayload {
+    key: SystemKey,
+    pressed_keys: Vec<SystemKey>,
 }
 
 fn pressed_keys() -> &'static Mutex<BTreeSet<SystemKey>> {
@@ -68,9 +75,6 @@ fn emit_system_key_event(event: &CGEvent) {
     let Some(app_handle) = APP_HANDLE.get() else {
         return;
     };
-    let Some(window) = app_handle.get_webview_window(VOICE_CONTROL_WINDOW_LABEL) else {
-        return;
-    };
 
     let keycode = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
     let Some(key) = key_from_keycode(keycode) else {
@@ -84,18 +88,31 @@ fn emit_system_key_event(event: &CGEvent) {
         .expect("system key pressed state mutex poisoned");
 
     if is_down {
-        let was_empty = pressed.is_empty();
         let was_new_key = pressed.insert(key);
 
-        if was_empty && was_new_key && pressed.len() == 1 {
-            let _ = window.emit("system-key-pressed", SystemKeyPressedPayload { key });
+        if was_new_key {
+            let _ = app_handle.emit(
+                "system-key-pressed",
+                SystemKeyPressedPayload {
+                    key,
+                    pressed_keys: pressed.iter().copied().collect(),
+                },
+            );
         }
 
         return;
     }
 
-    if pressed.remove(&key) && pressed.is_empty() {
-        let _ = window.emit("system-keys-released", ());
+    if pressed.remove(&key) {
+        let pressed_keys = pressed.iter().copied().collect::<Vec<_>>();
+        let _ = app_handle.emit(
+            "system-key-released",
+            SystemKeyReleasedPayload { key, pressed_keys },
+        );
+
+        if pressed.is_empty() {
+            let _ = app_handle.emit("system-keys-released", ());
+        }
     }
 }
 
