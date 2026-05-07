@@ -2,6 +2,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Check, ChevronDown, Copy, RefreshCw } from "lucide-solid";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
+import ToggleOption from "./ToggleOption";
 import { useHotkeyRecorder } from "../hooks/useHotkeyRecorder";
 import { type Locale, useI18n } from "../i18n";
 import { hotkeyDisplayName, validateHoldToSpeakHotkey, validateHandsFreeHotkey } from "../lib/hotkeyUtils";
@@ -15,6 +16,7 @@ import {
 	updateHoldToSpeakHotkey,
 	updateLanguage,
 	updateMicrophone,
+	updateMuteMediaWhileRecording,
 	updateTheme,
 	useSettings,
 } from "../lib/settingsStore";
@@ -363,6 +365,16 @@ export default function SettingsModal(props: SettingsModalProps) {
 											{t("settings.audioQualityDescription")}
 										</p>
 									</div>
+
+									<ToggleOption
+										label={t("settings.muteMediaWhileRecording")}
+										description={t("settings.muteMediaWhileRecordingDescription")}
+										isEnabled={settings().muteMediaWhileRecording}
+										onChange={(enabled) => {
+											capture("settings_mute_media_while_recording_changed", { enabled });
+											updateMuteMediaWhileRecording(enabled);
+										}}
+									/>
 								</div>
 							</Show>
 
@@ -625,3 +637,4 @@ function QualityOption(props: QualityOptionProps) {
 		</button>
 	);
 }
+

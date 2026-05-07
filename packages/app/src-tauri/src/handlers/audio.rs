@@ -3,7 +3,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, Sample, Stream};
 use hound::{SampleFormat, WavSpec, WavWriter};
 use serde::Serialize;
-use std::fs::{create_dir_all, File};
+use std::fs::{File, create_dir_all};
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -53,9 +53,7 @@ pub struct AudioDevice {
 pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
     let host = cpal::default_host();
 
-    let default_device_name = host
-        .default_input_device()
-        .and_then(|d| d.name().ok());
+    let default_device_name = host.default_input_device().and_then(|d| d.name().ok());
 
     let devices = host
         .input_devices()
@@ -129,7 +127,14 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::I8 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data_with_levels::<i8, i8>(data, &writer_2, &app_handle_2, &last_emit_time),
+                move |data, _: &_| {
+                    write_input_data_with_levels::<i8, i8>(
+                        data,
+                        &writer_2,
+                        &app_handle_2,
+                        &last_emit_time,
+                    )
+                },
                 err_fn,
                 None,
             )
@@ -137,7 +142,14 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::I16 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data_with_levels::<i16, i16>(data, &writer_2, &app_handle_2, &last_emit_time),
+                move |data, _: &_| {
+                    write_input_data_with_levels::<i16, i16>(
+                        data,
+                        &writer_2,
+                        &app_handle_2,
+                        &last_emit_time,
+                    )
+                },
                 err_fn,
                 None,
             )
@@ -145,7 +157,14 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::I32 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data_with_levels::<i32, i32>(data, &writer_2, &app_handle_2, &last_emit_time),
+                move |data, _: &_| {
+                    write_input_data_with_levels::<i32, i32>(
+                        data,
+                        &writer_2,
+                        &app_handle_2,
+                        &last_emit_time,
+                    )
+                },
                 err_fn,
                 None,
             )
@@ -153,7 +172,14 @@ pub async fn start_recording_with_device(
         cpal::SampleFormat::F32 => device
             .build_input_stream(
                 &config.into(),
-                move |data, _: &_| write_input_data_with_levels::<f32, f32>(data, &writer_2, &app_handle_2, &last_emit_time),
+                move |data, _: &_| {
+                    write_input_data_with_levels::<f32, f32>(
+                        data,
+                        &writer_2,
+                        &app_handle_2,
+                        &last_emit_time,
+                    )
+                },
                 err_fn,
                 None,
             )
@@ -263,24 +289,27 @@ pub fn process_audio_file(path: String, quality: String) -> Result<Vec<u8>, Stri
     };
 
     // Read the source WAV file
-    let mut reader = hound::WavReader::open(&path)
-        .map_err(|e| format!("Failed to open WAV file: {}", e))?;
+    let mut reader =
+        hound::WavReader::open(&path).map_err(|e| format!("Failed to open WAV file: {}", e))?;
     let source_spec = reader.spec();
     let source_rate = source_spec.sample_rate;
     let source_channels = source_spec.channels as usize;
 
     // Read all samples as f32
     let samples_f32: Vec<f32> = match source_spec.sample_format {
-        SampleFormat::Float => {
-            reader.samples::<f32>()
-                .map(|s| s.map_err(|e| format!("Failed to read sample: {}", e)))
-                .collect::<Result<Vec<f32>, String>>()?
-        }
+        SampleFormat::Float => reader
+            .samples::<f32>()
+            .map(|s| s.map_err(|e| format!("Failed to read sample: {}", e)))
+            .collect::<Result<Vec<f32>, String>>()?,
         SampleFormat::Int => {
             let bits = source_spec.bits_per_sample;
             let max_val = (1u32 << (bits - 1)) as f32;
-            reader.samples::<i32>()
-                .map(|s| s.map(|v| v as f32 / max_val).map_err(|e| format!("Failed to read sample: {}", e)))
+            reader
+                .samples::<i32>()
+                .map(|s| {
+                    s.map(|v| v as f32 / max_val)
+                        .map_err(|e| format!("Failed to read sample: {}", e))
+                })
                 .collect::<Result<Vec<f32>, String>>()?
         }
     };
@@ -337,10 +366,12 @@ pub fn process_audio_file(path: String, quality: String) -> Result<Vec<u8>, Stri
             // Clamp and convert f32 [-1.0, 1.0] to i16
             let clamped = sample.clamp(-1.0, 1.0);
             let val = (clamped * 32767.0) as i16;
-            writer.write_sample(val)
+            writer
+                .write_sample(val)
                 .map_err(|e| format!("Failed to write sample: {}", e))?;
         }
-        writer.finalize()
+        writer
+            .finalize()
             .map_err(|e| format!("Failed to finalize WAV: {}", e))?;
     }
 
@@ -355,8 +386,7 @@ fn write_input_data_with_levels<T, U>(
     writer: &WavWriterHandle,
     app_handle: &Arc<Mutex<Option<tauri::AppHandle>>>,
     last_emit_time: &Arc<AtomicU64>,
-)
-where
+) where
     T: Sample,
     U: Sample + hound::Sample + FromSample<T>,
 {

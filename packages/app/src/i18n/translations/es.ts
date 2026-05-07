@@ -56,6 +56,9 @@ export const es: Translations = {
 		audioQualityMediumDescription: "16kHz mono, ~10x más pequeño",
 		audioQualityLow: "Baja",
 		audioQualityLowDescription: "8kHz mono, ~20x más pequeño",
+		muteMediaWhileRecording: "Silenciar medios durante la grabación",
+		muteMediaWhileRecordingDescription:
+			"Silencia temporalmente el audio del sistema mientras grabas y lo restaura después.",
 		recordingHotkey: "Atajo de grabación",
 		pressHotkey: "Presiona una combinación de teclas...",
 		hotkeyDescription: "Presiona esta combinación de teclas para iniciar o detener la grabación.",

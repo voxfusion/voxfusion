@@ -53,6 +53,8 @@ export const zh: Translations = {
 		audioQualityMediumDescription: "16kHz 单声道，约小10倍",
 		audioQualityLow: "低",
 		audioQualityLowDescription: "8kHz 单声道，约小20倍",
+		muteMediaWhileRecording: "录音时静音媒体",
+		muteMediaWhileRecordingDescription: "录音期间临时静音系统音频，并在结束后恢复。",
 		recordingHotkey: "录音快捷键",
 		pressHotkey: "按下组合键...",
 		hotkeyDescription: "按此组合键开始或停止录音。",

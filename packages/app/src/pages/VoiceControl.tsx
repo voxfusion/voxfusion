@@ -54,6 +54,7 @@ export default function VoiceControl() {
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
 	const [audioQuality, setAudioQuality] = createSignal<string>("high");
+	const [muteMediaWhileRecording, setMuteMediaWhileRecording] = createSignal(false);
 	const [audioLevel, setAudioLevel] = createSignal(0);
 	const [isAuthenticated, setIsAuthenticated] = createSignal(false);
 	const [isOnboardingComplete, setIsOnboardingComplete] = createSignal(false);
@@ -124,6 +125,7 @@ export default function VoiceControl() {
 		await registerShortcuts(hotkey, holdToSpeakHotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 		setAudioQuality(settings.audioQuality);
+		setMuteMediaWhileRecording(settings.muteMediaWhileRecording);
 		setIsOnboardingComplete(settings.onboardingComplete);
 
 		const unlistenAuth = await listen("auth-changed", async () => {
@@ -152,6 +154,7 @@ export default function VoiceControl() {
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
 			setAudioQuality(newSettings.audioQuality);
+			setMuteMediaWhileRecording(newSettings.muteMediaWhileRecording);
 			setIsOnboardingComplete(newSettings.onboardingComplete);
 		});
 
@@ -191,6 +194,7 @@ export default function VoiceControl() {
 
 		try {
 			const filePath = await invoke<string>("stop_recording_with_device");
+			await restoreMediaAfterRecording();
 
 			setLoading(true);
 
@@ -222,6 +226,7 @@ export default function VoiceControl() {
 		} catch {
 			// Transcription failed
 		} finally {
+			await restoreMediaAfterRecording();
 			setLoading(false);
 			isStopping = false;
 		}
@@ -258,7 +263,25 @@ export default function VoiceControl() {
 		} catch {
 			// Cancel recording failed
 		} finally {
+			await restoreMediaAfterRecording();
 			isStopping = false;
+		}
+	};
+
+	const muteMediaForRecording = async () => {
+		if (!muteMediaWhileRecording()) return;
+		try {
+			await invoke("mute_media_for_recording");
+		} catch {
+			// Media muting is best-effort and should not block recording.
+		}
+	};
+
+	const restoreMediaAfterRecording = async () => {
+		try {
+			await invoke("restore_media_after_recording");
+		} catch {
+			// Media restore failed
 		}
 	};
 
@@ -272,6 +295,7 @@ export default function VoiceControl() {
 			await invoke("start_recording_with_device", {
 				deviceName: deviceName === "default" ? null : deviceName,
 			});
+			await muteMediaForRecording();
 			activeRecordingMode = mode;
 			setIsRecording(true);
 			isStarting = false;
