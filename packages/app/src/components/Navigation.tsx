@@ -9,6 +9,7 @@ import { authClient } from "../lib/authClient";
 import eden from "../lib/eden";
 import { capture, resetUser } from "../lib/posthog";
 import { tokenManager } from "../lib/tokenManager";
+import UpdateNotification from "./UpdateNotification";
 
 interface SidebarProps {
 	onOpenSettings: () => void;
@@ -130,6 +131,8 @@ export default function Sidebar(props: SidebarProps) {
 					</Show>
 				</div>
 			</div>
+
+			<UpdateNotification />
 
 			<div class="p-3 border-t border-border relative">
 				<button

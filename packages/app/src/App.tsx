@@ -8,7 +8,6 @@ import appIcon from "../src-tauri/icons/icon.svg";
 import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
-import UpdateNotification from "./components/UpdateNotification";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
 import { authClient } from "./lib/authClient";
 import { capture, identifyUser } from "./lib/posthog";
@@ -200,7 +199,6 @@ function App(props: ParentProps) {
 							<main class="flex-1 overflow-auto pt-6">{props.children}</main>
 						</div>
 						<SettingsModal isOpen={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
-						<UpdateNotification />
 					</Show>
 				</Show>
 			</Show>
