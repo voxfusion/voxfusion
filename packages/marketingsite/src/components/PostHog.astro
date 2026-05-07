@@ -1,0 +1,107 @@
+---
+/**
+ * PostHog analytics + explicit marketing event tracking.
+ *
+ * Usage:
+ *   - Place <PostHog /> right before </body>.
+ *   - Add data-ph-event="event_name" to any clickable element.
+ *   - Add data-ph-view="event_name" to any section to capture once when it enters view.
+ *   - Optionally pass data-ph-props='{"key":"value"}' for event properties.
+ */
+const POSTHOG_KEY =
+	import.meta.env.PUBLIC_POSTHOG_KEY ?? "phc_n9Bb8O4Xw0diLGriQ4FKjrfHvUnFWDYcwo0fdBbd36m";
+const POSTHOG_HOST = import.meta.env.PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com";
+---
+
+<script is:inline define:vars={{ POSTHOG_KEY, POSTHOG_HOST }}>
+	!(function (t, e) {
+		var o, n, p, r;
+		e.__SV ||
+			((window.posthog = e),
+			(e._i = []),
+			(e.init = function (i, s, a) {
+				function g(t, e) {
+					var o = e.split(".");
+					o.length == 2 && ((t = t[o[0]]), (e = o[1]));
+					t[e] = function () {
+						t.push([e].concat(Array.prototype.slice.call(arguments, 0)));
+					};
+				}
+				((p = t.createElement("script")).type = "text/javascript"),
+					(p.async = !0),
+					(p.src = s.api_host + "/static/array.js"),
+					(r = t.getElementsByTagName("script")[0]).parentNode.insertBefore(p, r);
+				var u = e;
+				for (
+					a !== undefined ? (u = e[a] = []) : (a = "posthog"),
+						u.people = u.people || [],
+						u.toString = function (t) {
+							var e = "posthog";
+							return a !== "posthog" && (e += "." + a), t || (e += " (stub)"), e;
+						},
+						u.people.toString = function () {
+							return u.toString(1) + ".people (stub)";
+						},
+						o =
+							"init capture register register_once unregister identify alias set_config reset people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user".split(
+								" ",
+							),
+						n = 0;
+					n < o.length;
+					n++
+				)
+					g(u, o[n]);
+				e._i.push([i, s, a]);
+			}),
+			(e.__SV = 1));
+	})(document, window.posthog || []);
+
+	posthog.init(POSTHOG_KEY, {
+		api_host: POSTHOG_HOST,
+		capture_pageview: true,
+		capture_pageleave: true,
+		autocapture: false,
+		persistence: "localStorage",
+	});
+
+	function readProps(el) {
+		var raw = el.getAttribute("data-ph-props");
+		if (!raw) return undefined;
+
+		try {
+			return JSON.parse(raw);
+		} catch (error) {
+			console.warn("Invalid PostHog event properties", error);
+			return undefined;
+		}
+	}
+
+	document.addEventListener("click", function (event) {
+		var el = event.target.closest("[data-ph-event]");
+		if (!el) return;
+
+		posthog.capture(el.getAttribute("data-ph-event"), readProps(el));
+	});
+
+	if ("IntersectionObserver" in window) {
+		var viewed = {};
+		var observer = new IntersectionObserver(
+			function (entries) {
+				entries.forEach(function (entry) {
+					if (!entry.isIntersecting) return;
+
+					var eventName = entry.target.getAttribute("data-ph-view");
+					if (viewed[eventName]) return;
+
+					viewed[eventName] = true;
+					posthog.capture(eventName, readProps(entry.target));
+				});
+			},
+			{ threshold: 0.3 },
+		);
+
+		document.querySelectorAll("[data-ph-view]").forEach(function (el) {
+			observer.observe(el);
+		});
+	}
+</script>

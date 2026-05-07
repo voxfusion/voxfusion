@@ -1,6 +1,6 @@
 ---
 import Footer from "../components/Footer.astro";
-import YandexMetrika from "../components/YandexMetrika.astro";
+import PostHog from "../components/PostHog.astro";
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
 
 const lang = defaultLang;
@@ -100,7 +100,7 @@ const t = useTranslations(lang);
 	</main>
 
 	<Footer lang={lang} />
-	<YandexMetrika />
+	<PostHog />
 </body>
 </html>
 
