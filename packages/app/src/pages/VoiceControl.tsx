@@ -317,7 +317,7 @@ export default function VoiceControl() {
 			await invoke("start_recording_with_device", {
 				deviceName: deviceName === "default" ? null : deviceName,
 			});
-			await muteMediaForRecording();
+			void muteMediaForRecording();
 			activeRecordingMode = mode;
 			setIsRecording(true);
 			isStarting = false;
