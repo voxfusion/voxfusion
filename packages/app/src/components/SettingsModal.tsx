@@ -230,7 +230,13 @@ export default function SettingsModal(props: SettingsModalProps) {
 												: "text-txt-muted hover:text-txt-secondary hover:bg-th-surface border-l-2 border-transparent"
 										}`}
 									>
-										<span class="text-txt-faint">{item.num}</span>
+										<span
+											class={
+												activeSection() === item.id ? "text-ac" : "text-txt-faint"
+											}
+										>
+											{item.num}
+										</span>
 										<span>{item.label}</span>
 									</button>
 								)}
