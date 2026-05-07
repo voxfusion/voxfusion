@@ -200,14 +200,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 		{ value: "ru", label: "RUSSIAN" },
 		{ value: "es", label: "ESPAÑOL" },
 		{ value: "zh", label: "中文" },
-		{ value: "ja", label: "日本語" },
-		{ value: "ko", label: "한국어" },
 		{ value: "de", label: "DEUTSCH" },
 		{ value: "fr", label: "FRANÇAIS" },
 		{ value: "it", label: "ITALIANO" },
-		{ value: "sv", label: "SVENSKA" },
-		{ value: "hi", label: "हिन्दी" },
-		{ value: "uk", label: "UKRAINIAN" },
 	];
 
 	return (
@@ -237,11 +232,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 												: "text-txt-muted hover:text-txt-secondary hover:bg-th-surface border-l-2 border-transparent"
 										}`}
 									>
-										<span
-											class={
-												activeSection() === item.id ? "text-ac" : "text-txt-faint"
-											}
-										>
+										<span class={activeSection() === item.id ? "text-ac" : "text-txt-faint"}>
 											{item.num}
 										</span>
 										<span>{item.label}</span>

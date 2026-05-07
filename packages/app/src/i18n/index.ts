@@ -5,57 +5,22 @@ import { de } from "./translations/de";
 import { type Translations, en } from "./translations/en";
 import { es } from "./translations/es";
 import { fr } from "./translations/fr";
-import { hi } from "./translations/hi";
 import { it } from "./translations/it";
-import { ja } from "./translations/ja";
-import { ko } from "./translations/ko";
 import { ru } from "./translations/ru";
-import { sv } from "./translations/sv";
-import { uk } from "./translations/uk";
 import { zh } from "./translations/zh";
 
-export type Locale =
-	| "en"
-	| "ru"
-	| "es"
-	| "zh"
-	| "ja"
-	| "ko"
-	| "de"
-	| "fr"
-	| "it"
-	| "sv"
-	| "hi"
-	| "uk";
+export type Locale = "en" | "ru" | "es" | "zh" | "de" | "fr" | "it";
 
-const ALL_LOCALES: Locale[] = [
-	"en",
-	"ru",
-	"es",
-	"zh",
-	"ja",
-	"ko",
-	"de",
-	"fr",
-	"it",
-	"sv",
-	"hi",
-	"uk",
-];
+const ALL_LOCALES: Locale[] = ["en", "ru", "es", "zh", "de", "fr", "it"];
 
 const dictionaries: Record<Locale, Translations> = {
 	en,
 	ru,
 	es,
 	zh,
-	ja,
-	ko,
 	de,
 	fr,
 	it,
-	sv,
-	hi,
-	uk,
 };
 
 const flattenedDictionaries = {
@@ -63,14 +28,9 @@ const flattenedDictionaries = {
 	ru: flatten(ru),
 	es: flatten(es),
 	zh: flatten(zh),
-	ja: flatten(ja),
-	ko: flatten(ko),
 	de: flatten(de),
 	fr: flatten(fr),
 	it: flatten(it),
-	sv: flatten(sv),
-	hi: flatten(hi),
-	uk: flatten(uk),
 };
 
 export function createAppI18n(initialLocale: Locale = "en") {
