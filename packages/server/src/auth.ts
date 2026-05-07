@@ -13,8 +13,11 @@ const betterAuthSchema = {
 	jwks: schema.jwks,
 };
 
+const authBaseURL = process.env.BETTER_AUTH_URL || "http://localhost:3000";
+const localAuthOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
+
 export const auth = betterAuth({
-	baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+	baseURL: authBaseURL,
 	basePath: "/api/auth",
 	secret: process.env.BETTER_AUTH_SECRET!,
 	database: drizzleAdapter(db, {
@@ -39,7 +42,7 @@ export const auth = betterAuth({
 		bearer(),
 		jwt({
 			jwt: {
-				issuer: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+				issuer: authBaseURL,
 				audience: "voxfusion",
 				expirationTime: "400d",
 			},
@@ -52,5 +55,5 @@ export const auth = betterAuth({
 			secure: true,
 		},
 	},
-	trustedOrigins: ["voxfusion://", process.env.BETTER_AUTH_URL || "http://localhost:3000"],
+	trustedOrigins: ["voxfusion://", authBaseURL, ...localAuthOrigins],
 });
