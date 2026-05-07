@@ -60,6 +60,7 @@ export const it: Translations = {
 		pressHotkey: "Premi una combinazione di tasti...",
 		hotkeyDescription:
 			"Premi questa combinazione di tasti per avviare o interrompere la registrazione.",
+		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
 		change: "Modifica",
 		cancel: "Annulla",
 	},
@@ -124,7 +125,10 @@ export const it: Translations = {
 		hotkeyDescription:
 			"Questa scorciatoia da tastiera avvierà e interromperà la registrazione vocale da qualsiasi punto del tuo Mac.",
 		currentHotkey: "Scorciatoia attuale",
+		handsFreeHotkey: "Hands-free shortcut",
+		holdToSpeakHotkey: "Hold-to-speak shortcut",
 		recordHotkey: "Registra nuova scorciatoia",
+		recordHoldToSpeakHotkey: "Record Hold-to-Speak Hotkey",
 		pressKeys: "Premi la combinazione di tasti desiderata...",
 		languageTitle: "Scegli la tua lingua",
 		languageDescription: "Seleziona la lingua preferita per l'interfaccia.",
@@ -153,6 +157,8 @@ export const it: Translations = {
 		learningStep3Prefix: "Premi",
 		learningStep3Suffix: "di nuovo per fermare",
 		learningStep4: "Guarda la tua trascrizione apparire",
+		learningHoldToSpeakPrefix: "Or hold",
+		learningHoldToSpeakSuffix: "while speaking, then release to stop",
 		learningReady: "Pronto",
 		learningRecording: "Registrazione",
 		learningProcessing: "Elaborazione",

@@ -12,13 +12,14 @@ import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import eden from "../lib/eden";
 import {
 	isValidHotkey,
-	registerDictationHotkey,
+	registerDictationHotkeys,
 	unregisterDictationHotkey,
 } from "../lib/hotkeyUtils";
-import { loadSettings, updateHotkey } from "../lib/settingsStore";
+import { loadSettings, updateHoldToSpeakHotkey, updateHotkey } from "../lib/settingsStore";
 import { tokenManager } from "../lib/tokenManager";
 
 const DEFAULT_HOTKEY = "Command+;";
+const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "Command+Shift+;";
 
 const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
 
@@ -59,26 +60,49 @@ export default function VoiceControl() {
 	const [isLearningActive, setIsLearningActive] = createSignal(false);
 	let isStopping = false;
 	let isStarting = false;
+	let activeRecordingMode: "toggle" | "hold" | null = null;
+
+	const canUseShortcut = () => isAuthenticated() && (isOnboardingComplete() || isLearningActive());
 
 	const toggleRecording = () => {
-		if (!isAuthenticated() || (!isOnboardingComplete() && !isLearningActive())) {
-			return;
-		}
+		if (!canUseShortcut()) return;
 		if (isStarting || isStopping) return;
 
 		if (isRecording()) {
+			if (activeRecordingMode !== "toggle") return;
 			stopRecording();
 		} else {
-			startRecording();
+			startRecording("toggle");
 		}
+	};
+
+	const startHoldToSpeakRecording = () => {
+		if (!canUseShortcut()) return;
+		if (isStarting || isStopping || isRecording()) return;
+		startRecording("hold");
+	};
+
+	const stopHoldToSpeakRecording = () => {
+		if (!canUseShortcut()) return;
+		if (isStarting || isStopping || !isRecording()) return;
+		if (activeRecordingMode !== "hold") return;
+		stopRecording();
 	};
 
 	/**
 	 * Register a dictation shortcut through the matching backend.
 	 */
-	const registerShortcut = async (shortcut: string) => {
-		await registerDictationHotkey(shortcut, toggleRecording);
-		setCurrentShortcut(shortcut);
+	const registerShortcuts = async (toggleShortcut: string, holdShortcut: string) => {
+		const toggleHotkey = { hotkey: toggleShortcut, onPressed: toggleRecording };
+		const holdHotkey = {
+			hotkey: holdShortcut,
+			onPressed: startHoldToSpeakRecording,
+			onReleased: stopHoldToSpeakRecording,
+		};
+		const hotkeys = toggleShortcut === holdShortcut ? [toggleHotkey] : [toggleHotkey, holdHotkey];
+
+		await registerDictationHotkeys(hotkeys);
+		setCurrentShortcut(`${toggleShortcut}|${holdShortcut}`);
 	};
 
 	onMount(async () => {
@@ -92,7 +116,12 @@ export default function VoiceControl() {
 			hotkey = DEFAULT_HOTKEY;
 			await updateHotkey(hotkey);
 		}
-		await registerShortcut(hotkey);
+		let holdToSpeakHotkey = settings.holdToSpeakHotkey;
+		if (!isValidHotkey(holdToSpeakHotkey)) {
+			holdToSpeakHotkey = DEFAULT_HOLD_TO_SPEAK_HOTKEY;
+			await updateHoldToSpeakHotkey(holdToSpeakHotkey);
+		}
+		await registerShortcuts(hotkey, holdToSpeakHotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 		setAudioQuality(settings.audioQuality);
 		setIsOnboardingComplete(settings.onboardingComplete);
@@ -112,10 +141,14 @@ export default function VoiceControl() {
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
 			const newHotkey = isValidHotkey(newSettings.hotkey) ? newSettings.hotkey : DEFAULT_HOTKEY;
+			const newHoldToSpeakHotkey = isValidHotkey(newSettings.holdToSpeakHotkey)
+				? newSettings.holdToSpeakHotkey
+				: DEFAULT_HOLD_TO_SPEAK_HOTKEY;
 			const wasOnboarding = !isOnboardingComplete();
 			const nowComplete = newSettings.onboardingComplete;
-			if (newHotkey !== currentShortcut() || (wasOnboarding && nowComplete)) {
-				await registerShortcut(newHotkey);
+			const shortcutKey = `${newHotkey}|${newHoldToSpeakHotkey}`;
+			if (shortcutKey !== currentShortcut() || (wasOnboarding && nowComplete)) {
+				await registerShortcuts(newHotkey, newHoldToSpeakHotkey);
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
 			setAudioQuality(newSettings.audioQuality);
@@ -153,6 +186,7 @@ export default function VoiceControl() {
 
 		isStopping = true;
 		setIsRecording(false);
+		activeRecordingMode = null;
 		await unregisterEscapeShortcut();
 
 		try {
@@ -216,6 +250,7 @@ export default function VoiceControl() {
 
 		isStopping = true;
 		setIsRecording(false);
+		activeRecordingMode = null;
 		await unregisterEscapeShortcut();
 
 		try {
@@ -227,7 +262,7 @@ export default function VoiceControl() {
 		}
 	};
 
-	const startRecording = async () => {
+	const startRecording = async (mode: "toggle" | "hold") => {
 		try {
 			if (isRecording()) return;
 			if (isStopping || isStarting) return;
@@ -237,6 +272,7 @@ export default function VoiceControl() {
 			await invoke("start_recording_with_device", {
 				deviceName: deviceName === "default" ? null : deviceName,
 			});
+			activeRecordingMode = mode;
 			setIsRecording(true);
 			isStarting = false;
 			await registerEscapeShortcut();

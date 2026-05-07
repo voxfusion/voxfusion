@@ -61,7 +61,11 @@ const MOD_ORDER = [
 	"ShiftRight",
 ];
 
-export function useHotkeyRecorder() {
+interface UseHotkeyRecorderOptions {
+	onHotkeyRecorded?: (hotkey: string) => Promise<void>;
+}
+
+export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [pendingHotkey, setPendingHotkey] = createSignal("");
 
@@ -77,6 +81,9 @@ export function useHotkeyRecorder() {
 	const setRecorderActive = (active: boolean) => {
 		emit("hotkey-recorder-active", { active }).catch(() => {});
 	};
+
+	const saveRecordedHotkey = (hotkey: string) =>
+		options.onHotkeyRecorded?.(hotkey) ?? updateHotkey(hotkey);
 
 	/**
 	 * Build a display string for currently held modifiers.
@@ -144,7 +151,7 @@ export function useHotkeyRecorder() {
 			}
 
 			if (heldModifierCodes.size === 1 && heldModifierCodes.has(code) && systemHotkey) {
-				await updateHotkey(systemHotkey);
+				await saveRecordedHotkey(systemHotkey);
 				setIsRecording(false);
 				setPendingHotkey("");
 				resetTracking();
@@ -165,7 +172,7 @@ export function useHotkeyRecorder() {
 			// A non-modifier key was released — check if we have a valid combo shortcut
 			const pending = pendingHotkey();
 			if (pending?.includes("+")) {
-				await updateHotkey(pending);
+				await saveRecordedHotkey(pending);
 				setIsRecording(false);
 				setPendingHotkey("");
 				resetTracking();
@@ -181,7 +188,7 @@ export function useHotkeyRecorder() {
 
 			pendingSystemHotkey = systemHotkeyFromKeys(event.payload.pressedKeys);
 			setPendingHotkey(hotkeyDisplayName(pendingSystemHotkey));
-		},
+		}
 	);
 
 	const unlistenSystemReleasedPromise = listen("system-keys-released", () => {
@@ -189,7 +196,7 @@ export function useHotkeyRecorder() {
 		if (!pendingSystemHotkey) return;
 
 		const hotkey = pendingSystemHotkey;
-		updateHotkey(hotkey)
+		saveRecordedHotkey(hotkey)
 			.then(() => {
 				setIsRecording(false);
 				setPendingHotkey("");

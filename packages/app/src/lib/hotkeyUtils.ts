@@ -30,6 +30,10 @@ type GlobalShortcutEvent = {
 };
 
 type HotkeyHandler = () => void;
+type HotkeyHandlers = {
+	onPressed: HotkeyHandler;
+	onReleased?: HotkeyHandler;
+};
 
 type HotkeyRecorderActivePayload = {
 	active: boolean;
@@ -70,7 +74,7 @@ const MODIFIER_CODES = new Set([
 
 const COMBO_MODIFIER_NAMES = new Set(["Command", "Control", "Alt", "Shift", "CapsLock", "Fn"]);
 
-const SYSTEM_HOTKEY_TO_KEY = {
+const SYSTEM_HOTKEY_TO_KEY: Record<string, SystemKey> = {
 	Fn: "fn",
 	LeftControl: "leftControl",
 	RightControl: "rightControl",
@@ -78,7 +82,7 @@ const SYSTEM_HOTKEY_TO_KEY = {
 	RightOption: "rightOption",
 	LeftCommand: "leftCommand",
 	RightCommand: "rightCommand",
-} satisfies Record<string, SystemKey>;
+};
 
 const SYSTEM_HOTKEY_ORDER = [
 	"Fn",
@@ -101,6 +105,7 @@ const MODIFIER_CODE_TO_SYSTEM_HOTKEY: Record<string, string> = {
 };
 
 let registeredDictationHotkey: RegisteredHotkey | null = null;
+let registeredDictationHotkeys: RegisteredHotkey[] = [];
 
 /**
  * Check if a KeyboardEvent.code is a modifier key.
@@ -128,7 +133,10 @@ export function modifierCodeToSystemHotkey(code: string): string | undefined {
 export function systemHotkeyFromKeys(keys: Iterable<SystemKey>): string {
 	const keySet = new Set(keys);
 
-	return SYSTEM_HOTKEY_ORDER.filter((part) => keySet.has(SYSTEM_HOTKEY_TO_KEY[part])).join("+");
+	return SYSTEM_HOTKEY_ORDER.filter((part) => {
+		const key = SYSTEM_HOTKEY_TO_KEY[part];
+		return key !== undefined && keySet.has(key);
+	}).join("+");
 }
 
 function systemKeysFromHotkey(hotkey: string): SystemKey[] | undefined {
@@ -177,7 +185,10 @@ export function isValidHotkey(hotkey: string): boolean {
 	return parts.some((part) => !COMBO_MODIFIER_NAMES.has(part));
 }
 
-async function registerSystemHotkey(hotkey: string, handler: HotkeyHandler): Promise<RegisteredHotkey> {
+async function registerSystemHotkey(
+	hotkey: string,
+	handlers: HotkeyHandlers
+): Promise<RegisteredHotkey> {
 	const expectedKeys = systemKeysFromHotkey(hotkey);
 	if (!expectedKeys) {
 		throw new Error(`Unsupported system hotkey: ${hotkey}`);
@@ -190,7 +201,7 @@ async function registerSystemHotkey(hotkey: string, handler: HotkeyHandler): Pro
 		"hotkey-recorder-active",
 		(event) => {
 			isRecorderActive = event.payload.active;
-		},
+		}
 	);
 
 	const unlistenPressed = await listen<SystemKeyPressedPayload>("system-key-pressed", (event) => {
@@ -199,10 +210,11 @@ async function registerSystemHotkey(hotkey: string, handler: HotkeyHandler): Pro
 		if (isRecorderActive) return;
 
 		isHeld = true;
-		handler();
+		handlers.onPressed();
 	});
 
 	const unlistenReleased = await listen("system-keys-released", () => {
+		if (isHeld) handlers.onReleased?.();
 		isHeld = false;
 	});
 
@@ -210,8 +222,9 @@ async function registerSystemHotkey(hotkey: string, handler: HotkeyHandler): Pro
 		"system-key-released",
 		(event) => {
 			if (systemKeySetsMatch(event.payload.pressedKeys, expectedKeys)) return;
+			if (isHeld) handlers.onReleased?.();
 			isHeld = false;
-		},
+		}
 	);
 
 	return {
@@ -225,14 +238,20 @@ async function registerSystemHotkey(hotkey: string, handler: HotkeyHandler): Pro
 	};
 }
 
-async function registerGlobalHotkey(hotkey: string, handler: HotkeyHandler): Promise<RegisteredHotkey> {
+async function registerGlobalHotkey(
+	hotkey: string,
+	handlers: HotkeyHandlers
+): Promise<RegisteredHotkey> {
 	try {
 		await unregister(hotkey);
 	} catch {}
 
 	await register(hotkey, (event: GlobalShortcutEvent) => {
-		if (event.state !== "Pressed") return;
-		handler();
+		if (event.state === "Pressed") {
+			handlers.onPressed();
+		} else if (event.state === "Released") {
+			handlers.onReleased?.();
+		}
 	});
 
 	return {
@@ -252,13 +271,36 @@ async function registerGlobalHotkey(hotkey: string, handler: HotkeyHandler): Pro
  */
 export async function registerDictationHotkey(
 	hotkey: string,
-	handler: HotkeyHandler,
+	handler: HotkeyHandler
 ): Promise<void> {
 	await unregisterDictationHotkey();
 
 	registeredDictationHotkey = isSystemOnlyHotkey(hotkey)
-		? await registerSystemHotkey(hotkey, handler)
-		: await registerGlobalHotkey(hotkey, handler);
+		? await registerSystemHotkey(hotkey, { onPressed: handler })
+		: await registerGlobalHotkey(hotkey, { onPressed: handler });
+}
+
+export async function registerDictationHotkeys(
+	hotkeys: { hotkey: string; onPressed: HotkeyHandler; onReleased?: HotkeyHandler }[]
+): Promise<void> {
+	await unregisterDictationHotkey();
+
+	const registered: RegisteredHotkey[] = [];
+	try {
+		for (const config of hotkeys) {
+			registered.push(
+				isSystemOnlyHotkey(config.hotkey)
+					? await registerSystemHotkey(config.hotkey, config)
+					: await registerGlobalHotkey(config.hotkey, config)
+			);
+		}
+		registeredDictationHotkeys = registered;
+	} catch (error) {
+		for (const registration of registered) {
+			await registration.dispose();
+		}
+		throw error;
+	}
 }
 
 /**
@@ -266,10 +308,15 @@ export async function registerDictationHotkey(
  */
 export async function unregisterDictationHotkey(): Promise<void> {
 	const registered = registeredDictationHotkey;
-	if (!registered) return;
+	const registeredMany = registeredDictationHotkeys;
+	if (!registered && registeredMany.length === 0) return;
 
 	registeredDictationHotkey = null;
-	await registered.dispose();
+	registeredDictationHotkeys = [];
+	if (registered) await registered.dispose();
+	for (const registration of registeredMany) {
+		await registration.dispose();
+	}
 }
 
 /**

@@ -2,12 +2,17 @@ import { Keyboard } from "lucide-solid";
 import { useHotkeyRecorder } from "../../../hooks/useHotkeyRecorder";
 import { useI18n } from "../../../i18n";
 import { hotkeyDisplayName } from "../../../lib/hotkeyUtils";
-import { useSettings } from "../../../lib/settingsStore";
+import { updateHoldToSpeakHotkey, useSettings } from "../../../lib/settingsStore";
 
 export default function HotkeyStep() {
 	const [t] = useI18n();
 	const settings = useSettings();
 	const { isRecording, pendingHotkey, toggleRecording } = useHotkeyRecorder();
+	const {
+		isRecording: isRecordingHoldToSpeak,
+		pendingHotkey: pendingHoldToSpeakHotkey,
+		toggleRecording: toggleHoldToSpeakRecording,
+	} = useHotkeyRecorder({ onHotkeyRecorded: updateHoldToSpeakHotkey });
 
 	return (
 		<div class="text-center max-w-md mx-auto">
@@ -27,6 +32,9 @@ export default function HotkeyStep() {
 				<p class="font-mono text-sm text-txt-secondary mb-8">{t("onboarding.hotkeyDescription")}</p>
 
 				<div class="space-y-4">
+					<div class="font-mono text-xs text-txt-muted uppercase tracking-wider text-left">
+						{t("onboarding.handsFreeHotkey")}
+					</div>
 					<div
 						class={`px-6 py-4 border font-mono text-lg ${
 							isRecording()
@@ -49,6 +57,35 @@ export default function HotkeyStep() {
 						}`}
 					>
 						{isRecording() ? t("settings.cancel") : t("onboarding.recordHotkey")}
+					</button>
+
+					<div class="font-mono text-xs text-txt-muted uppercase tracking-wider text-left pt-4">
+						{t("onboarding.holdToSpeakHotkey")}
+					</div>
+					<div
+						class={`px-6 py-4 border font-mono text-lg ${
+							isRecordingHoldToSpeak()
+								? "border-ac bg-ac-bg text-ac"
+								: "border-border-strong bg-th-base text-txt-primary"
+						}`}
+					>
+						{isRecordingHoldToSpeak()
+							? pendingHoldToSpeakHotkey() || t("onboarding.pressKeys")
+							: hotkeyDisplayName(settings().holdToSpeakHotkey)}
+					</div>
+
+					<button
+						type="button"
+						onClick={toggleHoldToSpeakRecording}
+						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors ${
+							isRecordingHoldToSpeak()
+								? "border border-border-strong text-txt-secondary hover:border-ac hover:text-txt-primary bg-transparent"
+								: "bg-ac text-ac-on hover:bg-ac-hover"
+						}`}
+					>
+						{isRecordingHoldToSpeak()
+							? t("settings.cancel")
+							: t("onboarding.recordHoldToSpeakHotkey")}
 					</button>
 				</div>
 			</div>
