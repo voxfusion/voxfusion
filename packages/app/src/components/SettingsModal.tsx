@@ -12,6 +12,7 @@ import {
 	type Theme,
 	getAudioInputDevices,
 	updateAudioQuality,
+	updateHoldToSpeakHotkey,
 	updateLanguage,
 	updateMicrophone,
 	updateTheme,
@@ -114,6 +115,11 @@ export default function SettingsModal(props: SettingsModalProps) {
 		pendingHotkey,
 		toggleRecording: toggleHotkeyRecording,
 	} = useHotkeyRecorder();
+	const {
+		isRecording: isRecordingHoldToSpeakHotkey,
+		pendingHotkey: pendingHoldToSpeakHotkey,
+		toggleRecording: toggleHoldToSpeakHotkeyRecording,
+	} = useHotkeyRecorder({ onHotkeyRecorded: updateHoldToSpeakHotkey });
 	const [isLoadingDevices, setIsLoadingDevices] = createSignal(false);
 	const [appVersion, setAppVersion] = createSignal<string>("");
 	const [versionCopied, setVersionCopied] = createSignal(false);
@@ -148,7 +154,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 		if (!props.isOpen) return;
 
 		const handleEscape = (e: KeyboardEvent) => {
-			if (e.key === "Escape" && !isRecordingHotkey()) {
+			if (e.key === "Escape" && !isRecordingHotkey() && !isRecordingHoldToSpeakHotkey()) {
 				props.onClose();
 			}
 		};
@@ -206,6 +212,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 
 	return (
 		<Show when={props.isOpen}>
+			{/* biome-ignore lint/a11y/useKeyWithClickEvents: the overlay click only mirrors the Escape handler above. */}
 			<div
 				class="fixed inset-0 bg-th-overlay flex items-center justify-center z-50"
 				onClick={handleOverlayClick}
@@ -283,9 +290,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 								<div class="space-y-6">
 									<div>
 										<div class="flex items-center justify-between mb-3">
-											<label class="font-mono text-txt-muted text-xs uppercase tracking-wider">
+											<div class="font-mono text-txt-muted text-xs uppercase tracking-wider">
 												INPUT_DEVICE
-											</label>
+											</div>
 											<button
 												type="button"
 												onClick={fetchAudioDevices}
@@ -311,9 +318,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 
 									{/* Audio Quality Preset */}
 									<div>
-										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-4">
+										<div class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-4">
 											AUDIO_QUALITY
-										</label>
+										</div>
 										<div class="grid grid-cols-3 gap-4">
 											<QualityOption
 												value="high"
@@ -357,9 +364,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 							<Show when={activeSection() === "hotkey"}>
 								<div class="space-y-6">
 									<div>
-										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-3">
-											RECORDING_TRIGGER
-										</label>
+										<div class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-3">
+											HANDS_FREE_TRIGGER
+										</div>
 										<div class="flex items-center gap-3">
 											<div
 												class={`flex-1 px-4 py-3 border font-mono text-center text-sm ${
@@ -388,6 +395,38 @@ export default function SettingsModal(props: SettingsModalProps) {
 											{t("settings.hotkeyDescription")}
 										</p>
 									</div>
+									<div>
+										<div class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-3">
+											HOLD_TO_SPEAK_TRIGGER
+										</div>
+										<div class="flex items-center gap-3">
+											<div
+												class={`flex-1 px-4 py-3 border font-mono text-center text-sm ${
+													isRecordingHoldToSpeakHotkey()
+														? "border-ac bg-ac-bg text-ac"
+														: "border-border-strong bg-th-surface text-txt-primary"
+												}`}
+											>
+												{isRecordingHoldToSpeakHotkey()
+													? pendingHoldToSpeakHotkey() || "_ WAITING FOR INPUT _"
+													: hotkeyDisplayName(settings().holdToSpeakHotkey)}
+											</div>
+											<button
+												type="button"
+												onClick={() => toggleHoldToSpeakHotkeyRecording()}
+												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors ${
+													isRecordingHoldToSpeakHotkey()
+														? "bg-border text-txt-secondary hover:bg-border-strong"
+														: "bg-ac text-ac-on hover:bg-ac-hover"
+												}`}
+											>
+												{isRecordingHoldToSpeakHotkey() ? "[CANCEL]" : "[CHANGE]"}
+											</button>
+										</div>
+										<p class="mt-3 font-mono text-xs text-txt-faint">
+											{t("settings.holdToSpeakHotkeyDescription")}
+										</p>
+									</div>
 								</div>
 							</Show>
 
@@ -395,9 +434,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 							<Show when={activeSection() === "appearance"}>
 								<div class="space-y-6">
 									<div>
-										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-4">
+										<div class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-4">
 											THEME_MODE
-										</label>
+										</div>
 										<div class="grid grid-cols-3 gap-4">
 											<ThemeOption
 												value="light"
@@ -435,9 +474,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 							<Show when={activeSection() === "language"}>
 								<div class="space-y-6">
 									<div>
-										<label class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-3">
+										<div class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-3">
 											INTERFACE_LANGUAGE
-										</label>
+										</div>
 										<Select
 											value={locale()}
 											options={languageOptions}

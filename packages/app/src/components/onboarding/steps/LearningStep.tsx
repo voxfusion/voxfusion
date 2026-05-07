@@ -27,6 +27,7 @@ export default function LearningStep(props: LearningStepProps) {
 	let inputRef: HTMLInputElement | undefined;
 
 	const hotkeyParts = () => parseHotkeyParts(settings().hotkey);
+	const holdToSpeakHotkeyParts = () => parseHotkeyParts(settings().holdToSpeakHotkey);
 
 	const addMessage = () => {
 		const text = inputText().trim();
@@ -37,6 +38,7 @@ export default function LearningStep(props: LearningStepProps) {
 	};
 
 	onMount(async () => {
+		// biome-ignore lint/style/useConst: cleanup needs the listener reference before async setup finishes.
 		let unlisten: (() => void) | undefined;
 
 		onCleanup(() => {
@@ -130,6 +132,25 @@ export default function LearningStep(props: LearningStepProps) {
 							<span class="font-mono text-sm text-txt-secondary">
 								{t("onboarding.learningStep4")}
 							</span>
+						</div>
+
+						<div class="flex items-start gap-3">
+							<span class="font-mono text-ac text-sm font-bold mt-0.5">5.</span>
+							<div class="flex items-center gap-2 flex-wrap">
+								<span class="font-mono text-sm text-txt-secondary">
+									{t("onboarding.learningHoldToSpeakPrefix")}
+								</span>
+								<For each={holdToSpeakHotkeyParts()}>
+									{(part) => (
+										<kbd class="inline-flex items-center justify-center min-w-[2rem] px-2 py-1 font-mono text-sm border border-border-strong bg-th-base text-txt-primary rounded">
+											{part}
+										</kbd>
+									)}
+								</For>
+								<span class="font-mono text-sm text-txt-secondary">
+									{t("onboarding.learningHoldToSpeakSuffix")}
+								</span>
+							</div>
 						</div>
 					</div>
 				</div>

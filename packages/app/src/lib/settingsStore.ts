@@ -9,6 +9,7 @@ export type AudioQuality = "high" | "medium" | "low";
 export interface Settings {
 	theme: Theme;
 	hotkey: string;
+	holdToSpeakHotkey: string;
 	selectedMicrophoneId: string | null;
 	language: Locale;
 	audioQuality: AudioQuality;
@@ -19,6 +20,7 @@ export interface Settings {
 const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
 	hotkey: "Command+;",
+	holdToSpeakHotkey: "Command+Shift+;",
 	selectedMicrophoneId: null,
 	language: "en",
 	audioQuality: "medium",
@@ -36,6 +38,7 @@ async function getStore() {
 			defaults: {
 				theme: DEFAULT_SETTINGS.theme,
 				hotkey: DEFAULT_SETTINGS.hotkey,
+				holdToSpeakHotkey: DEFAULT_SETTINGS.holdToSpeakHotkey,
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
 				audioQuality: DEFAULT_SETTINGS.audioQuality,
@@ -52,6 +55,7 @@ export async function loadSettings(): Promise<Settings> {
 	const store = await getStore();
 	const theme = await store.get<Theme>("theme");
 	const hotkey = await store.get<string>("hotkey");
+	const holdToSpeakHotkey = await store.get<string>("holdToSpeakHotkey");
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
 	const audioQuality = await store.get<AudioQuality>("audioQuality");
@@ -61,6 +65,7 @@ export async function loadSettings(): Promise<Settings> {
 	return {
 		theme: theme ?? DEFAULT_SETTINGS.theme,
 		hotkey: hotkey ?? DEFAULT_SETTINGS.hotkey,
+		holdToSpeakHotkey: holdToSpeakHotkey ?? DEFAULT_SETTINGS.holdToSpeakHotkey,
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
 		audioQuality: audioQuality ?? DEFAULT_SETTINGS.audioQuality,
@@ -74,12 +79,17 @@ export async function saveTheme(theme: Theme): Promise<void> {
 	await store.set("theme", theme);
 	try {
 		localStorage.setItem("voxfusion-theme", theme);
-	} catch (e) {}
+	} catch {}
 }
 
 export async function saveHotkey(hotkey: string): Promise<void> {
 	const store = await getStore();
 	await store.set("hotkey", hotkey);
+}
+
+export async function saveHoldToSpeakHotkey(hotkey: string): Promise<void> {
+	const store = await getStore();
+	await store.set("holdToSpeakHotkey", hotkey);
 }
 
 export async function saveMicrophone(microphoneId: string | null): Promise<void> {
@@ -127,7 +137,7 @@ export async function initSettings(): Promise<void> {
 	applyTheme(loaded.theme);
 	try {
 		localStorage.setItem("voxfusion-theme", loaded.theme);
-	} catch (e) {}
+	} catch {}
 }
 
 export async function updateTheme(theme: Theme): Promise<void> {
@@ -140,6 +150,12 @@ export async function updateTheme(theme: Theme): Promise<void> {
 export async function updateHotkey(hotkey: string): Promise<void> {
 	await saveHotkey(hotkey);
 	setSettingsInternal((prev) => ({ ...prev, hotkey }));
+	await emit("settings-changed");
+}
+
+export async function updateHoldToSpeakHotkey(hotkey: string): Promise<void> {
+	await saveHoldToSpeakHotkey(hotkey);
+	setSettingsInternal((prev) => ({ ...prev, holdToSpeakHotkey: hotkey }));
 	await emit("settings-changed");
 }
 

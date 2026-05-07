@@ -54,6 +54,7 @@ export type Translations = {
 		recordingHotkey: string;
 		pressHotkey: string;
 		hotkeyDescription: string;
+		holdToSpeakHotkeyDescription: string;
 		change: string;
 		cancel: string;
 	};
@@ -114,7 +115,10 @@ export type Translations = {
 		hotkeyTitle: string;
 		hotkeyDescription: string;
 		currentHotkey: string;
+		handsFreeHotkey: string;
+		holdToSpeakHotkey: string;
 		recordHotkey: string;
+		recordHoldToSpeakHotkey: string;
 		pressKeys: string;
 		languageTitle: string;
 		languageDescription: string;
@@ -140,6 +144,8 @@ export type Translations = {
 		learningStep3Prefix: string;
 		learningStep3Suffix: string;
 		learningStep4: string;
+		learningHoldToSpeakPrefix: string;
+		learningHoldToSpeakSuffix: string;
 		learningReady: string;
 		learningRecording: string;
 		learningProcessing: string;
@@ -214,6 +220,7 @@ export const en: Translations = {
 		recordingHotkey: "Recording Hotkey",
 		pressHotkey: "Press a key combination...",
 		hotkeyDescription: "Press this key combination to start or stop recording.",
+		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
 		change: "Change",
 		cancel: "Cancel",
 	},
@@ -275,9 +282,12 @@ export const en: Translations = {
 		refreshDevices: "Refresh devices",
 		hotkeyTitle: "Set Your Hotkey",
 		hotkeyDescription:
-			"This keyboard shortcut will start and stop voice recording from anywhere on your Mac.",
+			"Set a hands-free shortcut and an optional hold-to-speak shortcut for quick dictation.",
 		currentHotkey: "Current hotkey",
+		handsFreeHotkey: "Hands-free shortcut",
+		holdToSpeakHotkey: "Hold-to-speak shortcut",
 		recordHotkey: "Record New Hotkey",
+		recordHoldToSpeakHotkey: "Record Hold-to-Speak Hotkey",
 		pressKeys: "Press your desired key combination...",
 		languageTitle: "Choose Your Language",
 		languageDescription: "Select your preferred language for the interface.",
@@ -306,6 +316,8 @@ export const en: Translations = {
 		learningStep3Prefix: "Press",
 		learningStep3Suffix: "again to stop",
 		learningStep4: "See your transcription appear",
+		learningHoldToSpeakPrefix: "Or hold",
+		learningHoldToSpeakSuffix: "while speaking, then release to stop",
 		learningReady: "Ready",
 		learningRecording: "Recording",
 		learningProcessing: "Processing",

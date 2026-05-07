@@ -60,6 +60,7 @@ export const de: Translations = {
 		pressHotkey: "Drücken Sie eine Tastenkombination...",
 		hotkeyDescription:
 			"Drücken Sie diese Tastenkombination, um die Aufnahme zu starten oder zu stoppen.",
+		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
 		change: "Ändern",
 		cancel: "Abbrechen",
 	},
@@ -125,7 +126,10 @@ export const de: Translations = {
 		hotkeyDescription:
 			"Dieses Tastenkürzel startet und stoppt die Sprachaufnahme von überall auf Ihrem Mac.",
 		currentHotkey: "Aktuelles Tastenkürzel",
+		handsFreeHotkey: "Hands-free shortcut",
+		holdToSpeakHotkey: "Hold-to-speak shortcut",
 		recordHotkey: "Neues Tastenkürzel aufnehmen",
+		recordHoldToSpeakHotkey: "Record Hold-to-Speak Hotkey",
 		pressKeys: "Drücken Sie die gewünschte Tastenkombination...",
 		languageTitle: "Wählen Sie Ihre Sprache",
 		languageDescription: "Wählen Sie Ihre bevorzugte Sprache für die Benutzeroberfläche.",
@@ -154,6 +158,8 @@ export const de: Translations = {
 		learningStep3Prefix: "Drücken Sie",
 		learningStep3Suffix: "erneut, um zu stoppen",
 		learningStep4: "Sehen Sie Ihre Transkription erscheinen",
+		learningHoldToSpeakPrefix: "Or hold",
+		learningHoldToSpeakSuffix: "while speaking, then release to stop",
 		learningReady: "Bereit",
 		learningRecording: "Aufnahme",
 		learningProcessing: "Verarbeitung",
