@@ -26,6 +26,11 @@ const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6
 const WINDOW_WIDTH = 100;
 const WINDOW_HEIGHT = 20;
 const BOTTOM_PADDING = 20;
+const ESCAPE_KEY_CODE = 53;
+
+type KeyboardKeyPressedPayload = {
+	keyCode: number;
+};
 
 let lastMonitorX = 0;
 let lastMonitorY = 0;
@@ -88,6 +93,13 @@ export default function VoiceControl() {
 		if (isStarting || isStopping || !isRecording()) return;
 		if (activeRecordingMode !== "hold") return;
 		stopRecording();
+	};
+
+	const cancelInterruptedHoldToSpeakRecording = () => {
+		if (!canUseShortcut()) return;
+		if (isStarting || isStopping || !isRecording()) return;
+		if (activeRecordingMode !== "hold") return;
+		cancelRecording();
 	};
 
 	/**
@@ -166,11 +178,21 @@ export default function VoiceControl() {
 			setIsLearningActive(event.payload);
 		});
 
+		const unlistenKeyboardKeyPressed = await listen<KeyboardKeyPressedPayload>(
+			"keyboard-key-pressed",
+			(event) => {
+				if (event.payload.keyCode === ESCAPE_KEY_CODE) return;
+				if (activeRecordingMode !== "hold") return;
+				cancelInterruptedHoldToSpeakRecording();
+			}
+		);
+
 		onCleanup(() => {
 			unlistenSettings();
 			unlistenAudio();
 			unlistenAuth();
 			unlistenLearning();
+			unlistenKeyboardKeyPressed();
 		});
 	});
 

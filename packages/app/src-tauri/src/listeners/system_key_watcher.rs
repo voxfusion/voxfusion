@@ -39,6 +39,12 @@ struct SystemKeyReleasedPayload {
     pressed_keys: Vec<SystemKey>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct KeyboardKeyPressedPayload {
+    key_code: i64,
+}
+
 fn pressed_keys() -> &'static Mutex<BTreeSet<SystemKey>> {
     PRESSED_KEYS.get_or_init(|| Mutex::new(BTreeSet::new()))
 }
@@ -116,6 +122,23 @@ fn emit_system_key_event(event: &CGEvent) {
     }
 }
 
+fn emit_keyboard_key_pressed(event: &CGEvent) {
+    let Some(app_handle) = APP_HANDLE.get() else {
+        return;
+    };
+
+    let is_repeat = event.get_integer_value_field(EventField::KEYBOARD_EVENT_AUTOREPEAT) != 0;
+    if is_repeat {
+        return;
+    }
+
+    let key_code = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
+    let _ = app_handle.emit(
+        "keyboard-key-pressed",
+        KeyboardKeyPressedPayload { key_code },
+    );
+}
+
 pub fn setup(app_handle: &tauri::AppHandle) {
     APP_HANDLE.set(app_handle.clone()).ok();
 
@@ -124,9 +147,13 @@ pub fn setup(app_handle: &tauri::AppHandle) {
             CGEventTapLocation::HID,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::ListenOnly,
-            vec![CGEventType::FlagsChanged],
-            |_proxy: CGEventTapProxy, _event_type: CGEventType, event: &CGEvent| {
-                emit_system_key_event(event);
+            vec![CGEventType::FlagsChanged, CGEventType::KeyDown],
+            |_proxy: CGEventTapProxy, event_type: CGEventType, event: &CGEvent| {
+                match event_type {
+                    CGEventType::FlagsChanged => emit_system_key_event(event),
+                    CGEventType::KeyDown => emit_keyboard_key_pressed(event),
+                    _ => {}
+                }
                 None
             },
         );
