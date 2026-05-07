@@ -314,10 +314,10 @@ export default function VoiceControl() {
 			isStarting = true;
 
 			const deviceName = selectedMicrophone();
-			void muteMediaForRecording();
 			await invoke("start_recording_with_device", {
 				deviceName: deviceName === "default" ? null : deviceName,
 			});
+			void muteMediaForRecording();
 			activeRecordingMode = mode;
 			setIsRecording(true);
 			isStarting = false;
