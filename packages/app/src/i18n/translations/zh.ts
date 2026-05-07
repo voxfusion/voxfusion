@@ -11,7 +11,7 @@ export const zh: Translations = {
 	},
 	home: {
 		yourTranscriptions: "你的转录",
-		pressToRecord: "按 Command+; 开始新的录音",
+		pressToRecord: "按 Left Control+Left Option 开始新的录音",
 	},
 	about: {
 		title: "关于",
@@ -73,7 +73,7 @@ export const zh: Translations = {
 		failedToFetch: "获取转录失败",
 		errorOccurred: "发生错误",
 		noTranscriptions: "暂无转录",
-		useCommandToRecord: "使用 Command+; 开始录音并创建你的第一个转录",
+		useCommandToRecord: "使用 Left Control+Left Option 开始录音并创建你的第一个转录",
 		tryAgain: "重试",
 		noMore: "没有更多转录",
 		today: "今天",

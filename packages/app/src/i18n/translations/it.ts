@@ -11,7 +11,7 @@ export const it: Translations = {
 	},
 	home: {
 		yourTranscriptions: "Le tue trascrizioni",
-		pressToRecord: "Premi Command+; per avviare una nuova registrazione",
+		pressToRecord: "Premi Left Control+Left Option per avviare una nuova registrazione",
 	},
 	about: {
 		title: "Informazioni",
@@ -78,7 +78,7 @@ export const it: Translations = {
 		errorOccurred: "Si è verificato un errore",
 		noTranscriptions: "Nessuna trascrizione ancora",
 		useCommandToRecord:
-			"Usa Command+; per avviare la registrazione e creare la tua prima trascrizione",
+			"Usa Left Control+Left Option per avviare la registrazione e creare la tua prima trascrizione",
 		tryAgain: "Riprova",
 		noMore: "Non ci sono altre trascrizioni",
 		today: "Oggi",

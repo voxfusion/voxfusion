@@ -14,6 +14,12 @@ function parseHotkeyParts(hotkey: string): string[] {
 		Control: "\u2303",
 		Alt: "\u2325",
 		Shift: "\u21E7",
+		LeftControl: "Left \u2303",
+		RightControl: "Right \u2303",
+		LeftOption: "Left \u2325",
+		RightOption: "Right \u2325",
+		LeftCommand: "Left \u2318",
+		RightCommand: "Right \u2318",
 	};
 	return hotkey.split("+").map((part) => DISPLAY_MAP[part] ?? part);
 }

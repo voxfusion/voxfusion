@@ -11,7 +11,7 @@ export const ru: Translations = {
 	},
 	home: {
 		yourTranscriptions: "Ваши транскрипции",
-		pressToRecord: "Нажмите Command+; чтобы начать запись",
+		pressToRecord: "Нажмите Left Control+Left Option, чтобы начать запись",
 	},
 	about: {
 		title: "О приложении",
@@ -76,7 +76,8 @@ export const ru: Translations = {
 		failedToFetch: "Не удалось загрузить транскрипции",
 		errorOccurred: "Произошла ошибка",
 		noTranscriptions: "Пока нет транскрипций",
-		useCommandToRecord: "Используйте Command+; чтобы начать запись и создать первую транскрипцию",
+		useCommandToRecord:
+			"Используйте Left Control+Left Option, чтобы начать запись и создать первую транскрипцию",
 		tryAgain: "Попробовать снова",
 		noMore: "Больше нет транскрипций",
 		today: "Сегодня",

@@ -18,8 +18,8 @@ import {
 import { loadSettings, updateHoldToSpeakHotkey, updateHotkey } from "../lib/settingsStore";
 import { tokenManager } from "../lib/tokenManager";
 
-const DEFAULT_HOTKEY = "Command+;";
-const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "Command+Shift+;";
+const DEFAULT_HOTKEY = "LeftControl+LeftOption";
+const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
 
 const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
 

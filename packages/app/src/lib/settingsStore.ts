@@ -19,8 +19,8 @@ export interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
-	hotkey: "Command+;",
-	holdToSpeakHotkey: "Command+Shift+;",
+	hotkey: "LeftControl+LeftOption",
+	holdToSpeakHotkey: "RightCommand",
 	selectedMicrophoneId: null,
 	language: "en",
 	audioQuality: "medium",
