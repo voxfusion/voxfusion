@@ -2,22 +2,25 @@
 import Footer from "../components/Footer.astro";
 import PostHog from "../components/PostHog.astro";
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
+import Seo from "../components/Seo.astro";
 
 const lang = defaultLang;
 const t = useTranslations(lang);
+const title = `${t("security.title")} - VoxFusion`;
+const description = title;
 ---
 
 <!doctype html>
 <html lang={lang}>
 <head>
 	<meta charset="UTF-8" />
-	<meta name="description" content={t("security.title") + " - VoxFusion"} />
+	<Seo title={title} description={description} lang={lang} />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-	<title>{t("security.title")} - VoxFusion</title>
+	<title>{title}</title>
 </head>
 <body>
 	<div class="grid-overlay"></div>
