@@ -6,11 +6,8 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
   actions: write
-
-env:
-  RELEASES_REPO: gregor-tokarev/voxfusion-releases
 
 jobs:
   build:
@@ -151,7 +148,7 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
           SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
-          DOWNLOAD_URL="https://github.com/${{ env.RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
 
           jq -n \
             --arg version "$VERSION" \
@@ -172,11 +169,9 @@ jobs:
           echo "Created latest.json:"
           cat latest.json
 
-      - name: Create release in public repository
+      - name: Create release in current repository
         uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.RELEASES_GITHUB_TOKEN }}
-          repository: ${{ env.RELEASES_REPO }}
           tag_name: ${{ github.ref_name }}
           name: VoxFusion ${{ github.ref_name }}
           body: |
