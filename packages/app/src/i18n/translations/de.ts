@@ -35,6 +35,7 @@ export const de: Translations = {
 		ukrainian: "Ukrainisch",
 		audio: "Audio",
 		hotkey: "Tastenkürzel",
+		hotkeys: "Tastenkürzel",
 		appearance: "Erscheinungsbild",
 		microphone: "Mikrofon",
 		defaultMicrophone: "Systemstandard",

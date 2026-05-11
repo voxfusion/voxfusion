@@ -33,6 +33,7 @@ export const zh: Translations = {
 		ukrainian: "乌克兰语",
 		audio: "音频",
 		hotkey: "快捷键",
+		hotkeys: "快捷键",
 		appearance: "外观",
 		microphone: "麦克风",
 		defaultMicrophone: "系统默认",

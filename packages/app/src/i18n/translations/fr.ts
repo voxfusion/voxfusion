@@ -35,6 +35,7 @@ export const fr: Translations = {
 		ukrainian: "Ukrainien",
 		audio: "Audio",
 		hotkey: "Raccourci clavier",
+		hotkeys: "Raccourcis clavier",
 		appearance: "Apparence",
 		microphone: "Microphone",
 		defaultMicrophone: "Par défaut du système",

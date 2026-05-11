@@ -31,6 +31,7 @@ export type Translations = {
 		ukrainian: string;
 		audio: string;
 		hotkey: string;
+		hotkeys: string;
 		appearance: string;
 		microphone: string;
 		defaultMicrophone: string;
@@ -183,6 +184,7 @@ export const en: Translations = {
 		ukrainian: "Ukrainian",
 		audio: "Audio",
 		hotkey: "Hotkey",
+		hotkeys: "Hotkeys",
 		appearance: "Appearance",
 		microphone: "Microphone",
 		defaultMicrophone: "System Default",

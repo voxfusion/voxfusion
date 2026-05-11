@@ -1,11 +1,18 @@
 import { Check, Copy } from "lucide-solid";
 import { For, Show } from "solid-js";
+import { useI18n } from "../../i18n";
 import type { SettingsSection } from "./types";
+
+type SidebarLabelKey =
+	| "settings.audio"
+	| "settings.hotkeys"
+	| "settings.appearance"
+	| "settings.language";
 
 interface SidebarItem {
 	id: SettingsSection;
 	num: string;
-	label: string;
+	labelKey: SidebarLabelKey;
 }
 
 interface SettingsSidebarProps {
@@ -17,17 +24,21 @@ interface SettingsSidebarProps {
 }
 
 const sidebarItems: SidebarItem[] = [
-	{ id: "audio", num: "01", label: "AUDIO" },
-	{ id: "hotkey", num: "02", label: "HOTKEYS" },
-	{ id: "appearance", num: "03", label: "APPEARANCE" },
-	{ id: "language", num: "04", label: "LANGUAGE" },
+	{ id: "audio", num: "01", labelKey: "settings.audio" },
+	{ id: "hotkey", num: "02", labelKey: "settings.hotkeys" },
+	{ id: "appearance", num: "03", labelKey: "settings.appearance" },
+	{ id: "language", num: "04", labelKey: "settings.language" },
 ];
 
 export default function SettingsSidebar(props: SettingsSidebarProps) {
+	const [t] = useI18n();
+
 	return (
 		<div class="w-56 bg-th-base border-r border-border flex flex-col">
 			<div class="px-4 py-4 border-b border-border">
-				<h2 class="font-mono text-ac text-sm tracking-wider">[VOXFUSION] &gt; SETTINGS</h2>
+				<h2 class="font-mono text-ac text-sm tracking-wider uppercase">
+					[VOXFUSION] &gt; {t("settings.title")}
+				</h2>
 			</div>
 			<nav class="flex-1 py-2">
 				<For each={sidebarItems}>
@@ -44,7 +55,7 @@ export default function SettingsSidebar(props: SettingsSidebarProps) {
 							<span class={props.activeSection === item.id ? "text-ac" : "text-txt-faint"}>
 								{item.num}
 							</span>
-							<span>{item.label}</span>
+							<span class="uppercase">{t(item.labelKey)}</span>
 						</button>
 					)}
 				</For>
