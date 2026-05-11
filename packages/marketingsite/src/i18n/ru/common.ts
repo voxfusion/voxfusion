@@ -5,6 +5,7 @@ export const common = {
 
 	"nav.features": "Features",
 	"nav.download": "Download",
+	"nav.github": "GitHub",
 
 	"cta.title": "Ready to type with your voice?",
 	"cta.description":
@@ -21,7 +22,6 @@ export const common = {
 	"footer.product": "Product",
 	"footer.company": "Company",
 	"footer.legal": "Legal",
-	"footer.changelog": "Changelog",
 	"footer.about": "About",
 	"footer.blog": "Blog",
 	"footer.careers": "Careers",
