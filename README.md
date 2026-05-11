@@ -1,20 +1,17 @@
 # VoxFusion
 
-A monorepo containing the VoxFusion platform, built with Turborepo.
+A local-first, offline-capable voice transcription desktop app. All transcription happens on-device using a Whisper V3 Large Turbo model — no servers, no accounts, no internet required after first-time model download.
 
 ## Packages
 
 | Package | Description | Stack |
 |---------|-------------|-------|
-| `@voxfusion/app` | Desktop application | Tauri v2, SolidJS, Tailwind CSS, TypeScript |
-| `@voxfusion/server` | Backend API server | Elysia.js, Drizzle ORM, PostgreSQL, better-auth |
-| `@voxfusion/marketingsite` | Marketing landing page | Astro |
+| `@voxfusion/app` | Desktop application | Tauri v2, SolidJS, Tailwind CSS, TypeScript, whisper-rs, SQLite |
 
 ## Prerequisites
 
 - [Bun](https://bun.sh/) (v1.0+)
 - [Rust](https://rustup.rs/) (for Tauri development)
-- [PostgreSQL](https://postgresql.org/) (for the server)
 
 ## Getting Started
 
@@ -26,23 +23,14 @@ bun install
 
 ### Development
 
-Run all packages in development mode:
-
 ```bash
 bun run dev
 ```
 
-Or run individual packages:
+Or run the app directly:
 
 ```bash
-# Desktop app (runs at http://localhost:1420)
 bun run --filter @voxfusion/app dev
-
-# Server (runs at http://localhost:3000)
-bun run --filter @voxfusion/server dev
-
-# Marketing site (runs at http://localhost:4321)
-bun run --filter @voxfusion/marketingsite dev
 ```
 
 ### Tauri Desktop App
@@ -56,46 +44,34 @@ bun run tauri:dev
 
 ### Build
 
-Build all packages:
-
 ```bash
 bun run build
 ```
 
-### Database (Server)
+## How it works
 
-```bash
-cd packages/server
+On first launch, the app walks the user through onboarding:
 
-# Generate migrations
-bun run db:generate
+1. Microphone permission
+2. Accessibility permission (for global hotkeys and typing into other apps)
+3. Microphone device selection
+4. Hotkey configuration
+5. **Whisper model download** (~1.5 GB, one-time, requires internet)
+6. Try-it-out / learning step
+7. Completion
 
-# Run migrations
-bun run db:migrate
-
-# Push schema directly (development)
-bun run db:push
-
-# Open Drizzle Studio
-bun run db:studio
-```
+After onboarding, the app is fully offline. All transcriptions and dictionary words are stored locally in a SQLite database under the app's data directory.
 
 ## Linting & Formatting
 
 This project uses [Biome](https://biomejs.dev/) for linting and formatting.
 
 ```bash
-# Check all files
-bun run check
-
-# Fix all auto-fixable issues
-bun run check:fix
-
-# Format all files
-bun run format
-
-# Lint only
-bun run lint
+bun run check        # lint + format
+bun run check:fix    # auto-fix
+bun run format       # format only
+bun run lint         # lint only
+bun run typecheck    # TypeScript type checking
 ```
 
 ## Project Structure
@@ -103,46 +79,26 @@ bun run lint
 ```
 voxfusion/
 ├── packages/
-│   ├── app/                # Tauri + SolidJS desktop app
-│   │   ├── src/            # Frontend source
-│   │   └── src-tauri/      # Tauri/Rust backend
-│   ├── server/             # Elysia.js API server
-│   │   ├── src/
-│   │   │   ├── db/         # Drizzle ORM schemas
-│   │   │   └── routes/     # API routes
-│   │   └── drizzle/        # Migrations
-│   └── marketingsite/      # Astro marketing site
-│       └── src/
-│           ├── components/
-│           ├── layouts/
-│           └── pages/
+│   └── app/                # Tauri + SolidJS desktop app
+│       ├── src/            # Frontend source (SolidJS)
+│       │   ├── components/ # UI components, onboarding wizard
+│       │   ├── pages/      # Home, Dictionary, VoiceControl
+│       │   ├── lib/        # Settings, hotkey utils
+│       │   └── i18n/       # Translations
+│       └── src-tauri/      # Tauri/Rust backend
+│           └── src/
+│               ├── handlers/  # audio, whisper, db, text, media
+│               └── listeners/ # accessibility, system keys
 ├── turbo.json              # Turborepo configuration
 ├── biome.json              # Biome linter config
 └── package.json            # Root package.json
 ```
 
-## Scripts
+## Local storage
 
-| Script | Description |
-|--------|-------------|
-| `bun run dev` | Start all packages in dev mode |
-| `bun run build` | Build all packages |
-| `bun run lint` | Run Biome linter |
-| `bun run lint:fix` | Fix linter issues |
-| `bun run format` | Format all files with Biome |
-| `bun run check` | Run Biome check (lint + format) |
-| `bun run check:fix` | Fix all Biome issues |
-| `bun run typecheck` | Run TypeScript type checking |
-
-## Environment Variables
-
-### Server (`packages/server/.env`)
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/voxfusion
-BETTER_AUTH_SECRET=your-secret-key-here
-BETTER_AUTH_URL=http://localhost:3000
-```
+- **Whisper model**: `{app_data_dir}/models/ggml-large-v3-turbo.bin`
+- **Transcriptions + dictionary**: `{app_data_dir}/voxfusion.db` (SQLite)
+- **Settings**: Tauri store plugin (`settings.json` in app data dir)
 
 ## License
 

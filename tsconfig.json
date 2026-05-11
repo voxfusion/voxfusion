@@ -30,9 +30,7 @@
 
 		"baseUrl": ".",
 		"paths": {
-			"@voxfusion/server": ["./packages/server/src"],
-			"@voxfusion/app": ["./packages/app/src"],
-			"@voxfusion/marketingsite": ["./packages/marketingsite/src"]
+			"@voxfusion/app": ["./packages/app/src"]
 		}
 	}
 }
