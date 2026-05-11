@@ -1,12 +1,4 @@
 export type Translations = {
-	auth: {
-		welcome: string;
-		signInToContinue: string;
-		continueWithGoogle: string;
-		devPasteToken: string;
-		pasteTokenPlaceholder: string;
-		authenticate: string;
-	};
 	home: {
 		yourTranscriptions: string;
 		pressToRecord: string;
@@ -43,14 +35,6 @@ export type Translations = {
 		microphone: string;
 		defaultMicrophone: string;
 		microphoneDescription: string;
-		audioQuality: string;
-		audioQualityDescription: string;
-		audioQualityHigh: string;
-		audioQualityHighDescription: string;
-		audioQualityMedium: string;
-		audioQualityMediumDescription: string;
-		audioQualityLow: string;
-		audioQualityLowDescription: string;
 		muteMediaWhileRecording: string;
 		muteMediaWhileRecordingDescription: string;
 		recordingHotkey: string;
@@ -85,11 +69,6 @@ export type Translations = {
 		account: string;
 		settings: string;
 		privacy: string;
-		logout: string;
-		wordsUsed: string;
-		limitReached: string;
-		proPlan: string;
-		unlimited: string;
 	};
 	dictionary: {
 		title: string;
@@ -151,6 +130,14 @@ export type Translations = {
 		learningProcessing: string;
 		learningPlaceholder: string;
 		learningError: string;
+		modelDownloadTitle: string;
+		modelDownloadDescription: string;
+		modelDownloadComplete: string;
+		modelDownloading: string;
+		modelSize: string;
+		downloadModel: string;
+		retryDownload: string;
+		modelDownloadNote: string;
 	};
 	update: {
 		available: string;
@@ -162,14 +149,6 @@ export type Translations = {
 };
 
 export const en: Translations = {
-	auth: {
-		welcome: "Welcome to VoxFusion",
-		signInToContinue: "Sign in to continue",
-		continueWithGoogle: "Continue with Google",
-		devPasteToken: "Development: Paste token to authenticate",
-		pasteTokenPlaceholder: "Paste token here",
-		authenticate: "Authenticate",
-	},
 	home: {
 		yourTranscriptions: "Your Transcriptions",
 		pressToRecord: "Press Left Control+Left Option to start a new recording",
@@ -208,15 +187,6 @@ export const en: Translations = {
 		microphone: "Microphone",
 		defaultMicrophone: "System Default",
 		microphoneDescription: "Select the microphone to use for voice recording.",
-		audioQuality: "Audio Quality",
-		audioQualityDescription:
-			"Lower quality reduces file size for faster uploads and transcriptions.",
-		audioQualityHigh: "High",
-		audioQualityHighDescription: "Original quality, largest file size",
-		audioQualityMedium: "Medium",
-		audioQualityMediumDescription: "16kHz mono, ~10x smaller",
-		audioQualityLow: "Low",
-		audioQualityLowDescription: "8kHz mono, ~20x smaller",
 		muteMediaWhileRecording: "Mute Media During Recording",
 		muteMediaWhileRecordingDescription:
 			"Temporarily mute system audio while recording and restore it afterward.",
@@ -253,11 +223,6 @@ export const en: Translations = {
 		account: "Account",
 		settings: "Settings",
 		privacy: "Privacy",
-		logout: "Log out",
-		wordsUsed: "Words used",
-		limitReached: "Limit reached",
-		proPlan: "Pro plan",
-		unlimited: "Unlimited",
 	},
 	dictionary: {
 		title: "Dictionary",
@@ -325,6 +290,16 @@ export const en: Translations = {
 		learningProcessing: "Processing",
 		learningPlaceholder: "Your transcriptions will appear here",
 		learningError: "Transcription failed. Try again.",
+		modelDownloadTitle: "Download Whisper Model",
+		modelDownloadDescription:
+			"Download the Whisper V3 Large Turbo model for local, offline transcription.",
+		modelDownloadComplete: "Model downloaded successfully",
+		modelDownloading: "Downloading...",
+		modelSize: "Model size",
+		downloadModel: "Download Model",
+		retryDownload: "Retry Download",
+		modelDownloadNote:
+			"This model enables offline transcription. Download requires internet connection.",
 	},
 	update: {
 		available: "Update Available",

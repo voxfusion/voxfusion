@@ -9,14 +9,12 @@ import {
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
-import eden from "../lib/eden";
 import {
 	isValidHotkey,
 	registerDictationHotkeys,
 	unregisterDictationHotkey,
 } from "../lib/hotkeyUtils";
 import { loadSettings, updateHoldToSpeakHotkey, updateHotkey } from "../lib/settingsStore";
-import { tokenManager } from "../lib/tokenManager";
 
 const DEFAULT_HOTKEY = "LeftControl+LeftOption";
 const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
@@ -58,17 +56,15 @@ export default function VoiceControl() {
 	const [loading, setLoading] = createSignal(false);
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
-	const [audioQuality, setAudioQuality] = createSignal<string>("high");
 	const [muteMediaWhileRecording, setMuteMediaWhileRecording] = createSignal(false);
 	const [audioLevel, setAudioLevel] = createSignal(0);
-	const [isAuthenticated, setIsAuthenticated] = createSignal(false);
 	const [isOnboardingComplete, setIsOnboardingComplete] = createSignal(false);
 	const [isLearningActive, setIsLearningActive] = createSignal(false);
 	let isStopping = false;
 	let isStarting = false;
 	let activeRecordingMode: "toggle" | "hold" | null = null;
 
-	const canUseShortcut = () => isAuthenticated() && (isOnboardingComplete() || isLearningActive());
+	const canUseShortcut = () => isOnboardingComplete() || isLearningActive();
 
 	const toggleRecording = () => {
 		if (!canUseShortcut()) return;
@@ -102,9 +98,6 @@ export default function VoiceControl() {
 		cancelRecording();
 	};
 
-	/**
-	 * Register a dictation shortcut through the matching backend.
-	 */
 	const registerShortcuts = async (toggleShortcut: string, holdShortcut: string) => {
 		const toggleHotkey = { hotkey: toggleShortcut, onPressed: toggleRecording };
 		const holdHotkey = {
@@ -136,21 +129,8 @@ export default function VoiceControl() {
 		}
 		await registerShortcuts(hotkey, holdToSpeakHotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
-		setAudioQuality(settings.audioQuality);
 		setMuteMediaWhileRecording(settings.muteMediaWhileRecording);
 		setIsOnboardingComplete(settings.onboardingComplete);
-
-		const unlistenAuth = await listen("auth-changed", async () => {
-			await tokenManager.init();
-			const token = await tokenManager.getToken();
-			setIsAuthenticated(!!token);
-		});
-
-		// Request current auth state from the main window. This avoids
-		// calling Stronghold.load() concurrently with the main window,
-		// which replaces the Rust-side vault instance and causes token
-		// reads to fail.
-		await emit("auth-request");
 
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
@@ -165,7 +145,6 @@ export default function VoiceControl() {
 				await registerShortcuts(newHotkey, newHoldToSpeakHotkey);
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
-			setAudioQuality(newSettings.audioQuality);
 			setMuteMediaWhileRecording(newSettings.muteMediaWhileRecording);
 			setIsOnboardingComplete(newSettings.onboardingComplete);
 		});
@@ -190,7 +169,6 @@ export default function VoiceControl() {
 		onCleanup(() => {
 			unlistenSettings();
 			unlistenAudio();
-			unlistenAuth();
 			unlistenLearning();
 			unlistenKeyboardKeyPressed();
 		});
@@ -220,33 +198,28 @@ export default function VoiceControl() {
 
 			setLoading(true);
 
-			const audioBytes = await invoke<number[]>("process_audio_file", {
-				path: filePath,
-				quality: audioQuality(),
+			const prompt = await invoke<string | null>("get_dictionary_prompt");
+
+			const result = await invoke<{
+				text: string;
+				word_count: number;
+				processing_time_ms: number;
+				audio_duration_ms: number | null;
+			}>("transcribe_audio", { audioPath: filePath, prompt });
+
+			await invoke("save_transcription", {
+				text: result.text,
+				wordCount: result.word_count,
+				processingTimeMs: result.processing_time_ms,
+				audioDurationMs: result.audio_duration_ms,
 			});
-			const audioBlob = new Blob([new Uint8Array(audioBytes)], { type: "audio/wav" });
-			const audioFile = new File([audioBlob], "recording.wav", { type: "audio/wav" });
 
-			const res = await eden.api.transcribe.post({ file: audioFile });
-
-			if (res.status === 403) {
-				emit("transcription-created");
-				return;
-			}
-
-			let body: { text?: string };
-			if (res.data instanceof Response) {
-				body = await res.data.json();
-			} else {
-				body = res.data as { text?: string };
-			}
-			await invoke("type_text", { text: body?.text ?? "" });
+			await invoke("type_text", { text: result.text ?? "" });
 
 			setTimeout(() => {
 				emit("transcription-created");
 			}, 1000);
 		} catch {
-			// Transcription failed
 		} finally {
 			await restoreMediaAfterRecording();
 			setLoading(false);
@@ -260,9 +233,7 @@ export default function VoiceControl() {
 				if (evt.state !== "Pressed") return;
 				cancelRecording();
 			});
-		} catch {
-			// Escape shortcut registration failed
-		}
+		} catch {}
 	};
 
 	const unregisterEscapeShortcut = async () => {
@@ -283,7 +254,6 @@ export default function VoiceControl() {
 		try {
 			await invoke<string>("stop_recording_with_device");
 		} catch {
-			// Cancel recording failed
 		} finally {
 			await restoreMediaAfterRecording();
 			isStopping = false;
@@ -294,17 +264,13 @@ export default function VoiceControl() {
 		if (!muteMediaWhileRecording()) return;
 		try {
 			await invoke("mute_media_for_recording");
-		} catch {
-			// Media muting is best-effort and should not block recording.
-		}
+		} catch {}
 	};
 
 	const restoreMediaAfterRecording = async () => {
 		try {
 			await invoke("restore_media_after_recording");
-		} catch {
-			// Media restore failed
-		}
+		} catch {}
 	};
 
 	const startRecording = async (mode: "toggle" | "hold") => {

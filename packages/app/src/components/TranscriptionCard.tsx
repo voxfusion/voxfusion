@@ -7,11 +7,9 @@ import { capture } from "../lib/posthog";
 type Transcription = {
 	id: string;
 	text: string;
-	fileUrl: string;
-	processingTimeMs: number;
-	audioDurationMs: number | null;
-	rating: string | null;
-	createdAt: Date;
+	processing_time_ms: number;
+	audio_duration_ms: number | null;
+	created_at: string;
 };
 
 type Props = {
@@ -37,7 +35,8 @@ export default function TranscriptionCard(props: Props) {
 		return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 	};
 
-	const formatTime = (date: Date) => {
+	const formatTime = (dateStr: string) => {
+		const date = new Date(dateStr);
 		return date.toLocaleTimeString(locale(), {
 			hour: "2-digit",
 			minute: "2-digit",
@@ -60,8 +59,8 @@ export default function TranscriptionCard(props: Props) {
 			</p>
 
 			<div class="flex items-center gap-3 text-txt-muted font-mono text-xs">
-				<span>{formatTime(props.transcription.createdAt)}</span>
-				<span>{formatProcessingTime(props.transcription.processingTimeMs)}</span>
+				<span>{formatTime(props.transcription.created_at)}</span>
+				<span>{formatProcessingTime(props.transcription.processing_time_ms)}</span>
 			</div>
 
 			<Show when={isHovered() || copied()}>

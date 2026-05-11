@@ -9,13 +9,14 @@ import HotkeyStep from "./steps/HotkeyStep";
 import LearningStep from "./steps/LearningStep";
 import MicrophonePermissionStep from "./steps/MicrophonePermissionStep";
 import MicrophoneStep from "./steps/MicrophoneStep";
+import ModelDownloadStep from "./steps/ModelDownloadStep";
 
 interface OnboardingWizardProps {
 	initialStep: number;
 	onComplete: () => void;
 }
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 export default function OnboardingWizard(props: OnboardingWizardProps) {
 	const [t] = useI18n();
@@ -26,6 +27,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 	);
 	const [micPermissionGranted, setMicPermissionGranted] = createSignal(false);
 	const [accessibilityPermissionGranted, setAccessibilityPermissionGranted] = createSignal(false);
+	const [modelDownloaded, setModelDownloaded] = createSignal(false);
 	const [learningCompleted, setLearningCompleted] = createSignal(false);
 
 	const goToNext = () => {
@@ -63,7 +65,8 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 		const step = currentStep();
 		if (step === 1) return micPermissionGranted();
 		if (step === 2) return accessibilityPermissionGranted();
-		if (step === 5) return learningCompleted();
+		if (step === 5) return modelDownloaded();
+		if (step === 6) return learningCompleted();
 		return true;
 	};
 
@@ -71,7 +74,6 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 
 	return (
 		<div class="fixed inset-0 bg-th-base flex flex-col items-center justify-center p-8">
-			{/* Grid overlay background */}
 			<div
 				class="absolute inset-0 pointer-events-none"
 				style={{
@@ -83,7 +85,6 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 
-			{/* Progress fraction */}
 			<div class="absolute top-8 right-8 font-mono text-txt-muted text-sm tracking-wider">
 				{formatStep(currentStep())}/{formatStep(TOTAL_STEPS)}
 			</div>
@@ -93,7 +94,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 			</div>
 
 			<div
-				class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 5 ? "max-w-4xl" : "max-w-2xl"}`}
+				class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
 			>
 				<div
 					class={`w-full transition-all duration-200 ${
@@ -117,16 +118,19 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 						<HotkeyStep />
 					</Show>
 					<Show when={currentStep() === 5}>
-						<LearningStep onTranscriptionComplete={() => setLearningCompleted(true)} />
+						<ModelDownloadStep onDownloadComplete={() => setModelDownloaded(true)} />
 					</Show>
 					<Show when={currentStep() === 6}>
+						<LearningStep onTranscriptionComplete={() => setLearningCompleted(true)} />
+					</Show>
+					<Show when={currentStep() === 7}>
 						<CompletionStep />
 					</Show>
 				</div>
 			</div>
 
 			<div
-				class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 5 ? "max-w-4xl" : "max-w-2xl"}`}
+				class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
 			>
 				<Show when={currentStep() > 1} fallback={<div />}>
 					<button

@@ -115,7 +115,7 @@ export default function MicrophoneStep() {
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
 			<div class="font-mono text-ac text-sm mb-8 tracking-wider">
-				[STEP_04] &gt; MICROPHONE_SELECT
+				[STEP_03] &gt; MICROPHONE_SELECT
 			</div>
 
 			{/* Card container */}

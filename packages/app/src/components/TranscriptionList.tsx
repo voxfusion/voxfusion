@@ -1,22 +1,18 @@
+import { invoke } from "@tauri-apps/api/core";
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
-import eden from "../lib/eden";
 import { capture } from "../lib/posthog";
 import TranscriptionCard from "./TranscriptionCard";
 
 type Transcription = {
 	id: string;
 	text: string;
-	fileUrl: string;
-	processingTimeMs: number;
-	audioDurationMs: number | null;
-	rating: string | null;
-	createdAt: Date;
-	userId: string;
-	provider: string;
-	model: string;
+	word_count: number;
+	processing_time_ms: number;
+	audio_duration_ms: number | null;
+	created_at: string;
 };
 
 type GroupedTranscriptions = {
@@ -37,7 +33,8 @@ export default function TranscriptionList() {
 	let observer: IntersectionObserver | null = null;
 	let unlisten: UnlistenFn | null = null;
 
-	const getDateLabel = (date: Date): string => {
+	const getDateLabel = (dateStr: string): string => {
+		const date = new Date(dateStr);
 		const today = new Date();
 		const yesterday = new Date(today);
 		yesterday.setDate(yesterday.getDate() - 1);
@@ -70,7 +67,7 @@ export default function TranscriptionList() {
 		const groups: Map<string, Transcription[]> = new Map();
 
 		for (const transcription of transcriptions()) {
-			const label = getDateLabel(transcription.createdAt);
+			const label = getDateLabel(transcription.created_at);
 			const existing = groups.get(label) ?? [];
 			groups.set(label, [...existing, transcription]);
 		}
@@ -88,29 +85,20 @@ export default function TranscriptionList() {
 		setError(null);
 
 		try {
-			const response = await eden.api.transcribe.get({
-				query: cursor ? { cursor, limit: 20 } : { limit: 20 },
+			const result = await invoke<{
+				transcriptions: Transcription[];
+				has_more: boolean;
+			}>("list_transcriptions", {
+				limit: 20,
+				cursor: cursor || null,
 			});
 
-			if (response.error) {
-				throw new Error(t("transcriptionList.failedToFetch"));
-			}
-
-			let data: { transcriptions: Transcription[]; nextCursor: string | null; hasMore: boolean };
-			if (response.data instanceof Response) {
-				data = await response.data.json();
-			} else {
-				data = response.data as typeof data;
-			}
-
-			const items = (data.transcriptions ?? []).map((item) => ({
-				...item,
-				createdAt: new Date(item.createdAt),
-			}));
+			const items = result.transcriptions ?? [];
+			const lastItem = items[items.length - 1];
 
 			setTranscriptions((prev) => (cursor ? [...prev, ...items] : items));
-			setNextCursor(data.nextCursor ?? null);
-			setHasMore(data.hasMore ?? false);
+			setNextCursor(lastItem?.created_at ?? null);
+			setHasMore(result.has_more ?? false);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : t("transcriptionList.errorOccurred"));
 		} finally {

@@ -1,14 +1,6 @@
 import type { Translations } from "./en";
 
 export const de: Translations = {
-	auth: {
-		welcome: "Willkommen bei VoxFusion",
-		signInToContinue: "Melden Sie sich an, um fortzufahren",
-		continueWithGoogle: "Mit Google fortfahren",
-		devPasteToken: "Entwicklung: Token zum Authentifizieren einfügen",
-		pasteTokenPlaceholder: "Token hier einfügen",
-		authenticate: "Authentifizieren",
-	},
 	home: {
 		yourTranscriptions: "Ihre Transkriptionen",
 		pressToRecord: "Drücken Sie Left Control+Left Option, um eine neue Aufnahme zu starten",
@@ -47,15 +39,6 @@ export const de: Translations = {
 		microphone: "Mikrofon",
 		defaultMicrophone: "Systemstandard",
 		microphoneDescription: "Wählen Sie das Mikrofon für Sprachaufnahmen aus.",
-		audioQuality: "Audioqualität",
-		audioQualityDescription:
-			"Niedrigere Qualität reduziert die Dateigröße für schnellere Uploads und Transkriptionen.",
-		audioQualityHigh: "Hoch",
-		audioQualityHighDescription: "Originalqualität, größte Dateigröße",
-		audioQualityMedium: "Mittel",
-		audioQualityMediumDescription: "16kHz Mono, ~10x kleiner",
-		audioQualityLow: "Niedrig",
-		audioQualityLowDescription: "8kHz Mono, ~20x kleiner",
 		muteMediaWhileRecording: "Medien bei Aufnahme stummschalten",
 		muteMediaWhileRecordingDescription:
 			"Schaltet Systemaudio während der Aufnahme vorübergehend stumm und stellt es danach wieder her.",
@@ -93,11 +76,6 @@ export const de: Translations = {
 		account: "Konto",
 		settings: "Einstellungen",
 		privacy: "Datenschutz",
-		logout: "Abmelden",
-		wordsUsed: "Wörter verwendet",
-		limitReached: "Limit erreicht",
-		proPlan: "Pro-Plan",
-		unlimited: "Unbegrenzt",
 	},
 	dictionary: {
 		title: "Wörterbuch",
@@ -166,6 +144,16 @@ export const de: Translations = {
 		learningProcessing: "Verarbeitung",
 		learningPlaceholder: "Ihre Transkriptionen werden hier angezeigt",
 		learningError: "Transkription fehlgeschlagen. Versuchen Sie es erneut.",
+		modelDownloadTitle: "Whisper-Modell herunterladen",
+		modelDownloadDescription:
+			"Laden Sie das Whisper V3 Large Turbo-Modell für die lokale Offline-Transkription herunter.",
+		modelDownloadComplete: "Modell erfolgreich heruntergeladen",
+		modelDownloading: "Wird heruntergeladen...",
+		modelSize: "Modellgröße",
+		downloadModel: "Modell herunterladen",
+		retryDownload: "Erneut versuchen",
+		modelDownloadNote:
+			"Dieses Modell ermöglicht Offline-Transkription. Download benötigt Internetverbindung.",
 	},
 	update: {
 		available: "Update verfügbar",

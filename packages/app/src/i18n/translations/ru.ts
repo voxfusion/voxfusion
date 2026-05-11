@@ -1,14 +1,6 @@
 import type { Translations } from "./en";
 
 export const ru: Translations = {
-	auth: {
-		welcome: "Добро пожаловать в VoxFusion",
-		signInToContinue: "Войдите, чтобы продолжить",
-		continueWithGoogle: "Продолжить с Google",
-		devPasteToken: "Разработка: Вставьте токен для аутентификации",
-		pasteTokenPlaceholder: "Вставьте токен сюда",
-		authenticate: "Аутентификация",
-	},
 	home: {
 		yourTranscriptions: "Ваши транскрипции",
 		pressToRecord: "Нажмите Left Control+Left Option, чтобы начать запись",
@@ -47,15 +39,6 @@ export const ru: Translations = {
 		microphone: "Микрофон",
 		defaultMicrophone: "Системный по умолчанию",
 		microphoneDescription: "Выберите микрофон для записи голоса.",
-		audioQuality: "Качество аудио",
-		audioQualityDescription:
-			"Низкое качество уменьшает размер файла для более быстрой загрузки и транскрипции.",
-		audioQualityHigh: "Высокое",
-		audioQualityHighDescription: "Оригинальное качество, большой размер",
-		audioQualityMedium: "Среднее",
-		audioQualityMediumDescription: "16 кГц моно, ~10x меньше",
-		audioQualityLow: "Низкое",
-		audioQualityLowDescription: "8 кГц моно, ~20x меньше",
 		muteMediaWhileRecording: "Отключать медиа во время записи",
 		muteMediaWhileRecordingDescription:
 			"Временно отключать системный звук во время записи и восстанавливать его после.",
@@ -92,11 +75,6 @@ export const ru: Translations = {
 		account: "Аккаунт",
 		settings: "Настройки",
 		privacy: "Приватность",
-		logout: "Выйти",
-		wordsUsed: "Слов использовано",
-		limitReached: "Лимит достигнут",
-		proPlan: "Про план",
-		unlimited: "Безлимитно",
 	},
 	dictionary: {
 		title: "Словарь",
@@ -164,6 +142,16 @@ export const ru: Translations = {
 		learningProcessing: "Обработка",
 		learningPlaceholder: "Ваши транскрипции появятся здесь",
 		learningError: "Ошибка транскрипции. Попробуйте снова.",
+		modelDownloadTitle: "Загрузка модели Whisper",
+		modelDownloadDescription:
+			"Загрузите модель Whisper V3 Large Turbo для локальной транскрипции без подключения к интернету.",
+		modelDownloadComplete: "Модель успешно загружена",
+		modelDownloading: "Загрузка...",
+		modelSize: "Размер модели",
+		downloadModel: "Загрузить модель",
+		retryDownload: "Повторить загрузку",
+		modelDownloadNote:
+			"Эта модель обеспечивает офлайн-транскрипцию. Для загрузки требуется подключение к интернету.",
 	},
 	update: {
 		available: "Доступно обновление",

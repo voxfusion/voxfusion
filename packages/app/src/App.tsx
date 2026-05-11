@@ -1,4 +1,5 @@
 import { useNavigate } from "@solidjs/router";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { type ParentProps, Show, createSignal, onCleanup, onMount } from "solid-js";
@@ -10,9 +11,12 @@ import { capture } from "./lib/posthog";
 import {
 	initSettings,
 	markOnboardingComplete,
+	resumeOnboardingAt,
 	updateMicrophone,
 	useSettings,
 } from "./lib/settingsStore";
+
+const MODEL_DOWNLOAD_STEP = 5;
 
 const FORCE_SHOW_ONBOARDING =
 	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
@@ -51,6 +55,16 @@ function App(props: ParentProps) {
 		capture("app_opened");
 		await waitForTauriIPC();
 		await initSettings();
+
+		try {
+			const modelReady = await invoke<boolean>("check_model_status");
+			if (!modelReady && settings().onboardingComplete) {
+				await resumeOnboardingAt(MODEL_DOWNLOAD_STEP);
+			}
+		} catch (err) {
+			console.error("Failed to verify Whisper model state:", err);
+		}
+
 		setIsReady(true);
 
 		const unlistenNavigate = await listen<string>("navigate", (event) => {
