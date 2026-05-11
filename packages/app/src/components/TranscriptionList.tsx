@@ -1,19 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
 import { Loader } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
+import { type Transcription, listTranscriptions } from "../lib/commands/transcriptions";
 import { capture } from "../lib/posthog";
 import TranscriptionCard from "./TranscriptionCard";
-
-type Transcription = {
-	id: string;
-	text: string;
-	word_count: number;
-	processing_time_ms: number;
-	audio_duration_ms: number | null;
-	created_at: string;
-};
 
 type GroupedTranscriptions = {
 	label: string;
@@ -85,13 +76,7 @@ export default function TranscriptionList() {
 		setError(null);
 
 		try {
-			const result = await invoke<{
-				transcriptions: Transcription[];
-				has_more: boolean;
-			}>("list_transcriptions", {
-				limit: 20,
-				cursor: cursor || null,
-			});
+			const result = await listTranscriptions(20, cursor || null);
 
 			const items = result.transcriptions ?? [];
 			const lastItem = items[items.length - 1];

@@ -1,8 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AlertCircle, Check, Download, Loader } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../../../i18n";
+import { checkModelStatus, downloadWhisperModel } from "../../../lib/commands/model";
 
 interface ModelDownloadStepProps {
 	onDownloadComplete: () => void;
@@ -18,7 +18,7 @@ export default function ModelDownloadStep(props: ModelDownloadStepProps) {
 
 	onMount(async () => {
 		try {
-			const downloaded = await invoke<boolean>("check_model_status");
+			const downloaded = await checkModelStatus();
 			if (downloaded) {
 				setIsDownloaded(true);
 				setDownloadProgress(100);
@@ -41,7 +41,7 @@ export default function ModelDownloadStep(props: ModelDownloadStepProps) {
 		setError(null);
 
 		try {
-			await invoke("download_whisper_model");
+			await downloadWhisperModel();
 			setIsDownloaded(true);
 			props.onDownloadComplete();
 		} catch (err) {

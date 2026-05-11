@@ -74,6 +74,12 @@ bun run lint         # lint only
 bun run typecheck    # TypeScript type checking
 ```
 
+## Contributing
+
+VoxFusion is released under the MIT license. See [CONTRIBUTING.md](CONTRIBUTING.md)
+for setup instructions, pull request guidelines, and privacy expectations for
+contributions.
+
 ## Project Structure
 
 ```
@@ -102,4 +108,4 @@ voxfusion/
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

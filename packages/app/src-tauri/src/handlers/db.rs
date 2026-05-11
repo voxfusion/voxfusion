@@ -38,8 +38,7 @@ fn get_db_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 pub fn init_db(app_handle: &tauri::AppHandle) -> Result<DbState, String> {
     let db_path = get_db_path(app_handle)?;
-    let conn =
-        Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
+    let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
     conn.execute_batch(
         "PRAGMA journal_mode=WAL;
@@ -47,6 +46,14 @@ pub fn init_db(app_handle: &tauri::AppHandle) -> Result<DbState, String> {
     )
     .map_err(|e| e.to_string())?;
 
+    run_migrations(&conn)?;
+
+    Ok(DbState {
+        conn: Mutex::new(conn),
+    })
+}
+
+fn run_migrations(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS transcriptions (
             id TEXT PRIMARY KEY,
@@ -67,9 +74,7 @@ pub fn init_db(app_handle: &tauri::AppHandle) -> Result<DbState, String> {
     )
     .map_err(|e| format!("Failed to create tables: {}", e))?;
 
-    Ok(DbState {
-        conn: Mutex::new(conn),
-    })
+    Ok(())
 }
 
 #[tauri::command]
@@ -256,10 +261,7 @@ pub fn update_dictionary_word(
 }
 
 #[tauri::command]
-pub fn delete_dictionary_word(
-    state: tauri::State<'_, DbState>,
-    id: String,
-) -> Result<(), String> {
+pub fn delete_dictionary_word(state: tauri::State<'_, DbState>, id: String) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM dictionary_words WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
@@ -267,14 +269,10 @@ pub fn delete_dictionary_word(
 }
 
 #[tauri::command]
-pub fn get_dictionary_prompt(
-    state: tauri::State<'_, DbState>,
-) -> Result<Option<String>, String> {
+pub fn get_dictionary_prompt(state: tauri::State<'_, DbState>) -> Result<Option<String>, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare(
-            "SELECT word FROM dictionary_words ORDER BY created_at DESC LIMIT 50",
-        )
+        .prepare("SELECT word FROM dictionary_words ORDER BY created_at DESC LIMIT 50")
         .map_err(|e| e.to_string())?;
 
     let words: Vec<String> = stmt
