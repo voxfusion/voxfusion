@@ -1,24 +1,25 @@
 export const features = {
 	"features.tag": "Features",
-	"features.title": "Fast, simple dictation everywhere",
-	"features.description": "No app switching. No copy and paste. Just speak.",
+	"features.title": "Fast, private dictation everywhere",
+	"features.description":
+		"No app switching. No copy and paste. No cloud. Just speak — and your audio never leaves your Mac.",
 	"features.globalHotkey.title": "Global hotkey",
 	"features.globalHotkey.description":
 		"Press Cmd+; anywhere on your Mac to dictate. It works in email, documents, chats, and code editors.",
-	"features.instantTranscription.title": "Instant transcription",
+	"features.instantTranscription.title": "Local transcription",
 	"features.instantTranscription.description":
-		"Recognition is far more accurate than the built-in macOS dictation. Text appears in seconds.",
+		"Speech recognition runs entirely on your Mac using a local Whisper model. No internet required after install.",
 	"features.customDictionary.title": "Custom dictionary",
 	"features.customDictionary.description":
-		"Add up to 50 specialized terms, names, or technical words for better accuracy.",
+		"Add specialized terms, names, or technical words for better accuracy. Stored locally on your device.",
 	"features.history.title": "Transcription history",
 	"features.history.description":
-		"Review past transcriptions with timestamps. Copy them or rate their accuracy.",
+		"Review past transcriptions with timestamps. Everything stays on your Mac.",
 	"features.highlight.tag": "Why VoxFusion?",
-	"features.highlight.title": "Dictate into any app without switching windows.",
+	"features.highlight.title": "Private by design. Free forever.",
 	"features.highlight.description":
-		"Most dictation apps make you copy and paste. VoxFusion inserts text directly at the cursor in any app and any text field.",
-	"features.highlight.list1": "Works in any Mac app: browsers, editors, and email",
-	"features.highlight.list2": "Customizable hotkey (Cmd+; by default)",
-	"features.highlight.list3": "Custom terms for names and technical vocabulary",
+		"VoxFusion is local-first. There's no server, no account, and no subscription. Your audio is transcribed on-device and never sent anywhere.",
+	"features.highlight.list1": "100% offline transcription after install",
+	"features.highlight.list2": "Inserts text directly at the cursor in any app",
+	"features.highlight.list3": "No account, no telemetry of your voice data",
 } as const;
