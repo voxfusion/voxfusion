@@ -1,7 +1,11 @@
 import { Keyboard } from "lucide-solid";
 import { useHotkeyRecorder } from "../../../hooks/useHotkeyRecorder";
 import { useI18n } from "../../../i18n";
-import { hotkeyDisplayName, validateHoldToSpeakHotkey, validateHandsFreeHotkey } from "../../../lib/hotkeyUtils";
+import {
+	hotkeyDisplayName,
+	validateHandsFreeHotkey,
+	validateHoldToSpeakHotkey,
+} from "../../../lib/hotkeyUtils";
 import { updateHoldToSpeakHotkey, useSettings } from "../../../lib/settingsStore";
 
 export default function HotkeyStep() {
@@ -25,7 +29,7 @@ export default function HotkeyStep() {
 	return (
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
-			<div class="font-mono text-ac text-sm mb-8 tracking-wider">[STEP_05] &gt; HOTKEY_CONFIG</div>
+			<div class="font-mono text-ac text-sm mb-8 tracking-wider">[STEP_04] &gt; HOTKEY_CONFIG</div>
 
 			{/* Card container */}
 			<div class="border border-border bg-th-surface p-8">
@@ -98,7 +102,9 @@ export default function HotkeyStep() {
 							? t("settings.cancel")
 							: t("onboarding.recordHoldToSpeakHotkey")}
 					</button>
-					{holdToSpeakError() && <div class="font-mono text-xs text-red-500">{holdToSpeakError()}</div>}
+					{holdToSpeakError() && (
+						<div class="font-mono text-xs text-red-500">{holdToSpeakError()}</div>
+					)}
 				</div>
 			</div>
 		</div>

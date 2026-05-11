@@ -1,14 +1,6 @@
 import type { Translations } from "./en";
 
 export const zh: Translations = {
-	auth: {
-		welcome: "欢迎使用 VoxFusion",
-		signInToContinue: "登录以继续",
-		continueWithGoogle: "使用 Google 继续",
-		devPasteToken: "开发：粘贴令牌以进行身份验证",
-		pasteTokenPlaceholder: "在此粘贴令牌",
-		authenticate: "验证",
-	},
 	home: {
 		yourTranscriptions: "你的转录",
 		pressToRecord: "按 Left Control+Left Option 开始新的录音",
@@ -45,14 +37,6 @@ export const zh: Translations = {
 		microphone: "麦克风",
 		defaultMicrophone: "系统默认",
 		microphoneDescription: "选择用于语音录制的麦克风。",
-		audioQuality: "音频质量",
-		audioQualityDescription: "较低的质量可减小文件大小，加快上传和转录速度。",
-		audioQualityHigh: "高",
-		audioQualityHighDescription: "原始质量，最大文件大小",
-		audioQualityMedium: "中",
-		audioQualityMediumDescription: "16kHz 单声道，约小10倍",
-		audioQualityLow: "低",
-		audioQualityLowDescription: "8kHz 单声道，约小20倍",
 		muteMediaWhileRecording: "录音时静音媒体",
 		muteMediaWhileRecordingDescription: "录音期间临时静音系统音频，并在结束后恢复。",
 		recordingHotkey: "录音快捷键",
@@ -87,11 +71,6 @@ export const zh: Translations = {
 		account: "账户",
 		settings: "设置",
 		privacy: "隐私",
-		logout: "退出登录",
-		wordsUsed: "已用单词数",
-		limitReached: "已达上限",
-		proPlan: "专业版",
-		unlimited: "无限制",
 	},
 	dictionary: {
 		title: "词典",
@@ -153,6 +132,14 @@ export const zh: Translations = {
 		learningProcessing: "处理中",
 		learningPlaceholder: "您的转录结果将显示在这里",
 		learningError: "转录失败。请重试。",
+		modelDownloadTitle: "下载 Whisper 模型",
+		modelDownloadDescription: "下载 Whisper V3 Large Turbo 模型以进行本地离线转录。",
+		modelDownloadComplete: "模型下载成功",
+		modelDownloading: "正在下载...",
+		modelSize: "模型大小",
+		downloadModel: "下载模型",
+		retryDownload: "重试下载",
+		modelDownloadNote: "此模型可实现离线转录。下载需要互联网连接。",
 	},
 	update: {
 		available: "有可用更新",

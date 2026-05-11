@@ -33,7 +33,9 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 		setIsRequesting(true);
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-			stream.getTracks().forEach((track) => track.stop());
+			for (const track of stream.getTracks()) {
+				track.stop();
+			}
 			setIsGranted(true);
 			props.onPermissionChange(true);
 		} catch {
@@ -46,7 +48,7 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 	return (
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
-			<div class="font-mono text-ac text-sm mb-8 tracking-wider">[STEP_02] &gt; MIC_PERMISSION</div>
+			<div class="font-mono text-ac text-sm mb-8 tracking-wider">[STEP_01] &gt; MIC_PERMISSION</div>
 
 			{/* Card container */}
 			<div class="border border-border bg-th-surface p-8">

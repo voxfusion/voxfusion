@@ -2,17 +2,18 @@ import { getVersion } from "@tauri-apps/api/app";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Check, ChevronDown, Copy, RefreshCw } from "lucide-solid";
 import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
-import ToggleOption from "./ToggleOption";
 import { useHotkeyRecorder } from "../hooks/useHotkeyRecorder";
 import { type Locale, useI18n } from "../i18n";
-import { hotkeyDisplayName, validateHoldToSpeakHotkey, validateHandsFreeHotkey } from "../lib/hotkeyUtils";
+import {
+	hotkeyDisplayName,
+	validateHandsFreeHotkey,
+	validateHoldToSpeakHotkey,
+} from "../lib/hotkeyUtils";
 import { capture } from "../lib/posthog";
 import {
 	type AudioDevice,
-	type AudioQuality,
 	type Theme,
 	getAudioInputDevices,
-	updateAudioQuality,
 	updateHoldToSpeakHotkey,
 	updateLanguage,
 	updateMicrophone,
@@ -20,6 +21,7 @@ import {
 	updateTheme,
 	useSettings,
 } from "../lib/settingsStore";
+import ToggleOption from "./ToggleOption";
 
 interface SettingsModalProps {
 	isOpen: boolean;
@@ -324,48 +326,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 										</p>
 									</div>
 
-									{/* Audio Quality Preset */}
-									<div>
-										<div class="font-mono text-txt-muted text-xs uppercase tracking-wider block mb-4">
-											AUDIO_QUALITY
-										</div>
-										<div class="grid grid-cols-3 gap-4">
-											<QualityOption
-												value="high"
-												label={t("settings.audioQualityHigh")}
-												description={t("settings.audioQualityHighDescription")}
-												isSelected={settings().audioQuality === "high"}
-												onClick={() => {
-													capture("settings_audio_quality_changed", { quality: "high" });
-													updateAudioQuality("high");
-												}}
-											/>
-											<QualityOption
-												value="medium"
-												label={t("settings.audioQualityMedium")}
-												description={t("settings.audioQualityMediumDescription")}
-												isSelected={settings().audioQuality === "medium"}
-												onClick={() => {
-													capture("settings_audio_quality_changed", { quality: "medium" });
-													updateAudioQuality("medium");
-												}}
-											/>
-											<QualityOption
-												value="low"
-												label={t("settings.audioQualityLow")}
-												description={t("settings.audioQualityLowDescription")}
-												isSelected={settings().audioQuality === "low"}
-												onClick={() => {
-													capture("settings_audio_quality_changed", { quality: "low" });
-													updateAudioQuality("low");
-												}}
-											/>
-										</div>
-										<p class="mt-3 font-mono text-xs text-txt-faint">
-											{t("settings.audioQualityDescription")}
-										</p>
-									</div>
-
 									<ToggleOption
 										label={t("settings.muteMediaWhileRecording")}
 										description={t("settings.muteMediaWhileRecordingDescription")}
@@ -400,7 +360,10 @@ export default function SettingsModal(props: SettingsModalProps) {
 											<button
 												type="button"
 												onClick={() => toggleHotkeyRecording()}
-												disabled={holdToSpeakHotkeyError() !== null || (isRecordingHoldToSpeakHotkey() && !isRecordingHotkey())}
+												disabled={
+													holdToSpeakHotkeyError() !== null ||
+													(isRecordingHoldToSpeakHotkey() && !isRecordingHotkey())
+												}
 												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
 													isRecordingHotkey()
 														? "bg-border text-txt-secondary hover:bg-border-strong"
@@ -410,7 +373,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 												{isRecordingHotkey() ? "[CANCEL]" : "[CHANGE]"}
 											</button>
 										</div>
-										{hotkeyError() && <div class="font-mono text-xs text-red-500">{hotkeyError()}</div>}
+										{hotkeyError() && (
+											<div class="font-mono text-xs text-red-500">{hotkeyError()}</div>
+										)}
 										<p class="mt-3 font-mono text-xs text-txt-faint">
 											{t("settings.hotkeyDescription")}
 										</p>
@@ -434,7 +399,10 @@ export default function SettingsModal(props: SettingsModalProps) {
 											<button
 												type="button"
 												onClick={() => toggleHoldToSpeakHotkeyRecording()}
-												disabled={hotkeyError() !== null || (isRecordingHotkey() && !isRecordingHoldToSpeakHotkey())}
+												disabled={
+													hotkeyError() !== null ||
+													(isRecordingHotkey() && !isRecordingHoldToSpeakHotkey())
+												}
 												class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
 													isRecordingHoldToSpeakHotkey()
 														? "bg-border text-txt-secondary hover:bg-border-strong"
@@ -444,7 +412,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 												{isRecordingHoldToSpeakHotkey() ? "[CANCEL]" : "[CHANGE]"}
 											</button>
 										</div>
-										{holdToSpeakHotkeyError() && <div class="font-mono text-xs text-red-500">{holdToSpeakHotkeyError()}</div>}
+										{holdToSpeakHotkeyError() && (
+											<div class="font-mono text-xs text-red-500">{holdToSpeakHotkeyError()}</div>
+										)}
 										<p class="mt-3 font-mono text-xs text-txt-faint">
 											{t("settings.holdToSpeakHotkeyDescription")}
 										</p>
@@ -570,67 +540,6 @@ function ThemeOption(props: ThemeOptionProps) {
 			>
 				{props.label}
 			</span>
-			<Show when={props.isSelected}>
-				<div class="absolute top-2 right-2 font-mono text-ac text-xs">[*]</div>
-			</Show>
-		</button>
-	);
-}
-
-interface QualityOptionProps {
-	value: AudioQuality;
-	label: string;
-	description: string;
-	isSelected: boolean;
-	onClick: () => void;
-}
-
-function QualityOption(props: QualityOptionProps) {
-	return (
-		<button
-			type="button"
-			onClick={props.onClick}
-			class={`relative p-4 border transition-all text-left ${
-				props.isSelected
-					? "border-ac bg-ac-bg"
-					: "border-border-strong bg-th-surface hover:border-txt-faint"
-			}`}
-		>
-			<div class="mb-2">
-				<div
-					class={`w-full h-8 border flex items-end justify-center gap-[2px] px-2 pb-1 ${
-						props.isSelected ? "border-ac/30 bg-th-surface" : "border-border-strong bg-th-base"
-					}`}
-				>
-					<Show when={props.value === "high"}>
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-6 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-5 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-					</Show>
-					<Show when={props.value === "medium"}>
-						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-4 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-3 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-					</Show>
-					<Show when={props.value === "low"}>
-						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-1.5 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-1 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-						<div class={`w-[3px] h-2 ${props.isSelected ? "bg-ac" : "bg-txt-faint"}`} />
-					</Show>
-				</div>
-			</div>
-			<span
-				class={`font-mono text-xs uppercase tracking-wider block ${props.isSelected ? "text-ac" : "text-txt-secondary"}`}
-			>
-				{props.label}
-			</span>
-			<span class="font-mono text-[10px] text-txt-muted block mt-1">{props.description}</span>
 			<Show when={props.isSelected}>
 				<div class="absolute top-2 right-2 font-mono text-ac text-xs">[*]</div>
 			</Show>

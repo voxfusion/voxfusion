@@ -108,7 +108,7 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
 			<div class="font-mono text-ac text-sm mb-8 tracking-wider">
-				[STEP_03] &gt; ACCESSIBILITY_PERMISSION
+				[STEP_02] &gt; ACCESSIBILITY_PERMISSION
 			</div>
 
 			{/* Card container */}

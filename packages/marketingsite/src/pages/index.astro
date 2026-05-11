@@ -36,7 +36,6 @@ const t = useTranslations(lang);
 			</a>
 			<div class="nav-links">
 				<a href="#features" class="nav-link"><span class="link-index">01</span>{t("nav.features")}</a>
-				<a href="#pricing" class="nav-link"><span class="link-index">02</span>{t("nav.pricing")}</a>
 			</div>
 			<a href={getLocalizedPath("/download", lang)} class="nav-cta">{t("nav.download")} →</a>
 		</div>
@@ -79,6 +78,9 @@ const t = useTranslations(lang);
 						</div>
 						<div class="terminal-line output">
 							<span class="status recording">[REC]</span> "Hey team, let's schedule..."
+						</div>
+						<div class="terminal-line output">
+							<span class="status">[LOCAL]</span> Transcribing on-device · whisper.cpp
 						</div>
 						<div class="terminal-line output">
 							<span class="status success">[DONE]</span> Text inserted → Messages.app
@@ -169,57 +171,6 @@ const t = useTranslations(lang);
 				<li><span class="check">[✓]</span> {t("features.highlight.list3")}</li>
 			</ul>
 		</div>
-	</section>
-
-	<section id="pricing" class="pricing" data-ph-view="view_pricing">
-		<div class="section-header">
-			<span class="section-number">02</span>
-			<h2 class="section-title">{t("pricing.tag")}</h2>
-			<div class="section-line"></div>
-		</div>
-		<div class="section-intro">
-			<h3>{t("pricing.title")}</h3>
-			<p>{t("pricing.description")}</p>
-		</div>
-		<div class="pricing-grid">
-			<div class="pricing-card">
-				<div class="plan-header">
-					<span class="plan-name">{t("pricing.free.name")}</span>
-					<div class="plan-price">
-						<span class="price">{t("pricing.free.price")}</span>
-						<span class="period">/{t("pricing.free.period")}</span>
-					</div>
-				</div>
-				<p class="plan-desc">{t("pricing.free.description")}</p>
-				<ul class="plan-features">
-					<li><span class="bullet">→</span> {t("pricing.free.feature1")}</li>
-					<li><span class="bullet">→</span> {t("pricing.free.feature2")}</li>
-					<li><span class="bullet">→</span> {t("pricing.free.feature3")}</li>
-					<li><span class="bullet">→</span> {t("pricing.free.feature4")}</li>
-					<li><span class="bullet">→</span> {t("pricing.free.feature5")}</li>
-				</ul>
-				<a href={getLocalizedPath("/download", lang)} class="plan-cta" data-ph-event="pricing_free_click">{t("pricing.free.cta")}</a>
-			</div>
-			<div class="pricing-card featured">
-				<div class="featured-badge">{t("pricing.pro.badge")}</div>
-				<div class="plan-header">
-					<span class="plan-name">{t("pricing.pro.name")}</span>
-					<div class="plan-price">
-						<span class="price">{t("pricing.pro.price")}</span>
-						<span class="period">/{t("pricing.pro.period")}</span>
-					</div>
-				</div>
-				<p class="plan-desc">{t("pricing.pro.description")}</p>
-				<ul class="plan-features">
-					<li><span class="bullet">→</span> <strong>{t("pricing.pro.feature1")}</strong>{t("pricing.pro.feature1.suffix")}</li>
-					<li><span class="bullet">→</span> {t("pricing.pro.feature2")}</li>
-					<li><span class="bullet">→</span> {t("pricing.pro.feature3")}</li>
-					<li><span class="bullet">→</span> {t("pricing.pro.feature4")}</li>
-				</ul>
-				<a href={getLocalizedPath("/download", lang)} class="plan-cta primary" data-ph-event="pricing_pro_click">{t("pricing.pro.cta")}</a>
-			</div>
-		</div>
-		<p class="pricing-note">{t("pricing.faq")} <a href="mailto:hello@voxfusion.com">hello@voxfusion.com</a> {t("pricing.faq.suffix")}</p>
 	</section>
 
 	<section class="cta">
@@ -600,7 +551,7 @@ const t = useTranslations(lang);
 	}
 
 	/* Sections */
-	.features, .pricing {
+	.features {
 		padding: 120px 32px;
 		max-width: 1400px;
 		margin: 0 auto;
@@ -745,136 +696,6 @@ const t = useTranslations(lang);
 	}
 
 
-	/* Pricing */
-	.pricing-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 32px;
-		max-width: 900px;
-	}
-
-	.pricing-card {
-		background: #111;
-		border: 1px solid #222;
-		padding: 40px;
-		position: relative;
-	}
-
-	.pricing-card.featured {
-		border-color: #ff3e00;
-	}
-
-	.featured-badge {
-		position: absolute;
-		top: -1px;
-		right: 32px;
-		background: #ff3e00;
-		color: #000;
-		padding: 6px 16px;
-		font-size: 10px;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-	}
-
-	.plan-header {
-		margin-bottom: 20px;
-	}
-
-	.plan-name {
-		font-size: 12px;
-		color: #666;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-	}
-
-	.plan-price {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		margin-top: 12px;
-	}
-
-	.price {
-		font-size: 48px;
-		font-weight: 700;
-	}
-
-	.period {
-		font-size: 14px;
-		color: #666;
-	}
-
-	.plan-desc {
-		font-size: 13px;
-		color: #666;
-		margin-bottom: 32px;
-	}
-
-	.plan-features {
-		list-style: none;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		margin-bottom: 32px;
-	}
-
-	.plan-features li {
-		font-size: 13px;
-		color: #888;
-		display: flex;
-		align-items: flex-start;
-		gap: 12px;
-	}
-
-	.plan-features li strong {
-		color: #fff;
-	}
-
-	.bullet {
-		color: #ff3e00;
-	}
-
-	.plan-cta {
-		display: block;
-		width: 100%;
-		padding: 14px;
-		text-align: center;
-		font-size: 13px;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		font-weight: 600;
-		border: 1px solid #333;
-		color: #888;
-		transition: all 0.2s;
-	}
-
-	.plan-cta:hover {
-		border-color: #666;
-		color: #fff;
-	}
-
-	.plan-cta.primary {
-		background: #ff3e00;
-		border-color: #ff3e00;
-		color: #000;
-	}
-
-	.plan-cta.primary:hover {
-		background: #fff;
-		border-color: #fff;
-	}
-
-	.pricing-note {
-		margin-top: 48px;
-		font-size: 13px;
-		color: #666;
-	}
-
-	.pricing-note a {
-		color: #ff3e00;
-	}
-
 	/* CTA */
 	.cta {
 		padding: 120px 32px;
@@ -935,10 +756,6 @@ const t = useTranslations(lang);
 		}
 
 		.features-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.pricing-grid {
 			grid-template-columns: 1fr;
 		}
 

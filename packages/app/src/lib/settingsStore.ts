@@ -4,7 +4,6 @@ import { createSignal } from "solid-js";
 import type { Locale } from "../i18n";
 
 export type Theme = "dark" | "light" | "system";
-export type AudioQuality = "high" | "medium" | "low";
 
 export interface Settings {
 	theme: Theme;
@@ -12,7 +11,6 @@ export interface Settings {
 	holdToSpeakHotkey: string;
 	selectedMicrophoneId: string | null;
 	language: Locale;
-	audioQuality: AudioQuality;
 	muteMediaWhileRecording: boolean;
 	onboardingComplete: boolean;
 	onboardingStep: number;
@@ -24,15 +22,14 @@ const DEFAULT_SETTINGS: Settings = {
 	holdToSpeakHotkey: "RightCommand",
 	selectedMicrophoneId: null,
 	language: "en",
-	audioQuality: "medium",
 	muteMediaWhileRecording: false,
 	onboardingComplete: false,
 	onboardingStep: 1,
 };
 
 const STORE_NAME = "settings.json";
-const ONBOARDING_STEP_COUNT = 6;
-const CURRENT_ONBOARDING_VERSION = 2;
+const ONBOARDING_STEP_COUNT = 7;
+const CURRENT_ONBOARDING_VERSION = 3;
 
 function normalizeOnboardingStep(
 	step: number,
@@ -43,8 +40,11 @@ function normalizeOnboardingStep(
 		return DEFAULT_SETTINGS.onboardingStep;
 	}
 
-	const migratedStep = onboardingVersion < CURRENT_ONBOARDING_VERSION && step > 1 ? step - 1 : step;
-	return Math.min(Math.max(migratedStep, 1), ONBOARDING_STEP_COUNT);
+	if (onboardingVersion < CURRENT_ONBOARDING_VERSION) {
+		return DEFAULT_SETTINGS.onboardingStep;
+	}
+
+	return Math.min(Math.max(step, 1), ONBOARDING_STEP_COUNT);
 }
 
 let storeInstance: Awaited<ReturnType<typeof load>> | null = null;
@@ -58,7 +58,6 @@ async function getStore() {
 				holdToSpeakHotkey: DEFAULT_SETTINGS.holdToSpeakHotkey,
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
-				audioQuality: DEFAULT_SETTINGS.audioQuality,
 				muteMediaWhileRecording: DEFAULT_SETTINGS.muteMediaWhileRecording,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
 				onboardingStep: DEFAULT_SETTINGS.onboardingStep,
@@ -77,7 +76,6 @@ export async function loadSettings(): Promise<Settings> {
 	const holdToSpeakHotkey = await store.get<string>("holdToSpeakHotkey");
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
-	const audioQuality = await store.get<AudioQuality>("audioQuality");
 	const muteMediaWhileRecording = await store.get<boolean>("muteMediaWhileRecording");
 	const onboardingComplete = await store.get<boolean>("onboardingComplete");
 	const onboardingStep = await store.get<number>("onboardingStep");
@@ -101,7 +99,6 @@ export async function loadSettings(): Promise<Settings> {
 		holdToSpeakHotkey: holdToSpeakHotkey ?? DEFAULT_SETTINGS.holdToSpeakHotkey,
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
-		audioQuality: audioQuality ?? DEFAULT_SETTINGS.audioQuality,
 		muteMediaWhileRecording: muteMediaWhileRecording ?? DEFAULT_SETTINGS.muteMediaWhileRecording,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
 		onboardingStep: normalizedOnboardingStep,
@@ -134,11 +131,6 @@ export async function saveMicrophone(microphoneId: string | null): Promise<void>
 export async function saveLanguage(language: Locale): Promise<void> {
 	const store = await getStore();
 	await store.set("language", language);
-}
-
-export async function saveAudioQuality(quality: AudioQuality): Promise<void> {
-	const store = await getStore();
-	await store.set("audioQuality", quality);
 }
 
 export async function saveMuteMediaWhileRecording(enabled: boolean): Promise<void> {
@@ -213,12 +205,6 @@ export async function updateLanguage(
 	setLocale(language);
 }
 
-export async function updateAudioQuality(quality: AudioQuality): Promise<void> {
-	await saveAudioQuality(quality);
-	setSettingsInternal((prev) => ({ ...prev, audioQuality: quality }));
-	await emit("settings-changed");
-}
-
 export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	await saveMuteMediaWhileRecording(enabled);
 	setSettingsInternal((prev) => ({ ...prev, muteMediaWhileRecording: enabled }));
@@ -253,16 +239,38 @@ export async function updateOnboardingStep(step: number): Promise<void> {
 }
 
 export async function markOnboardingComplete(): Promise<void> {
-	const store = await getStore();
-	await store.set("onboardingComplete", true);
-	await store.set("onboardingStep", 1);
-	await store.save();
 	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: true, onboardingStep: 1 }));
-	await emit("settings-changed");
+	try {
+		const store = await getStore();
+		await store.set("onboardingComplete", true);
+		await store.set("onboardingStep", 1);
+		await store.save();
+		await emit("settings-changed");
+	} catch (err) {
+		console.error("Failed to persist onboarding completion:", err);
+	}
 }
 
 export async function resetOnboarding(): Promise<void> {
 	const store = await getStore();
 	await store.set("onboardingComplete", false);
 	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: false }));
+}
+
+export async function resumeOnboardingAt(step: number): Promise<void> {
+	const clamped = Math.min(Math.max(step, 1), ONBOARDING_STEP_COUNT);
+	setSettingsInternal((prev) => ({
+		...prev,
+		onboardingComplete: false,
+		onboardingStep: clamped,
+	}));
+	try {
+		const store = await getStore();
+		await store.set("onboardingComplete", false);
+		await store.set("onboardingStep", clamped);
+		await store.save();
+		await emit("settings-changed");
+	} catch (err) {
+		console.error("Failed to persist onboarding resume:", err);
+	}
 }

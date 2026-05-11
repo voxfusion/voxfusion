@@ -57,12 +57,6 @@
 	},
 	"plugins": {
 		"opener": {},
-		"deep-link": {
-			"mobile": [],
-			"desktop": {
-				"schemes": ["voxfusion"]
-			}
-		},
 		"updater": {
 			"endpoints": [
 				"https://github.com/gregor-tokarev/voxfusion-releases/releases/latest/download/latest.json"

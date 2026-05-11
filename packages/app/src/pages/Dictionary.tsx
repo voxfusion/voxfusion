@@ -1,7 +1,7 @@
+import { invoke } from "@tauri-apps/api/core";
 import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
-import eden from "../lib/eden";
 import { capture } from "../lib/posthog";
 
 type DictionaryWord = {
@@ -23,11 +23,8 @@ export default function Dictionary() {
 	const fetchWords = async () => {
 		setLoading(true);
 		try {
-			const response = await eden.api.dictionary.get();
-			if (!response.error && response.data) {
-				const data = response.data instanceof Response ? await response.data.json() : response.data;
-				setWords(data.words ?? []);
-			}
+			const result = await invoke<DictionaryWord[]>("list_dictionary_words");
+			setWords(result);
 		} finally {
 			setLoading(false);
 		}
@@ -44,12 +41,10 @@ export default function Dictionary() {
 
 		setAdding(true);
 		try {
-			const response = await eden.api.dictionary.post({ word });
-			if (!response.error) {
-				capture("dictionary_word_added");
-				await fetchWords();
-				setNewWord("");
-			}
+			await invoke("add_dictionary_word", { word });
+			capture("dictionary_word_added");
+			await fetchWords();
+			setNewWord("");
 		} finally {
 			setAdding(false);
 		}
@@ -64,7 +59,7 @@ export default function Dictionary() {
 	const handleDelete = async (id: string) => {
 		capture("dictionary_word_deleted");
 		setWords(words().filter((w) => w.id !== id));
-		await eden.api.dictionary({ id }).delete();
+		await invoke("delete_dictionary_word", { id });
 	};
 
 	const startEdit = (word: DictionaryWord) => {
@@ -86,7 +81,7 @@ export default function Dictionary() {
 		setEditingId(null);
 		setEditingWord("");
 
-		await eden.api.dictionary({ id }).patch({ word });
+		await invoke("update_dictionary_word", { id, word });
 	};
 
 	const handleEditKeyDown = (e: KeyboardEvent, id: string) => {
@@ -100,7 +95,6 @@ export default function Dictionary() {
 	return (
 		<div class="min-h-screen bg-th-base px-6 py-8">
 			<div class="max-w-2xl mx-auto">
-				{/* Header */}
 				<div class="mb-8">
 					<div class="flex items-center justify-between">
 						<h1 class="font-mono text-txt-primary text-sm">
@@ -119,7 +113,6 @@ export default function Dictionary() {
 					</p>
 				</div>
 
-				{/* Add Word Input */}
 				<div class="bg-th-surface border border-border p-4 mb-6">
 					<div class="flex gap-3">
 						<input
@@ -144,14 +137,12 @@ export default function Dictionary() {
 					</div>
 				</div>
 
-				{/* Loading State */}
 				<Show when={loading()}>
 					<div class="bg-th-surface border border-border p-12 flex justify-center">
 						<Loader class="w-6 h-6 animate-spin text-ac" />
 					</div>
 				</Show>
 
-				{/* Empty State */}
 				<Show when={!loading() && words().length === 0}>
 					<div class="bg-th-surface border border-border p-12 flex flex-col items-center justify-center text-center">
 						<div class="font-mono text-txt-muted text-sm mb-4">
@@ -166,7 +157,6 @@ export default function Dictionary() {
 					</div>
 				</Show>
 
-				{/* Word List */}
 				<Show when={!loading() && words().length > 0}>
 					<div class="space-y-1">
 						<For each={words()}>

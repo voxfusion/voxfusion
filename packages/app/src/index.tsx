@@ -1,12 +1,12 @@
-import { render } from "solid-js/web";
 import { Route, Router } from "@solidjs/router";
+import { render } from "solid-js/web";
 import "./styles.css";
-import Home from "./pages/Home";
-import About from "./pages/About";
-import Dictionary from "./pages/Dictionary";
 import App from "./App";
 import { I18nCtx, createAppI18n, getStoredLocale } from "./i18n";
 import { initPostHog } from "./lib/posthog";
+import About from "./pages/About";
+import Dictionary from "./pages/Dictionary";
+import Home from "./pages/Home";
 
 initPostHog();
 

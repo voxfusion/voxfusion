@@ -1,14 +1,6 @@
 import type { Translations } from "./en";
 
 export const it: Translations = {
-	auth: {
-		welcome: "Benvenuto su VoxFusion",
-		signInToContinue: "Accedi per continuare",
-		continueWithGoogle: "Continua con Google",
-		devPasteToken: "Sviluppo: Incolla il token per autenticarti",
-		pasteTokenPlaceholder: "Incolla il token qui",
-		authenticate: "Autenticazione",
-	},
 	home: {
 		yourTranscriptions: "Le tue trascrizioni",
 		pressToRecord: "Premi Left Control+Left Option per avviare una nuova registrazione",
@@ -47,15 +39,6 @@ export const it: Translations = {
 		microphone: "Microfono",
 		defaultMicrophone: "Predefinito di sistema",
 		microphoneDescription: "Seleziona il microfono da utilizzare per la registrazione vocale.",
-		audioQuality: "Qualità audio",
-		audioQualityDescription:
-			"Una qualità inferiore riduce la dimensione del file per caricamenti e trascrizioni più veloci.",
-		audioQualityHigh: "Alta",
-		audioQualityHighDescription: "Qualità originale, dimensione file maggiore",
-		audioQualityMedium: "Media",
-		audioQualityMediumDescription: "16kHz mono, ~10x più piccolo",
-		audioQualityLow: "Bassa",
-		audioQualityLowDescription: "8kHz mono, ~20x più piccolo",
 		muteMediaWhileRecording: "Disattiva i media durante la registrazione",
 		muteMediaWhileRecordingDescription:
 			"Disattiva temporaneamente l'audio di sistema durante la registrazione e lo ripristina dopo.",
@@ -93,11 +76,6 @@ export const it: Translations = {
 		account: "Account",
 		settings: "Impostazioni",
 		privacy: "Privacy",
-		logout: "Esci",
-		wordsUsed: "Parole utilizzate",
-		limitReached: "Limite raggiunto",
-		proPlan: "Piano Pro",
-		unlimited: "Illimitato",
 	},
 	dictionary: {
 		title: "Dizionario",
@@ -165,6 +143,16 @@ export const it: Translations = {
 		learningProcessing: "Elaborazione",
 		learningPlaceholder: "Le tue trascrizioni appariranno qui",
 		learningError: "Trascrizione fallita. Riprova.",
+		modelDownloadTitle: "Scarica il modello Whisper",
+		modelDownloadDescription:
+			"Scarica il modello Whisper V3 Large Turbo per la trascrizione locale offline.",
+		modelDownloadComplete: "Modello scaricato con successo",
+		modelDownloading: "Download in corso...",
+		modelSize: "Dimensione del modello",
+		downloadModel: "Scarica modello",
+		retryDownload: "Riprova il download",
+		modelDownloadNote:
+			"Questo modello consente la trascrizione offline. Il download richiede una connessione internet.",
 	},
 	update: {
 		available: "Aggiornamento disponibile",

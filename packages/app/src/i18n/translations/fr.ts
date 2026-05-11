@@ -1,14 +1,6 @@
 import type { Translations } from "./en";
 
 export const fr: Translations = {
-	auth: {
-		welcome: "Bienvenue sur VoxFusion",
-		signInToContinue: "Connectez-vous pour continuer",
-		continueWithGoogle: "Continuer avec Google",
-		devPasteToken: "Développement : Collez le jeton pour vous authentifier",
-		pasteTokenPlaceholder: "Collez le jeton ici",
-		authenticate: "Authentifier",
-	},
 	home: {
 		yourTranscriptions: "Vos transcriptions",
 		pressToRecord: "Appuyez sur Left Control+Left Option pour démarrer un nouvel enregistrement",
@@ -47,15 +39,6 @@ export const fr: Translations = {
 		microphone: "Microphone",
 		defaultMicrophone: "Par défaut du système",
 		microphoneDescription: "Sélectionnez le microphone à utiliser pour l'enregistrement vocal.",
-		audioQuality: "Qualité audio",
-		audioQualityDescription:
-			"Une qualité inférieure réduit la taille du fichier pour des téléchargements et transcriptions plus rapides.",
-		audioQualityHigh: "Haute",
-		audioQualityHighDescription: "Qualité originale, plus grande taille de fichier",
-		audioQualityMedium: "Moyenne",
-		audioQualityMediumDescription: "16kHz mono, ~10x plus petit",
-		audioQualityLow: "Basse",
-		audioQualityLowDescription: "8kHz mono, ~20x plus petit",
 		muteMediaWhileRecording: "Couper les médias pendant l'enregistrement",
 		muteMediaWhileRecordingDescription:
 			"Coupe temporairement l'audio système pendant l'enregistrement, puis le restaure.",
@@ -93,11 +76,6 @@ export const fr: Translations = {
 		account: "Compte",
 		settings: "Paramètres",
 		privacy: "Confidentialité",
-		logout: "Déconnexion",
-		wordsUsed: "Mots utilisés",
-		limitReached: "Limite atteinte",
-		proPlan: "Plan Pro",
-		unlimited: "Illimité",
 	},
 	dictionary: {
 		title: "Dictionnaire",
@@ -165,6 +143,16 @@ export const fr: Translations = {
 		learningProcessing: "Traitement",
 		learningPlaceholder: "Vos transcriptions apparaîtront ici",
 		learningError: "Échec de la transcription. Réessayez.",
+		modelDownloadTitle: "Télécharger le modèle Whisper",
+		modelDownloadDescription:
+			"Téléchargez le modèle Whisper V3 Large Turbo pour la transcription locale hors-ligne.",
+		modelDownloadComplete: "Modèle téléchargé avec succès",
+		modelDownloading: "Téléchargement...",
+		modelSize: "Taille du modèle",
+		downloadModel: "Télécharger le modèle",
+		retryDownload: "Réessayer le téléchargement",
+		modelDownloadNote:
+			"Ce modèle permet la transcription hors-ligne. Le téléchargement nécessite une connexion internet.",
 	},
 	update: {
 		available: "Mise à jour disponible",
