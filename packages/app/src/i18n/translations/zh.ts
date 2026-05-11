@@ -124,8 +124,6 @@ export const zh: Translations = {
 		recordHotkey: "录制新快捷键",
 		recordHoldToSpeakHotkey: "Record Hold-to-Speak Hotkey",
 		pressKeys: "按下你想要的组合键...",
-		languageTitle: "选择你的语言",
-		languageDescription: "选择你偏好的界面语言。",
 		completionTitle: "一切就绪！",
 		completionDescription: "VoxFusion 已准备好帮助你进行语音转录。",
 		micPermissionTitle: "麦克风权限",

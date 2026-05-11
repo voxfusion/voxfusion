@@ -132,8 +132,6 @@ export const ru: Translations = {
 		recordHotkey: "Записать новую клавишу",
 		recordHoldToSpeakHotkey: "Record Hold-to-Speak Hotkey",
 		pressKeys: "Нажмите желаемую комбинацию клавиш...",
-		languageTitle: "Выберите язык",
-		languageDescription: "Выберите предпочитаемый язык интерфейса.",
 		completionTitle: "Всё готово!",
 		completionDescription: "VoxFusion готов помочь вам с транскрипцией голоса.",
 		micPermissionTitle: "Доступ к микрофону",

@@ -6,7 +6,6 @@ import StepIndicator from "./StepIndicator";
 import AccessibilityPermissionStep from "./steps/AccessibilityPermissionStep";
 import CompletionStep from "./steps/CompletionStep";
 import HotkeyStep from "./steps/HotkeyStep";
-import LanguageStep from "./steps/LanguageStep";
 import LearningStep from "./steps/LearningStep";
 import MicrophonePermissionStep from "./steps/MicrophonePermissionStep";
 import MicrophoneStep from "./steps/MicrophoneStep";
@@ -16,7 +15,7 @@ interface OnboardingWizardProps {
 	onComplete: () => void;
 }
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 
 export default function OnboardingWizard(props: OnboardingWizardProps) {
 	const [t] = useI18n();
@@ -62,9 +61,9 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 
 	const canProceed = () => {
 		const step = currentStep();
-		if (step === 2) return micPermissionGranted();
-		if (step === 3) return accessibilityPermissionGranted();
-		if (step === 6) return learningCompleted();
+		if (step === 1) return micPermissionGranted();
+		if (step === 2) return accessibilityPermissionGranted();
+		if (step === 5) return learningCompleted();
 		return true;
 	};
 
@@ -94,7 +93,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 			</div>
 
 			<div
-				class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
+				class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 5 ? "max-w-4xl" : "max-w-2xl"}`}
 			>
 				<div
 					class={`w-full transition-all duration-200 ${
@@ -106,31 +105,28 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 					}`}
 				>
 					<Show when={currentStep() === 1}>
-						<LanguageStep />
-					</Show>
-					<Show when={currentStep() === 2}>
 						<MicrophonePermissionStep onPermissionChange={setMicPermissionGranted} />
 					</Show>
-					<Show when={currentStep() === 3}>
+					<Show when={currentStep() === 2}>
 						<AccessibilityPermissionStep onPermissionChange={setAccessibilityPermissionGranted} />
 					</Show>
-					<Show when={currentStep() === 4}>
+					<Show when={currentStep() === 3}>
 						<MicrophoneStep />
 					</Show>
-					<Show when={currentStep() === 5}>
+					<Show when={currentStep() === 4}>
 						<HotkeyStep />
 					</Show>
-					<Show when={currentStep() === 6}>
+					<Show when={currentStep() === 5}>
 						<LearningStep onTranscriptionComplete={() => setLearningCompleted(true)} />
 					</Show>
-					<Show when={currentStep() === 7}>
+					<Show when={currentStep() === 6}>
 						<CompletionStep />
 					</Show>
 				</div>
 			</div>
 
 			<div
-				class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
+				class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 5 ? "max-w-4xl" : "max-w-2xl"}`}
 			>
 				<Show when={currentStep() > 1} fallback={<div />}>
 					<button

@@ -122,8 +122,6 @@ export type Translations = {
 		recordHotkey: string;
 		recordHoldToSpeakHotkey: string;
 		pressKeys: string;
-		languageTitle: string;
-		languageDescription: string;
 		completionTitle: string;
 		completionDescription: string;
 		micPermissionTitle: string;
@@ -295,8 +293,6 @@ export const en: Translations = {
 		recordHotkey: "Record New Hotkey",
 		recordHoldToSpeakHotkey: "Record Hold-to-Speak Hotkey",
 		pressKeys: "Press your desired key combination...",
-		languageTitle: "Choose Your Language",
-		languageDescription: "Select your preferred language for the interface.",
 		completionTitle: "You're All Set!",
 		completionDescription: "VoxFusion is ready to help you with voice transcription.",
 		micPermissionTitle: "Microphone Access",
