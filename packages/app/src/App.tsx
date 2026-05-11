@@ -1,23 +1,18 @@
-import { useStore } from "@nanostores/solid";
 import { useNavigate } from "@solidjs/router";
-import { emit, listen } from "@tauri-apps/api/event";
+import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
-import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { type ParentProps, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { type ParentProps, Show, createSignal, onCleanup, onMount } from "solid-js";
 import appIcon from "../src-tauri/icons/icon.svg";
-import Auth from "./components/Auth";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
-import { authClient } from "./lib/authClient";
-import { capture, identifyUser } from "./lib/posthog";
+import { capture } from "./lib/posthog";
 import {
 	initSettings,
 	markOnboardingComplete,
 	updateMicrophone,
 	useSettings,
 } from "./lib/settingsStore";
-import { tokenManager } from "./lib/tokenManager";
 
 const FORCE_SHOW_ONBOARDING =
 	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
@@ -41,42 +36,11 @@ function waitForTauriIPC(): Promise<void> {
 	});
 }
 
-const handleDeepLinkUrls = async (urls: string[]) => {
-	await tokenManager.init();
-
-	for (const urlString of urls) {
-		try {
-			const url = new URL(urlString);
-			const token = url.searchParams.get("token");
-
-			if (token) {
-				await tokenManager.storeToken(token);
-				await authClient.useSession.get().refetch();
-
-				break;
-			}
-		} catch {
-			// Deep link handling failed silently
-		}
-	}
-};
-
 function App(props: ParentProps) {
-	const session = useStore(authClient.useSession);
 	const settings = useSettings();
 	const navigate = useNavigate();
 	const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
-	const [isSessionChecked, setIsSessionChecked] = createSignal(false);
-
-	createEffect(() => {
-		const s = session();
-		if (s?.data?.user) {
-			identifyUser(s.data.user.id, {
-				email: s.data.user.email,
-				name: s.data.user.name,
-			});
-		}
-	});
+	const [isReady, setIsReady] = createSignal(false);
 
 	const shouldShowOnboarding = () => {
 		if (FORCE_SHOW_ONBOARDING) return true;
@@ -85,39 +49,9 @@ function App(props: ParentProps) {
 
 	onMount(async () => {
 		capture("app_opened");
-
 		await waitForTauriIPC();
-		await tokenManager.init();
 		await initSettings();
-
-		try {
-			const storedToken = await tokenManager.getToken();
-			if (storedToken) {
-				await authClient.useSession.get().refetch();
-			}
-		} catch {
-			// Session restoration failed silently
-		}
-		setIsSessionChecked(true);
-
-		// Notify other windows of current auth state after init completes.
-		// Also respond to future auth-request events from windows that
-		// start after this emit.
-		await emit("auth-changed");
-		const unlistenAuthRequest = await listen("auth-request", async () => {
-			await emit("auth-changed");
-		});
-		onCleanup(() => unlistenAuthRequest());
-
-		const initialUrls = await getCurrent();
-		if (initialUrls) {
-			await handleDeepLinkUrls(initialUrls);
-		}
-
-		const unlistenDeepLink = await onOpenUrl((urls) => {
-			handleDeepLinkUrls(urls).catch(() => {});
-		});
-		onCleanup(() => unlistenDeepLink());
+		setIsReady(true);
 
 		const unlistenNavigate = await listen<string>("navigate", (event) => {
 			navigate(event.payload);
@@ -130,9 +64,6 @@ function App(props: ParentProps) {
 		});
 		onCleanup(() => unlistenMicrophone());
 
-		// If the voice-control window reports that a modifier-only shortcut
-		// could not be registered because Accessibility permission is missing,
-		// open the settings modal so the user sees the relevant section.
 		const unlistenAccessibility = await listen("accessibility-permission-needed", () => {
 			setIsSettingsOpen(true);
 		});
@@ -156,16 +87,16 @@ function App(props: ParentProps) {
 
 	return (
 		<div class="relative min-h-screen h-full w-full bg-th-base transition-colors">
-			{/* Grid overlay pattern */}
 			<div
 				class="pointer-events-none absolute inset-0 z-0"
 				style={{
-					"background-image": `linear-gradient(var(--color-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px)`,
+					"background-image":
+						"linear-gradient(var(--color-grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--color-grid-line) 1px, transparent 1px)",
 					"background-size": "40px 40px",
 				}}
 			/>
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
-			<Show when={!isSessionChecked() || session()?.isPending}>
+			<Show when={!isReady()}>
 				<div class="h-full flex flex-col items-center justify-center">
 					<img src={appIcon} alt="VoxFusion" class="w-16 h-16 mb-8" />
 					<div class="w-48 h-1 bg-border overflow-hidden">
@@ -173,33 +104,24 @@ function App(props: ParentProps) {
 					</div>
 				</div>
 			</Show>
-			<Show when={isSessionChecked() && !session()?.isPending}>
+			<Show when={isReady()}>
 				<Show
-					when={session()?.data?.user}
+					when={!shouldShowOnboarding()}
 					fallback={
-						<div class="h-full pt-6">
-							<Auth />
-						</div>
+						<OnboardingWizard
+							initialStep={settings().onboardingStep}
+							onComplete={() => {
+								capture("onboarding_completed");
+								markOnboardingComplete();
+							}}
+						/>
 					}
 				>
-					<Show
-						when={!shouldShowOnboarding()}
-						fallback={
-							<OnboardingWizard
-								initialStep={settings().onboardingStep}
-								onComplete={() => {
-									capture("onboarding_completed");
-									markOnboardingComplete();
-								}}
-							/>
-						}
-					>
-						<div class="flex h-full">
-							<Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
-							<main class="flex-1 overflow-auto pt-6">{props.children}</main>
-						</div>
-						<SettingsModal isOpen={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
-					</Show>
+					<div class="flex h-full">
+						<Sidebar onOpenSettings={() => setIsSettingsOpen(true)} />
+						<main class="flex-1 overflow-auto pt-6">{props.children}</main>
+					</div>
+					<SettingsModal isOpen={isSettingsOpen()} onClose={() => setIsSettingsOpen(false)} />
 				</Show>
 			</Show>
 		</div>

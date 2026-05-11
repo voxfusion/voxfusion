@@ -10,21 +10,13 @@ export function initPostHog() {
 
 	posthog.init(POSTHOG_KEY, {
 		api_host: POSTHOG_HOST,
-		capture_pageview: false, // We track SolidJS route changes manually
+		capture_pageview: false,
 		capture_pageleave: false,
 		persistence: "localStorage",
-		autocapture: false, // We instrument events explicitly
+		autocapture: false,
 	});
 
 	initialized = true;
-}
-
-export function identifyUser(userId: string, properties?: Record<string, unknown>) {
-	posthog.identify(userId, properties);
-}
-
-export function resetUser() {
-	posthog.reset();
 }
 
 export function capture(event: string, properties?: Record<string, unknown>) {
