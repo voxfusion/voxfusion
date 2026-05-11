@@ -9,6 +9,9 @@ permissions:
   contents: write
   actions: write
 
+env:
+  LEGACY_RELEASES_REPO: gregor-tokarev/voxfusion-releases
+
 jobs:
   build:
     runs-on: macos-15
@@ -144,34 +147,74 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Generate latest.json
+      - name: Generate updater manifests
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
           SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
 
-          jq -n \
-            --arg version "$VERSION" \
-            --arg signature "$SIGNATURE" \
-            --arg url "$DOWNLOAD_URL" \
-            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            '{
-              version: $version,
-              notes: "See release notes on GitHub",
-              pub_date: $pub_date,
-              platforms: {
-                "darwin-universal": { signature: $signature, url: $url },
-                "darwin-x86_64": { signature: $signature, url: $url },
-                "darwin-aarch64": { signature: $signature, url: $url }
-              }
-            }' > latest.json
+          create_manifest() {
+            local output="$1"
+            local download_url="$2"
 
-          echo "Created latest.json:"
-          cat latest.json
+            jq -n \
+              --arg version "$VERSION" \
+              --arg signature "$SIGNATURE" \
+              --arg url "$download_url" \
+              --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{
+                version: $version,
+                notes: "See release notes on GitHub",
+                pub_date: $pub_date,
+                platforms: {
+                  "darwin-universal": { signature: $signature, url: $url },
+                  "darwin-x86_64": { signature: $signature, url: $url },
+                  "darwin-aarch64": { signature: $signature, url: $url }
+                }
+              }' > "$output"
+          }
+
+          create_manifest latest-current.json "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
+          create_manifest latest-legacy.json "https://github.com/${{ env.LEGACY_RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
+
+          echo "Created current repository updater manifest:"
+          cat latest-current.json
+          echo "Created legacy releases repository updater manifest:"
+          cat latest-legacy.json
+
+      - name: Prepare current repository manifest
+        run: cp latest-current.json latest.json
 
       - name: Create release in current repository
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: VoxFusion ${{ github.ref_name }}
+          body: |
+            ## VoxFusion ${{ github.ref_name }}
+
+            ### Download
+            Download the DMG file below and drag VoxFusion to your Applications folder.
+
+            This release is signed and notarized by Apple.
+
+            ---
+            Existing users will receive this update automatically.
+          draft: false
+          prerelease: false
+          files: |
+            release-artifacts/VoxFusion.dmg
+            release-artifacts/VoxFusion-latest.dmg
+            release-artifacts/VoxFusion.app.tar.gz
+            latest.json
+
+      - name: Prepare legacy releases repository manifest
+        run: cp latest-legacy.json latest.json
+
+      - name: Create release in legacy releases repository
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+          repository: ${{ env.LEGACY_RELEASES_REPO }}
           tag_name: ${{ github.ref_name }}
           name: VoxFusion ${{ github.ref_name }}
           body: |
