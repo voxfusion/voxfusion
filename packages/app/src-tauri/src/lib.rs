@@ -1,26 +1,25 @@
 mod handlers;
 mod listeners;
 
-use argon2::{Algorithm, Argon2, Params, Version};
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Listener, Manager};
 
 use handlers::{
-    check_accessibility_probe, list_audio_devices, mute_media_for_recording, process_audio_file,
-    read_audio_file, restore_media_after_recording, start_recording_with_device,
-    stop_recording_with_device, type_text,
+    add_dictionary_word, check_accessibility_probe, check_model_status,
+    delete_dictionary_word, download_whisper_model, get_dictionary_prompt,
+    list_audio_devices, list_dictionary_words, list_transcriptions,
+    mute_media_for_recording, process_audio_file, read_audio_file,
+    restore_media_after_recording, save_transcription, start_recording_with_device,
+    stop_recording_with_device, transcribe_audio, type_text, update_dictionary_word,
 };
 
-/// Shows the main window if it exists, or creates a new one if it was closed.
-/// Used for macOS reopen events (dock click, Spotlight activation) and single-instance handling.
 #[cfg(desktop)]
 fn show_or_create_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.set_focus();
     } else {
-        // Window was closed, recreate it
         use tauri::WebviewWindowBuilder;
         if let Ok(window) =
             WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
@@ -66,24 +65,6 @@ fn build_microphone_submenu(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(
-            tauri_plugin_stronghold::Builder::new(|password| {
-                let salt = b"voxfusion-stronghold-salt";
-
-                let params =
-                    Params::new(10_000, 10, 4, Some(32)).expect("failed to create argon2 params");
-
-                let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
-
-                let mut key = vec![0u8; 32];
-                argon2
-                    .hash_password_into(password.as_ref(), salt, &mut key)
-                    .expect("failed to hash password");
-
-                key
-            })
-            .build(),
-        )
         .invoke_handler(tauri::generate_handler![
             type_text,
             read_audio_file,
@@ -93,31 +74,34 @@ pub fn run() {
             mute_media_for_recording,
             restore_media_after_recording,
             start_recording_with_device,
-            stop_recording_with_device
+            stop_recording_with_device,
+            save_transcription,
+            list_transcriptions,
+            add_dictionary_word,
+            list_dictionary_words,
+            update_dictionary_word,
+            delete_dictionary_word,
+            get_dictionary_prompt,
+            check_model_status,
+            download_whisper_model,
+            transcribe_audio,
         ])
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_keychain::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
-            #[cfg(any(windows, target_os = "linux"))]
-            {
-                use tauri_plugin_deep_link::DeepLinkExt;
-                if let Err(e) = app.deep_link().register("voxfusion") {
-                    eprintln!("Failed to register deep link: {}", e);
-                }
-            }
-
             #[cfg(target_os = "macos")]
             {
                 listeners::accessibility_watcher::setup(app.handle());
                 listeners::system_key_watcher::setup(app.handle());
             }
+
+            let db_state = handlers::db::init_db(app.handle())?;
+            app.manage(db_state);
 
             #[cfg(desktop)]
             let _ = app
@@ -132,30 +116,22 @@ pub fn run() {
 
                 let handle = app.handle().clone();
 
-                // Read selected microphone from store
                 let selected_mic = app
                     .store("settings.json")
                     .ok()
                     .and_then(|store| store.get("selectedMicrophoneId"))
                     .and_then(|v| v.as_str().map(|s| s.to_string()));
 
-                // Build microphone submenu with empty devices initially
-                // Devices will be populated when the user grants microphone permission
-                // This avoids triggering a microphone permission request on app startup
                 let mic_submenu = build_microphone_submenu(&handle, selected_mic, vec![])?;
 
-                // Create menu items (no shortcuts to avoid conflicts with global shortcuts)
                 let home_item = MenuItem::with_id(app, "home", "Home", true, None::<&str>)?;
                 let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-                // Create menu
                 let menu = Menu::with_items(app, &[&home_item, &mic_submenu, &quit_item])?;
 
-                // Clone submenu for use in closures
                 let mic_submenu_for_menu = mic_submenu.clone();
                 let mic_submenu_for_listener = mic_submenu.clone();
 
-                // Build tray icon with dedicated tray icon
                 let tray_icon_bytes = include_bytes!("../icons/tray-icon.png");
                 let tray_image = tauri::image::Image::from_bytes(tray_icon_bytes)
                     .expect("Failed to load tray icon");
@@ -171,10 +147,8 @@ pub fn run() {
                                 if let Some(window) = app.get_webview_window("main") {
                                     let _ = window.show();
                                     let _ = window.set_focus();
-                                    // Emit event to navigate to home
                                     let _ = window.emit("navigate", "/");
                                 } else {
-                                    // Window was closed, recreate it with same settings as tauri.conf.json
                                     use tauri::WebviewWindowBuilder;
                                     if let Ok(window) = WebviewWindowBuilder::new(
                                         app,
@@ -202,7 +176,6 @@ pub fn run() {
                             _ if id.starts_with("mic_") => {
                                 let device_name = id.strip_prefix("mic_").unwrap_or("").to_string();
 
-                                // Update checkmarks in submenu
                                 let devices =
                                     handlers::audio::list_audio_devices().unwrap_or_default();
                                 for device in &devices {
@@ -215,7 +188,6 @@ pub fn run() {
                                     }
                                 }
 
-                                // Emit event to frontend to save microphone selection
                                 if let Some(window) = app.get_webview_window("main") {
                                     let _ = window.emit("select-microphone", &device_name);
                                 }
@@ -225,20 +197,16 @@ pub fn run() {
                     })
                     .build(app)?;
 
-                // Listen for settings changes from frontend to update tray menu
                 let app_handle = app.handle().clone();
                 app.listen("settings-changed", move |_| {
                     use tauri_plugin_store::StoreExt;
 
-                    // Read the new selected microphone from store
                     let selected_mic = app_handle
                         .store("settings.json")
                         .ok()
                         .and_then(|store| store.get("selectedMicrophoneId"))
                         .and_then(|v| v.as_str().map(|s| s.to_string()));
 
-                    // Fetch devices and update menu
-                    // This is safe to call here as it only happens after user interaction
                     let devices = handlers::audio::list_audio_devices().unwrap_or_default();
 
                     for device in &devices {
@@ -246,13 +214,11 @@ pub fn run() {
                         let is_selected =
                             selected_mic.as_ref().map_or(false, |s| s == &device.name);
 
-                        // Try to update existing item, or add new one
                         if let Some(item) = mic_submenu_for_listener.get(&mic_id) {
                             if let Some(check_item) = item.as_check_menuitem() {
                                 let _ = check_item.set_checked(is_selected);
                             }
                         } else {
-                            // Add new item if it doesn't exist
                             let label = if device.is_default {
                                 format!("{} (Default)", device.name)
                             } else {

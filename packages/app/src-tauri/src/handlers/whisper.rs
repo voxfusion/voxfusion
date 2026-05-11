@@ -1,0 +1,234 @@
+use futures_util::StreamExt;
+use std::fs;
+use std::path::PathBuf;
+use tauri::{Emitter, Manager};
+use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+const MODEL_FILENAME: &str = "ggml-large-v3-turbo.bin";
+const MODEL_URL: &str =
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin";
+const MODEL_EXPECTED_SIZE: u64 = 1_624_555_275;
+
+fn get_model_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
+    let model_dir = data_dir.join("models");
+    fs::create_dir_all(&model_dir).map_err(|e| e.to_string())?;
+    Ok(model_dir)
+}
+
+fn get_model_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(get_model_dir(app_handle)?.join(MODEL_FILENAME))
+}
+
+#[tauri::command]
+pub async fn check_model_status(app_handle: tauri::AppHandle) -> Result<bool, String> {
+    let model_path = get_model_path(&app_handle)?;
+    if !model_path.exists() {
+        return Ok(false);
+    }
+    let metadata = fs::metadata(&model_path).map_err(|e| e.to_string())?;
+    Ok(metadata.len() == MODEL_EXPECTED_SIZE)
+}
+
+#[tauri::command]
+pub async fn download_whisper_model(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let model_path = get_model_path(&app_handle)?;
+
+    if model_path.exists() {
+        let metadata = fs::metadata(&model_path).map_err(|e| e.to_string())?;
+        if metadata.len() == MODEL_EXPECTED_SIZE {
+            let _ = app_handle.emit("model-download-progress", 100u32);
+            return Ok(());
+        }
+        let _ = fs::remove_file(&model_path);
+    }
+
+    let temp_path = model_path.with_extension("bin.tmp");
+    let _ = fs::remove_file(&temp_path);
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60 * 60))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    let response = client
+        .get(MODEL_URL)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to start download: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed: HTTP {}", response.status()));
+    }
+
+    let total_size = response.content_length().unwrap_or(MODEL_EXPECTED_SIZE);
+
+    let mut file =
+        fs::File::create(&temp_path).map_err(|e| format!("Failed to create file: {}", e))?;
+
+    let mut stream = response.bytes_stream();
+    let mut downloaded: u64 = 0;
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| {
+            let _ = fs::remove_file(&temp_path);
+            format!("Download failed: {}", e)
+        })?;
+
+        std::io::Write::write_all(&mut file, &chunk).map_err(|e| {
+            let _ = fs::remove_file(&temp_path);
+            format!("Write failed: {}", e)
+        })?;
+
+        downloaded += chunk.len() as u64;
+
+        let progress = ((downloaded as f64 / total_size as f64) * 100.0).min(99.0) as u32;
+        let _ = app_handle.emit("model-download-progress", progress);
+    }
+
+    drop(file);
+
+    let actual_size = fs::metadata(&temp_path).map_err(|e| e.to_string())?.len();
+    if actual_size != MODEL_EXPECTED_SIZE {
+        let _ = fs::remove_file(&temp_path);
+        return Err(format!(
+            "Download incomplete: got {} bytes, expected {}",
+            actual_size, MODEL_EXPECTED_SIZE
+        ));
+    }
+
+    fs::rename(&temp_path, &model_path).map_err(|e| {
+        let _ = fs::remove_file(&temp_path);
+        format!("Failed to finalize model: {}", e)
+    })?;
+
+    let _ = app_handle.emit("model-download-progress", 100u32);
+
+    Ok(())
+}
+
+fn read_wav_as_f32(path: &str) -> Result<Vec<f32>, String> {
+    let mut reader = hound::WavReader::open(path).map_err(|e| format!("Failed to open WAV: {}", e))?;
+    let spec = reader.spec();
+    let channels = spec.channels as usize;
+    let sample_rate = spec.sample_rate;
+
+    let samples: Vec<f32> = match spec.sample_format {
+        hound::SampleFormat::Float => reader
+            .samples::<f32>()
+            .map(|s| s.unwrap_or(0.0))
+            .collect(),
+        hound::SampleFormat::Int => {
+            let max_val = (1u32 << (spec.bits_per_sample - 1)) as f32;
+            reader
+                .samples::<i32>()
+                .map(|s| s.map(|v| v as f32 / max_val).unwrap_or(0.0))
+                .collect()
+        }
+    };
+
+    let mono: Vec<f32> = if channels > 1 {
+        samples
+            .chunks(channels)
+            .map(|frame| frame.iter().sum::<f32>() / channels as f32)
+            .collect()
+    } else {
+        samples
+    };
+
+    if sample_rate != 16000 {
+        let ratio = sample_rate as f64 / 16000.0;
+        let output_len = (mono.len() as f64 / ratio) as usize;
+        let mut resampled = Vec::with_capacity(output_len);
+        for i in 0..output_len {
+            let src_pos = i as f64 * ratio;
+            let src_idx = src_pos as usize;
+            let frac = (src_pos - src_idx as f64) as f32;
+            let sample = if src_idx + 1 < mono.len() {
+                mono[src_idx] * (1.0 - frac) + mono[src_idx + 1] * frac
+            } else if src_idx < mono.len() {
+                mono[src_idx]
+            } else {
+                0.0
+            };
+            resampled.push(sample);
+        }
+        Ok(resampled)
+    } else {
+        Ok(mono)
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct TranscriptionResult {
+    pub text: String,
+    pub word_count: i64,
+    pub processing_time_ms: i64,
+    pub audio_duration_ms: Option<i64>,
+}
+
+#[tauri::command]
+pub async fn transcribe_audio(
+    app_handle: tauri::AppHandle,
+    audio_path: String,
+    prompt: Option<String>,
+) -> Result<TranscriptionResult, String> {
+    let model_path = get_model_path(&app_handle)?;
+
+    if !model_path.exists() {
+        return Err("Whisper model not found. Please download it first.".to_string());
+    }
+
+    let start = std::time::Instant::now();
+
+    let audio_data = read_wav_as_f32(&audio_path)?;
+    let audio_duration_ms = if audio_data.len() > 0 {
+        Some((audio_data.len() as f64 / 16.0) as i64)
+    } else {
+        None
+    };
+
+    let ctx_params = WhisperContextParameters::default();
+    let ctx = WhisperContext::new_with_params(&model_path, ctx_params)
+        .map_err(|e| format!("Failed to load model: {}", e))?;
+
+    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    params.set_print_progress(false);
+    params.set_print_special(false);
+    params.set_print_realtime(false);
+    params.set_print_timestamps(false);
+
+    if let Some(ref p) = prompt {
+        params.set_initial_prompt(p);
+    }
+
+    let mut state = ctx.create_state().map_err(|e| format!("Failed to create state: {}", e))?;
+    state
+        .full(params, &audio_data)
+        .map_err(|e| format!("Transcription failed: {}", e))?;
+
+    let num_segments = state.full_n_segments();
+
+    let mut text = String::new();
+    for i in 0..num_segments {
+        if let Some(segment) = state.get_segment(i) {
+            let segment_text = segment
+                .to_str_lossy()
+                .map_err(|e| format!("Failed to get segment: {}", e))?;
+            text.push_str(&segment_text);
+        }
+    }
+
+    let text = text.trim().to_string();
+    let word_count = text.split_whitespace().count() as i64;
+    let processing_time_ms = start.elapsed().as_millis() as i64;
+
+    Ok(TranscriptionResult {
+        text,
+        word_count,
+        processing_time_ms,
+        audio_duration_ms,
+    })
+}

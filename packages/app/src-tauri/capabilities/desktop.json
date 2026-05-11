@@ -8,8 +8,6 @@
 		"global-shortcut:allow-unregister",
 		"clipboard-manager:default",
 		"core:path:allow-resolve-directory",
-		"stronghold:default",
-		"stronghold:allow-remove-store-record",
 		"clipboard-manager:allow-write-text",
 		"clipboard-manager:default",
 		"core:window:allow-set-position",
