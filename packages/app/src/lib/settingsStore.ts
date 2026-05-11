@@ -31,6 +31,21 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 const STORE_NAME = "settings.json";
+const ONBOARDING_STEP_COUNT = 6;
+const CURRENT_ONBOARDING_VERSION = 2;
+
+function normalizeOnboardingStep(
+	step: number,
+	onboardingComplete: boolean,
+	onboardingVersion: number
+): number {
+	if (onboardingComplete) {
+		return DEFAULT_SETTINGS.onboardingStep;
+	}
+
+	const migratedStep = onboardingVersion < CURRENT_ONBOARDING_VERSION && step > 1 ? step - 1 : step;
+	return Math.min(Math.max(migratedStep, 1), ONBOARDING_STEP_COUNT);
+}
 
 let storeInstance: Awaited<ReturnType<typeof load>> | null = null;
 
@@ -47,6 +62,7 @@ async function getStore() {
 				muteMediaWhileRecording: DEFAULT_SETTINGS.muteMediaWhileRecording,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
 				onboardingStep: DEFAULT_SETTINGS.onboardingStep,
+				onboardingVersion: CURRENT_ONBOARDING_VERSION,
 			},
 			autoSave: 500,
 		});
@@ -65,6 +81,19 @@ export async function loadSettings(): Promise<Settings> {
 	const muteMediaWhileRecording = await store.get<boolean>("muteMediaWhileRecording");
 	const onboardingComplete = await store.get<boolean>("onboardingComplete");
 	const onboardingStep = await store.get<number>("onboardingStep");
+	const onboardingVersion = await store.get<number>("onboardingVersion");
+	const normalizedOnboardingStep = normalizeOnboardingStep(
+		onboardingStep ?? DEFAULT_SETTINGS.onboardingStep,
+		onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
+		onboardingVersion ?? 1
+	);
+
+	if (normalizedOnboardingStep !== (onboardingStep ?? DEFAULT_SETTINGS.onboardingStep)) {
+		await store.set("onboardingStep", normalizedOnboardingStep);
+	}
+	if ((onboardingVersion ?? 1) !== CURRENT_ONBOARDING_VERSION) {
+		await store.set("onboardingVersion", CURRENT_ONBOARDING_VERSION);
+	}
 
 	return {
 		theme: theme ?? DEFAULT_SETTINGS.theme,
@@ -75,7 +104,7 @@ export async function loadSettings(): Promise<Settings> {
 		audioQuality: audioQuality ?? DEFAULT_SETTINGS.audioQuality,
 		muteMediaWhileRecording: muteMediaWhileRecording ?? DEFAULT_SETTINGS.muteMediaWhileRecording,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
-		onboardingStep: onboardingStep ?? DEFAULT_SETTINGS.onboardingStep,
+		onboardingStep: normalizedOnboardingStep,
 	};
 }
 

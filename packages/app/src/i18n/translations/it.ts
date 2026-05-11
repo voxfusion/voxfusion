@@ -133,8 +133,6 @@ export const it: Translations = {
 		recordHotkey: "Registra nuova scorciatoia",
 		recordHoldToSpeakHotkey: "Record Hold-to-Speak Hotkey",
 		pressKeys: "Premi la combinazione di tasti desiderata...",
-		languageTitle: "Scegli la tua lingua",
-		languageDescription: "Seleziona la lingua preferita per l'interfaccia.",
 		completionTitle: "Tutto pronto!",
 		completionDescription: "VoxFusion è pronto ad aiutarti con la trascrizione vocale.",
 		micPermissionTitle: "Accesso al microfono",
