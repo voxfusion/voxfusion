@@ -546,4 +546,3 @@ function ThemeOption(props: ThemeOptionProps) {
 		</button>
 	);
 }
-

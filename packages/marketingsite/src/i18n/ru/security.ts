@@ -22,7 +22,8 @@ export const security = {
 		"3.1. The app is signed with an Apple developer certificate and notarized by Apple.",
 	"security.section3.p2":
 		"3.2. Automatic updates are delivered over a secure channel with digital signature verification.",
-	"security.section3.p3": "3.3. The app runs with the minimum macOS privileges required to operate.",
+	"security.section3.p3":
+		"3.3. The app runs with the minimum macOS privileges required to operate.",
 	"security.section4.title": "4. Incident response",
 	"security.section4.p1":
 		"4.1. If you discover a security vulnerability, please report it to security@voxfusion.com.",
