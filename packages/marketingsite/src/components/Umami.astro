@@ -1,0 +1,66 @@
+---
+/**
+ * Umami analytics + explicit marketing event tracking.
+ *
+ * Usage:
+ *   - Place <Umami /> right before </body>.
+ *   - Add data-umami-event="event_name" to any clickable element.
+ *   - Add data-umami-event-* attributes for click event properties.
+ *   - Add data-umami-view="event_name" to any section to capture once when it enters view.
+ *   - Optionally pass data-umami-props='{"key":"value"}' for view event properties.
+ */
+const UMAMI_WEBSITE_ID =
+	import.meta.env.PUBLIC_UMAMI_WEBSITE_ID ?? "d882f732-3dfa-4adc-8382-1b62cf146a98";
+const UMAMI_SCRIPT_URL = import.meta.env.PUBLIC_UMAMI_SCRIPT_URL ?? "https://cloud.umami.is/script.js";
+---
+
+<script is:inline async defer src={UMAMI_SCRIPT_URL} data-website-id={UMAMI_WEBSITE_ID}></script>
+
+<script is:inline>
+	function readProps(el) {
+		var raw = el.getAttribute("data-umami-props");
+		if (!raw) return undefined;
+
+		try {
+			return JSON.parse(raw);
+		} catch (error) {
+			console.warn("Invalid Umami event properties", error);
+			return undefined;
+		}
+	}
+
+	function track(eventName, props, retries) {
+		if (window.umami) {
+			window.umami.track(eventName, props);
+			return;
+		}
+
+		if (retries > 0) {
+			window.setTimeout(function () {
+				track(eventName, props, retries - 1);
+			}, 250);
+		}
+	}
+
+	if ("IntersectionObserver" in window) {
+		var viewed = {};
+		var observer = new IntersectionObserver(
+			function (entries) {
+				entries.forEach(function (entry) {
+					if (!entry.isIntersecting) return;
+
+					var eventName = entry.target.getAttribute("data-umami-view");
+					if (viewed[eventName]) return;
+
+					viewed[eventName] = true;
+					track(eventName, readProps(entry.target), 20);
+				});
+			},
+			{ threshold: 0.3 },
+		);
+
+		document.querySelectorAll("[data-umami-view]").forEach(function (el) {
+			observer.observe(el);
+		});
+	}
+</script>

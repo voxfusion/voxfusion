@@ -1,7 +1,7 @@
 ---
 import Downloads from "../components/Downloads.astro";
 import Footer from "../components/Footer.astro";
-import PostHog from "../components/PostHog.astro";
+import Umami from "../components/Umami.astro";
 import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
 import Seo from "../components/Seo.astro";
 
@@ -53,7 +53,7 @@ const description = t("meta.description");
 
 	<Downloads lang={lang} />
 	<Footer lang={lang} />
-	<PostHog />
+	<Umami />
 </body>
 </html>
 
