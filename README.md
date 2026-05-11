@@ -4,9 +4,10 @@ A local-first, offline-capable voice transcription desktop app. All transcriptio
 
 ## Packages
 
-| Package | Description | Stack |
-|---------|-------------|-------|
-| `@voxfusion/app` | Desktop application | Tauri v2, SolidJS, Tailwind CSS, TypeScript, whisper-rs, SQLite |
+| Package                    | Description              | Stack                                                           |
+| -------------------------- | ------------------------ | --------------------------------------------------------------- |
+| `@voxfusion/app`           | Desktop application      | Tauri v2, SolidJS, Tailwind CSS, TypeScript, whisper-rs, SQLite |
+| `@voxfusion/marketingsite` | Public marketing website | Astro, TypeScript, Wrangler                                     |
 
 ## Prerequisites
 
@@ -31,6 +32,12 @@ Or run the app directly:
 
 ```bash
 bun run --filter @voxfusion/app dev
+```
+
+Or run the marketing site directly:
+
+```bash
+bun run --filter @voxfusion/marketingsite dev
 ```
 
 ### Tauri Desktop App
@@ -79,32 +86,6 @@ bun run typecheck    # TypeScript type checking
 VoxFusion is released under the MIT license. See [CONTRIBUTING.md](CONTRIBUTING.md)
 for setup instructions, pull request guidelines, and privacy expectations for
 contributions.
-
-## Project Structure
-
-```
-voxfusion/
-├── packages/
-│   └── app/                # Tauri + SolidJS desktop app
-│       ├── src/            # Frontend source (SolidJS)
-│       │   ├── components/ # UI components, onboarding wizard
-│       │   ├── pages/      # Home, Dictionary, VoiceControl
-│       │   ├── lib/        # Settings, hotkey utils
-│       │   └── i18n/       # Translations
-│       └── src-tauri/      # Tauri/Rust backend
-│           └── src/
-│               ├── handlers/  # audio, whisper, db, text, media
-│               └── listeners/ # accessibility, system keys
-├── turbo.json              # Turborepo configuration
-├── biome.json              # Biome linter config
-└── package.json            # Root package.json
-```
-
-## Local storage
-
-- **Whisper model**: `{app_data_dir}/models/ggml-large-v3-turbo.bin`
-- **Transcriptions + dictionary**: `{app_data_dir}/voxfusion.db` (SQLite)
-- **Settings**: Tauri store plugin (`settings.json` in app data dir)
 
 ## License
 
