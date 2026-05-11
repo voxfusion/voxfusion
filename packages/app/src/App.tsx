@@ -1,5 +1,4 @@
 import { useNavigate } from "@solidjs/router";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { type ParentProps, Show, createSignal, onCleanup, onMount } from "solid-js";
@@ -7,6 +6,8 @@ import appIcon from "../src-tauri/icons/icon.svg";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
+import { checkModelStatus } from "./lib/commands/model";
+import { MODEL_DOWNLOAD_STEP } from "./lib/onboarding";
 import { capture } from "./lib/posthog";
 import {
 	initSettings,
@@ -16,13 +17,15 @@ import {
 	useSettings,
 } from "./lib/settingsStore";
 
-const MODEL_DOWNLOAD_STEP = 5;
-
 const FORCE_SHOW_ONBOARDING =
 	import.meta.env.DEV && import.meta.env.VITE_FORCE_ONBOARDING === "true";
 
+type TauriWindow = Window & {
+	__TAURI_INTERNALS__?: unknown;
+};
+
 function waitForTauriIPC(): Promise<void> {
-	if ((window as any).__TAURI_INTERNALS__) return Promise.resolve();
+	if ((window as TauriWindow).__TAURI_INTERNALS__) return Promise.resolve();
 
 	return new Promise((resolve, reject) => {
 		const timeout = setTimeout(() => {
@@ -31,7 +34,7 @@ function waitForTauriIPC(): Promise<void> {
 		}, 5000);
 
 		const interval = setInterval(() => {
-			if ((window as any).__TAURI_INTERNALS__) {
+			if ((window as TauriWindow).__TAURI_INTERNALS__) {
 				clearInterval(interval);
 				clearTimeout(timeout);
 				resolve();
@@ -57,7 +60,7 @@ function App(props: ParentProps) {
 		await initSettings();
 
 		try {
-			const modelReady = await invoke<boolean>("check_model_status");
+			const modelReady = await checkModelStatus();
 			if (!modelReady && settings().onboardingComplete) {
 				await resumeOnboardingAt(MODEL_DOWNLOAD_STEP);
 			}

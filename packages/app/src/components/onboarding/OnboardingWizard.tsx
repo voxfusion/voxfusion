@@ -1,5 +1,6 @@
 import { Show, createSignal } from "solid-js";
 import { useI18n } from "../../i18n";
+import { ONBOARDING_STEP_COUNT } from "../../lib/onboarding";
 import { capture } from "../../lib/posthog";
 import { updateOnboardingStep } from "../../lib/settingsStore";
 import StepIndicator from "./StepIndicator";
@@ -16,8 +17,6 @@ interface OnboardingWizardProps {
 	onComplete: () => void;
 }
 
-const TOTAL_STEPS = 7;
-
 export default function OnboardingWizard(props: OnboardingWizardProps) {
 	const [t] = useI18n();
 	const [currentStep, setCurrentStep] = createSignal(props.initialStep);
@@ -31,7 +30,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 	const [learningCompleted, setLearningCompleted] = createSignal(false);
 
 	const goToNext = () => {
-		if (currentStep() < TOTAL_STEPS) {
+		if (currentStep() < ONBOARDING_STEP_COUNT) {
 			capture("onboarding_step_completed", { step: currentStep() });
 			setAnimationDirection("forward");
 			setIsAnimating(true);
@@ -86,11 +85,11 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
 
 			<div class="absolute top-8 right-8 font-mono text-txt-muted text-sm tracking-wider">
-				{formatStep(currentStep())}/{formatStep(TOTAL_STEPS)}
+				{formatStep(currentStep())}/{formatStep(ONBOARDING_STEP_COUNT)}
 			</div>
 
 			<div class="mb-12">
-				<StepIndicator currentStep={currentStep()} totalSteps={TOTAL_STEPS} />
+				<StepIndicator currentStep={currentStep()} totalSteps={ONBOARDING_STEP_COUNT} />
 			</div>
 
 			<div
@@ -143,7 +142,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 				</Show>
 
 				<Show
-					when={currentStep() < TOTAL_STEPS}
+					when={currentStep() < ONBOARDING_STEP_COUNT}
 					fallback={
 						<button
 							type="button"

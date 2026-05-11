@@ -1,4 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import {
 	LogicalPosition,
@@ -14,6 +13,14 @@ import {
 	registerDictationHotkeys,
 	unregisterDictationHotkey,
 } from "../lib/hotkeyUtils";
+import { startRecordingWithDevice, stopRecordingWithDevice } from "../lib/commands/audio";
+import { getDictionaryPrompt } from "../lib/commands/dictionary";
+import {
+	muteMediaForRecording as muteMediaForRecordingCommand,
+	restoreMediaAfterRecording as restoreMediaAfterRecordingCommand,
+} from "../lib/commands/media";
+import { typeText } from "../lib/commands/text";
+import { saveTranscription, transcribeAudio } from "../lib/commands/transcriptions";
 import { loadSettings, updateHoldToSpeakHotkey, updateHotkey } from "../lib/settingsStore";
 
 const DEFAULT_HOTKEY = "LeftControl+LeftOption";
@@ -193,28 +200,17 @@ export default function VoiceControl() {
 		await unregisterEscapeShortcut();
 
 		try {
-			const filePath = await invoke<string>("stop_recording_with_device");
+			const filePath = await stopRecordingWithDevice();
 			await restoreMediaAfterRecording();
 
 			setLoading(true);
 
-			const prompt = await invoke<string | null>("get_dictionary_prompt");
+			const prompt = await getDictionaryPrompt();
 
-			const result = await invoke<{
-				text: string;
-				word_count: number;
-				processing_time_ms: number;
-				audio_duration_ms: number | null;
-			}>("transcribe_audio", { audioPath: filePath, prompt });
+			const result = await transcribeAudio(filePath, prompt);
+			await saveTranscription(result);
 
-			await invoke("save_transcription", {
-				text: result.text,
-				wordCount: result.word_count,
-				processingTimeMs: result.processing_time_ms,
-				audioDurationMs: result.audio_duration_ms,
-			});
-
-			await invoke("type_text", { text: result.text ?? "" });
+			await typeText(result.text ?? "");
 
 			setTimeout(() => {
 				emit("transcription-created");
@@ -252,7 +248,7 @@ export default function VoiceControl() {
 		await unregisterEscapeShortcut();
 
 		try {
-			await invoke<string>("stop_recording_with_device");
+			await stopRecordingWithDevice();
 		} catch {
 		} finally {
 			await restoreMediaAfterRecording();
@@ -263,13 +259,13 @@ export default function VoiceControl() {
 	const muteMediaForRecording = async () => {
 		if (!muteMediaWhileRecording()) return;
 		try {
-			await invoke("mute_media_for_recording");
+			await muteMediaForRecordingCommand();
 		} catch {}
 	};
 
 	const restoreMediaAfterRecording = async () => {
 		try {
-			await invoke("restore_media_after_recording");
+			await restoreMediaAfterRecordingCommand();
 		} catch {}
 	};
 
@@ -280,9 +276,7 @@ export default function VoiceControl() {
 			isStarting = true;
 
 			const deviceName = selectedMicrophone();
-			await invoke("start_recording_with_device", {
-				deviceName: deviceName === "default" ? null : deviceName,
-			});
+			await startRecordingWithDevice(deviceName === "default" ? null : deviceName);
 			void muteMediaForRecording();
 			activeRecordingMode = mode;
 			setIsRecording(true);

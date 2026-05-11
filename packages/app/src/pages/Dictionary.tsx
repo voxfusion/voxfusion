@@ -1,15 +1,14 @@
-import { invoke } from "@tauri-apps/api/core";
 import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
+import {
+	type DictionaryWord,
+	addDictionaryWord,
+	deleteDictionaryWord,
+	listDictionaryWords,
+	updateDictionaryWord,
+} from "../lib/commands/dictionary";
 import { capture } from "../lib/posthog";
-
-type DictionaryWord = {
-	id: string;
-	word: string;
-	createdAt: string;
-	updatedAt: string;
-};
 
 export default function Dictionary() {
 	const [t] = useI18n();
@@ -23,7 +22,7 @@ export default function Dictionary() {
 	const fetchWords = async () => {
 		setLoading(true);
 		try {
-			const result = await invoke<DictionaryWord[]>("list_dictionary_words");
+			const result = await listDictionaryWords();
 			setWords(result);
 		} finally {
 			setLoading(false);
@@ -41,7 +40,7 @@ export default function Dictionary() {
 
 		setAdding(true);
 		try {
-			await invoke("add_dictionary_word", { word });
+			await addDictionaryWord(word);
 			capture("dictionary_word_added");
 			await fetchWords();
 			setNewWord("");
@@ -59,7 +58,7 @@ export default function Dictionary() {
 	const handleDelete = async (id: string) => {
 		capture("dictionary_word_deleted");
 		setWords(words().filter((w) => w.id !== id));
-		await invoke("delete_dictionary_word", { id });
+		await deleteDictionaryWord(id);
 	};
 
 	const startEdit = (word: DictionaryWord) => {
@@ -81,7 +80,7 @@ export default function Dictionary() {
 		setEditingId(null);
 		setEditingWord("");
 
-		await invoke("update_dictionary_word", { id, word });
+		await updateDictionaryWord(id, word);
 	};
 
 	const handleEditKeyDown = (e: KeyboardEvent, id: string) => {

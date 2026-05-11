@@ -2,6 +2,12 @@ import { emit } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
 import { createSignal } from "solid-js";
 import type { Locale } from "../i18n";
+import { listAudioDevices } from "./commands/audio";
+import {
+	CURRENT_ONBOARDING_VERSION,
+	normalizeOnboardingStep,
+	ONBOARDING_STEP_COUNT,
+} from "./onboarding";
 
 export type Theme = "dark" | "light" | "system";
 
@@ -28,24 +34,6 @@ const DEFAULT_SETTINGS: Settings = {
 };
 
 const STORE_NAME = "settings.json";
-const ONBOARDING_STEP_COUNT = 7;
-const CURRENT_ONBOARDING_VERSION = 3;
-
-function normalizeOnboardingStep(
-	step: number,
-	onboardingComplete: boolean,
-	onboardingVersion: number
-): number {
-	if (onboardingComplete) {
-		return DEFAULT_SETTINGS.onboardingStep;
-	}
-
-	if (onboardingVersion < CURRENT_ONBOARDING_VERSION) {
-		return DEFAULT_SETTINGS.onboardingStep;
-	}
-
-	return Math.min(Math.max(step, 1), ONBOARDING_STEP_COUNT);
-}
 
 let storeInstance: Awaited<ReturnType<typeof load>> | null = null;
 
@@ -145,8 +133,7 @@ export interface AudioDevice {
 
 export async function getAudioInputDevices(): Promise<AudioDevice[]> {
 	try {
-		const { invoke } = await import("@tauri-apps/api/core");
-		const devices = await invoke<{ name: string; is_default: boolean }[]>("list_audio_devices");
+		const devices = await listAudioDevices();
 		return devices.map((device) => ({
 			name: device.name,
 			isDefault: device.is_default,

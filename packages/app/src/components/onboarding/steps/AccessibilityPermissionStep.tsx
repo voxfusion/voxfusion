@@ -1,9 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
 import { AlertCircle, Check, ExternalLink, Shield } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { requestAccessibilityPermission } from "tauri-plugin-macos-permissions-api";
 import { useI18n } from "../../../i18n";
+import { checkAccessibilityProbe } from "../../../lib/commands/permissions";
 
 interface AccessibilityPermissionStepProps {
 	onPermissionChange: (granted: boolean) => void;
@@ -27,7 +27,7 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 
 	const checkPermission = async () => {
 		try {
-			const granted = await invoke<boolean>("check_accessibility_probe");
+			const granted = await checkAccessibilityProbe();
 			setIsGranted(granted);
 			props.onPermissionChange(granted);
 			if (granted && pollInterval) {

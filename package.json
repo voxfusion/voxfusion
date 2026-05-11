@@ -1,6 +1,7 @@
 {
 	"name": "voxfusion",
 	"private": true,
+	"license": "MIT",
 	"packageManager": "bun@1.3.3",
 	"workspaces": ["packages/*"],
 	"scripts": {
