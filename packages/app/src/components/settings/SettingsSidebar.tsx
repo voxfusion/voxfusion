@@ -18,7 +18,7 @@ interface SettingsSidebarProps {
 
 const sidebarItems: SidebarItem[] = [
 	{ id: "audio", num: "01", label: "AUDIO" },
-	{ id: "hotkey", num: "02", label: "HOTKEY" },
+	{ id: "hotkey", num: "02", label: "HOTKEYS" },
 	{ id: "appearance", num: "03", label: "APPEARANCE" },
 	{ id: "language", num: "04", label: "LANGUAGE" },
 ];
