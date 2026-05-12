@@ -1,7 +1,8 @@
+import { listen } from "@tauri-apps/api/event";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { type Update, check } from "@tauri-apps/plugin-updater";
 import { Download } from "lucide-solid";
-import { Show, createSignal, onMount } from "solid-js";
+import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 
 export default function UpdateNotification() {
@@ -11,7 +12,7 @@ export default function UpdateNotification() {
 	const [isDownloading, setIsDownloading] = createSignal(false);
 	const [downloadProgress, setDownloadProgress] = createSignal(0);
 
-	onMount(async () => {
+	const checkForUpdates = async () => {
 		try {
 			const available = await check();
 			if (available) {
@@ -21,6 +22,27 @@ export default function UpdateNotification() {
 		} catch {
 			// Update check failed
 		}
+	};
+
+	onMount(() => {
+		void checkForUpdates();
+
+		let cleanup: (() => void) | undefined;
+		let disposed = false;
+		void listen("check-for-updates", () => {
+			void checkForUpdates();
+		}).then((unlisten) => {
+			if (disposed) {
+				unlisten();
+			} else {
+				cleanup = unlisten;
+			}
+		});
+
+		onCleanup(() => {
+			disposed = true;
+			cleanup?.();
+		});
 	});
 
 	const handleDownloadAndRestart = async () => {
