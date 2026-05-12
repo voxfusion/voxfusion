@@ -5,6 +5,8 @@
 	"windows": ["voice-control"],
 	"permissions": [
 		"core:window:default",
+		"core:window:allow-show",
+		"core:window:allow-hide",
 		"core:window:allow-start-dragging",
 		"core:event:allow-listen",
 		"core:event:allow-emit",

@@ -40,6 +40,15 @@ type KeyboardKeyPressedPayload = {
 let lastMonitorX = 0;
 let lastMonitorY = 0;
 
+async function showVoiceControlWindow() {
+	await repositionToCurrentMonitor();
+	await getCurrentWindow().show();
+}
+
+async function hideVoiceControlWindow() {
+	await getCurrentWindow().hide();
+}
+
 async function repositionToCurrentMonitor() {
 	const cursor = await cursorPosition();
 	const monitor = await monitorFromPoint(cursor.x, cursor.y);
@@ -220,6 +229,7 @@ export default function VoiceControl() {
 			await restoreMediaAfterRecording();
 			setLoading(false);
 			isStopping = false;
+			await hideVoiceControlWindow();
 		}
 	};
 
@@ -253,6 +263,7 @@ export default function VoiceControl() {
 		} finally {
 			await restoreMediaAfterRecording();
 			isStopping = false;
+			await hideVoiceControlWindow();
 		}
 	};
 
@@ -274,6 +285,7 @@ export default function VoiceControl() {
 			if (isRecording()) return;
 			if (isStopping || isStarting) return;
 			isStarting = true;
+			await showVoiceControlWindow();
 
 			const deviceName = selectedMicrophone();
 			await startRecordingWithDevice(deviceName === "default" ? null : deviceName);
@@ -283,6 +295,7 @@ export default function VoiceControl() {
 			isStarting = false;
 			await registerEscapeShortcut();
 		} catch {
+			await hideVoiceControlWindow();
 			isStopping = false;
 			isStarting = false;
 		}
