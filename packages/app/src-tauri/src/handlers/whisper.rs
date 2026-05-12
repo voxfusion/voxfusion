@@ -8,6 +8,7 @@ const MODEL_FILENAME: &str = "ggml-large-v3-turbo.bin";
 const MODEL_URL: &str =
     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin";
 const MODEL_EXPECTED_SIZE: u64 = 1_624_555_275;
+const WHISPER_BEAM_SIZE: i32 = 8;
 
 fn get_model_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     let data_dir = app_handle
@@ -110,24 +111,13 @@ pub async fn download_whisper_model(app_handle: tauri::AppHandle) -> Result<(), 
 }
 
 fn read_wav_as_f32(path: &str) -> Result<Vec<f32>, String> {
-    let mut reader = hound::WavReader::open(path).map_err(|e| format!("Failed to open WAV: {}", e))?;
+    let mut reader =
+        hound::WavReader::open(path).map_err(|e| format!("Failed to open WAV: {}", e))?;
     let spec = reader.spec();
     let channels = spec.channels as usize;
     let sample_rate = spec.sample_rate;
 
-    let samples: Vec<f32> = match spec.sample_format {
-        hound::SampleFormat::Float => reader
-            .samples::<f32>()
-            .map(|s| s.unwrap_or(0.0))
-            .collect(),
-        hound::SampleFormat::Int => {
-            let max_val = (1u32 << (spec.bits_per_sample - 1)) as f32;
-            reader
-                .samples::<i32>()
-                .map(|s| s.map(|v| v as f32 / max_val).unwrap_or(0.0))
-                .collect()
-        }
-    };
+    let samples: Vec<f32> = read_samples_as_f32(&mut reader, spec)?;
 
     let mono: Vec<f32> = if channels > 1 {
         samples
@@ -158,6 +148,40 @@ fn read_wav_as_f32(path: &str) -> Result<Vec<f32>, String> {
         Ok(resampled)
     } else {
         Ok(mono)
+    }
+}
+
+fn read_samples_as_f32<R: std::io::Read>(
+    reader: &mut hound::WavReader<R>,
+    spec: hound::WavSpec,
+) -> Result<Vec<f32>, String> {
+    match spec.sample_format {
+        hound::SampleFormat::Float => reader
+            .samples::<f32>()
+            .map(|sample| sample.map_err(|e| format!("Failed to read float sample: {}", e)))
+            .collect(),
+        hound::SampleFormat::Int if spec.bits_per_sample <= 16 => {
+            let max_val = (1u32 << (spec.bits_per_sample - 1)) as f32;
+            reader
+                .samples::<i16>()
+                .map(|sample| {
+                    sample
+                        .map(|value| value as f32 / max_val)
+                        .map_err(|e| format!("Failed to read 16-bit sample: {}", e))
+                })
+                .collect()
+        }
+        hound::SampleFormat::Int => {
+            let max_val = (1u64 << (spec.bits_per_sample - 1)) as f32;
+            reader
+                .samples::<i32>()
+                .map(|sample| {
+                    sample
+                        .map(|value| value as f32 / max_val)
+                        .map_err(|e| format!("Failed to read int sample: {}", e))
+                })
+                .collect()
+        }
     }
 }
 
@@ -194,17 +218,31 @@ pub async fn transcribe_audio(
     let ctx = WhisperContext::new_with_params(&model_path, ctx_params)
         .map_err(|e| format!("Failed to load model: {}", e))?;
 
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+        beam_size: WHISPER_BEAM_SIZE,
+        patience: -1.0,
+    });
+    let thread_count = std::thread::available_parallelism()
+        .map(|count| count.get().saturating_sub(1).max(1) as i32)
+        .unwrap_or(4);
+    params.set_n_threads(thread_count);
+    params.set_no_context(true);
+    params.set_no_timestamps(true);
     params.set_print_progress(false);
     params.set_print_special(false);
     params.set_print_realtime(false);
     params.set_print_timestamps(false);
+    params.set_suppress_nst(true);
+    params.set_temperature(0.0);
+    params.set_temperature_inc(0.0);
 
     if let Some(ref p) = prompt {
         params.set_initial_prompt(p);
     }
 
-    let mut state = ctx.create_state().map_err(|e| format!("Failed to create state: {}", e))?;
+    let mut state = ctx
+        .create_state()
+        .map_err(|e| format!("Failed to create state: {}", e))?;
     state
         .full(params, &audio_data)
         .map_err(|e| format!("Transcription failed: {}", e))?;
