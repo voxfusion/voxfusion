@@ -1,6 +1,5 @@
 import { useNavigate } from "@solidjs/router";
 import { listen } from "@tauri-apps/api/event";
-import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { type ParentProps, Show, createSignal, onCleanup, onMount } from "solid-js";
 import appIcon from "../src-tauri/icons/icon.svg";
 import Sidebar from "./components/Navigation";
@@ -94,12 +93,6 @@ function App(props: ParentProps) {
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
-
-		const allWindows = await getAllWebviewWindows();
-		const voiceWindow = allWindows.find((w) => w.label === "voice-control");
-		if (voiceWindow) {
-			await voiceWindow.show();
-		}
 	});
 
 	return (
