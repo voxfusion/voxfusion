@@ -284,6 +284,6 @@ pub fn get_dictionary_prompt(state: tauri::State<'_, DbState>) -> Result<Option<
     if words.is_empty() {
         Ok(None)
     } else {
-        Ok(Some(format!("Specialized terms: {}", words.join(", "))))
+        Ok(Some(words.join(", ")))
     }
 }

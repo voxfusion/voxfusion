@@ -235,6 +235,8 @@ pub async fn transcribe_audio(
     params.set_suppress_nst(true);
     params.set_temperature(0.0);
     params.set_temperature_inc(0.0);
+    params.set_translate(false);
+    params.set_language(None);
 
     if let Some(ref p) = prompt {
         params.set_initial_prompt(p);
