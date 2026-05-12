@@ -1,5 +1,6 @@
 mod handlers;
 mod listeners;
+mod menu;
 mod tray;
 mod window;
 
@@ -60,6 +61,9 @@ pub fn run() {
                 .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
                     window::show_or_create_main_window(app);
                 }));
+
+            #[cfg(desktop)]
+            menu::setup(app)?;
 
             #[cfg(desktop)]
             tray::setup(app)?;

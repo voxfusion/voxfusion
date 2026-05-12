@@ -1,0 +1,43 @@
+#[cfg(desktop)]
+use crate::window::show_or_create_main_window;
+
+#[cfg(desktop)]
+use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
+#[cfg(desktop)]
+use tauri::{Emitter, Manager};
+
+#[cfg(desktop)]
+const CHECK_FOR_UPDATES_ID: &str = "check_for_updates";
+
+#[cfg(desktop)]
+pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let menu = Menu::default(app.handle())?;
+
+    if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        app_menu.insert_items(
+            &[
+                &MenuItem::with_id(
+                    app,
+                    CHECK_FOR_UPDATES_ID,
+                    "Check for Updates",
+                    true,
+                    None::<&str>,
+                )?,
+                &PredefinedMenuItem::separator(app)?,
+            ],
+            2,
+        )?;
+    }
+
+    app.set_menu(menu)?;
+    app.on_menu_event(|app, event| {
+        if event.id().as_ref() == CHECK_FOR_UPDATES_ID {
+            show_or_create_main_window(app);
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.emit("check-for-updates", ());
+            }
+        }
+    });
+
+    Ok(())
+}
