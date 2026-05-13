@@ -5,27 +5,41 @@ import { Download } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 
+const UPDATE_CHECK_INTERVAL_MS = 10_000;
+
 export default function UpdateNotification() {
 	const [t] = useI18n();
 	const [update, setUpdate] = createSignal<Update | null>(null);
 	const [isVisible, setIsVisible] = createSignal(false);
 	const [isDownloading, setIsDownloading] = createSignal(false);
 	const [downloadProgress, setDownloadProgress] = createSignal(0);
+	let isCheckingForUpdates = false;
 
 	const checkForUpdates = async () => {
+		if (isCheckingForUpdates || isDownloading()) return;
+
+		isCheckingForUpdates = true;
 		try {
 			const available = await check();
 			if (available) {
 				setUpdate(available);
 				setIsVisible(true);
+			} else {
+				setUpdate(null);
+				setIsVisible(false);
 			}
 		} catch {
 			// Update check failed
+		} finally {
+			isCheckingForUpdates = false;
 		}
 	};
 
 	onMount(() => {
 		void checkForUpdates();
+		const intervalId = window.setInterval(() => {
+			void checkForUpdates();
+		}, UPDATE_CHECK_INTERVAL_MS);
 
 		let cleanup: (() => void) | undefined;
 		let disposed = false;
@@ -41,6 +55,7 @@ export default function UpdateNotification() {
 
 		onCleanup(() => {
 			disposed = true;
+			window.clearInterval(intervalId);
 			cleanup?.();
 		});
 	});
