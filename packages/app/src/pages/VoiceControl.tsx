@@ -6,8 +6,8 @@ import {
 	monitorFromPoint,
 } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
-import { Loader } from "lucide-solid";
-import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import DotMatrixSpinner from "../components/DotMatrixSpinner";
 import {
 	isValidHotkey,
 	registerDictationHotkeys,
@@ -26,10 +26,20 @@ import { loadSettings, updateHoldToSpeakHotkey, updateHotkey } from "../lib/sett
 const DEFAULT_HOTKEY = "LeftControl+LeftOption";
 const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
 
-const BAR_MULTIPLIERS = [0.5, 0.8, 0.4, 0.9, 0.6, 1.0, 0.7, 0.95, 0.5, 0.85, 0.6, 0.45];
+const NUM_BARS = 10;
+const BAR_INDICES = Array.from({ length: NUM_BARS }, (_, i) => i);
+const BAR_BASE_HEIGHT = 4;
+const BAR_MAX_HEIGHT = 18;
+const BAR_IDLE_AMPLITUDE = 2;
+const BAR_VOICE_SCALE = 2.5;
+const WAVE_STEP_MS = 110;
+const WAVE_PATTERN = [
+	0.25, 0.45, 0.7, 0.9, 1.0, 0.95, 0.75, 0.5,
+	0.3, 0.4, 0.65, 0.85, 1.0, 0.9, 0.65, 0.35,
+];
 
 const WINDOW_WIDTH = 100;
-const WINDOW_HEIGHT = 20;
+const WINDOW_HEIGHT = 28;
 const BOTTOM_PADDING = 20;
 const ESCAPE_KEY_CODE = 53;
 
@@ -74,8 +84,24 @@ export default function VoiceControl() {
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
 	const [muteMediaWhileRecording, setMuteMediaWhileRecording] = createSignal(false);
 	const [audioLevel, setAudioLevel] = createSignal(0);
+	const [waveOffset, setWaveOffset] = createSignal(0);
 	const [isOnboardingComplete, setIsOnboardingComplete] = createSignal(false);
 	const [isLearningActive, setIsLearningActive] = createSignal(false);
+
+	createEffect(() => {
+		if (!isRecording()) return;
+		const intervalId = setInterval(() => {
+			setWaveOffset((o) => (o + 1) % WAVE_PATTERN.length);
+		}, WAVE_STEP_MS);
+		onCleanup(() => clearInterval(intervalId));
+	});
+
+	const barHeight = (index: number) => {
+		if (loading()) return BAR_BASE_HEIGHT;
+		const factor = WAVE_PATTERN[(waveOffset() + index) % WAVE_PATTERN.length]!;
+		const amplitude = BAR_IDLE_AMPLITUDE + audioLevel() * BAR_VOICE_SCALE;
+		return Math.min(BAR_MAX_HEIGHT, BAR_BASE_HEIGHT + factor * amplitude);
+	};
 	let isStopping = false;
 	let isStarting = false;
 	let activeRecordingMode: "toggle" | "hold" | null = null;
@@ -303,23 +329,26 @@ export default function VoiceControl() {
 
 	return (
 		<div
-			class={`min-h-2 mx-auto bg-th-base h-full rounded-xl flex align-center justify-center ${!isRecording() && !loading() ? "opacity-0" : ""}`}
+			class={`min-h-2 mx-auto w-fit bg-th-base h-full rounded-2xl border border-border-strong flex align-center justify-center px-4 py-1 ${!isRecording() && !loading() ? "opacity-0" : ""}`}
 		>
-			<Show when={loading()}>
-				<Loader class="w-4 h-4 animate-spin text-ac m-auto" />
-			</Show>
-			<Show when={isRecording() && !loading()}>
-				<div class="flex items-center justify-center gap-[3px]">
-					<For each={BAR_MULTIPLIERS}>
-						{(multiplier) => (
+			<Show when={isRecording() || loading()}>
+				<div class="flex items-center justify-center gap-[2px]">
+					<For each={BAR_INDICES}>
+						{(index) => (
 							<div
-								class="w-[2px] rounded bg-ac transition-all duration-75"
-								style={{ height: `${Math.max(4, audioLevel() * multiplier * 3)}px` }}
+								class="w-[2px] rounded-full bg-ac transition-[height] duration-200 ease-out"
+								style={{ height: `${barHeight(index)}px` }}
 							/>
 						)}
 					</For>
 				</div>
 			</Show>
+			<div
+				class="overflow-hidden transition-[max-width] duration-300 ease-out flex items-center"
+				style={{ "max-width": loading() ? "26px" : "0px" }}
+			>
+				<DotMatrixSpinner class="text-ac ml-2" size={18} dotSize={3} />
+			</div>
 		</div>
 	);
 }
