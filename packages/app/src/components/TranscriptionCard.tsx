@@ -50,7 +50,7 @@ export default function TranscriptionCard(props: Props) {
 
 	return (
 		<div
-			class="group relative p-3 hover:bg-th-hover transition-colors"
+			class="group relative p-3 hover:bg-th-hover"
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
 		>
