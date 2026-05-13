@@ -111,6 +111,13 @@ export default function MicrophoneStep() {
 		];
 	};
 
+	const selectedMicrophoneValue = () => {
+		const selectedMicrophoneId = settings().selectedMicrophoneId ?? "default";
+		return microphoneOptions().some((option) => option.value === selectedMicrophoneId)
+			? selectedMicrophoneId
+			: "default";
+	};
+
 	return (
 		<div class="text-center max-w-md mx-auto">
 			{/* Terminal-style header */}
@@ -136,7 +143,7 @@ export default function MicrophoneStep() {
 					<div class="flex items-center justify-end">
 						<button
 							type="button"
-							onClick={fetchDevices}
+							onClick={() => fetchDevices()}
 							disabled={isLoading()}
 							class="flex items-center gap-2 px-3 py-1.5 font-mono text-xs text-txt-muted hover:text-ac border border-transparent hover:border-border-strong transition-colors disabled:opacity-50 uppercase tracking-wider"
 						>
@@ -146,7 +153,7 @@ export default function MicrophoneStep() {
 					</div>
 
 					<Select
-						value={settings().selectedMicrophoneId ?? "default"}
+						value={selectedMicrophoneValue()}
 						options={microphoneOptions()}
 						onChange={(value) => {
 							updateMicrophone(value === "default" ? null : value);
