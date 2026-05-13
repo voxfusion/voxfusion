@@ -1,4 +1,3 @@
-import { Loader } from "lucide-solid";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import {
@@ -13,20 +12,14 @@ import { capture } from "../lib/posthog";
 export default function Dictionary() {
 	const [t] = useI18n();
 	const [words, setWords] = createSignal<DictionaryWord[]>([]);
-	const [loading, setLoading] = createSignal(true);
 	const [newWord, setNewWord] = createSignal("");
 	const [adding, setAdding] = createSignal(false);
 	const [editingId, setEditingId] = createSignal<string | null>(null);
 	const [editingWord, setEditingWord] = createSignal("");
 
 	const fetchWords = async () => {
-		setLoading(true);
-		try {
-			const result = await listDictionaryWords();
-			setWords(result);
-		} finally {
-			setLoading(false);
-		}
+		const result = await listDictionaryWords();
+		setWords(result);
 	};
 
 	onMount(() => {
@@ -128,21 +121,13 @@ export default function Dictionary() {
 							disabled={!newWord().trim() || adding()}
 							class="flex items-center gap-2 px-4 py-2 bg-ac text-ac-on font-mono uppercase tracking-wider text-sm hover:bg-ac-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 						>
-							<Show when={adding()} fallback={<span>+</span>}>
-								<Loader class="w-4 h-4 animate-spin" />
-							</Show>
+							<span>+</span>
 							{t("dictionary.addWord")}
 						</button>
 					</div>
 				</div>
 
-				<Show when={loading()}>
-					<div class="bg-th-surface border border-border p-12 flex justify-center">
-						<Loader class="w-6 h-6 animate-spin text-ac" />
-					</div>
-				</Show>
-
-				<Show when={!loading() && words().length === 0}>
+				<Show when={words().length === 0}>
 					<div class="bg-th-surface border border-border p-12 flex flex-col items-center justify-center text-center">
 						<div class="font-mono text-txt-muted text-sm mb-4">
 							<span class="text-ac">[INFO]</span> NO_TERMS_FOUND
@@ -156,7 +141,7 @@ export default function Dictionary() {
 					</div>
 				</Show>
 
-				<Show when={!loading() && words().length > 0}>
+				<Show when={words().length > 0}>
 					<div class="space-y-1">
 						<For each={words()}>
 							{(word) => (
