@@ -35,7 +35,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 	const settings = useSettings();
 	const [activeSection, setActiveSection] = createSignal<SettingsSection>("audio");
 	const [audioDevices, setAudioDevices] = createSignal<AudioDevice[]>([]);
-	const [isLoadingDevices, setIsLoadingDevices] = createSignal(false);
 	const [appVersion, setAppVersion] = createSignal("");
 	const [versionCopied, setVersionCopied] = createSignal(false);
 
@@ -66,19 +65,10 @@ export default function SettingsModal(props: SettingsModalProps) {
 		setTimeout(() => setVersionCopied(false), 1500);
 	};
 
-	const fetchAudioDevices = async (showLoading = true) => {
-		if (showLoading) {
-			setIsLoadingDevices(true);
-		}
-		try {
-			const devices = await getAudioInputDevices();
-			setAudioDevices(devices);
-			await normalizeSelectedMicrophone(devices);
-		} finally {
-			if (showLoading) {
-				setIsLoadingDevices(false);
-			}
-		}
+	const fetchAudioDevices = async () => {
+		const devices = await getAudioInputDevices();
+		setAudioDevices(devices);
+		await normalizeSelectedMicrophone(devices);
 	};
 
 	createEffect(() => {
@@ -92,10 +82,10 @@ export default function SettingsModal(props: SettingsModalProps) {
 		if (!props.isOpen) return;
 
 		let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
-		const refreshInterval = setInterval(() => fetchAudioDevices(false), 1000);
+		const refreshInterval = setInterval(fetchAudioDevices, 1000);
 		const handleDeviceChange = () => {
 			clearTimeout(refreshTimeout);
-			refreshTimeout = setTimeout(() => fetchAudioDevices(false), 250);
+			refreshTimeout = setTimeout(fetchAudioDevices, 250);
 		};
 
 		navigator.mediaDevices?.addEventListener("devicechange", handleDeviceChange);
@@ -161,7 +151,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 									t={t}
 									settings={settings}
 									audioDevices={audioDevices()}
-									isLoadingDevices={isLoadingDevices()}
 									onRefreshDevices={fetchAudioDevices}
 								/>
 							</Show>
