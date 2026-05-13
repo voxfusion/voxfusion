@@ -7,6 +7,7 @@ import { validateHandsFreeHotkey, validateHoldToSpeakHotkey } from "../lib/hotke
 import {
 	type AudioDevice,
 	getAudioInputDevices,
+	normalizeSelectedMicrophone,
 	updateHoldToSpeakHotkey,
 	useSettings,
 } from "../lib/settingsStore";
@@ -65,12 +66,18 @@ export default function SettingsModal(props: SettingsModalProps) {
 		setTimeout(() => setVersionCopied(false), 1500);
 	};
 
-	const fetchAudioDevices = async () => {
-		setIsLoadingDevices(true);
+	const fetchAudioDevices = async (showLoading = true) => {
+		if (showLoading) {
+			setIsLoadingDevices(true);
+		}
 		try {
-			setAudioDevices(await getAudioInputDevices());
+			const devices = await getAudioInputDevices();
+			setAudioDevices(devices);
+			await normalizeSelectedMicrophone(devices);
 		} finally {
-			setIsLoadingDevices(false);
+			if (showLoading) {
+				setIsLoadingDevices(false);
+			}
 		}
 	};
 
@@ -79,6 +86,24 @@ export default function SettingsModal(props: SettingsModalProps) {
 			fetchAudioDevices();
 			getVersion().then(setAppVersion);
 		}
+	});
+
+	createEffect(() => {
+		if (!props.isOpen) return;
+
+		let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+		const refreshInterval = setInterval(() => fetchAudioDevices(false), 1000);
+		const handleDeviceChange = () => {
+			clearTimeout(refreshTimeout);
+			refreshTimeout = setTimeout(() => fetchAudioDevices(false), 250);
+		};
+
+		navigator.mediaDevices?.addEventListener("devicechange", handleDeviceChange);
+		return () => {
+			clearTimeout(refreshTimeout);
+			clearInterval(refreshInterval);
+			navigator.mediaDevices?.removeEventListener("devicechange", handleDeviceChange);
+		};
 	});
 
 	createEffect(() => {
