@@ -116,3 +116,16 @@ body {
 .animate-slide {
 	animation: slide 1.5s ease-in-out infinite;
 }
+
+@keyframes refresh-devices-once {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.animate-refresh-devices-once {
+	animation: refresh-devices-once 600ms ease-in-out 1;
+}
