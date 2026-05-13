@@ -7,7 +7,6 @@ import { validateHandsFreeHotkey, validateHoldToSpeakHotkey } from "../lib/hotke
 import {
 	type AudioDevice,
 	getAudioInputDevices,
-	normalizeSelectedMicrophone,
 	updateHoldToSpeakHotkey,
 	useSettings,
 } from "../lib/settingsStore";
@@ -68,7 +67,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 	const fetchAudioDevices = async () => {
 		const devices = await getAudioInputDevices();
 		setAudioDevices(devices);
-		await normalizeSelectedMicrophone(devices);
 	};
 
 	createEffect(() => {
@@ -76,24 +74,6 @@ export default function SettingsModal(props: SettingsModalProps) {
 			fetchAudioDevices();
 			getVersion().then(setAppVersion);
 		}
-	});
-
-	createEffect(() => {
-		if (!props.isOpen) return;
-
-		let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
-		const refreshInterval = setInterval(fetchAudioDevices, 1000);
-		const handleDeviceChange = () => {
-			clearTimeout(refreshTimeout);
-			refreshTimeout = setTimeout(fetchAudioDevices, 250);
-		};
-
-		navigator.mediaDevices?.addEventListener("devicechange", handleDeviceChange);
-		return () => {
-			clearTimeout(refreshTimeout);
-			clearInterval(refreshInterval);
-			navigator.mediaDevices?.removeEventListener("devicechange", handleDeviceChange);
-		};
 	});
 
 	createEffect(() => {

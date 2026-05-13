@@ -75,37 +75,6 @@ pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
     Ok(devices)
 }
 
-fn default_input_device(host: &cpal::Host) -> Result<cpal::Device, String> {
-    host.default_input_device()
-        .ok_or("No default input device available".to_string())
-}
-
-fn input_device_by_name(host: &cpal::Host, name: &str) -> Result<Option<cpal::Device>, String> {
-    let device = host
-        .input_devices()
-        .map_err(|err| err.to_string())?
-        .find(|device| {
-            device
-                .name()
-                .map(|device_name| device_name == name)
-                .unwrap_or(false)
-        });
-
-    Ok(device)
-}
-
-fn input_device_or_default(
-    host: &cpal::Host,
-    device_name: Option<&str>,
-) -> Result<cpal::Device, String> {
-    match device_name {
-        Some(name) if !name.is_empty() && name != "default" => {
-            input_device_by_name(host, name)?.map_or_else(|| default_input_device(host), Ok)
-        }
-        _ => default_input_device(host),
-    }
-}
-
 #[tauri::command]
 pub async fn start_recording_with_device(
     app_handle: tauri::AppHandle,
@@ -121,7 +90,21 @@ pub async fn start_recording_with_device(
     *state.app_handle.lock().map_err(|err| err.to_string())? = Some(app_handle.clone());
 
     let host = cpal::default_host();
-    let device = input_device_or_default(&host, device_name.as_deref())?;
+
+    let device = if let Some(ref name) = device_name {
+        if name == "default" || name.is_empty() {
+            host.default_input_device()
+                .ok_or("No default input device available")?
+        } else {
+            host.input_devices()
+                .map_err(|err| err.to_string())?
+                .find(|x| x.name().map(|y| y == *name).unwrap_or(false))
+                .ok_or(format!("No input device found with name: {}", name))?
+        }
+    } else {
+        host.default_input_device()
+            .ok_or("No default input device available")?
+    };
 
     let config = device
         .default_input_config()

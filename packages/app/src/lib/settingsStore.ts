@@ -143,16 +143,6 @@ export async function getAudioInputDevices(): Promise<AudioDevice[]> {
 	}
 }
 
-export async function normalizeSelectedMicrophone(devices: AudioDevice[]): Promise<void> {
-	const selectedMicrophoneId = settings().selectedMicrophoneId;
-	if (!selectedMicrophoneId) return;
-
-	const selectedDevice = devices.find((device) => device.name === selectedMicrophoneId);
-	if (!selectedDevice || selectedDevice.isDefault) {
-		await updateMicrophone(null);
-	}
-}
-
 const [settings, setSettingsInternal] = createSignal<Settings>(DEFAULT_SETTINGS);
 
 export function useSettings() {

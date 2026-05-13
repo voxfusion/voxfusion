@@ -39,13 +39,6 @@ export default function AudioSettings(props: AudioSettingsProps) {
 		];
 	};
 
-	const selectedMicrophoneValue = () => {
-		const selectedMicrophoneId = props.settings().selectedMicrophoneId ?? "default";
-		return microphoneOptions().some((option) => option.value === selectedMicrophoneId)
-			? selectedMicrophoneId
-			: "default";
-	};
-
 	const handleRefreshDevices = () => {
 		if (isRefreshAnimating()) return;
 
@@ -79,7 +72,7 @@ export default function AudioSettings(props: AudioSettingsProps) {
 					</button>
 				</div>
 				<Select
-					value={selectedMicrophoneValue()}
+					value={props.settings().selectedMicrophoneId ?? "default"}
 					options={microphoneOptions()}
 					onChange={(value) => {
 						capture("settings_microphone_changed");
