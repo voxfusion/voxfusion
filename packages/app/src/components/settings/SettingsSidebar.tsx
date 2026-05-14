@@ -65,7 +65,7 @@ export default function SettingsSidebar(props: SettingsSidebarProps) {
 					<button
 						type="button"
 						onClick={props.onCopyVersion}
-						class="group flex items-center gap-1.5 font-mono text-[10px] text-txt-faint hover:text-txt-muted transition-all active:scale-95 cursor-pointer"
+						class="group flex items-center gap-1.5 font-mono text-[10px] text-txt-faint hover:text-txt-muted transition-all active:scale-95"
 					>
 						<span>v{props.appVersion}</span>
 						<Show

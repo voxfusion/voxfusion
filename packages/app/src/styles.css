@@ -80,6 +80,20 @@ body {
 	font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+button,
+a,
+input,
+select,
+textarea,
+summary,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+label {
+	cursor: default !important;
+}
+
 ::-webkit-scrollbar {
 	display: none;
 }

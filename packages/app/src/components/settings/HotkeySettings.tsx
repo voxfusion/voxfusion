@@ -42,7 +42,7 @@ export default function HotkeySettings(props: HotkeySettingsProps) {
 							props.holdToSpeakHotkeyError !== null ||
 							(props.isRecordingHoldToSpeakHotkey && !props.isRecordingHotkey)
 						}
-						class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+						class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 ${
 							props.isRecordingHotkey
 								? "bg-border text-txt-secondary hover:bg-border-strong"
 								: "bg-ac text-ac-on hover:bg-ac-hover"
@@ -79,7 +79,7 @@ export default function HotkeySettings(props: HotkeySettingsProps) {
 							props.hotkeyError !== null ||
 							(props.isRecordingHotkey && !props.isRecordingHoldToSpeakHotkey)
 						}
-						class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+						class={`px-4 py-3 font-mono text-xs uppercase tracking-wider transition-colors disabled:opacity-50 ${
 							props.isRecordingHoldToSpeakHotkey
 								? "bg-border text-txt-secondary hover:bg-border-strong"
 								: "bg-ac text-ac-on hover:bg-ac-hover"

@@ -90,7 +90,7 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 						type="button"
 						onClick={handleRequest}
 						disabled={isRequesting() || isGranted() === null}
-						class="px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+						class="px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30"
 					>
 						{isRequesting()
 							? t("onboarding.checkingPermission")

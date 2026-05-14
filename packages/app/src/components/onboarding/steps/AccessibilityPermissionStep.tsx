@@ -157,7 +157,7 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 						type="button"
 						onClick={handleOpenSettings}
 						disabled={isRequesting() || isGranted() === null}
-						class="inline-flex items-center gap-2 px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+						class="inline-flex items-center gap-2 px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30"
 					>
 						<span>{t("onboarding.openSystemPreferences")}</span>
 						<ExternalLink class="w-4 h-4" />

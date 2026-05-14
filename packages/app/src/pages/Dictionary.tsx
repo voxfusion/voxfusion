@@ -119,7 +119,7 @@ export default function Dictionary() {
 							type="button"
 							onClick={handleAdd}
 							disabled={!newWord().trim() || adding()}
-							class="flex items-center gap-2 px-4 py-2 bg-ac text-ac-on font-mono uppercase tracking-wider text-sm hover:bg-ac-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+							class="flex items-center gap-2 px-4 py-2 bg-ac text-ac-on font-mono uppercase tracking-wider text-sm hover:bg-ac-hover disabled:opacity-50 transition-colors"
 						>
 							<span>+</span>
 							{t("dictionary.addWord")}

@@ -157,7 +157,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 						type="button"
 						onClick={goToNext}
 						disabled={!canProceed()}
-						class="px-8 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+						class="px-8 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30"
 					>
 						{t("onboarding.next")}
 					</button>

@@ -63,7 +63,7 @@ export default function HotkeyStep() {
 						type="button"
 						onClick={toggleRecording}
 						disabled={holdToSpeakError() !== null || (isRecordingHoldToSpeak() && !isRecording())}
-						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-50 ${
 							isRecording()
 								? "border border-border-strong text-txt-secondary hover:border-ac hover:text-txt-primary bg-transparent"
 								: "bg-ac text-ac-on hover:bg-ac-hover"
@@ -92,7 +92,7 @@ export default function HotkeyStep() {
 						type="button"
 						onClick={toggleHoldToSpeakRecording}
 						disabled={error() !== null || (isRecording() && !isRecordingHoldToSpeak())}
-						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+						class={`px-6 py-3 font-mono font-bold uppercase tracking-wider text-sm transition-colors disabled:opacity-50 ${
 							isRecordingHoldToSpeak()
 								? "border border-border-strong text-txt-secondary hover:border-ac hover:text-txt-primary bg-transparent"
 								: "bg-ac text-ac-on hover:bg-ac-hover"
