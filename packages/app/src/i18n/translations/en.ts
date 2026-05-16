@@ -111,6 +111,15 @@ export type Translations = {
 		emptyState: string;
 		emptyStateDescription: string;
 		wordCount: string;
+		defaultSectionTitle: string;
+		perAppTitle: string;
+		perAppDescription: string;
+		perAppEmptyState: string;
+		perAppEmptyStateDescription: string;
+		expand: string;
+		collapse: string;
+		tabDefault: string;
+		tabPerApp: string;
 	};
 	onboarding: {
 		step: string;
@@ -301,6 +310,17 @@ export const en: Translations = {
 		emptyStateDescription:
 			"Add words to improve transcription accuracy for specialized terms, names, or phrases you use often.",
 		wordCount: "{count} words",
+		defaultSectionTitle: "Default Dictionary",
+		perAppTitle: "Per-App Dictionary",
+		perAppDescription:
+			"When an app is focused, its words are used alongside the default dictionary above.",
+		perAppEmptyState: "No apps configured",
+		perAppEmptyStateDescription:
+			"Search above to add an app, then expand it to add custom words for that app.",
+		expand: "Expand",
+		collapse: "Collapse",
+		tabDefault: "Default",
+		tabPerApp: "Per-App",
 	},
 	onboarding: {
 		step: "Step",

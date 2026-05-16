@@ -35,6 +35,21 @@ pub struct AppInstruction {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppDictionaryWord {
+    pub id: String,
+    pub word: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppDictionary {
+    pub bundle_id: String,
+    pub app_name: String,
+    pub words: Vec<AppDictionaryWord>,
+}
+
 pub struct StyleDef {
     pub key: &'static str,
     pub prompts: &'static [(&'static str, &'static str)],
@@ -125,6 +140,22 @@ pub fn resolve_style_key(
 }
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
+    let has_app_name = conn
+        .prepare("PRAGMA table_info(app_dictionary_words)")
+        .and_then(|mut stmt| {
+            let cols: Vec<String> = stmt
+                .query_map([], |row| row.get::<_, String>(1))?
+                .filter_map(|r| r.ok())
+                .collect();
+            Ok(cols)
+        })
+        .map(|cols| cols.iter().any(|c| c == "app_name"))
+        .unwrap_or(true);
+    if !has_app_name {
+        conn.execute_batch("DROP TABLE IF EXISTS app_dictionary_words;")
+            .map_err(|e| format!("Failed to drop stale app_dictionary_words: {}", e))?;
+    }
+
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS app_instructions (
             id TEXT PRIMARY KEY,
@@ -134,10 +165,41 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_app_instructions_bundle_id ON app_instructions(bundle_id);",
+        CREATE INDEX IF NOT EXISTS idx_app_instructions_bundle_id ON app_instructions(bundle_id);
+        CREATE TABLE IF NOT EXISTS app_dictionary_words (
+            id TEXT PRIMARY KEY,
+            bundle_id TEXT NOT NULL,
+            app_name TEXT NOT NULL,
+            word TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_app_dictionary_words_bundle_id ON app_dictionary_words(bundle_id);",
     )
-    .map_err(|e| format!("Failed to create app_instructions table: {}", e))?;
+    .map_err(|e| format!("Failed to create app tables: {}", e))?;
     Ok(())
+}
+
+pub fn fetch_app_dictionary_words(
+    conn: &rusqlite::Connection,
+    bundle_id: &str,
+) -> Option<String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT word FROM app_dictionary_words WHERE bundle_id = ?1 \
+             ORDER BY created_at DESC LIMIT 50",
+        )
+        .ok()?;
+    let words: Vec<String> = stmt
+        .query_map(params![bundle_id], |row| row.get::<_, String>(0))
+        .ok()?
+        .filter_map(|r| r.ok())
+        .collect();
+    if words.is_empty() {
+        None
+    } else {
+        Some(words.join(", "))
+    }
 }
 
 fn read_bundle_id(plist: &plist::Dictionary) -> Option<String> {
@@ -394,6 +456,146 @@ pub fn delete_app_instruction(state: tauri::State<'_, DbState>, id: String) -> R
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM app_instructions WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_app_dictionaries(
+    state: tauri::State<'_, DbState>,
+) -> Result<Vec<AppDictionary>, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, bundle_id, app_name, word, created_at, updated_at \
+             FROM app_dictionary_words \
+             ORDER BY app_name COLLATE NOCASE ASC, created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, String>(5)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    let mut grouped: Vec<AppDictionary> = Vec::new();
+    for (id, bundle_id, app_name, word, created_at, updated_at) in rows {
+        let entry = AppDictionaryWord {
+            id,
+            word,
+            created_at,
+            updated_at,
+        };
+        match grouped.iter_mut().find(|g| g.bundle_id == bundle_id) {
+            Some(group) => group.words.push(entry),
+            None => grouped.push(AppDictionary {
+                bundle_id,
+                app_name,
+                words: vec![entry],
+            }),
+        }
+    }
+    Ok(grouped)
+}
+
+#[tauri::command]
+pub fn add_app_dictionary_word(
+    state: tauri::State<'_, DbState>,
+    bundle_id: String,
+    app_name: String,
+    word: String,
+) -> Result<AppDictionaryWord, String> {
+    let bundle_id = bundle_id.trim().to_string();
+    let app_name = app_name.trim().to_string();
+    let word = word.trim();
+    if bundle_id.is_empty() || app_name.is_empty() {
+        return Err("bundle_id and app_name are required".to_string());
+    }
+    if word.is_empty() || word.len() > 100 {
+        return Err("Word must be between 1 and 100 characters".to_string());
+    }
+
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+
+    conn.execute(
+        "INSERT INTO app_dictionary_words (id, bundle_id, app_name, word, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, bundle_id, app_name, word, now, now],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(AppDictionaryWord {
+        id,
+        word: word.to_string(),
+        created_at: now.clone(),
+        updated_at: now,
+    })
+}
+
+#[tauri::command]
+pub fn update_app_dictionary_word(
+    state: tauri::State<'_, DbState>,
+    id: String,
+    word: String,
+) -> Result<AppDictionaryWord, String> {
+    let word = word.trim();
+    if word.is_empty() || word.len() > 100 {
+        return Err("Word must be between 1 and 100 characters".to_string());
+    }
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let now = Utc::now().to_rfc3339();
+    let rows_affected = conn
+        .execute(
+            "UPDATE app_dictionary_words SET word = ?1, updated_at = ?2 WHERE id = ?3",
+            params![word, now, id],
+        )
+        .map_err(|e| e.to_string())?;
+    if rows_affected == 0 {
+        return Err("Word not found".to_string());
+    }
+    Ok(AppDictionaryWord {
+        id,
+        word: word.to_string(),
+        created_at: String::new(),
+        updated_at: now,
+    })
+}
+
+#[tauri::command]
+pub fn delete_app_dictionary_word(
+    state: tauri::State<'_, DbState>,
+    id: String,
+) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM app_dictionary_words WHERE id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_app_dictionary(
+    state: tauri::State<'_, DbState>,
+    bundle_id: String,
+) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM app_dictionary_words WHERE bundle_id = ?1",
+        params![bundle_id],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 

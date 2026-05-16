@@ -124,6 +124,17 @@ export const ru: Translations = {
 		emptyStateDescription:
 			"Добавьте слова для улучшения точности транскрипции специальных терминов, имён или часто используемых фраз.",
 		wordCount: "{count} слов",
+		defaultSectionTitle: "Словарь по умолчанию",
+		perAppTitle: "Словарь для приложения",
+		perAppDescription:
+			"Когда приложение в фокусе, его слова используются вместе со словарём по умолчанию выше.",
+		perAppEmptyState: "Приложения не настроены",
+		perAppEmptyStateDescription:
+			"Найдите приложение выше, затем разверните его, чтобы добавить слова для этого приложения.",
+		expand: "Развернуть",
+		collapse: "Свернуть",
+		tabDefault: "По умолчанию",
+		tabPerApp: "По приложению",
 	},
 	onboarding: {
 		step: "Шаг",
