@@ -7,6 +7,7 @@ import { initPostHog } from "./lib/posthog";
 import About from "./pages/About";
 import Dictionary from "./pages/Dictionary";
 import Home from "./pages/Home";
+import Style from "./pages/Style";
 
 initPostHog();
 
@@ -26,6 +27,7 @@ render(
 				<Route path="/" component={Home} />
 				<Route path="/about" component={About} />
 				<Route path="/dictionary" component={Dictionary} />
+				<Route path="/style" component={Style} />
 			</Router>
 		</I18nCtx.Provider>
 	),

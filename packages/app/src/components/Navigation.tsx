@@ -1,5 +1,5 @@
 import { A, useLocation } from "@solidjs/router";
-import { BookOpen, Home, Settings } from "lucide-solid";
+import { BookOpen, Home, Settings, Wand2 } from "lucide-solid";
 import { useI18n } from "../i18n";
 import UpdateNotification from "./UpdateNotification";
 
@@ -37,6 +37,17 @@ export default function Sidebar(props: SidebarProps) {
 				>
 					<BookOpen class="w-4 h-4" />
 					<span>02 {t("sidebar.dictionary")}</span>
+				</A>
+				<A
+					href="/style"
+					class={`flex items-center gap-3 px-3 py-2 font-mono uppercase tracking-wider text-xs transition-colors ${
+						isActive("/style")
+							? "text-ac border-l-2 border-ac bg-th-surface"
+							: "text-txt-secondary hover:text-txt-primary hover:bg-th-surface border-l-2 border-transparent"
+					}`}
+				>
+					<Wand2 class="w-4 h-4" />
+					<span>03 {t("sidebar.style")}</span>
 				</A>
 			</nav>
 

@@ -67,9 +67,37 @@ export type Translations = {
 	sidebar: {
 		home: string;
 		dictionary: string;
+		style: string;
 		account: string;
 		settings: string;
 		privacy: string;
+	};
+	style: {
+		defaultStyleTitle: string;
+		defaultStyleDescription: string;
+		perAppTitle: string;
+		descriptions: {
+			professional: string;
+			casual: string;
+			agents: string;
+			default: string;
+		};
+	};
+	appInstructions: {
+		description: string;
+		searchPlaceholder: string;
+		appCount: string;
+		emptyState: string;
+		emptyStateDescription: string;
+		delete: string;
+		noAppsDetected: string;
+		noMatches: string;
+		styles: {
+			professional: string;
+			casual: string;
+			agents: string;
+			default: string;
+		};
 	};
 	dictionary: {
 		title: string;
@@ -222,9 +250,43 @@ export const en: Translations = {
 	sidebar: {
 		home: "Home",
 		dictionary: "Dictionary",
+		style: "Style",
 		account: "Account",
 		settings: "Settings",
 		privacy: "Privacy",
+	},
+	style: {
+		defaultStyleTitle: "Default Style",
+		defaultStyleDescription:
+			"Used for any app that isn't listed below. Switch between tabs to see what each style does.",
+		perAppTitle: "Per-App Override",
+		descriptions: {
+			professional:
+				"Formal business communication. Complete sentences, precise grammar and punctuation, no slang or contractions. Best for email, documents, reports, and formal messaging.",
+			casual:
+				"Conversational tone with contractions and everyday vocabulary. Sparse punctuation, lowercase throughout. Best for chat apps, personal notes, and quick messages.",
+			agents:
+				"Technical instructions for coding agents. Imperative voice, software engineering vocabulary, file paths and identifiers preserved. Best for prompting Claude Code, Cursor, and similar tools.",
+			default:
+				"Clean dictation with standard sentence structure, accurate punctuation, and proper capitalization. No specific tone applied — a neutral baseline.",
+		},
+	},
+	appInstructions: {
+		description: "Apps listed here override the default style above.",
+		searchPlaceholder: "Search installed applications...",
+		appCount: "{count} apps",
+		emptyState: "No apps configured",
+		emptyStateDescription:
+			"Search above to add an app and choose a transcription style for it.",
+		delete: "Remove",
+		noAppsDetected: "No installed applications detected",
+		noMatches: "No matching applications",
+		styles: {
+			professional: "Professional",
+			casual: "Casual",
+			agents: "Agents",
+			default: "Default",
+		},
 	},
 	dictionary: {
 		title: "Dictionary",

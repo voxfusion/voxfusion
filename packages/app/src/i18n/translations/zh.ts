@@ -69,9 +69,37 @@ export const zh: Translations = {
 	sidebar: {
 		home: "首页",
 		dictionary: "词典",
+		style: "风格",
 		account: "账户",
 		settings: "设置",
 		privacy: "隐私",
+	},
+	style: {
+		defaultStyleTitle: "默认风格",
+		defaultStyleDescription: "用于下面未列出的所有应用。切换选项卡可查看每种风格。",
+		perAppTitle: "按应用设置",
+		descriptions: {
+			professional: "正式的商务交流。完整句子、精确的语法和标点符号，无俚语或缩写。",
+			casual: "口语化语气，含缩写和日常词汇。标点稀疏，全部小写。",
+			agents: "面向编码代理的技术指令。祈使语气，软件工程术语，保留文件路径和标识符。",
+			default: "清晰的口述，标准句式、准确的标点和大写。不应用特定语气——中性基线。",
+		},
+	},
+	appInstructions: {
+		description: "此处列出的应用将覆盖默认风格。",
+		searchPlaceholder: "搜索已安装的应用...",
+		appCount: "{count} 个应用",
+		emptyState: "尚未配置应用",
+		emptyStateDescription: "在上方搜索以添加应用并选择转录风格。",
+		delete: "移除",
+		noAppsDetected: "未检测到已安装的应用",
+		noMatches: "没有匹配项",
+		styles: {
+			professional: "专业",
+			casual: "随意",
+			agents: "代理",
+			default: "默认",
+		},
 	},
 	dictionary: {
 		title: "词典",

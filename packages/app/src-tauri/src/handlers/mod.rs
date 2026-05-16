@@ -1,3 +1,4 @@
+pub mod apps;
 pub mod audio;
 pub mod audio_processing;
 pub mod db;
@@ -5,6 +6,10 @@ pub mod media;
 pub mod text;
 pub mod whisper;
 
+pub use apps::{
+    delete_app_instruction, get_frontmost_app, list_app_instructions, list_installed_apps,
+    set_app_instruction,
+};
 pub use audio::{list_audio_devices, start_recording_with_device, stop_recording_with_device};
 pub use audio_processing::process_audio_file;
 pub use db::{
