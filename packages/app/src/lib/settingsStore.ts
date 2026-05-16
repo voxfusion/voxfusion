@@ -2,6 +2,7 @@ import { emit } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
 import { createSignal } from "solid-js";
 import type { Locale } from "../i18n";
+import { type AppStyle, STYLE_LIST } from "./commands/apps";
 import { listAudioDevices } from "./commands/audio";
 import {
 	CURRENT_ONBOARDING_VERSION,
@@ -18,6 +19,7 @@ export interface Settings {
 	selectedMicrophoneId: string | null;
 	language: Locale;
 	muteMediaWhileRecording: boolean;
+	defaultStyle: AppStyle;
 	onboardingComplete: boolean;
 	onboardingStep: number;
 }
@@ -29,6 +31,7 @@ const DEFAULT_SETTINGS: Settings = {
 	selectedMicrophoneId: null,
 	language: "en",
 	muteMediaWhileRecording: false,
+	defaultStyle: "default",
 	onboardingComplete: false,
 	onboardingStep: 1,
 };
@@ -47,6 +50,7 @@ async function getStore() {
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
 				muteMediaWhileRecording: DEFAULT_SETTINGS.muteMediaWhileRecording,
+				defaultStyle: DEFAULT_SETTINGS.defaultStyle,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
 				onboardingStep: DEFAULT_SETTINGS.onboardingStep,
 				onboardingVersion: CURRENT_ONBOARDING_VERSION,
@@ -65,6 +69,11 @@ export async function loadSettings(): Promise<Settings> {
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
 	const muteMediaWhileRecording = await store.get<boolean>("muteMediaWhileRecording");
+	const storedDefaultStyle = await store.get<AppStyle>("defaultStyle");
+	const defaultStyle =
+		storedDefaultStyle && STYLE_LIST.includes(storedDefaultStyle)
+			? storedDefaultStyle
+			: DEFAULT_SETTINGS.defaultStyle;
 	const onboardingComplete = await store.get<boolean>("onboardingComplete");
 	const onboardingStep = await store.get<number>("onboardingStep");
 	const onboardingVersion = await store.get<number>("onboardingVersion");
@@ -88,6 +97,7 @@ export async function loadSettings(): Promise<Settings> {
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
 		muteMediaWhileRecording: muteMediaWhileRecording ?? DEFAULT_SETTINGS.muteMediaWhileRecording,
+		defaultStyle,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
 		onboardingStep: normalizedOnboardingStep,
 	};
@@ -124,6 +134,11 @@ export async function saveLanguage(language: Locale): Promise<void> {
 export async function saveMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set("muteMediaWhileRecording", enabled);
+}
+
+export async function saveDefaultStyle(style: AppStyle): Promise<void> {
+	const store = await getStore();
+	await store.set("defaultStyle", style);
 }
 
 export interface AudioDevice {
@@ -195,6 +210,12 @@ export async function updateLanguage(
 export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	await saveMuteMediaWhileRecording(enabled);
 	setSettingsInternal((prev) => ({ ...prev, muteMediaWhileRecording: enabled }));
+	await emit("settings-changed");
+}
+
+export async function updateDefaultStyle(style: AppStyle): Promise<void> {
+	await saveDefaultStyle(style);
+	setSettingsInternal((prev) => ({ ...prev, defaultStyle: style }));
 	await emit("settings-changed");
 }
 

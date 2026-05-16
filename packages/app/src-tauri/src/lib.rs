@@ -7,11 +7,13 @@ mod window;
 use tauri::Manager;
 
 use handlers::{
-    add_dictionary_word, check_accessibility_probe, check_model_status, delete_dictionary_word,
-    download_whisper_model, get_dictionary_prompt, list_audio_devices, list_dictionary_words,
+    add_dictionary_word, check_accessibility_probe, check_model_status, delete_app_instruction,
+    delete_dictionary_word, download_whisper_model, get_dictionary_prompt, get_frontmost_app,
+    list_app_instructions, list_audio_devices, list_dictionary_words, list_installed_apps,
     list_transcriptions, mute_media_for_recording, process_audio_file, read_audio_file,
-    restore_media_after_recording, save_transcription, start_recording_with_device,
-    stop_recording_with_device, transcribe_audio, type_text, update_dictionary_word,
+    restore_media_after_recording, save_transcription, set_app_instruction,
+    start_recording_with_device, stop_recording_with_device, transcribe_audio, type_text,
+    update_dictionary_word,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -37,6 +39,11 @@ pub fn run() {
             check_model_status,
             download_whisper_model,
             transcribe_audio,
+            list_installed_apps,
+            get_frontmost_app,
+            list_app_instructions,
+            set_app_instruction,
+            delete_app_instruction,
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_macos_permissions::init())

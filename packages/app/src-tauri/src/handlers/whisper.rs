@@ -4,6 +4,13 @@ use std::path::PathBuf;
 use tauri::{Emitter, Manager};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
+fn cap_prompt_chars(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_string();
+    }
+    s.chars().take(max_chars).collect()
+}
+
 const MODEL_FILENAME: &str = "ggml-large-v3-turbo.bin";
 const MODEL_URL: &str =
     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin";
@@ -193,11 +200,29 @@ pub struct TranscriptionResult {
     pub audio_duration_ms: Option<i64>,
 }
 
+fn fetch_dictionary_words(conn: &rusqlite::Connection) -> Option<String> {
+    let mut stmt = conn
+        .prepare("SELECT word FROM dictionary_words ORDER BY created_at DESC LIMIT 50")
+        .ok()?;
+    let words: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .ok()?
+        .filter_map(|r| r.ok())
+        .collect();
+    if words.is_empty() {
+        None
+    } else {
+        Some(words.join(", "))
+    }
+}
+
 #[tauri::command]
 pub async fn transcribe_audio(
     app_handle: tauri::AppHandle,
+    db_state: tauri::State<'_, crate::handlers::db::DbState>,
     audio_path: String,
-    prompt: Option<String>,
+    bundle_id: Option<String>,
+    fallback_style: Option<String>,
 ) -> Result<TranscriptionResult, String> {
     let model_path = get_model_path(&app_handle)?;
 
@@ -218,13 +243,58 @@ pub async fn transcribe_audio(
     let ctx = WhisperContext::new_with_params(&model_path, ctx_params)
         .map_err(|e| format!("Failed to load model: {}", e))?;
 
+    let thread_count = std::thread::available_parallelism()
+        .map(|count| count.get().saturating_sub(1).max(1) as i32)
+        .unwrap_or(4);
+
+    let mut state = ctx
+        .create_state()
+        .map_err(|e| format!("Failed to create state: {}", e))?;
+
+    // Step 1: encode mel + detect language so we can pick a same-language prompt.
+    state
+        .pcm_to_mel(&audio_data, thread_count as usize)
+        .map_err(|e| format!("Failed to compute mel: {:?}", e))?;
+    let detected_lang = match state.lang_detect(0, thread_count as usize) {
+        Ok((lang_id, _probs)) => whisper_rs::get_lang_str(lang_id)
+            .unwrap_or(crate::handlers::apps::DEFAULT_LOCALE)
+            .to_string(),
+        Err(e) => {
+            eprintln!("[whisper] lang_detect failed: {:?}", e);
+            crate::handlers::apps::DEFAULT_LOCALE.to_string()
+        }
+    };
+
+    // Step 2: resolve the style key and compose the prompt in the detected language.
+    let composed_prompt = {
+        let conn = db_state.conn.lock().map_err(|e| e.to_string())?;
+        let style_key = crate::handlers::apps::resolve_style_key(
+            &conn,
+            bundle_id.as_deref(),
+            fallback_style.as_deref(),
+        );
+        let style_text =
+            crate::handlers::apps::style_prompt_text(&style_key, &detected_lang).to_string();
+        let dictionary = fetch_dictionary_words(&conn);
+        eprintln!(
+            "[style] bundle={:?} style={} lang={} style_chars={} dict_words={}",
+            bundle_id,
+            style_key,
+            detected_lang,
+            style_text.chars().count(),
+            dictionary
+                .as_ref()
+                .map(|d| d.split(',').count())
+                .unwrap_or(0)
+        );
+        compose_prompt(&style_text, dictionary.as_deref())
+    };
+
+    // Step 3: run full transcription with the resolved prompt.
     let mut params = FullParams::new(SamplingStrategy::BeamSearch {
         beam_size: WHISPER_BEAM_SIZE,
         patience: -1.0,
     });
-    let thread_count = std::thread::available_parallelism()
-        .map(|count| count.get().saturating_sub(1).max(1) as i32)
-        .unwrap_or(4);
     params.set_n_threads(thread_count);
     params.set_no_context(true);
     params.set_no_timestamps(true);
@@ -236,15 +306,22 @@ pub async fn transcribe_audio(
     params.set_temperature(0.0);
     params.set_temperature_inc(0.0);
     params.set_translate(false);
-    params.set_language(None);
+    params.set_language(Some(&detected_lang));
 
-    if let Some(ref p) = prompt {
+    let capped_prompt = composed_prompt.as_deref().map(|p| cap_prompt_chars(p, 700));
+    if let Some(ref p) = capped_prompt {
+        let preview: String = p.chars().take(80).collect();
+        eprintln!(
+            "[whisper] initial_prompt: {} chars lang={} (head: {:?})",
+            p.chars().count(),
+            detected_lang,
+            preview
+        );
         params.set_initial_prompt(p);
+    } else {
+        eprintln!("[whisper] no initial_prompt lang={}", detected_lang);
     }
 
-    let mut state = ctx
-        .create_state()
-        .map_err(|e| format!("Failed to create state: {}", e))?;
     state
         .full(params, &audio_data)
         .map_err(|e| format!("Transcription failed: {}", e))?;
@@ -271,4 +348,20 @@ pub async fn transcribe_audio(
         processing_time_ms,
         audio_duration_ms,
     })
+}
+
+fn compose_prompt(style_text: &str, dictionary: Option<&str>) -> Option<String> {
+    let mut parts: Vec<String> = Vec::new();
+    let style_trimmed = style_text.trim();
+    if !style_trimmed.is_empty() {
+        parts.push(style_trimmed.to_string());
+    }
+    if let Some(dict) = dictionary.map(|d| d.trim()).filter(|d| !d.is_empty()) {
+        parts.push(format!("{}", dict));
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("\n\n"))
+    }
 }

@@ -74,9 +74,43 @@ export const de: Translations = {
 	sidebar: {
 		home: "Startseite",
 		dictionary: "Wörterbuch",
+		style: "Stil",
 		account: "Konto",
 		settings: "Einstellungen",
 		privacy: "Datenschutz",
+	},
+	style: {
+		defaultStyleTitle: "Standardstil",
+		defaultStyleDescription:
+			"Wird für jede App verwendet, die unten nicht aufgeführt ist. Wechseln Sie zwischen den Tabs, um jeden Stil zu sehen.",
+		perAppTitle: "App-spezifischer Stil",
+		descriptions: {
+			professional:
+				"Formelle Geschäftskommunikation. Vollständige Sätze, präzise Grammatik und Zeichensetzung, keine Umgangssprache oder Kontraktionen.",
+			casual:
+				"Konversationston mit Kontraktionen und alltäglichem Vokabular. Sparsame Zeichensetzung, durchgehend Kleinschreibung.",
+			agents:
+				"Technische Anweisungen für Coding-Agenten. Imperativ, Software-Engineering-Vokabular, Dateipfade und Bezeichner werden beibehalten.",
+			default:
+				"Klare Diktate mit Standardsatzbau, korrekter Zeichensetzung und Großschreibung. Keine bestimmte Tonalität — neutrale Grundlinie.",
+		},
+	},
+	appInstructions: {
+		description: "Hier aufgeführte Apps überschreiben den Standardstil.",
+		searchPlaceholder: "Installierte Anwendungen suchen...",
+		appCount: "{count} Apps",
+		emptyState: "Keine Apps konfiguriert",
+		emptyStateDescription:
+			"Suchen Sie oben, um eine App hinzuzufügen und einen Transkriptionsstil zu wählen.",
+		delete: "Entfernen",
+		noAppsDetected: "Keine installierten Anwendungen erkannt",
+		noMatches: "Keine passenden Anwendungen",
+		styles: {
+			professional: "Professionell",
+			casual: "Locker",
+			agents: "Agenten",
+			default: "Standard",
+		},
 	},
 	dictionary: {
 		title: "Wörterbuch",

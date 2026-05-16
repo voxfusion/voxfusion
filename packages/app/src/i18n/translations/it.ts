@@ -74,9 +74,43 @@ export const it: Translations = {
 	sidebar: {
 		home: "Home",
 		dictionary: "Dizionario",
+		style: "Stile",
 		account: "Account",
 		settings: "Impostazioni",
 		privacy: "Privacy",
+	},
+	style: {
+		defaultStyleTitle: "Stile Predefinito",
+		defaultStyleDescription:
+			"Usato per qualsiasi app non elencata sotto. Passa tra i tab per vedere ogni stile.",
+		perAppTitle: "Stile per app",
+		descriptions: {
+			professional:
+				"Comunicazione professionale formale. Frasi complete, grammatica e punteggiatura precise, senza slang o contrazioni.",
+			casual:
+				"Tono colloquiale con contrazioni e vocabolario quotidiano. Punteggiatura minima, tutto in minuscolo.",
+			agents:
+				"Istruzioni tecniche per agenti di programmazione. Voce imperativa, vocabolario di ingegneria del software, percorsi e identificatori preservati.",
+			default:
+				"Dettatura chiara con struttura della frase standard, punteggiatura e maiuscole corrette. Nessun tono specifico applicato.",
+		},
+	},
+	appInstructions: {
+		description: "Le app qui elencate sovrascrivono lo stile predefinito.",
+		searchPlaceholder: "Cerca tra le app installate...",
+		appCount: "{count} app",
+		emptyState: "Nessuna app configurata",
+		emptyStateDescription:
+			"Cerca sopra per aggiungere un'app e scegliere uno stile di trascrizione.",
+		delete: "Rimuovi",
+		noAppsDetected: "Nessuna app installata rilevata",
+		noMatches: "Nessuna corrispondenza",
+		styles: {
+			professional: "Professionale",
+			casual: "Casual",
+			agents: "Agenti",
+			default: "Predefinito",
+		},
 	},
 	dictionary: {
 		title: "Dizionario",

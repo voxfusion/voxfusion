@@ -37,6 +37,9 @@ reqwest = { version = "0.12", features = ["stream"] }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
 futures-util = "0.3"
+plist = "1"
+base64 = "0.22"
+icns = "0.3"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
@@ -45,6 +48,9 @@ tauri-plugin-global-shortcut = "2"
 core-graphics = "0.24"
 core-foundation = "0.10"
 core-foundation-sys = "0.8"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSString"] }
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
 
 [profile.release]
 strip = true

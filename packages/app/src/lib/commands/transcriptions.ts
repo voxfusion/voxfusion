@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { AppStyle } from "./apps";
 
 export interface Transcription {
 	id: string;
@@ -30,9 +31,14 @@ export async function listTranscriptions(
 
 export async function transcribeAudio(
 	audioPath: string,
-	prompt: string | null
+	bundleId: string | null,
+	fallbackStyle: AppStyle
 ): Promise<TranscriptionResult> {
-	return invoke<TranscriptionResult>("transcribe_audio", { audioPath, prompt });
+	return invoke<TranscriptionResult>("transcribe_audio", {
+		audioPath,
+		bundleId,
+		fallbackStyle,
+	});
 }
 
 export async function saveTranscription(result: TranscriptionResult): Promise<Transcription> {

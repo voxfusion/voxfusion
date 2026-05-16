@@ -13,15 +13,20 @@ import {
 	registerDictationHotkeys,
 	unregisterDictationHotkey,
 } from "../lib/hotkeyUtils";
+import { getFrontmostApp } from "../lib/commands/apps";
 import { startRecordingWithDevice, stopRecordingWithDevice } from "../lib/commands/audio";
-import { getDictionaryPrompt } from "../lib/commands/dictionary";
 import {
 	muteMediaForRecording as muteMediaForRecordingCommand,
 	restoreMediaAfterRecording as restoreMediaAfterRecordingCommand,
 } from "../lib/commands/media";
 import { typeText } from "../lib/commands/text";
 import { saveTranscription, transcribeAudio } from "../lib/commands/transcriptions";
-import { loadSettings, updateHoldToSpeakHotkey, updateHotkey } from "../lib/settingsStore";
+import {
+	loadSettings,
+	updateHoldToSpeakHotkey,
+	updateHotkey,
+	useSettings,
+} from "../lib/settingsStore";
 
 const DEFAULT_HOTKEY = "LeftControl+LeftOption";
 const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
@@ -42,6 +47,7 @@ const WINDOW_WIDTH = 100;
 const WINDOW_HEIGHT = 28;
 const BOTTOM_PADDING = 20;
 const ESCAPE_KEY_CODE = 53;
+const VOXFUSION_BUNDLE_ID = "io.voxfusion.app";
 
 type KeyboardKeyPressedPayload = {
 	keyCode: number;
@@ -78,6 +84,7 @@ async function repositionToCurrentMonitor() {
 }
 
 export default function VoiceControl() {
+	const settings = useSettings();
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [loading, setLoading] = createSignal(false);
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
@@ -105,6 +112,7 @@ export default function VoiceControl() {
 	let isStopping = false;
 	let isStarting = false;
 	let activeRecordingMode: "toggle" | "hold" | null = null;
+	let activeAppBundleId: string | null = null;
 
 	const canUseShortcut = () => isOnboardingComplete() || isLearningActive();
 
@@ -240,9 +248,9 @@ export default function VoiceControl() {
 
 			setLoading(true);
 
-			const prompt = await getDictionaryPrompt();
-
-			const result = await transcribeAudio(filePath, prompt);
+			const bundleId = activeAppBundleId;
+			activeAppBundleId = null;
+			const result = await transcribeAudio(filePath, bundleId, settings().defaultStyle);
 			await saveTranscription(result);
 
 			await typeText(result.text ?? "");
@@ -281,6 +289,7 @@ export default function VoiceControl() {
 		isStopping = true;
 		setIsRecording(false);
 		activeRecordingMode = null;
+		activeAppBundleId = null;
 		await unregisterEscapeShortcut();
 
 		try {
@@ -311,6 +320,13 @@ export default function VoiceControl() {
 			if (isRecording()) return;
 			if (isStopping || isStarting) return;
 			isStarting = true;
+			activeAppBundleId = null;
+			try {
+				const frontmost = await getFrontmostApp();
+				if (frontmost?.bundle_id && frontmost.bundle_id !== VOXFUSION_BUNDLE_ID) {
+					activeAppBundleId = frontmost.bundle_id;
+				}
+			} catch {}
 			await showVoiceControlWindow();
 
 			const deviceName = selectedMicrophone();
