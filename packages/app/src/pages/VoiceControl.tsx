@@ -53,8 +53,7 @@ type KeyboardKeyPressedPayload = {
 	keyCode: number;
 };
 
-let lastMonitorX = 0;
-let lastMonitorY = 0;
+let lastMonitorKey: string | null = null;
 
 async function showVoiceControlWindow() {
 	await repositionToCurrentMonitor();
@@ -73,9 +72,9 @@ async function repositionToCurrentMonitor() {
 	const pos = monitor.position.toLogical(monitor.scaleFactor);
 	const size = monitor.size.toLogical(monitor.scaleFactor);
 
-	if (pos.x === lastMonitorX && pos.y === lastMonitorY) return;
-	lastMonitorX = pos.x;
-	lastMonitorY = pos.y;
+	const monitorKey = `${pos.x}:${pos.y}:${size.width}:${size.height}`;
+	if (monitorKey === lastMonitorKey) return;
+	lastMonitorKey = monitorKey;
 
 	const x = pos.x + (size.width - WINDOW_WIDTH) / 2;
 	const y = pos.y + size.height - WINDOW_HEIGHT - BOTTOM_PADDING;
