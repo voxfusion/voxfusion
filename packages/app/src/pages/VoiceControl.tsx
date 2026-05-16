@@ -53,8 +53,8 @@ type KeyboardKeyPressedPayload = {
 	keyCode: number;
 };
 
-let lastMonitorX = 0;
-let lastMonitorY = 0;
+let lastMonitorX: number | null = null;
+let lastMonitorY: number | null = null;
 
 async function showVoiceControlWindow() {
 	await repositionToCurrentMonitor();
