@@ -125,6 +125,17 @@ export const fr: Translations = {
 		emptyStateDescription:
 			"Ajoutez des mots pour améliorer la précision de transcription des termes spécialisés, noms ou expressions que vous utilisez souvent.",
 		wordCount: "{count} mots",
+		defaultSectionTitle: "Dictionnaire par défaut",
+		perAppTitle: "Dictionnaire par application",
+		perAppDescription:
+			"Lorsqu'une application est au premier plan, ses mots s'ajoutent au dictionnaire par défaut ci-dessus.",
+		perAppEmptyState: "Aucune application configurée",
+		perAppEmptyStateDescription:
+			"Recherchez ci-dessus pour ajouter une application, puis développez-la pour ajouter ses mots personnalisés.",
+		expand: "Développer",
+		collapse: "Réduire",
+		tabDefault: "Par défaut",
+		tabPerApp: "Par application",
 	},
 	onboarding: {
 		step: "Étape",

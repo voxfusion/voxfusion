@@ -275,14 +275,23 @@ pub async fn transcribe_audio(
         );
         let style_text =
             crate::handlers::apps::style_prompt_text(&style_key, &detected_lang).to_string();
-        let dictionary = fetch_dictionary_words(&conn);
+        let default_dict = fetch_dictionary_words(&conn);
+        let app_dict = bundle_id
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .and_then(|bid| crate::handlers::apps::fetch_app_dictionary_words(&conn, bid));
+        let dictionary = merge_dictionaries(default_dict.as_deref(), app_dict.as_deref());
         eprintln!(
-            "[style] bundle={:?} style={} lang={} style_chars={} dict_words={}",
+            "[style] bundle={:?} style={} lang={} style_chars={} dict_words={} app_dict_words={}",
             bundle_id,
             style_key,
             detected_lang,
             style_text.chars().count(),
-            dictionary
+            default_dict
+                .as_ref()
+                .map(|d| d.split(',').count())
+                .unwrap_or(0),
+            app_dict
                 .as_ref()
                 .map(|d| d.split(',').count())
                 .unwrap_or(0)
@@ -348,6 +357,18 @@ pub async fn transcribe_audio(
         processing_time_ms,
         audio_duration_ms,
     })
+}
+
+fn merge_dictionaries(default_dict: Option<&str>, app_dict: Option<&str>) -> Option<String> {
+    match (
+        default_dict.map(|s| s.trim()).filter(|s| !s.is_empty()),
+        app_dict.map(|s| s.trim()).filter(|s| !s.is_empty()),
+    ) {
+        (Some(d), Some(a)) => Some(format!("{}, {}", d, a)),
+        (Some(d), None) => Some(d.to_string()),
+        (None, Some(a)) => Some(a.to_string()),
+        (None, None) => None,
+    }
 }
 
 fn compose_prompt(style_text: &str, dictionary: Option<&str>) -> Option<String> {

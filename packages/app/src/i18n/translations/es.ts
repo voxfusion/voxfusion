@@ -124,6 +124,17 @@ export const es: Translations = {
 		emptyStateDescription:
 			"Agrega palabras para mejorar la precisión de transcripción de términos especializados, nombres o frases que uses con frecuencia.",
 		wordCount: "{count} palabras",
+		defaultSectionTitle: "Diccionario por defecto",
+		perAppTitle: "Diccionario por aplicación",
+		perAppDescription:
+			"Cuando una app está en foco, sus palabras se usan junto con el diccionario por defecto.",
+		perAppEmptyState: "Sin aplicaciones configuradas",
+		perAppEmptyStateDescription:
+			"Busca arriba para añadir una app y luego despliégala para agregar sus palabras personalizadas.",
+		expand: "Expandir",
+		collapse: "Contraer",
+		tabDefault: "Predeterminado",
+		tabPerApp: "Por aplicación",
 	},
 	onboarding: {
 		step: "Paso",

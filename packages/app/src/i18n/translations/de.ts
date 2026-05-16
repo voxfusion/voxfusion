@@ -126,6 +126,17 @@ export const de: Translations = {
 		emptyStateDescription:
 			"Fügen Sie Wörter hinzu, um die Transkriptionsgenauigkeit für Fachbegriffe, Namen oder häufig verwendete Phrasen zu verbessern.",
 		wordCount: "{count} Wörter",
+		defaultSectionTitle: "Standardwörterbuch",
+		perAppTitle: "Wörterbuch je App",
+		perAppDescription:
+			"Wenn eine App im Vordergrund ist, werden ihre Wörter zusätzlich zum Standardwörterbuch verwendet.",
+		perAppEmptyState: "Keine Apps konfiguriert",
+		perAppEmptyStateDescription:
+			"Suchen Sie oben, um eine App hinzuzufügen, und klappen Sie sie dann auf, um Wörter dafür hinzuzufügen.",
+		expand: "Ausklappen",
+		collapse: "Einklappen",
+		tabDefault: "Standard",
+		tabPerApp: "Pro App",
 	},
 	onboarding: {
 		step: "Schritt",
