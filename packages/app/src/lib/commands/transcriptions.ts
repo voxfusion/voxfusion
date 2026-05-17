@@ -33,11 +33,13 @@ export async function listTranscriptions(
 export async function transcribeAudio(
 	audioPath: string,
 	bundleId: string | null,
+	domain: string | null,
 	fallbackStyle: AppStyle
 ): Promise<CommandResult<TranscriptionResult>> {
 	return invokeResult<TranscriptionResult>("transcribe_audio", {
 		audioPath,
 		bundleId,
+		domain,
 		fallbackStyle,
 	});
 }

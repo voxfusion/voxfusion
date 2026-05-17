@@ -7,7 +7,8 @@ const Dictionary: ParentComponent = (props) => {
 	const location = useLocation();
 
 	const isPerApp = () => location.pathname.startsWith("/dictionary/per-app");
-	const isDefault = () => !isPerApp();
+	const isSites = () => location.pathname.startsWith("/dictionary/sites");
+	const isDefault = () => !isPerApp() && !isSites();
 
 	const tabClass = (active: boolean) =>
 		`font-mono text-xs uppercase tracking-wider transition-colors py-2 ${
@@ -36,6 +37,9 @@ const Dictionary: ParentComponent = (props) => {
 					</A>
 					<A href="/dictionary/per-app" class={tabClass(isPerApp())}>
 						[{t("dictionary.tabPerApp")}]
+					</A>
+					<A href="/dictionary/sites" class={tabClass(isSites())}>
+						[{t("dictionary.tabSites")}]
 					</A>
 				</div>
 

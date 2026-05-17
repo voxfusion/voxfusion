@@ -222,6 +222,7 @@ pub async fn transcribe_audio(
     db_state: tauri::State<'_, crate::handlers::db::DbState>,
     audio_path: String,
     bundle_id: Option<String>,
+    domain: Option<String>,
     fallback_style: Option<String>,
 ) -> Result<TranscriptionResult, String> {
     let model_path = get_model_path(&app_handle)?;
@@ -271,6 +272,7 @@ pub async fn transcribe_audio(
         let style_key = crate::handlers::apps::resolve_style_key(
             &conn,
             bundle_id.as_deref(),
+            domain.as_deref(),
             fallback_style.as_deref(),
         );
         let style_text =
@@ -280,10 +282,19 @@ pub async fn transcribe_audio(
             .as_deref()
             .filter(|s| !s.is_empty())
             .and_then(|bid| crate::handlers::apps::fetch_app_dictionary_words(&conn, bid));
-        let dictionary = merge_dictionaries(default_dict.as_deref(), app_dict.as_deref());
+        let site_dict = domain
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .and_then(|d| crate::handlers::sites::fetch_site_dictionary_words(&conn, d));
+        let dictionary = merge_dictionaries(
+            default_dict.as_deref(),
+            app_dict.as_deref(),
+            site_dict.as_deref(),
+        );
         eprintln!(
-            "[style] bundle={:?} style={} lang={} style_chars={} dict_words={} app_dict_words={}",
+            "[style] bundle={:?} domain={:?} style={} lang={} style_chars={} dict_words={} app_dict_words={} site_dict_words={}",
             bundle_id,
+            domain,
             style_key,
             detected_lang,
             style_text.chars().count(),
@@ -292,6 +303,10 @@ pub async fn transcribe_audio(
                 .map(|d| d.split(',').count())
                 .unwrap_or(0),
             app_dict
+                .as_ref()
+                .map(|d| d.split(',').count())
+                .unwrap_or(0),
+            site_dict
                 .as_ref()
                 .map(|d| d.split(',').count())
                 .unwrap_or(0)
@@ -359,15 +374,19 @@ pub async fn transcribe_audio(
     })
 }
 
-fn merge_dictionaries(default_dict: Option<&str>, app_dict: Option<&str>) -> Option<String> {
-    match (
-        default_dict.map(|s| s.trim()).filter(|s| !s.is_empty()),
-        app_dict.map(|s| s.trim()).filter(|s| !s.is_empty()),
-    ) {
-        (Some(d), Some(a)) => Some(format!("{}, {}", d, a)),
-        (Some(d), None) => Some(d.to_string()),
-        (None, Some(a)) => Some(a.to_string()),
-        (None, None) => None,
+fn merge_dictionaries(
+    default_dict: Option<&str>,
+    app_dict: Option<&str>,
+    site_dict: Option<&str>,
+) -> Option<String> {
+    let parts: Vec<&str> = [default_dict, app_dict, site_dict]
+        .into_iter()
+        .filter_map(|d| d.map(|s| s.trim()).filter(|s| !s.is_empty()))
+        .collect();
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(", "))
     }
 }
 

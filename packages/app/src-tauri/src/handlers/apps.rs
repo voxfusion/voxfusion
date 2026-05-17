@@ -23,6 +23,10 @@ pub struct InstalledApp {
 pub struct FrontmostApp {
     pub name: String,
     pub bundle_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,8 +126,18 @@ pub fn style_prompt_text(key: &str, locale: &str) -> &'static str {
 pub fn resolve_style_key(
     conn: &rusqlite::Connection,
     bundle_id: Option<&str>,
+    domain: Option<&str>,
     fallback_style: Option<&str>,
 ) -> String {
+    if let Some(d) = domain.filter(|s| !s.is_empty()) {
+        if let Ok(style) = conn.query_row(
+            "SELECT style FROM site_styles WHERE domain = ?1",
+            params![d],
+            |row| row.get::<_, String>(0),
+        ) {
+            return style;
+        }
+    }
     if let Some(bid) = bundle_id.filter(|s| !s.is_empty()) {
         if let Ok(style) = conn.query_row(
             "SELECT style FROM app_instructions WHERE bundle_id = ?1",
@@ -346,7 +360,22 @@ pub async fn get_frontmost_app() -> Result<Option<FrontmostApp>, String> {
             if bundle_id.is_empty() {
                 return None;
             }
-            Some(FrontmostApp { name, bundle_id })
+            let pid: i32 = app.processIdentifier() as i32;
+            let (url, domain) = if crate::handlers::browser::is_known_browser(&bundle_id) {
+                let url = crate::handlers::browser::get_frontmost_browser_url(&bundle_id, pid);
+                let domain = url
+                    .as_deref()
+                    .and_then(crate::handlers::browser::normalize_domain);
+                (url, domain)
+            } else {
+                (None, None)
+            };
+            Some(FrontmostApp {
+                name,
+                bundle_id,
+                url,
+                domain,
+            })
         })
         .unwrap_or(None);
         Ok(result)
@@ -389,7 +418,7 @@ pub fn list_app_instructions(
     Ok(rows)
 }
 
-fn normalize_style(style: &str) -> Result<&'static str, String> {
+pub fn normalize_style(style: &str) -> Result<&'static str, String> {
     STYLES
         .iter()
         .find(|s| s.key == style)

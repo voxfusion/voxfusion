@@ -1,8 +1,10 @@
 pub mod apps;
 pub mod audio;
 pub mod audio_processing;
+pub mod browser;
 pub mod db;
 pub mod media;
+pub mod sites;
 pub mod text;
 pub mod whisper;
 
@@ -10,6 +12,11 @@ pub use apps::{
     add_app_dictionary_word, delete_app_dictionary, delete_app_dictionary_word,
     delete_app_instruction, get_frontmost_app, list_app_dictionaries, list_app_instructions,
     list_installed_apps, set_app_instruction, update_app_dictionary_word,
+};
+pub use sites::{
+    add_site_dictionary_word, delete_site_dictionary, delete_site_dictionary_word,
+    delete_site_style, list_site_dictionaries, list_site_styles, set_site_style,
+    update_site_dictionary_word,
 };
 pub use audio::{list_audio_devices, start_recording_with_device, stop_recording_with_device};
 pub use audio_processing::process_audio_file;

@@ -82,8 +82,16 @@ export const it: Translations = {
 	style: {
 		defaultStyleTitle: "Stile Predefinito",
 		defaultStyleDescription:
-			"Usato per qualsiasi app non elencata sotto. Passa tra i tab per vedere ogni stile.",
+			"Usato ovunque tranne nelle app o nei siti configurati negli altri tab. Cambia stile per vederne un'anteprima.",
 		perAppTitle: "Stile per app",
+		tabDefault: "Predefinito",
+		tabPerApp: "Per App",
+		tabSites: "Per Sito",
+		perSiteDescription:
+			"Quando una scheda del browser è attiva, questo stile sovrascrive quello dell'app e quello predefinito.",
+		perSiteEmptyState: "Nessun sito configurato",
+		perSiteEmptyStateDescription:
+			"Aggiungi un dominio o cattura la scheda corrente del browser, poi scegli uno stile.",
 		descriptions: {
 			professional:
 				"Comunicazione professionale formale. Frasi complete, grammatica e punteggiatura precise, senza slang o contrazioni.",
@@ -136,6 +144,18 @@ export const it: Translations = {
 		collapse: "Comprimi",
 		tabDefault: "Predefinito",
 		tabPerApp: "Per app",
+		tabSites: "Per sito",
+		sitesDescription:
+			"Quando sei concentrato su una scheda del browser, le parole di quel sito vengono usate insieme al dizionario predefinito.",
+		sitesEmptyState: "Nessun sito configurato",
+		sitesEmptyStateDescription:
+			"Aggiungi un dominio o cattura la scheda corrente del browser, poi espandilo per aggiungere parole personalizzate per quel sito.",
+		sitesDomainPlaceholder: "example.com",
+		sitesAddSite: "Aggiungi sito",
+		sitesUseCurrent: "Usa sito corrente",
+		sitesInvalidDomain: "Inserisci un dominio valido",
+		sitesNoCurrentSite: "Nessun sito rilevato",
+		siteCount: "{count} siti",
 	},
 	onboarding: {
 		step: "Passo",

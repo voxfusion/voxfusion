@@ -82,8 +82,16 @@ export const de: Translations = {
 	style: {
 		defaultStyleTitle: "Standardstil",
 		defaultStyleDescription:
-			"Wird für jede App verwendet, die unten nicht aufgeführt ist. Wechseln Sie zwischen den Tabs, um jeden Stil zu sehen.",
+			"Wird überall verwendet, außer in Apps oder auf Websites, die in den anderen Tabs konfiguriert sind. Wechseln Sie zwischen den Stilen, um eine Vorschau zu sehen.",
 		perAppTitle: "App-spezifischer Stil",
+		tabDefault: "Standard",
+		tabPerApp: "Pro App",
+		tabSites: "Pro Site",
+		perSiteDescription:
+			"Wenn ein Browser-Tab aktiv ist, überschreibt dieser Stil den App- und Standardstil.",
+		perSiteEmptyState: "Keine Sites konfiguriert",
+		perSiteEmptyStateDescription:
+			"Fügen Sie eine Domain hinzu oder übernehmen Sie den aktuellen Tab und wählen Sie einen Stil dafür.",
 		descriptions: {
 			professional:
 				"Formelle Geschäftskommunikation. Vollständige Sätze, präzise Grammatik und Zeichensetzung, keine Umgangssprache oder Kontraktionen.",
@@ -137,6 +145,18 @@ export const de: Translations = {
 		collapse: "Einklappen",
 		tabDefault: "Standard",
 		tabPerApp: "Pro App",
+		tabSites: "Pro Site",
+		sitesDescription:
+			"Wenn ein Browser-Tab im Vordergrund ist, werden die Wörter dieser Seite zusätzlich zum Standardwörterbuch verwendet.",
+		sitesEmptyState: "Keine Seiten konfiguriert",
+		sitesEmptyStateDescription:
+			"Fügen Sie eine Domain hinzu oder übernehmen Sie den aktuellen Browser-Tab und klappen Sie sie aus, um Wörter für diese Seite hinzuzufügen.",
+		sitesDomainPlaceholder: "example.com",
+		sitesAddSite: "Hinzufügen",
+		sitesUseCurrent: "Aktuelle Seite verwenden",
+		sitesInvalidDomain: "Geben Sie eine gültige Domain ein",
+		sitesNoCurrentSite: "Keine Browser-Seite erkannt",
+		siteCount: "{count} Seiten",
 	},
 	onboarding: {
 		step: "Schritt",

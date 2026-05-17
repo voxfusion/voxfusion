@@ -82,8 +82,16 @@ export const fr: Translations = {
 	style: {
 		defaultStyleTitle: "Style par défaut",
 		defaultStyleDescription:
-			"Utilisé pour toute application non listée ci-dessous. Changez d'onglet pour voir chaque style.",
+			"Utilisé partout sauf pour les apps ou sites configurés dans les autres onglets. Changez de style pour en voir un aperçu.",
 		perAppTitle: "Style par application",
+		tabDefault: "Par défaut",
+		tabPerApp: "Par App",
+		tabSites: "Par Site",
+		perSiteDescription:
+			"Quand un onglet du navigateur est actif, ce style remplace celui de l'app et le style par défaut.",
+		perSiteEmptyState: "Aucun site configuré",
+		perSiteEmptyStateDescription:
+			"Ajoutez un domaine ou capturez l'onglet actuel du navigateur, puis choisissez un style.",
 		descriptions: {
 			professional:
 				"Communication professionnelle formelle. Phrases complètes, grammaire et ponctuation précises, sans argot ni contractions.",
@@ -136,6 +144,18 @@ export const fr: Translations = {
 		collapse: "Réduire",
 		tabDefault: "Par défaut",
 		tabPerApp: "Par application",
+		tabSites: "Par site",
+		sitesDescription:
+			"Lorsque vous êtes sur un onglet du navigateur, les mots de ce site s'ajoutent au dictionnaire par défaut.",
+		sitesEmptyState: "Aucun site configuré",
+		sitesEmptyStateDescription:
+			"Ajoutez un domaine ou capturez l'onglet actuel du navigateur, puis développez-le pour ajouter ses mots personnalisés.",
+		sitesDomainPlaceholder: "example.com",
+		sitesAddSite: "Ajouter",
+		sitesUseCurrent: "Utiliser le site actuel",
+		sitesInvalidDomain: "Entrez un domaine valide",
+		sitesNoCurrentSite: "Aucun site détecté",
+		siteCount: "{count} sites",
 	},
 	onboarding: {
 		step: "Étape",

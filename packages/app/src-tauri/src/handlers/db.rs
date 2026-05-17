@@ -75,6 +75,7 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
     .map_err(|e| format!("Failed to create tables: {}", e))?;
 
     super::apps::run_migrations(conn)?;
+    super::sites::run_migrations(conn)?;
 
     Ok(())
 }

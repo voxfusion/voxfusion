@@ -6,7 +6,10 @@ import appIcon from "../src-tauri/icons/icon.svg";
 import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
+import { listInstalledApps } from "./lib/commands/apps";
+import { listSiteDictionaries } from "./lib/commands/dictionary";
 import { checkModelStatus } from "./lib/commands/model";
+import { preloadFavicons } from "./lib/favicons";
 import { MODEL_DOWNLOAD_STEP } from "./lib/onboarding";
 import { capture } from "./lib/posthog";
 import {
@@ -68,6 +71,14 @@ function App(props: ParentProps) {
 		}
 
 		setIsReady(true);
+
+		void listSiteDictionaries().then((result) => {
+			if (Result.isOk(result)) {
+				preloadFavicons(result.value.map((g) => g.domain));
+			}
+		});
+
+		void listInstalledApps();
 
 		const unlistenNavigate = await listen<string>("navigate", (event) => {
 			navigate(event.payload);

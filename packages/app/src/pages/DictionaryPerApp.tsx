@@ -2,7 +2,11 @@ import { Result } from "better-result";
 import { ChevronDown, Search } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
-import { type InstalledApp, listInstalledApps } from "../lib/commands/apps";
+import {
+	type InstalledApp,
+	getCachedInstalledApps,
+	listInstalledApps,
+} from "../lib/commands/apps";
 import {
 	type AppDictionary,
 	addAppDictionaryWord,
@@ -17,10 +21,11 @@ const SKELETON_ROWS = Array.from({ length: 4 });
 
 export default function DictionaryPerApp() {
 	const [t] = useI18n();
-	const [installedApps, setInstalledApps] = createSignal<InstalledApp[]>([]);
+	const cachedApps = getCachedInstalledApps();
+	const [installedApps, setInstalledApps] = createSignal<InstalledApp[]>(cachedApps ?? []);
 	const [appDicts, setAppDicts] = createSignal<AppDictionary[]>([]);
 	const [pendingApps, setPendingApps] = createSignal<AppDictionary[]>([]);
-	const [appsLoading, setAppsLoading] = createSignal(true);
+	const [appsLoading, setAppsLoading] = createSignal(cachedApps === null);
 
 	const [searchQuery, setSearchQuery] = createSignal("");
 	const [searchOpen, setSearchOpen] = createSignal(false);
@@ -42,7 +47,6 @@ export default function DictionaryPerApp() {
 
 	onMount(async () => {
 		capture("$pageview", { $current_url: "/dictionary/per-app" });
-		setAppsLoading(true);
 		const apps = await listInstalledApps();
 		if (Result.isOk(apps)) setInstalledApps(apps.value);
 		else console.error("Failed to load installed apps", apps.error);
