@@ -81,8 +81,16 @@ export const es: Translations = {
 	style: {
 		defaultStyleTitle: "Estilo Predeterminado",
 		defaultStyleDescription:
-			"Se aplica a cualquier aplicación no listada abajo. Cambia entre pestañas para ver cada estilo.",
+			"Se usa en todos lados excepto en apps o sitios configurados en las otras pestañas. Cambia entre estilos para ver una vista previa.",
 		perAppTitle: "Estilo por App",
+		tabDefault: "Predeterminado",
+		tabPerApp: "Por App",
+		tabSites: "Por Sitio",
+		perSiteDescription:
+			"Cuando una pestaña del navegador está activa, este estilo anula el de la app y el predeterminado.",
+		perSiteEmptyState: "Sin sitios configurados",
+		perSiteEmptyStateDescription:
+			"Agrega un dominio o captura la pestaña actual del navegador y elige un estilo para él.",
 		descriptions: {
 			professional:
 				"Comunicación empresarial formal. Frases completas, gramática y puntuación precisas, sin jerga ni contracciones.",
@@ -135,6 +143,18 @@ export const es: Translations = {
 		collapse: "Contraer",
 		tabDefault: "Predeterminado",
 		tabPerApp: "Por aplicación",
+		tabSites: "Por sitio",
+		sitesDescription:
+			"Cuando estás enfocado en una pestaña del navegador, las palabras de ese sitio se usan junto con el diccionario por defecto.",
+		sitesEmptyState: "Sin sitios configurados",
+		sitesEmptyStateDescription:
+			"Añade un dominio o captura la pestaña actual del navegador, luego despliégalo para añadir palabras personalizadas para ese sitio.",
+		sitesDomainPlaceholder: "example.com",
+		sitesAddSite: "Añadir sitio",
+		sitesUseCurrent: "Usar sitio actual",
+		sitesInvalidDomain: "Introduce un dominio válido",
+		sitesNoCurrentSite: "No se detectó ningún sitio",
+		siteCount: "{count} sitios",
 	},
 	onboarding: {
 		step: "Paso",

@@ -74,3 +74,41 @@ export async function deleteAppDictionaryWord(id: string): Promise<CommandResult
 export async function deleteAppDictionary(bundleId: string): Promise<CommandResult<void>> {
 	return invokeResult<void>("delete_app_dictionary", { bundleId });
 }
+
+export interface SiteDictionaryWord {
+	id: string;
+	word: string;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface SiteDictionary {
+	domain: string;
+	words: SiteDictionaryWord[];
+}
+
+export async function listSiteDictionaries(): Promise<CommandResult<SiteDictionary[]>> {
+	return invokeResult<SiteDictionary[]>("list_site_dictionaries");
+}
+
+export async function addSiteDictionaryWord(
+	domain: string,
+	word: string
+): Promise<CommandResult<SiteDictionaryWord>> {
+	return invokeResult<SiteDictionaryWord>("add_site_dictionary_word", { domain, word });
+}
+
+export async function updateSiteDictionaryWord(
+	id: string,
+	word: string
+): Promise<CommandResult<SiteDictionaryWord>> {
+	return invokeResult<SiteDictionaryWord>("update_site_dictionary_word", { id, word });
+}
+
+export async function deleteSiteDictionaryWord(id: string): Promise<CommandResult<void>> {
+	return invokeResult<void>("delete_site_dictionary_word", { id });
+}
+
+export async function deleteSiteDictionary(domain: string): Promise<CommandResult<void>> {
+	return invokeResult<void>("delete_site_dictionary", { domain });
+}

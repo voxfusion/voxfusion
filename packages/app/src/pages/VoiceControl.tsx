@@ -113,6 +113,7 @@ export default function VoiceControl() {
 	let isStarting = false;
 	let activeRecordingMode: "toggle" | "hold" | null = null;
 	let activeAppBundleId: string | null = null;
+	let activeDomain: string | null = null;
 
 	const canUseShortcut = () => isOnboardingComplete() || isLearningActive();
 
@@ -250,8 +251,15 @@ export default function VoiceControl() {
 			setLoading(true);
 
 			const bundleId = activeAppBundleId;
+			const domain = activeDomain;
 			activeAppBundleId = null;
-			const result = await transcribeAudio(filePath.value, bundleId, settings().defaultStyle);
+			activeDomain = null;
+			const result = await transcribeAudio(
+				filePath.value,
+				bundleId,
+				domain,
+				settings().defaultStyle
+			);
 			if (Result.isError(result)) return;
 			await saveTranscription(result.value);
 
@@ -289,6 +297,7 @@ export default function VoiceControl() {
 		setIsRecording(false);
 		activeRecordingMode = null;
 		activeAppBundleId = null;
+		activeDomain = null;
 		await unregisterEscapeShortcut();
 
 		await stopRecordingWithDevice();
@@ -312,10 +321,12 @@ export default function VoiceControl() {
 			if (isStopping || isStarting) return;
 			isStarting = true;
 			activeAppBundleId = null;
+			activeDomain = null;
 			const frontmost = await getFrontmostApp();
 			if (Result.isOk(frontmost)) {
 				if (frontmost.value?.bundle_id && frontmost.value.bundle_id !== VOXFUSION_BUNDLE_ID) {
 					activeAppBundleId = frontmost.value.bundle_id;
+					activeDomain = frontmost.value.domain ?? null;
 				}
 			}
 			await showVoiceControlWindow();

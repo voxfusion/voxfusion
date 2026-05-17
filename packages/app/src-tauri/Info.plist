@@ -6,6 +6,8 @@
 	<string>VoxFusion needs microphone access to record and transcribe your voice.</string>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>VoxFusion needs accessibility access to type transcribed text into other applications.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>VoxFusion uses Apple Events to read the active tab URL from your browser so it can apply per-site dictionaries during transcription.</string>
 </dict>
 </plist>
 

@@ -81,8 +81,16 @@ export const ru: Translations = {
 	style: {
 		defaultStyleTitle: "Стиль по умолчанию",
 		defaultStyleDescription:
-			"Применяется ко всем приложениям, не указанным ниже. Переключайте вкладки, чтобы увидеть каждый стиль.",
+			"Используется везде, кроме приложений и сайтов, настроенных на других вкладках. Переключайте стили, чтобы посмотреть превью каждого.",
 		perAppTitle: "Стиль для приложения",
+		tabDefault: "По умолчанию",
+		tabPerApp: "По приложению",
+		tabSites: "По сайту",
+		perSiteDescription:
+			"Когда активна вкладка браузера, этот стиль переопределяет стиль приложения и стиль по умолчанию.",
+		perSiteEmptyState: "Сайты не настроены",
+		perSiteEmptyStateDescription:
+			"Добавьте домен или возьмите текущую вкладку браузера и выберите для неё стиль.",
 		descriptions: {
 			professional:
 				"Формальное деловое общение. Полные предложения, точная грамматика и пунктуация, без сленга и сокращений.",
@@ -135,6 +143,18 @@ export const ru: Translations = {
 		collapse: "Свернуть",
 		tabDefault: "По умолчанию",
 		tabPerApp: "По приложению",
+		tabSites: "По сайту",
+		sitesDescription:
+			"Когда открыта вкладка браузера, слова этого сайта используются вместе со словарём по умолчанию.",
+		sitesEmptyState: "Сайты не настроены",
+		sitesEmptyStateDescription:
+			"Добавьте домен или захватите текущую вкладку браузера, затем разверните её, чтобы добавить слова для этого сайта.",
+		sitesDomainPlaceholder: "example.com",
+		sitesAddSite: "Добавить",
+		sitesUseCurrent: "Текущий сайт",
+		sitesInvalidDomain: "Введите корректный домен",
+		sitesNoCurrentSite: "Сайт не определён",
+		siteCount: "{count} сайтов",
 	},
 	onboarding: {
 		step: "Шаг",

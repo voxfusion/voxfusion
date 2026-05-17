@@ -76,6 +76,12 @@ export type Translations = {
 		defaultStyleTitle: string;
 		defaultStyleDescription: string;
 		perAppTitle: string;
+		tabDefault: string;
+		tabPerApp: string;
+		tabSites: string;
+		perSiteDescription: string;
+		perSiteEmptyState: string;
+		perSiteEmptyStateDescription: string;
 		descriptions: {
 			professional: string;
 			casual: string;
@@ -120,6 +126,16 @@ export type Translations = {
 		collapse: string;
 		tabDefault: string;
 		tabPerApp: string;
+		tabSites: string;
+		sitesDescription: string;
+		sitesEmptyState: string;
+		sitesEmptyStateDescription: string;
+		sitesDomainPlaceholder: string;
+		sitesAddSite: string;
+		sitesUseCurrent: string;
+		sitesInvalidDomain: string;
+		sitesNoCurrentSite: string;
+		siteCount: string;
 	};
 	onboarding: {
 		step: string;
@@ -267,8 +283,16 @@ export const en: Translations = {
 	style: {
 		defaultStyleTitle: "Default Style",
 		defaultStyleDescription:
-			"Used for any app that isn't listed below. Switch between tabs to see what each style does.",
+			"Used everywhere except for apps or sites configured on the other tabs. Switch between styles to preview what each one does.",
 		perAppTitle: "Per-App Override",
+		tabDefault: "Default",
+		tabPerApp: "Per-App",
+		tabSites: "Per-Site",
+		perSiteDescription:
+			"When you're focused on a browser tab, this style overrides the per-app and default style.",
+		perSiteEmptyState: "No sites configured",
+		perSiteEmptyStateDescription:
+			"Add a domain or capture the current browser tab, then pick a style for it.",
 		descriptions: {
 			professional:
 				"Formal business communication. Complete sentences, precise grammar and punctuation, no slang or contractions. Best for email, documents, reports, and formal messaging.",
@@ -321,6 +345,18 @@ export const en: Translations = {
 		collapse: "Collapse",
 		tabDefault: "Default",
 		tabPerApp: "Per-App",
+		tabSites: "Per-Site",
+		sitesDescription:
+			"When you're focused on a browser tab, that site's words are used alongside the default dictionary.",
+		sitesEmptyState: "No sites configured",
+		sitesEmptyStateDescription:
+			"Add a domain or capture the current browser tab, then expand it to add custom words for that site.",
+		sitesDomainPlaceholder: "example.com",
+		sitesAddSite: "Add Site",
+		sitesUseCurrent: "Use current site",
+		sitesInvalidDomain: "Enter a valid domain",
+		sitesNoCurrentSite: "No browser site detected",
+		siteCount: "{count} sites",
 	},
 	onboarding: {
 		step: "Step",

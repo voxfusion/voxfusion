@@ -7,14 +7,17 @@ mod window;
 use tauri::Manager;
 
 use handlers::{
-    add_app_dictionary_word, add_dictionary_word, check_accessibility_probe, check_model_status,
-    delete_app_dictionary, delete_app_dictionary_word, delete_app_instruction,
-    delete_dictionary_word, download_whisper_model, get_dictionary_prompt, get_frontmost_app,
-    list_app_dictionaries, list_app_instructions, list_audio_devices, list_dictionary_words,
-    list_installed_apps, list_transcriptions, mute_media_for_recording, process_audio_file,
-    read_audio_file, restore_media_after_recording, save_transcription, set_app_instruction,
-    start_recording_with_device, stop_recording_with_device, transcribe_audio, type_text,
-    update_app_dictionary_word, update_dictionary_word,
+    add_app_dictionary_word, add_dictionary_word, add_site_dictionary_word,
+    check_accessibility_probe, check_model_status, delete_app_dictionary,
+    delete_app_dictionary_word, delete_app_instruction, delete_dictionary_word,
+    delete_site_dictionary, delete_site_dictionary_word, delete_site_style,
+    download_whisper_model, get_dictionary_prompt, get_frontmost_app, list_app_dictionaries,
+    list_app_instructions, list_audio_devices, list_dictionary_words, list_installed_apps,
+    list_site_dictionaries, list_site_styles, list_transcriptions, mute_media_for_recording,
+    process_audio_file, read_audio_file, restore_media_after_recording, save_transcription,
+    set_app_instruction, set_site_style, start_recording_with_device, stop_recording_with_device,
+    transcribe_audio, type_text, update_app_dictionary_word, update_dictionary_word,
+    update_site_dictionary_word,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -50,6 +53,14 @@ pub fn run() {
             update_app_dictionary_word,
             delete_app_dictionary_word,
             delete_app_dictionary,
+            list_site_dictionaries,
+            add_site_dictionary_word,
+            update_site_dictionary_word,
+            delete_site_dictionary_word,
+            delete_site_dictionary,
+            list_site_styles,
+            set_site_style,
+            delete_site_style,
         ])
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_macos_permissions::init())

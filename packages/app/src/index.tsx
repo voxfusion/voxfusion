@@ -8,8 +8,12 @@ import About from "./pages/About";
 import Dictionary from "./pages/Dictionary";
 import DictionaryDefault from "./pages/DictionaryDefault";
 import DictionaryPerApp from "./pages/DictionaryPerApp";
+import DictionarySites from "./pages/DictionarySites";
 import Home from "./pages/Home";
 import Style from "./pages/Style";
+import StyleDefault from "./pages/StyleDefault";
+import StylePerApp from "./pages/StylePerApp";
+import StylePerSite from "./pages/StylePerSite";
 
 initPostHog();
 
@@ -31,8 +35,13 @@ render(
 				<Route path="/dictionary" component={Dictionary}>
 					<Route path="/" component={DictionaryDefault} />
 					<Route path="/per-app" component={DictionaryPerApp} />
+					<Route path="/sites" component={DictionarySites} />
 				</Route>
-				<Route path="/style" component={Style} />
+				<Route path="/style" component={Style}>
+					<Route path="/" component={StyleDefault} />
+					<Route path="/per-app" component={StylePerApp} />
+					<Route path="/sites" component={StylePerSite} />
+				</Route>
 			</Router>
 		</I18nCtx.Provider>
 	),
