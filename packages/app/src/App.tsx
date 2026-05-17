@@ -1,5 +1,6 @@
 import { useNavigate } from "@solidjs/router";
 import { listen } from "@tauri-apps/api/event";
+import { Result } from "better-result";
 import { type ParentProps, Show, createSignal, onCleanup, onMount } from "solid-js";
 import appIcon from "../src-tauri/icons/icon.svg";
 import Sidebar from "./components/Navigation";
@@ -58,13 +59,12 @@ function App(props: ParentProps) {
 		await waitForTauriIPC();
 		await initSettings();
 
-		try {
-			const modelReady = await checkModelStatus();
-			if (!modelReady && settings().onboardingComplete) {
-				await resumeOnboardingAt(MODEL_DOWNLOAD_STEP);
-			}
-		} catch (err) {
-			console.error("Failed to verify Whisper model state:", err);
+		const modelReady = await checkModelStatus();
+		if (Result.isOk(modelReady) && !modelReady.value && settings().onboardingComplete) {
+			await resumeOnboardingAt(MODEL_DOWNLOAD_STEP);
+		}
+		if (Result.isError(modelReady)) {
+			console.error("Failed to verify Whisper model state:", modelReady.error);
 		}
 
 		setIsReady(true);

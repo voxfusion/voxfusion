@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { type Update, check } from "@tauri-apps/plugin-updater";
+import { Result } from "better-result";
 import { Download } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
@@ -19,20 +20,15 @@ export default function UpdateNotification() {
 		if (isCheckingForUpdates || isDownloading()) return;
 
 		isCheckingForUpdates = true;
-		try {
-			const available = await check();
-			if (available) {
-				setUpdate(available);
-				setIsVisible(true);
-			} else {
-				setUpdate(null);
-				setIsVisible(false);
-			}
-		} catch {
-			// Update check failed
-		} finally {
-			isCheckingForUpdates = false;
+		const available = await Result.tryPromise(() => check());
+		if (Result.isOk(available) && available.value) {
+			setUpdate(available.value);
+			setIsVisible(true);
+		} else if (Result.isOk(available)) {
+			setUpdate(null);
+			setIsVisible(false);
 		}
+		isCheckingForUpdates = false;
 	};
 
 	onMount(() => {
@@ -65,19 +61,23 @@ export default function UpdateNotification() {
 		if (!updateInfo) return;
 
 		setIsDownloading(true);
-		try {
-			await updateInfo.downloadAndInstall((event) => {
-				if (event.event === "Started" && event.data.contentLength) {
-					setDownloadProgress(0);
-				} else if (event.event === "Progress") {
-					const progress = downloadProgress() + event.data.chunkLength;
-					setDownloadProgress(progress);
-				} else if (event.event === "Finished") {
-					setDownloadProgress(100);
-				}
-			});
-			await relaunch();
-		} catch {
+		const installed = await Result.tryPromise({
+			try: async () => {
+				await updateInfo.downloadAndInstall((event) => {
+					if (event.event === "Started" && event.data.contentLength) {
+						setDownloadProgress(0);
+					} else if (event.event === "Progress") {
+						const progress = downloadProgress() + event.data.chunkLength;
+						setDownloadProgress(progress);
+					} else if (event.event === "Finished") {
+						setDownloadProgress(100);
+					}
+				});
+				await relaunch();
+			},
+			catch: (cause) => cause,
+		});
+		if (Result.isError(installed)) {
 			setIsDownloading(false);
 		}
 	};

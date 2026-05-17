@@ -1,5 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { AppStyle } from "./apps";
+import type { CommandResult } from "./invokeResult";
+import { invokeResult } from "./invokeResult";
 
 export interface Transcription {
 	id: string;
@@ -25,24 +26,26 @@ export interface TranscriptionResult {
 export async function listTranscriptions(
 	limit: number,
 	cursor: string | null
-): Promise<TranscriptionPage> {
-	return invoke<TranscriptionPage>("list_transcriptions", { limit, cursor });
+): Promise<CommandResult<TranscriptionPage>> {
+	return invokeResult<TranscriptionPage>("list_transcriptions", { limit, cursor });
 }
 
 export async function transcribeAudio(
 	audioPath: string,
 	bundleId: string | null,
 	fallbackStyle: AppStyle
-): Promise<TranscriptionResult> {
-	return invoke<TranscriptionResult>("transcribe_audio", {
+): Promise<CommandResult<TranscriptionResult>> {
+	return invokeResult<TranscriptionResult>("transcribe_audio", {
 		audioPath,
 		bundleId,
 		fallbackStyle,
 	});
 }
 
-export async function saveTranscription(result: TranscriptionResult): Promise<Transcription> {
-	return invoke<Transcription>("save_transcription", {
+export async function saveTranscription(
+	result: TranscriptionResult
+): Promise<CommandResult<Transcription>> {
+	return invokeResult<Transcription>("save_transcription", {
 		text: result.text,
 		wordCount: result.word_count,
 		processingTimeMs: result.processing_time_ms,

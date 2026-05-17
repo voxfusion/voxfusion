@@ -1,9 +1,10 @@
-import { invoke } from "@tauri-apps/api/core";
+import type { CommandResult } from "./invokeResult";
+import { invokeResult } from "./invokeResult";
 
-export async function checkModelStatus(): Promise<boolean> {
-	return invoke<boolean>("check_model_status");
+export async function checkModelStatus(): Promise<CommandResult<boolean>> {
+	return invokeResult<boolean>("check_model_status");
 }
 
-export async function downloadWhisperModel(): Promise<void> {
-	await invoke("download_whisper_model");
+export async function downloadWhisperModel(): Promise<CommandResult<void>> {
+	return invokeResult<void>("download_whisper_model");
 }

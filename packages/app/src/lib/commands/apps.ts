@@ -1,13 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
+import type { CommandResult } from "./invokeResult";
+import { invokeResult } from "./invokeResult";
 
 export type AppStyle = "professional" | "casual" | "agents" | "default";
 
-export const STYLE_LIST: readonly AppStyle[] = [
-	"professional",
-	"casual",
-	"agents",
-	"default",
-];
+export const STYLE_LIST: readonly AppStyle[] = ["professional", "casual", "agents", "default"];
 
 export const DEFAULT_STYLE: AppStyle = "default";
 
@@ -32,31 +28,30 @@ export interface AppInstruction {
 	updated_at: string;
 }
 
-export async function listInstalledApps(): Promise<InstalledApp[]> {
-	return invoke<InstalledApp[]>("list_installed_apps");
+export async function listInstalledApps(): Promise<CommandResult<InstalledApp[]>> {
+	return invokeResult<InstalledApp[]>("list_installed_apps");
 }
 
-export async function getFrontmostApp(): Promise<FrontmostApp | null> {
-	return invoke<FrontmostApp | null>("get_frontmost_app");
+export async function getFrontmostApp(): Promise<CommandResult<FrontmostApp | null>> {
+	return invokeResult<FrontmostApp | null>("get_frontmost_app");
 }
 
-export async function listAppInstructions(): Promise<AppInstruction[]> {
-	return invoke<AppInstruction[]>("list_app_instructions");
+export async function listAppInstructions(): Promise<CommandResult<AppInstruction[]>> {
+	return invokeResult<AppInstruction[]>("list_app_instructions");
 }
 
 export async function setAppInstruction(
 	bundleId: string,
 	appName: string,
 	style: AppStyle
-): Promise<AppInstruction> {
-	return invoke<AppInstruction>("set_app_instruction", {
+): Promise<CommandResult<AppInstruction>> {
+	return invokeResult<AppInstruction>("set_app_instruction", {
 		bundleId,
 		appName,
 		style,
 	});
 }
 
-export async function deleteAppInstruction(id: string): Promise<void> {
-	await invoke("delete_app_instruction", { id });
+export async function deleteAppInstruction(id: string): Promise<CommandResult<void>> {
+	return invokeResult<void>("delete_app_instruction", { id });
 }
-

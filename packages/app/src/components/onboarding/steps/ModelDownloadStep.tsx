@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { Result } from "better-result";
 import { AlertCircle, Check, Download, Loader } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../../../i18n";
@@ -17,14 +18,12 @@ export default function ModelDownloadStep(props: ModelDownloadStepProps) {
 	const downloadSize = "~1.5 GB";
 
 	onMount(async () => {
-		try {
-			const downloaded = await checkModelStatus();
-			if (downloaded) {
-				setIsDownloaded(true);
-				setDownloadProgress(100);
-				props.onDownloadComplete();
-			}
-		} catch {}
+		const downloaded = await checkModelStatus();
+		if (Result.isOk(downloaded) && downloaded.value) {
+			setIsDownloaded(true);
+			setDownloadProgress(100);
+			props.onDownloadComplete();
+		}
 
 		const unlisten = await listen<number>("model-download-progress", (event) => {
 			setDownloadProgress(event.payload);
@@ -40,12 +39,12 @@ export default function ModelDownloadStep(props: ModelDownloadStepProps) {
 		setIsDownloading(true);
 		setError(null);
 
-		try {
-			await downloadWhisperModel();
+		const result = await downloadWhisperModel();
+		if (Result.isOk(result)) {
 			setIsDownloaded(true);
 			props.onDownloadComplete();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Download failed");
+		} else {
+			setError(result.error.message || "Download failed");
 			setIsDownloading(false);
 		}
 	};
