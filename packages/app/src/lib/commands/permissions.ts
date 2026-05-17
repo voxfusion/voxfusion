@@ -1,5 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import type { CommandResult } from "./invokeResult";
+import { invokeResult } from "./invokeResult";
 
-export async function checkAccessibilityProbe(): Promise<boolean> {
-	return invoke<boolean>("check_accessibility_probe");
+export async function checkAccessibilityProbe(): Promise<CommandResult<boolean>> {
+	return invokeResult<boolean>("check_accessibility_probe");
 }

@@ -1,3 +1,4 @@
+import { Result } from "better-result";
 import { ChevronDown, Search } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
@@ -30,19 +31,16 @@ export default function Style() {
 
 	const fetchInstructions = async () => {
 		const result = await listAppInstructions();
-		setInstructions(result);
+		if (Result.isOk(result)) setInstructions(result.value);
 	};
 
 	onMount(async () => {
 		capture("$pageview", { $current_url: "/style" });
 		setLoading(true);
-		try {
-			const [apps, instr] = await Promise.all([listInstalledApps(), listAppInstructions()]);
-			setInstalledApps(apps);
-			setInstructions(instr);
-		} finally {
-			setLoading(false);
-		}
+		const [apps, instr] = await Promise.all([listInstalledApps(), listAppInstructions()]);
+		if (Result.isOk(apps)) setInstalledApps(apps.value);
+		if (Result.isOk(instr)) setInstructions(instr.value);
+		setLoading(false);
 	});
 
 	const handleClickOutside = (e: MouseEvent) => {
@@ -63,9 +61,7 @@ export default function Style() {
 		document.removeEventListener("click", handleClickOutside);
 	});
 
-	const configuredBundleIds = createMemo(
-		() => new Set(instructions().map((i) => i.bundle_id))
-	);
+	const configuredBundleIds = createMemo(() => new Set(instructions().map((i) => i.bundle_id)));
 
 	const iconByBundleId = createMemo(() => {
 		const map = new Map<string, string>();
@@ -83,8 +79,7 @@ export default function Style() {
 			.filter((app) => {
 				if (!query) return true;
 				return (
-					app.name.toLowerCase().includes(query) ||
-					app.bundle_id.toLowerCase().includes(query)
+					app.name.toLowerCase().includes(query) || app.bundle_id.toLowerCase().includes(query)
 				);
 			})
 			.slice(0, 50);
@@ -127,7 +122,8 @@ export default function Style() {
 	};
 
 	const handleAddApp = async (app: InstalledApp) => {
-		await setAppInstruction(app.bundle_id, app.name, "default");
+		const result = await setAppInstruction(app.bundle_id, app.name, "default");
+		if (Result.isError(result)) return;
 		capture("app_instruction_added", { style: "default" });
 		setSearchQuery("");
 		setSearchOpen(false);
@@ -135,17 +131,17 @@ export default function Style() {
 	};
 
 	const handleChangeStyle = async (instruction: AppInstruction, style: AppStyle) => {
-		setInstructions(
-			instructions().map((i) => (i.id === instruction.id ? { ...i, style } : i))
-		);
-		await setAppInstruction(instruction.bundle_id, instruction.app_name, style);
-		capture("app_instruction_style_changed", { style });
+		setInstructions(instructions().map((i) => (i.id === instruction.id ? { ...i, style } : i)));
+		const result = await setAppInstruction(instruction.bundle_id, instruction.app_name, style);
+		if (Result.isOk(result)) capture("app_instruction_style_changed", { style });
+		else await fetchInstructions();
 	};
 
 	const handleDelete = async (id: string) => {
 		capture("app_instruction_deleted");
 		setInstructions(instructions().filter((i) => i.id !== id));
-		await deleteAppInstruction(id);
+		const result = await deleteAppInstruction(id);
+		if (Result.isError(result)) await fetchInstructions();
 	};
 
 	const handleSelectDefaultStyle = async (style: AppStyle) => {
@@ -239,10 +235,7 @@ export default function Style() {
 						</div>
 						<Show when={instructions().length > 0}>
 							<span class="text-txt-muted font-mono text-xs uppercase">
-								{t("appInstructions.appCount").replace(
-									"{count}",
-									String(instructions().length)
-								)}
+								{t("appInstructions.appCount").replace("{count}", String(instructions().length))}
 							</span>
 						</Show>
 					</div>
@@ -270,9 +263,7 @@ export default function Style() {
 							<div class="absolute z-50 w-full mt-1 bg-th-surface border border-border-strong max-h-72 overflow-auto">
 								<Show
 									when={!loading()}
-									fallback={
-										<For each={SKELETON_ROWS}>{() => <AppRowSkeleton />}</For>
-									}
+									fallback={<For each={SKELETON_ROWS}>{() => <AppRowSkeleton />}</For>}
 								>
 									<Show
 										when={filteredApps().length > 0}
@@ -408,9 +399,7 @@ function AppIcon(props: AppIconProps) {
 				</div>
 			}
 		>
-			{(src) => (
-				<img src={src()} alt={props.alt} class="w-8 h-8 shrink-0" draggable={false} />
-			)}
+			{(src) => <img src={src()} alt={props.alt} class="w-8 h-8 shrink-0" draggable={false} />}
 		</Show>
 	);
 }

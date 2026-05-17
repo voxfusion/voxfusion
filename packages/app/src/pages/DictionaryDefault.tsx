@@ -1,3 +1,4 @@
+import { Result } from "better-result";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import {
@@ -19,7 +20,7 @@ export default function DictionaryDefault() {
 
 	const fetchWords = async () => {
 		const result = await listDictionaryWords();
-		setWords(result);
+		if (Result.isOk(result)) setWords(result.value);
 	};
 
 	onMount(() => {
@@ -32,14 +33,13 @@ export default function DictionaryDefault() {
 		if (!word || adding()) return;
 
 		setAdding(true);
-		try {
-			await addDictionaryWord(word);
+		const result = await addDictionaryWord(word);
+		if (Result.isOk(result)) {
 			capture("dictionary_word_added");
 			await fetchWords();
 			setNewWord("");
-		} finally {
-			setAdding(false);
 		}
+		setAdding(false);
 	};
 
 	const handleKeyDown = (e: KeyboardEvent) => {
@@ -49,7 +49,8 @@ export default function DictionaryDefault() {
 	const handleDelete = async (id: string) => {
 		capture("dictionary_word_deleted");
 		setWords(words().filter((w) => w.id !== id));
-		await deleteDictionaryWord(id);
+		const result = await deleteDictionaryWord(id);
+		if (Result.isError(result)) await fetchWords();
 	};
 
 	const startEdit = (word: DictionaryWord) => {
@@ -71,7 +72,8 @@ export default function DictionaryDefault() {
 		setEditingId(null);
 		setEditingWord("");
 
-		await updateDictionaryWord(id, word);
+		const result = await updateDictionaryWord(id, word);
+		if (Result.isError(result)) await fetchWords();
 	};
 
 	const handleEditKeyDown = (e: KeyboardEvent, id: string) => {

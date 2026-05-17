@@ -1,4 +1,5 @@
 import { emit, listen } from "@tauri-apps/api/event";
+import { Result } from "better-result";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import {
 	hotkeyDisplayName,
@@ -85,7 +86,7 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 	};
 
 	const setRecorderActive = (active: boolean) => {
-		emit("hotkey-recorder-active", { active }).catch(() => {});
+		void Result.tryPromise(() => emit("hotkey-recorder-active", { active }));
 	};
 
 	const saveRecordedHotkey = async (hotkey: string) => {
@@ -95,12 +96,13 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 			return false;
 		}
 		setError(null);
-		try {
+		const saved = await Result.tryPromise(async () => {
 			await (options.onHotkeyRecorded?.(hotkey) ?? updateHotkey(hotkey));
-			return true;
-		} catch {
+		});
+		if (Result.isError(saved)) {
 			return false;
 		}
+		return true;
 	};
 
 	/**
@@ -218,8 +220,8 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 		if (!pendingSystemHotkey) return;
 
 		const hotkey = pendingSystemHotkey;
-		saveRecordedHotkey(hotkey)
-			.then((success) => {
+		void Result.tryPromise(() =>
+			saveRecordedHotkey(hotkey).then((success) => {
 				if (success) {
 					setIsRecording(false);
 					setPendingHotkey("");
@@ -227,7 +229,7 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 					setRecorderActive(false);
 				}
 			})
-			.catch(() => {});
+		);
 	});
 
 	createEffect(() => {
@@ -248,8 +250,8 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 			activeRecordingId = null;
 		}
 		setRecorderActive(false);
-		unlistenSystemPressedPromise.then((unlisten) => unlisten()).catch(() => {});
-		unlistenSystemReleasedPromise.then((unlisten) => unlisten()).catch(() => {});
+		void Result.tryPromise(() => unlistenSystemPressedPromise.then((unlisten) => unlisten()));
+		void Result.tryPromise(() => unlistenSystemReleasedPromise.then((unlisten) => unlisten()));
 	});
 
 	return {

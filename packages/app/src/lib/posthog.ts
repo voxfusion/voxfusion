@@ -1,4 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
+import { Result } from "better-result";
 import posthog from "posthog-js";
 
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
@@ -9,18 +10,17 @@ let ready = false;
 const pendingEvents: Array<[string, Record<string, unknown> | undefined]> = [];
 
 async function registerAppVersion() {
-	try {
-		const appVersion = await getVersion();
-		posthog.register({ app_version: appVersion });
-		posthog.people.set_once({ first_app_version: appVersion });
-		posthog.people.set({ app_version: appVersion });
-	} catch (err) {
-		console.warn("Failed to register PostHog app version:", err);
-	} finally {
-		ready = true;
-		for (const [event, properties] of pendingEvents.splice(0)) {
-			posthog.capture(event, properties);
-		}
+	const appVersion = await Result.tryPromise(() => getVersion());
+	if (Result.isOk(appVersion)) {
+		posthog.register({ app_version: appVersion.value });
+		posthog.people.set_once({ first_app_version: appVersion.value });
+		posthog.people.set({ app_version: appVersion.value });
+	} else {
+		console.warn("Failed to register PostHog app version:", appVersion.error);
+	}
+	ready = true;
+	for (const [event, properties] of pendingEvents.splice(0)) {
+		posthog.capture(event, properties);
 	}
 }
 

@@ -1,4 +1,5 @@
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
+import { Result } from "better-result";
 import { AlertCircle, Check, ExternalLink, Shield } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { requestAccessibilityPermission } from "tauri-plugin-macos-permissions-api";
@@ -26,17 +27,17 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 	};
 
 	const checkPermission = async () => {
-		try {
-			const granted = await checkAccessibilityProbe();
-			setIsGranted(granted);
-			props.onPermissionChange(granted);
-			if (granted && pollInterval) {
-				clearInterval(pollInterval);
-				pollInterval = undefined;
-			}
-		} catch {
+		const granted = await checkAccessibilityProbe();
+		if (Result.isError(granted)) {
 			setIsGranted(false);
 			props.onPermissionChange(false);
+			return;
+		}
+		setIsGranted(granted.value);
+		props.onPermissionChange(granted.value);
+		if (granted.value && pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = undefined;
 		}
 	};
 
@@ -93,11 +94,7 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 
 	const handleOpenSettings = async () => {
 		setIsRequesting(true);
-		try {
-			await requestAccessibilityPermission();
-		} catch {
-			// ignore - settings may still open
-		}
+		await Result.tryPromise(() => requestAccessibilityPermission());
 		if (!pollInterval) {
 			pollInterval = setInterval(checkPermission, 1000);
 		}

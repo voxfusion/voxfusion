@@ -1,5 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
+import type { CommandResult } from "./invokeResult";
+import { invokeResult } from "./invokeResult";
 
-export async function typeText(text: string): Promise<void> {
-	await invoke("type_text", { text });
+export async function typeText(text: string): Promise<CommandResult<void>> {
+	return invokeResult<void>("type_text", { text });
 }

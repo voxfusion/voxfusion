@@ -1,13 +1,15 @@
 import { emit } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
+import { Result } from "better-result";
 import { createSignal } from "solid-js";
 import type { Locale } from "../i18n";
 import { type AppStyle, STYLE_LIST } from "./commands/apps";
 import { listAudioDevices } from "./commands/audio";
+import { saveBrowserValue, storageError } from "./errors";
 import {
 	CURRENT_ONBOARDING_VERSION,
-	normalizeOnboardingStep,
 	ONBOARDING_STEP_COUNT,
+	normalizeOnboardingStep,
 } from "./onboarding";
 
 export type Theme = "dark" | "light" | "system";
@@ -106,9 +108,7 @@ export async function loadSettings(): Promise<Settings> {
 export async function saveTheme(theme: Theme): Promise<void> {
 	const store = await getStore();
 	await store.set("theme", theme);
-	try {
-		localStorage.setItem("voxfusion-theme", theme);
-	} catch {}
+	saveBrowserValue("voxfusion-theme", theme);
 }
 
 export async function saveHotkey(hotkey: string): Promise<void> {
@@ -147,15 +147,12 @@ export interface AudioDevice {
 }
 
 export async function getAudioInputDevices(): Promise<AudioDevice[]> {
-	try {
-		const devices = await listAudioDevices();
-		return devices.map((device) => ({
-			name: device.name,
-			isDefault: device.is_default,
-		}));
-	} catch {
-		return [];
-	}
+	const devices = await listAudioDevices();
+	if (Result.isError(devices)) return [];
+	return devices.value.map((device) => ({
+		name: device.name,
+		isDefault: device.is_default,
+	}));
 }
 
 const [settings, setSettingsInternal] = createSignal<Settings>(DEFAULT_SETTINGS);
@@ -168,9 +165,7 @@ export async function initSettings(): Promise<void> {
 	const loaded = await loadSettings();
 	setSettingsInternal(loaded);
 	applyTheme(loaded.theme);
-	try {
-		localStorage.setItem("voxfusion-theme", loaded.theme);
-	} catch {}
+	saveBrowserValue("voxfusion-theme", loaded.theme);
 }
 
 export async function updateTheme(theme: Theme): Promise<void> {
@@ -248,14 +243,18 @@ export async function updateOnboardingStep(step: number): Promise<void> {
 
 export async function markOnboardingComplete(): Promise<void> {
 	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: true, onboardingStep: 1 }));
-	try {
-		const store = await getStore();
-		await store.set("onboardingComplete", true);
-		await store.set("onboardingStep", 1);
-		await store.save();
-		await emit("settings-changed");
-	} catch (err) {
-		console.error("Failed to persist onboarding completion:", err);
+	const result = await Result.tryPromise({
+		try: async () => {
+			const store = await getStore();
+			await store.set("onboardingComplete", true);
+			await store.set("onboardingStep", 1);
+			await store.save();
+			await emit("settings-changed");
+		},
+		catch: (cause) => storageError("persist onboarding completion", cause),
+	});
+	if (Result.isError(result)) {
+		console.error("Failed to persist onboarding completion:", result.error);
 	}
 }
 
@@ -272,13 +271,17 @@ export async function resumeOnboardingAt(step: number): Promise<void> {
 		onboardingComplete: false,
 		onboardingStep: clamped,
 	}));
-	try {
-		const store = await getStore();
-		await store.set("onboardingComplete", false);
-		await store.set("onboardingStep", clamped);
-		await store.save();
-		await emit("settings-changed");
-	} catch (err) {
-		console.error("Failed to persist onboarding resume:", err);
+	const result = await Result.tryPromise({
+		try: async () => {
+			const store = await getStore();
+			await store.set("onboardingComplete", false);
+			await store.set("onboardingStep", clamped);
+			await store.save();
+			await emit("settings-changed");
+		},
+		catch: (cause) => storageError("persist onboarding resume", cause),
+	});
+	if (Result.isError(result)) {
+		console.error("Failed to persist onboarding resume:", result.error);
 	}
 }

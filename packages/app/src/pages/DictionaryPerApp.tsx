@@ -1,3 +1,4 @@
+import { Result } from "better-result";
 import { ChevronDown, Search } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
@@ -36,24 +37,18 @@ export default function DictionaryPerApp() {
 
 	const fetchAppDicts = async () => {
 		const result = await listAppDictionaries();
-		setAppDicts(result);
+		if (Result.isOk(result)) setAppDicts(result.value);
 	};
 
 	onMount(async () => {
 		capture("$pageview", { $current_url: "/dictionary/per-app" });
 		setAppsLoading(true);
-		try {
-			const apps = await listInstalledApps();
-			setInstalledApps(apps);
-		} catch (err) {
-			console.error("Failed to load installed apps", err);
-		}
-		try {
-			const dicts = await listAppDictionaries();
-			setAppDicts(dicts);
-		} catch (err) {
-			console.error("Failed to load app dictionaries", err);
-		}
+		const apps = await listInstalledApps();
+		if (Result.isOk(apps)) setInstalledApps(apps.value);
+		else console.error("Failed to load installed apps", apps.error);
+		const dicts = await listAppDictionaries();
+		if (Result.isOk(dicts)) setAppDicts(dicts.value);
+		else console.error("Failed to load app dictionaries", dicts.error);
 		setAppsLoading(false);
 	});
 
@@ -64,9 +59,7 @@ export default function DictionaryPerApp() {
 		return [...persisted, ...pending];
 	});
 
-	const configuredBundleIds = createMemo(
-		() => new Set(allAppGroups().map((d) => d.bundle_id))
-	);
+	const configuredBundleIds = createMemo(() => new Set(allAppGroups().map((d) => d.bundle_id)));
 
 	const iconByBundleId = createMemo(() => {
 		const map = new Map<string, string>();
@@ -84,8 +77,7 @@ export default function DictionaryPerApp() {
 			.filter((app) => {
 				if (!query) return true;
 				return (
-					app.name.toLowerCase().includes(query) ||
-					app.bundle_id.toLowerCase().includes(query)
+					app.name.toLowerCase().includes(query) || app.bundle_id.toLowerCase().includes(query)
 				);
 			})
 			.slice(0, 50);
@@ -179,19 +171,18 @@ export default function DictionaryPerApp() {
 			next.add(group.bundle_id);
 			return next;
 		});
-		try {
-			await addAppDictionaryWord(group.bundle_id, group.app_name, word);
+		const result = await addAppDictionaryWord(group.bundle_id, group.app_name, word);
+		if (Result.isOk(result)) {
 			capture("app_dictionary_word_added");
 			setNewWordByApp((prev) => ({ ...prev, [group.bundle_id]: "" }));
 			setPendingApps((prev) => prev.filter((p) => p.bundle_id !== group.bundle_id));
 			await fetchAppDicts();
-		} finally {
-			setAddingApp((prev) => {
-				const next = new Set(prev);
-				next.delete(group.bundle_id);
-				return next;
-			});
 		}
+		setAddingApp((prev) => {
+			const next = new Set(prev);
+			next.delete(group.bundle_id);
+			return next;
+		});
 	};
 
 	const handleAppWordKeyDown = (e: KeyboardEvent, group: AppDictionary) => {
@@ -221,14 +212,11 @@ export default function DictionaryPerApp() {
 		);
 		setEditingAppWordId(null);
 		setEditingAppWord("");
-		await updateAppDictionaryWord(wordId, word);
+		const result = await updateAppDictionaryWord(wordId, word);
+		if (Result.isError(result)) await fetchAppDicts();
 	};
 
-	const handleEditAppWordKeyDown = (
-		e: KeyboardEvent,
-		group: AppDictionary,
-		wordId: string,
-	) => {
+	const handleEditAppWordKeyDown = (e: KeyboardEvent, group: AppDictionary, wordId: string) => {
 		if (e.key === "Enter") handleEditAppWord(group, wordId);
 		else if (e.key === "Escape") cancelEditAppWord();
 	};
@@ -242,7 +230,8 @@ export default function DictionaryPerApp() {
 					: g
 			)
 		);
-		await deleteAppDictionaryWord(wordId);
+		const result = await deleteAppDictionaryWord(wordId);
+		if (Result.isError(result)) await fetchAppDicts();
 	};
 
 	const handleRemoveApp = async (group: AppDictionary) => {
@@ -255,22 +244,18 @@ export default function DictionaryPerApp() {
 			return next;
 		});
 		if (group.words.length > 0) {
-			await deleteAppDictionary(group.bundle_id);
+			const result = await deleteAppDictionary(group.bundle_id);
+			if (Result.isError(result)) await fetchAppDicts();
 		}
 	};
 
 	return (
 		<div>
 			<div class="mb-4 flex items-center justify-between">
-				<p class="text-txt-muted font-mono text-xs">
-					{t("dictionary.perAppDescription")}
-				</p>
+				<p class="text-txt-muted font-mono text-xs">{t("dictionary.perAppDescription")}</p>
 				<Show when={allAppGroups().length > 0}>
 					<span class="text-txt-muted font-mono text-xs uppercase">
-						{t("appInstructions.appCount").replace(
-							"{count}",
-							String(allAppGroups().length)
-						)}
+						{t("appInstructions.appCount").replace("{count}", String(allAppGroups().length))}
 					</span>
 				</Show>
 			</div>
@@ -324,9 +309,7 @@ export default function DictionaryPerApp() {
 											<AppIcon src={app.icon_data_url} alt={app.name} />
 											<div class="flex flex-col gap-0.5 min-w-0 flex-1">
 												<span class="text-txt-primary truncate">{app.name}</span>
-												<span class="text-txt-muted text-xs truncate">
-													{app.bundle_id}
-												</span>
+												<span class="text-txt-muted text-xs truncate">{app.bundle_id}</span>
 											</div>
 										</button>
 									)}
@@ -371,27 +354,20 @@ export default function DictionaryPerApp() {
 											type="button"
 											onClick={() => toggleExpanded(group.bundle_id)}
 											class="flex-1 px-4 py-3 flex items-center gap-3 text-left min-w-0"
-											title={
-												isOpen() ? t("dictionary.collapse") : t("dictionary.expand")
-											}
+											title={isOpen() ? t("dictionary.collapse") : t("dictionary.expand")}
 										>
 											<AppIcon
 												src={iconByBundleId().get(group.bundle_id) ?? null}
 												alt={group.app_name}
 											/>
 											<div class="flex flex-col min-w-0 flex-1">
-												<span class="text-txt-primary font-mono truncate">
-													{group.app_name}
-												</span>
+												<span class="text-txt-primary font-mono truncate">{group.app_name}</span>
 												<span class="text-txt-muted font-mono text-xs truncate">
 													{group.bundle_id}
 												</span>
 											</div>
 											<span class="text-txt-muted font-mono text-xs uppercase tracking-wider shrink-0">
-												{t("dictionary.wordCount").replace(
-													"{count}",
-													String(group.words.length)
-												)}
+												{t("dictionary.wordCount").replace("{count}", String(group.words.length))}
 											</span>
 											<ChevronDown
 												class={`w-4 h-4 text-txt-muted shrink-0 transition-transform ${
@@ -451,12 +427,8 @@ export default function DictionaryPerApp() {
 																	<input
 																		type="text"
 																		value={editingAppWord()}
-																		onInput={(e) =>
-																			setEditingAppWord(e.currentTarget.value)
-																		}
-																		onKeyDown={(e) =>
-																			handleEditAppWordKeyDown(e, group, word.id)
-																		}
+																		onInput={(e) => setEditingAppWord(e.currentTarget.value)}
+																		onKeyDown={(e) => handleEditAppWordKeyDown(e, group, word.id)}
 																		class="flex-1 px-2 py-1 bg-th-base border border-border-strong text-txt-primary font-mono text-sm focus:outline-none focus:border-ac transition-colors"
 																		autofocus
 																	/>
@@ -468,9 +440,7 @@ export default function DictionaryPerApp() {
 																			<>
 																				<button
 																					type="button"
-																					onClick={() =>
-																						startEditAppWord(word.id, word.word)
-																					}
+																					onClick={() => startEditAppWord(word.id, word.word)}
 																					class="text-txt-muted hover:text-ac opacity-0 group-hover/word:opacity-100 transition-all uppercase tracking-wider"
 																					title={t("dictionary.edit")}
 																				>
@@ -560,9 +530,7 @@ function AppIcon(props: AppIconProps) {
 				</div>
 			}
 		>
-			{(src) => (
-				<img src={src()} alt={props.alt} class="w-8 h-8 shrink-0" draggable={false} />
-			)}
+			{(src) => <img src={src()} alt={props.alt} class="w-8 h-8 shrink-0" draggable={false} />}
 		</Show>
 	);
 }

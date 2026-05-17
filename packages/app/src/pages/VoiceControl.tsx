@@ -6,13 +6,9 @@ import {
 	monitorFromPoint,
 } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
+import { Result } from "better-result";
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import DotMatrixSpinner from "../components/DotMatrixSpinner";
-import {
-	isValidHotkey,
-	registerDictationHotkeys,
-	unregisterDictationHotkey,
-} from "../lib/hotkeyUtils";
 import { getFrontmostApp } from "../lib/commands/apps";
 import { startRecordingWithDevice, stopRecordingWithDevice } from "../lib/commands/audio";
 import {
@@ -21,6 +17,11 @@ import {
 } from "../lib/commands/media";
 import { typeText } from "../lib/commands/text";
 import { saveTranscription, transcribeAudio } from "../lib/commands/transcriptions";
+import {
+	isValidHotkey,
+	registerDictationHotkeys,
+	unregisterDictationHotkey,
+} from "../lib/hotkeyUtils";
 import {
 	loadSettings,
 	updateHoldToSpeakHotkey,
@@ -39,8 +40,7 @@ const BAR_IDLE_AMPLITUDE = 2;
 const BAR_VOICE_SCALE = 2.5;
 const WAVE_STEP_MS = 110;
 const WAVE_PATTERN = [
-	0.25, 0.45, 0.7, 0.9, 1.0, 0.95, 0.75, 0.5,
-	0.3, 0.4, 0.65, 0.85, 1.0, 0.9, 0.65, 0.35,
+	0.25, 0.45, 0.7, 0.9, 1.0, 0.95, 0.75, 0.5, 0.3, 0.4, 0.65, 0.85, 1.0, 0.9, 0.65, 0.35,
 ];
 
 const WINDOW_WIDTH = 100;
@@ -242,44 +242,43 @@ export default function VoiceControl() {
 		activeRecordingMode = null;
 		await unregisterEscapeShortcut();
 
-		try {
+		const completed = await Result.tryPromise(async () => {
 			const filePath = await stopRecordingWithDevice();
+			if (Result.isError(filePath)) return;
 			await restoreMediaAfterRecording();
 
 			setLoading(true);
 
 			const bundleId = activeAppBundleId;
 			activeAppBundleId = null;
-			const result = await transcribeAudio(filePath, bundleId, settings().defaultStyle);
-			await saveTranscription(result);
+			const result = await transcribeAudio(filePath.value, bundleId, settings().defaultStyle);
+			if (Result.isError(result)) return;
+			await saveTranscription(result.value);
 
-			await typeText(result.text ?? "");
+			await typeText(result.value.text ?? "");
 
 			setTimeout(() => {
 				emit("transcription-created");
 			}, 1000);
-		} catch {
-		} finally {
-			await restoreMediaAfterRecording();
-			setLoading(false);
-			isStopping = false;
-			await hideVoiceControlWindow();
-		}
+		});
+		if (Result.isError(completed)) console.error("Failed to stop recording:", completed.error);
+		await restoreMediaAfterRecording();
+		setLoading(false);
+		isStopping = false;
+		await hideVoiceControlWindow();
 	};
 
 	const registerEscapeShortcut = async () => {
-		try {
+		await Result.tryPromise(async () => {
 			await register("Escape", (evt) => {
 				if (evt.state !== "Pressed") return;
 				cancelRecording();
 			});
-		} catch {}
+		});
 	};
 
 	const unregisterEscapeShortcut = async () => {
-		try {
-			await unregister("Escape");
-		} catch {}
+		await Result.tryPromise(() => unregister("Escape"));
 	};
 
 	const cancelRecording = async () => {
@@ -292,51 +291,49 @@ export default function VoiceControl() {
 		activeAppBundleId = null;
 		await unregisterEscapeShortcut();
 
-		try {
-			await stopRecordingWithDevice();
-		} catch {
-		} finally {
-			await restoreMediaAfterRecording();
-			isStopping = false;
-			await hideVoiceControlWindow();
-		}
+		await stopRecordingWithDevice();
+		await restoreMediaAfterRecording();
+		isStopping = false;
+		await hideVoiceControlWindow();
 	};
 
 	const muteMediaForRecording = async () => {
 		if (!muteMediaWhileRecording()) return;
-		try {
-			await muteMediaForRecordingCommand();
-		} catch {}
+		await muteMediaForRecordingCommand();
 	};
 
 	const restoreMediaAfterRecording = async () => {
-		try {
-			await restoreMediaAfterRecordingCommand();
-		} catch {}
+		await restoreMediaAfterRecordingCommand();
 	};
 
 	const startRecording = async (mode: "toggle" | "hold") => {
-		try {
+		const startedRecording = await Result.tryPromise(async () => {
 			if (isRecording()) return;
 			if (isStopping || isStarting) return;
 			isStarting = true;
 			activeAppBundleId = null;
-			try {
-				const frontmost = await getFrontmostApp();
-				if (frontmost?.bundle_id && frontmost.bundle_id !== VOXFUSION_BUNDLE_ID) {
-					activeAppBundleId = frontmost.bundle_id;
+			const frontmost = await getFrontmostApp();
+			if (Result.isOk(frontmost)) {
+				if (frontmost.value?.bundle_id && frontmost.value.bundle_id !== VOXFUSION_BUNDLE_ID) {
+					activeAppBundleId = frontmost.value.bundle_id;
 				}
-			} catch {}
+			}
 			await showVoiceControlWindow();
 
 			const deviceName = selectedMicrophone();
-			await startRecordingWithDevice(deviceName === "default" ? null : deviceName);
+			const started = await startRecordingWithDevice(deviceName === "default" ? null : deviceName);
+			if (Result.isError(started)) {
+				await hideVoiceControlWindow();
+				isStarting = false;
+				return;
+			}
 			void muteMediaForRecording();
 			activeRecordingMode = mode;
 			setIsRecording(true);
 			isStarting = false;
 			await registerEscapeShortcut();
-		} catch {
+		});
+		if (Result.isError(startedRecording)) {
 			await hideVoiceControlWindow();
 			isStopping = false;
 			isStarting = false;

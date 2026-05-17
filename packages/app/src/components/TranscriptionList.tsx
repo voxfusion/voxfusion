@@ -1,4 +1,5 @@
 import { type UnlistenFn, listen } from "@tauri-apps/api/event";
+import { Result } from "better-result";
 import { Loader } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
@@ -75,21 +76,22 @@ export default function TranscriptionList() {
 		setLoading(true);
 		setError(null);
 
-		try {
-			const result = await listTranscriptions(20, cursor || null);
-
-			const items = result.transcriptions ?? [];
-			const lastItem = items[items.length - 1];
-
-			setTranscriptions((prev) => (cursor ? [...prev, ...items] : items));
-			setNextCursor(lastItem?.created_at ?? null);
-			setHasMore(result.has_more ?? false);
-		} catch (err) {
-			setError(err instanceof Error ? err.message : t("transcriptionList.errorOccurred"));
-		} finally {
+		const result = await listTranscriptions(20, cursor || null);
+		if (Result.isError(result)) {
+			setError(result.error.message || t("transcriptionList.errorOccurred"));
 			setLoading(false);
 			setInitialLoading(false);
+			return;
 		}
+
+		const items = result.value.transcriptions ?? [];
+		const lastItem = items[items.length - 1];
+
+		setTranscriptions((prev) => (cursor ? [...prev, ...items] : items));
+		setNextCursor(lastItem?.created_at ?? null);
+		setHasMore(result.value.has_more ?? false);
+		setLoading(false);
+		setInitialLoading(false);
 	};
 
 	onMount(async () => {

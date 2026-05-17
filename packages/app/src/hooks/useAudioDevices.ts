@@ -9,14 +9,9 @@ export function useAudioDevices() {
 	const fetchDevices = async () => {
 		setIsLoading(true);
 		setError(null);
-		try {
-			const fetchedDevices = await getAudioInputDevices();
-			setDevices(fetchedDevices);
-		} catch {
-			setError("Failed to fetch audio devices");
-		} finally {
-			setIsLoading(false);
-		}
+		const fetchedDevices = await getAudioInputDevices();
+		setDevices(fetchedDevices);
+		setIsLoading(false);
 	};
 
 	return {

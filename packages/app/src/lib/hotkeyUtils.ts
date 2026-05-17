@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
+import { Result } from "better-result";
 
 type SystemKey =
 	| "fn"
@@ -242,9 +243,7 @@ async function registerGlobalHotkey(
 	hotkey: string,
 	handlers: HotkeyHandlers
 ): Promise<RegisteredHotkey> {
-	try {
-		await unregister(hotkey);
-	} catch {}
+	await Result.tryPromise(() => unregister(hotkey));
 
 	await register(hotkey, (event: GlobalShortcutEvent) => {
 		if (event.state === "Pressed") {
@@ -257,9 +256,7 @@ async function registerGlobalHotkey(
 	return {
 		hotkey,
 		dispose: async () => {
-			try {
-				await unregister(hotkey);
-			} catch {}
+			await Result.tryPromise(() => unregister(hotkey));
 		},
 	};
 }
@@ -286,7 +283,7 @@ export async function registerDictationHotkeys(
 	await unregisterDictationHotkey();
 
 	const registered: RegisteredHotkey[] = [];
-	try {
+	const result = await Result.tryPromise(async () => {
 		for (const config of hotkeys) {
 			registered.push(
 				isSystemOnlyHotkey(config.hotkey)
@@ -294,13 +291,14 @@ export async function registerDictationHotkeys(
 					: await registerGlobalHotkey(config.hotkey, config)
 			);
 		}
-		registeredDictationHotkeys = registered;
-	} catch (error) {
+	});
+	if (Result.isError(result)) {
 		for (const registration of registered) {
 			await registration.dispose();
 		}
-		throw error;
+		throw result.error;
 	}
+	registeredDictationHotkeys = registered;
 }
 
 /**

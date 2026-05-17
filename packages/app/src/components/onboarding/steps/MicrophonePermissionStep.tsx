@@ -1,3 +1,4 @@
+import { Result } from "better-result";
 import { AlertCircle, Check, Mic } from "lucide-solid";
 import { Show, createSignal, onMount } from "solid-js";
 import { useI18n } from "../../../i18n";
@@ -12,17 +13,19 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 	const [isRequesting, setIsRequesting] = createSignal(false);
 
 	const checkPermission = async () => {
-		try {
-			const result = await navigator.permissions.query({
+		const result = await Result.tryPromise(() =>
+			navigator.permissions.query({
 				name: "microphone" as PermissionName,
-			});
-			const granted = result.state === "granted";
-			setIsGranted(granted);
-			props.onPermissionChange(granted);
-		} catch {
+			})
+		);
+		if (Result.isError(result)) {
 			setIsGranted(false);
 			props.onPermissionChange(false);
+			return;
 		}
+		const granted = result.value.state === "granted";
+		setIsGranted(granted);
+		props.onPermissionChange(granted);
 	};
 
 	onMount(() => {
@@ -31,14 +34,16 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 
 	const handleRequest = async () => {
 		setIsRequesting(true);
-		try {
-			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-			for (const track of stream.getTracks()) {
+		const stream = await Result.tryPromise(() =>
+			navigator.mediaDevices.getUserMedia({ audio: true })
+		);
+		if (Result.isOk(stream)) {
+			for (const track of stream.value.getTracks()) {
 				track.stop();
 			}
 			setIsGranted(true);
 			props.onPermissionChange(true);
-		} catch {
+		} else {
 			setIsGranted(false);
 			props.onPermissionChange(false);
 		}
