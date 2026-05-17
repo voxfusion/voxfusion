@@ -11,7 +11,10 @@ export default function Sidebar(props: SidebarProps) {
 	const [t] = useI18n();
 	const location = useLocation();
 
-	const isActive = (path: string) => location.pathname === path;
+	const isActive = (path: string) =>
+		path === "/"
+			? location.pathname === path
+			: location.pathname === path || location.pathname.startsWith(`${path}/`);
 
 	return (
 		<aside class="w-56 bg-th-base border-r border-border flex flex-col h-full">
