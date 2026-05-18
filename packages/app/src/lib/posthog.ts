@@ -2,8 +2,8 @@ import { getVersion } from "@tauri-apps/api/app";
 import { Result } from "better-result";
 import posthog from "posthog-js";
 
-const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY;
-const POSTHOG_HOST = import.meta.env.VITE_POSTHOG_HOST ?? "https://eu.i.posthog.com";
+const POSTHOG_KEY = "phc_n9Bb8O4Xw0diLGriQ4FKjrfHvUnFWDYcwo0fdBbd36m";
+const POSTHOG_HOST = "https://eu.i.posthog.com";
 
 let initialized = false;
 let ready = false;
