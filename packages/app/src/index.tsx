@@ -4,6 +4,7 @@ import "./styles.css";
 import App from "./App";
 import { I18nCtx, createAppI18n, getStoredLocale } from "./i18n";
 import { initPostHog } from "./lib/posthog";
+import { disableContextMenu } from "./lib/contextMenu";
 import About from "./pages/About";
 import Dictionary from "./pages/Dictionary";
 import DictionaryDefault from "./pages/DictionaryDefault";
@@ -16,6 +17,7 @@ import StylePerApp from "./pages/StylePerApp";
 import StylePerSite from "./pages/StylePerSite";
 
 initPostHog();
+disableContextMenu();
 
 const root = document.getElementById("root");
 

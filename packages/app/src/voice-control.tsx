@@ -1,8 +1,11 @@
 import { listen } from "@tauri-apps/api/event";
 import { render } from "solid-js/web";
 import "./styles.css";
+import { disableContextMenu } from "./lib/contextMenu";
 import { type Theme, loadSettings } from "./lib/settingsStore";
 import VoiceControl from "./pages/VoiceControl";
+
+disableContextMenu();
 
 function applyTheme(theme: Theme): void {
 	const root = document.documentElement;
