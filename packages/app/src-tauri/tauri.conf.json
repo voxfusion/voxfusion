@@ -30,6 +30,8 @@
 				"title": "VoxFusion",
 				"width": 1360,
 				"height": 850,
+				"minWidth": 1024,
+				"minHeight": 720,
 				"resizable": true,
 				"decorations": true,
 				"titleBarStyle": "Overlay",

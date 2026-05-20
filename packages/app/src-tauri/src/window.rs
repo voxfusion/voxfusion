@@ -13,6 +13,7 @@ pub fn show_or_create_main_window(app: &tauri::AppHandle) {
             WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
                 .title("VoxFusion")
                 .inner_size(1360.0, 850.0)
+                .min_inner_size(1024.0, 720.0)
                 .resizable(true)
                 .decorations(true)
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
