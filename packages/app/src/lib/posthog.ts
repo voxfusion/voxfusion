@@ -13,8 +13,6 @@ async function registerAppVersion() {
 	const appVersion = await Result.tryPromise(() => getVersion());
 	if (Result.isOk(appVersion)) {
 		posthog.register({ app_version: appVersion.value });
-		posthog.people.set_once({ first_app_version: appVersion.value });
-		posthog.people.set({ app_version: appVersion.value });
 	} else {
 		console.warn("Failed to register PostHog app version:", appVersion.error);
 	}
