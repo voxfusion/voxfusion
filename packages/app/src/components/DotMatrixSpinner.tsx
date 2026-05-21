@@ -2,13 +2,19 @@ import { For } from "solid-js";
 
 const MATRIX_SIZE = 5;
 const CENTER = Math.floor(MATRIX_SIZE / 2);
+const RING_PATH: readonly number[] = [1, 2, 3, 9, 14, 19, 23, 22, 21, 15, 10, 5];
 
-const DOTS = Array.from({ length: MATRIX_SIZE * MATRIX_SIZE }, (_, i) => {
-	const row = Math.floor(i / MATRIX_SIZE);
-	const col = i % MATRIX_SIZE;
-	const manhattan = Math.abs(row - CENTER) + Math.abs(col - CENTER);
-	const ring = Math.max(0, Math.min(4, manhattan));
-	return { row, col, ring, parity: ring % 2 };
+const DOTS = Array.from({ length: MATRIX_SIZE * MATRIX_SIZE }, (_, index) => {
+	const row = Math.floor(index / MATRIX_SIZE);
+	const col = index % MATRIX_SIZE;
+	const distance = Math.hypot(row - CENTER, col - CENTER);
+	const ringOrder = RING_PATH.indexOf(index);
+
+	return {
+		isCenter: row === CENTER && col === CENTER,
+		isVisible: distance <= CENTER,
+		ringOrder,
+	};
 });
 
 type DotMatrixSpinnerProps = {
@@ -21,12 +27,11 @@ type DotMatrixSpinnerProps = {
 export default function DotMatrixSpinner(props: DotMatrixSpinnerProps) {
 	const size = () => props.size ?? 14;
 	const dotSize = () => props.dotSize ?? 2;
-	const cycleMs = () => props.cycleMs ?? 1500;
+	const cycleMs = () => props.cycleMs ?? 1200;
 	const gap = () => (size() - dotSize() * MATRIX_SIZE) / (MATRIX_SIZE - 1);
 
 	return (
-		<div
-			role="status"
+		<output
 			aria-label="Loading"
 			class={props.class}
 			style={{
@@ -44,15 +49,20 @@ export default function DotMatrixSpinner(props: DotMatrixSpinnerProps) {
 						style={{
 							"border-radius": "9999px",
 							"background-color": "currentColor",
-							"animation-name": "dmx-ripple-echo",
-							"animation-duration": `${cycleMs()}ms`,
-							"animation-timing-function": "ease-in-out",
-							"animation-iteration-count": "infinite",
-							"animation-delay": `${(dot.ring * 0.14 + dot.parity * 0.03) * cycleMs()}ms`,
+							opacity: dot.isVisible ? (dot.isCenter ? 0.18 : 0.08) : 0,
+							...(dot.ringOrder >= 0
+								? {
+										"animation-name": "dotm-circular-2",
+										"animation-duration": `${cycleMs()}ms`,
+										"animation-timing-function": "steps(12, end)",
+										"animation-iteration-count": "infinite",
+										"animation-delay": `${(dot.ringOrder / RING_PATH.length) * cycleMs()}ms`,
+									}
+								: {}),
 						}}
 					/>
 				)}
 			</For>
-		</div>
+		</output>
 	);
 }

@@ -369,9 +369,9 @@ export default function VoiceControl() {
 			</Show>
 			<div
 				class="overflow-hidden transition-[max-width] duration-300 ease-out flex items-center"
-				style={{ "max-width": loading() ? "26px" : "0px" }}
+				style={{ "max-width": loading() ? "24px" : "0px" }}
 			>
-				<DotMatrixSpinner class="text-ac ml-2" size={18} dotSize={3} />
+				<DotMatrixSpinner class="text-ac ml-2" size={16} dotSize={3} />
 			</div>
 		</div>
 	);
