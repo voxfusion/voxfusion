@@ -1,5 +1,5 @@
 ---
-import { useTranslations, defaultLang, languages } from "../i18n/utils";
+import { defaultLang, type languages, useTranslations } from "../i18n/utils";
 
 interface Props {
 	lang?: keyof typeof languages;
@@ -41,9 +41,25 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 					</div>
 					<div class="card-terminal">
 						<span class="terminal-prompt">$</span>
-						<span class="terminal-command">download --arch=auto</span>
+						<span class="terminal-command">download --arch=arm64</span>
 					</div>
-					<a href={`${baseUrl}/VoxFusion-latest.dmg`} class="download-btn" data-umami-event="download_dmg" data-umami-event-variant="latest">
+					<a href={`${baseUrl}/VoxFusion-latest.dmg`} class="download-btn" data-umami-event="download_dmg" data-umami-event-variant="apple_silicon">
+						<span class="btn-icon">↓</span>
+						<span>.dmg</span>
+					</a>
+				</div>
+
+				<div class="download-card">
+					<div class="card-index">02</div>
+					<div class="card-content">
+						<h3 class="card-title">{t("downloads.macos.intel")}</h3>
+						<p class="card-description">{t("downloads.macos.intel.description")}</p>
+					</div>
+					<div class="card-terminal">
+						<span class="terminal-prompt">$</span>
+						<span class="terminal-command">download --arch=x86_64</span>
+					</div>
+					<a href={`${baseUrl}/VoxFusion-latest-intel.dmg`} class="download-btn secondary" data-umami-event="download_dmg" data-umami-event-variant="intel">
 						<span class="btn-icon">↓</span>
 						<span>.dmg</span>
 					</a>
@@ -174,7 +190,7 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 
 	.download-grid {
 		display: grid;
-		grid-template-columns: 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 1px;
 		background: #222;
 		border: 1px solid #222;
