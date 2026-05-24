@@ -83,49 +83,84 @@ jobs:
           # APPLE_ID: ${{ secrets.APPLE_ID }}
           # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: bun run tauri build --target universal-apple-darwin
+        run: |
+          bun run tauri build --target aarch64-apple-darwin
+          bun run tauri build --target x86_64-apple-darwin
 
       - name: Find build artifacts
         id: artifacts
         run: |
           echo "Searching for artifacts..."
 
-          DMG_PATH=$(find packages/app/src-tauri/target -name "*.dmg" -type f | head -1)
-          if [ -z "$DMG_PATH" ]; then
-            echo "Error: No DMG file found"
-            find packages/app/src-tauri/target -type f -name "*.dmg" || true
+          ARM_DMG_PATH=$(find packages/app/src-tauri/target/aarch64-apple-darwin -name "*.dmg" -type f | head -1)
+          if [ -z "$ARM_DMG_PATH" ]; then
+            echo "Error: No Apple Silicon DMG file found"
+            find packages/app/src-tauri/target/aarch64-apple-darwin -type f -name "*.dmg" || true
             exit 1
           fi
-          echo "Found DMG: $DMG_PATH"
-          echo "DMG_PATH=$DMG_PATH" >> $GITHUB_OUTPUT
+          echo "Found Apple Silicon DMG: $ARM_DMG_PATH"
+          echo "ARM_DMG_PATH=$ARM_DMG_PATH" >> $GITHUB_OUTPUT
 
-          TARBALL_PATH=$(find packages/app/src-tauri/target -name "*.app.tar.gz" -type f | head -1)
-          if [ -z "$TARBALL_PATH" ]; then
-            echo "Error: No .app.tar.gz file found"
-            find packages/app/src-tauri/target -type f -name "*.tar.gz" || true
+          INTEL_DMG_PATH=$(find packages/app/src-tauri/target/x86_64-apple-darwin -name "*.dmg" -type f | head -1)
+          if [ -z "$INTEL_DMG_PATH" ]; then
+            echo "Error: No Intel DMG file found"
+            find packages/app/src-tauri/target/x86_64-apple-darwin -type f -name "*.dmg" || true
             exit 1
           fi
-          echo "Found tarball: $TARBALL_PATH"
-          echo "TARBALL_PATH=$TARBALL_PATH" >> $GITHUB_OUTPUT
+          echo "Found Intel DMG: $INTEL_DMG_PATH"
+          echo "INTEL_DMG_PATH=$INTEL_DMG_PATH" >> $GITHUB_OUTPUT
 
-          SIG_FILE="${TARBALL_PATH}.sig"
-          if [ -f "$SIG_FILE" ]; then
-            echo "Found signature file: $SIG_FILE"
-            cat "$SIG_FILE"
+          ARM_TARBALL_PATH=$(find packages/app/src-tauri/target/aarch64-apple-darwin -name "*.app.tar.gz" -type f | head -1)
+          if [ -z "$ARM_TARBALL_PATH" ]; then
+            echo "Error: No Apple Silicon .app.tar.gz file found"
+            find packages/app/src-tauri/target/aarch64-apple-darwin -type f -name "*.tar.gz" || true
+            exit 1
+          fi
+          echo "Found Apple Silicon tarball: $ARM_TARBALL_PATH"
+          echo "ARM_TARBALL_PATH=$ARM_TARBALL_PATH" >> $GITHUB_OUTPUT
+
+          INTEL_TARBALL_PATH=$(find packages/app/src-tauri/target/x86_64-apple-darwin -name "*.app.tar.gz" -type f | head -1)
+          if [ -z "$INTEL_TARBALL_PATH" ]; then
+            echo "Error: No Intel .app.tar.gz file found"
+            find packages/app/src-tauri/target/x86_64-apple-darwin -type f -name "*.tar.gz" || true
+            exit 1
+          fi
+          echo "Found Intel tarball: $INTEL_TARBALL_PATH"
+          echo "INTEL_TARBALL_PATH=$INTEL_TARBALL_PATH" >> $GITHUB_OUTPUT
+
+          ARM_SIG_FILE="${ARM_TARBALL_PATH}.sig"
+          if [ -f "$ARM_SIG_FILE" ]; then
+            echo "Found Apple Silicon signature file: $ARM_SIG_FILE"
+            cat "$ARM_SIG_FILE"
           else
-            echo "Error: No signature file found at $SIG_FILE"
-            find packages/app/src-tauri/target -name "*.sig" -type f || true
+            echo "Error: No Apple Silicon signature file found at $ARM_SIG_FILE"
+            find packages/app/src-tauri/target/aarch64-apple-darwin -name "*.sig" -type f || true
             exit 1
           fi
-          echo "SIG_FILE=$SIG_FILE" >> $GITHUB_OUTPUT
+          echo "ARM_SIG_FILE=$ARM_SIG_FILE" >> $GITHUB_OUTPUT
+
+          INTEL_SIG_FILE="${INTEL_TARBALL_PATH}.sig"
+          if [ -f "$INTEL_SIG_FILE" ]; then
+            echo "Found Intel signature file: $INTEL_SIG_FILE"
+            cat "$INTEL_SIG_FILE"
+          else
+            echo "Error: No Intel signature file found at $INTEL_SIG_FILE"
+            find packages/app/src-tauri/target/x86_64-apple-darwin -name "*.sig" -type f || true
+            exit 1
+          fi
+          echo "INTEL_SIG_FILE=$INTEL_SIG_FILE" >> $GITHUB_OUTPUT
 
       - name: Prepare artifacts for upload
         run: |
           mkdir -p release-artifacts
-          cp "${{ steps.artifacts.outputs.DMG_PATH }}" release-artifacts/VoxFusion.dmg
-          cp "${{ steps.artifacts.outputs.DMG_PATH }}" release-artifacts/VoxFusion-latest.dmg
-          cp "${{ steps.artifacts.outputs.TARBALL_PATH }}" release-artifacts/VoxFusion.app.tar.gz
-          cp "${{ steps.artifacts.outputs.SIG_FILE }}" release-artifacts/VoxFusion.app.tar.gz.sig
+          cp "${{ steps.artifacts.outputs.ARM_DMG_PATH }}" release-artifacts/VoxFusion.dmg
+          cp "${{ steps.artifacts.outputs.ARM_DMG_PATH }}" release-artifacts/VoxFusion-latest.dmg
+          cp "${{ steps.artifacts.outputs.ARM_TARBALL_PATH }}" release-artifacts/VoxFusion.app.tar.gz
+          cp "${{ steps.artifacts.outputs.ARM_SIG_FILE }}" release-artifacts/VoxFusion.app.tar.gz.sig
+          cp "${{ steps.artifacts.outputs.INTEL_DMG_PATH }}" release-artifacts/VoxFusion-intel.dmg
+          cp "${{ steps.artifacts.outputs.INTEL_DMG_PATH }}" release-artifacts/VoxFusion-latest-intel.dmg
+          cp "${{ steps.artifacts.outputs.INTEL_TARBALL_PATH }}" release-artifacts/VoxFusion-intel.app.tar.gz
+          cp "${{ steps.artifacts.outputs.INTEL_SIG_FILE }}" release-artifacts/VoxFusion-intel.app.tar.gz.sig
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -150,31 +185,40 @@ jobs:
       - name: Generate updater manifests
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
+          ARM_SIGNATURE=$(cat release-artifacts/VoxFusion.app.tar.gz.sig)
+          INTEL_SIGNATURE=$(cat release-artifacts/VoxFusion-intel.app.tar.gz.sig)
 
           create_manifest() {
             local output="$1"
-            local download_url="$2"
+            local arm_download_url="$2"
+            local intel_download_url="$3"
 
             jq -n \
               --arg version "$VERSION" \
-              --arg signature "$SIGNATURE" \
-              --arg url "$download_url" \
+              --arg arm_signature "$ARM_SIGNATURE" \
+              --arg intel_signature "$INTEL_SIGNATURE" \
+              --arg arm_url "$arm_download_url" \
+              --arg intel_url "$intel_download_url" \
               --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
               '{
                 version: $version,
                 notes: "See release notes on GitHub",
                 pub_date: $pub_date,
                 platforms: {
-                  "darwin-universal": { signature: $signature, url: $url },
-                  "darwin-x86_64": { signature: $signature, url: $url },
-                  "darwin-aarch64": { signature: $signature, url: $url }
+                  "darwin-aarch64": { signature: $arm_signature, url: $arm_url },
+                  "darwin-x86_64": { signature: $intel_signature, url: $intel_url }
                 }
               }' > "$output"
           }
 
-          create_manifest latest-current.json "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
-          create_manifest latest-legacy.json "https://github.com/${{ env.LEGACY_RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz"
+          create_manifest \
+            latest-current.json \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz" \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/VoxFusion-intel.app.tar.gz"
+          create_manifest \
+            latest-legacy.json \
+            "https://github.com/${{ env.LEGACY_RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion.app.tar.gz" \
+            "https://github.com/${{ env.LEGACY_RELEASES_REPO }}/releases/download/${{ github.ref_name }}/VoxFusion-intel.app.tar.gz"
 
           echo "Created current repository updater manifest:"
           cat latest-current.json
@@ -204,7 +248,10 @@ jobs:
           files: |
             release-artifacts/VoxFusion.dmg
             release-artifacts/VoxFusion-latest.dmg
+            release-artifacts/VoxFusion-intel.dmg
+            release-artifacts/VoxFusion-latest-intel.dmg
             release-artifacts/VoxFusion.app.tar.gz
+            release-artifacts/VoxFusion-intel.app.tar.gz
             latest.json
 
       - name: Prepare legacy releases repository manifest
@@ -232,5 +279,8 @@ jobs:
           files: |
             release-artifacts/VoxFusion.dmg
             release-artifacts/VoxFusion-latest.dmg
+            release-artifacts/VoxFusion-intel.dmg
+            release-artifacts/VoxFusion-latest-intel.dmg
             release-artifacts/VoxFusion.app.tar.gz
+            release-artifacts/VoxFusion-intel.app.tar.gz
             latest.json
