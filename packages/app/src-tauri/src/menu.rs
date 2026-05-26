@@ -14,6 +14,11 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let menu = Menu::default(app.handle())?;
 
     if let Some(MenuItemKind::Submenu(app_menu)) = menu.items()?.into_iter().next() {
+        // The default macOS app menu Quit item sends a Quit AppleEvent, bypassing
+        // Tauri's ExitRequested guard. Keep explicit quit in the tray menu only.
+        let last_item_index = app_menu.items()?.len().saturating_sub(1);
+        let _ = app_menu.remove_at(last_item_index)?;
+
         app_menu.insert_items(
             &[
                 &MenuItem::with_id(
