@@ -10,14 +10,13 @@ use handlers::{
     add_app_dictionary_word, add_dictionary_word, add_site_dictionary_word,
     check_accessibility_probe, check_model_status, delete_app_dictionary,
     delete_app_dictionary_word, delete_app_instruction, delete_dictionary_word,
-    delete_site_dictionary, delete_site_dictionary_word, delete_site_style,
-    download_whisper_model, get_dictionary_prompt, get_frontmost_app, list_app_dictionaries,
-    list_app_instructions, list_audio_devices, list_dictionary_words, list_installed_apps,
-    list_site_dictionaries, list_site_styles, list_transcriptions, mute_media_for_recording,
-    process_audio_file, read_audio_file, restore_media_after_recording, save_transcription,
-    set_app_instruction, set_site_style, start_recording_with_device, stop_recording_with_device,
-    transcribe_audio, type_text, update_app_dictionary_word, update_dictionary_word,
-    update_site_dictionary_word,
+    delete_site_dictionary, delete_site_dictionary_word, delete_site_style, download_whisper_model,
+    get_dictionary_prompt, get_frontmost_app, list_app_dictionaries, list_app_instructions,
+    list_audio_devices, list_dictionary_words, list_installed_apps, list_site_dictionaries,
+    list_site_styles, list_transcriptions, mute_media_for_recording, process_audio_file,
+    read_audio_file, restore_media_after_recording, save_transcription, set_app_instruction,
+    set_site_style, start_recording_with_device, stop_recording_with_device, transcribe_audio,
+    type_text, update_app_dictionary_word, update_dictionary_word, update_site_dictionary_word,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -105,8 +104,18 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| {
             #[cfg(desktop)]
-            if let tauri::RunEvent::Reopen { .. } = event {
-                window::show_or_create_main_window(app);
+            match event {
+                tauri::RunEvent::Reopen { .. } => {
+                    window::show_or_create_main_window(app);
+                }
+                tauri::RunEvent::ExitRequested { code, api, .. } => {
+                    // Keep the tray app resident when macOS or another app sends a Quit AppleEvent.
+                    // Explicit tray quits and updater restarts use a programmatic exit code.
+                    if code.is_none() {
+                        api.prevent_exit();
+                    }
+                }
+                _ => {}
             }
         });
 }
