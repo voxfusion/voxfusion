@@ -168,6 +168,7 @@ pub fn run() {
         .run(|app, event| {
             #[cfg(desktop)]
             match event {
+                #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
                     log::info!(target: "runtime", "reopen_requested");
                     window::show_or_create_main_window(app);

@@ -9,18 +9,23 @@ pub fn show_or_create_main_window(app: &tauri::AppHandle) {
     } else {
         use tauri::WebviewWindowBuilder;
 
-        if let Ok(window) =
-            WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
-                .title("VoxFusion")
-                .inner_size(1360.0, 850.0)
-                .min_inner_size(1024.0, 720.0)
-                .resizable(true)
-                .decorations(true)
+        let mut builder = WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
+            .title("VoxFusion")
+            .inner_size(1360.0, 850.0)
+            .min_inner_size(1024.0, 720.0)
+            .resizable(true)
+            .decorations(true)
+            .fullscreen(false)
+            .center();
+
+        #[cfg(target_os = "macos")]
+        {
+            builder = builder
                 .title_bar_style(tauri::TitleBarStyle::Overlay)
-                .hidden_title(true)
-                .fullscreen(false)
-                .center()
-                .build()
+                .hidden_title(true);
+        }
+
+        if let Ok(window) = builder.build()
         {
             let _ = window.show();
             let _ = window.set_focus();
