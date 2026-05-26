@@ -19,8 +19,38 @@ use handlers::{
     type_text, update_app_dictionary_word, update_dictionary_word, update_site_dictionary_word,
 };
 
+fn install_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let payload = panic_info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|value| (*value).to_string())
+            .or_else(|| panic_info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "unknown panic payload".to_string());
+
+        let location = panic_info
+            .location()
+            .map(|location| {
+                format!(
+                    "{}:{}:{}",
+                    location.file(),
+                    location.line(),
+                    location.column()
+                )
+            })
+            .unwrap_or_else(|| "unknown".to_string());
+
+        log::error!(target: "runtime", "rust_panic payload={payload:?} location={location}");
+
+        default_hook(panic_info);
+    }));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    install_panic_hook();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             type_text,
@@ -68,34 +98,67 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .clear_targets()
+                .level(log::LevelFilter::Debug)
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("voxfusion".to_string()),
+                    },
+                ))
+                .max_file_size(5_000_000)
+                .build(),
+        )
         .setup(|app| {
+            log::info!(
+                target: "runtime",
+                "setup_started cargo_package_version={}",
+                env!("CARGO_PKG_VERSION")
+            );
+
             #[cfg(target_os = "macos")]
             {
                 listeners::accessibility_watcher::setup(app.handle());
                 listeners::system_key_watcher::setup(app.handle());
+                log::info!(target: "runtime", "macos_listeners_setup");
             }
 
             let db_state = handlers::db::init_db(app.handle())?;
             app.manage(db_state);
+            log::info!(target: "runtime", "database_initialized");
 
             #[cfg(desktop)]
             let _ = app
                 .handle()
                 .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                    log::info!(target: "runtime", "single_instance_requested");
                     window::show_or_create_main_window(app);
                 }));
 
             #[cfg(desktop)]
             menu::setup(app)?;
+            #[cfg(desktop)]
+            log::info!(target: "runtime", "menu_setup");
 
             #[cfg(desktop)]
             tray::setup(app)?;
+            #[cfg(desktop)]
+            log::info!(target: "runtime", "tray_setup");
+
+            log::info!(target: "runtime", "setup_completed");
             Ok(())
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                log::info!(
+                    target: "runtime",
+                    "window_close_requested label={}",
+                    window.label()
+                );
                 if window.label() == "main" {
                     api.prevent_close();
+                    log::info!(target: "runtime", "main_window_close_prevented");
                     let _ = window.hide();
                 }
             }
@@ -106,14 +169,23 @@ pub fn run() {
             #[cfg(desktop)]
             match event {
                 tauri::RunEvent::Reopen { .. } => {
+                    log::info!(target: "runtime", "reopen_requested");
                     window::show_or_create_main_window(app);
                 }
                 tauri::RunEvent::ExitRequested { code, api, .. } => {
+                    log::warn!(target: "runtime", "exit_requested code={code:?}");
                     // Keep the tray app resident when macOS or another app sends a Quit AppleEvent.
                     // Explicit tray quits and updater restarts use a programmatic exit code.
                     if code.is_none() {
                         api.prevent_exit();
+                        log::warn!(
+                            target: "runtime",
+                            "exit_prevented reason=code_less_exit_request"
+                        );
                     }
+                }
+                tauri::RunEvent::Exit => {
+                    log::warn!(target: "runtime", "exit");
                 }
                 _ => {}
             }

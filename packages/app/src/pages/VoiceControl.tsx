@@ -17,6 +17,7 @@ import {
 } from "../lib/commands/media";
 import { typeText } from "../lib/commands/text";
 import { saveTranscription, transcribeAudio } from "../lib/commands/transcriptions";
+import { errorFields, logDiagnostic } from "../lib/diagnostics";
 import {
 	isValidHotkey,
 	registerDictationHotkeys,
@@ -238,6 +239,9 @@ export default function VoiceControl() {
 		if (isStopping) return;
 		if (!isRecording()) return;
 
+		logDiagnostic("info", "voice", "stop_recording_started", {
+			mode: activeRecordingMode,
+		});
 		isStopping = true;
 		setIsRecording(false);
 		activeRecordingMode = null;
@@ -245,7 +249,10 @@ export default function VoiceControl() {
 
 		const completed = await Result.tryPromise(async () => {
 			const filePath = await stopRecordingWithDevice();
-			if (Result.isError(filePath)) return;
+			if (Result.isError(filePath)) {
+				logDiagnostic("error", "voice", "stop_recording_failed", errorFields(filePath.error));
+				return;
+			}
 			await restoreMediaAfterRecording();
 
 			setLoading(true);
@@ -260,20 +267,40 @@ export default function VoiceControl() {
 				domain,
 				settings().defaultStyle
 			);
-			if (Result.isError(result)) return;
+			if (Result.isError(result)) {
+				logDiagnostic("error", "voice", "transcription_failed", errorFields(result.error));
+				return;
+			}
 			await saveTranscription(result.value);
+			logDiagnostic("info", "voice", "transcription_completed", {
+				wordCount: result.value.word_count,
+				processingTimeMs: result.value.processing_time_ms,
+				audioDurationMs: result.value.audio_duration_ms,
+				hasAppContext: Boolean(bundleId),
+				hasSiteContext: Boolean(domain),
+				style: settings().defaultStyle,
+			});
 
 			await typeText(result.value.text ?? "");
+			logDiagnostic("info", "voice", "text_typed", {
+				characterCount: result.value.text?.length ?? 0,
+			});
 
 			setTimeout(() => {
 				emit("transcription-created");
 			}, 1000);
 		});
-		if (Result.isError(completed)) console.error("Failed to stop recording:", completed.error);
+		if (Result.isError(completed)) {
+			logDiagnostic("error", "voice", "stop_recording_unhandled_failure", {
+				error: errorFields(completed.error),
+			});
+			console.error("Failed to stop recording:", completed.error);
+		}
 		await restoreMediaAfterRecording();
 		setLoading(false);
 		isStopping = false;
 		await hideVoiceControlWindow();
+		logDiagnostic("info", "voice", "stop_recording_completed");
 	};
 
 	const registerEscapeShortcut = async () => {
@@ -293,6 +320,9 @@ export default function VoiceControl() {
 		if (isStopping) return;
 		if (!isRecording()) return;
 
+		logDiagnostic("warn", "voice", "recording_cancelled", {
+			mode: activeRecordingMode,
+		});
 		isStopping = true;
 		setIsRecording(false);
 		activeRecordingMode = null;
@@ -320,6 +350,7 @@ export default function VoiceControl() {
 			if (isRecording()) return;
 			if (isStopping || isStarting) return;
 			isStarting = true;
+			logDiagnostic("info", "voice", "start_recording_started", { mode });
 			activeAppBundleId = null;
 			activeDomain = null;
 			const frontmost = await getFrontmostApp();
@@ -334,6 +365,10 @@ export default function VoiceControl() {
 			const deviceName = selectedMicrophone();
 			const started = await startRecordingWithDevice(deviceName === "default" ? null : deviceName);
 			if (Result.isError(started)) {
+				logDiagnostic("error", "voice", "start_recording_failed", {
+					error: errorFields(started.error),
+					hasSelectedMicrophone: Boolean(deviceName && deviceName !== "default"),
+				});
 				await hideVoiceControlWindow();
 				isStarting = false;
 				return;
@@ -343,8 +378,17 @@ export default function VoiceControl() {
 			setIsRecording(true);
 			isStarting = false;
 			await registerEscapeShortcut();
+			logDiagnostic("info", "voice", "start_recording_completed", {
+				mode,
+				hasAppContext: Boolean(activeAppBundleId),
+				hasSiteContext: Boolean(activeDomain),
+				hasSelectedMicrophone: Boolean(deviceName && deviceName !== "default"),
+			});
 		});
 		if (Result.isError(startedRecording)) {
+			logDiagnostic("error", "voice", "start_recording_unhandled_failure", {
+				error: errorFields(startedRecording.error),
+			});
 			await hideVoiceControlWindow();
 			isStopping = false;
 			isStarting = false;

@@ -5,6 +5,7 @@ import { Result } from "better-result";
 import { Download } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
+import { errorFields, logDiagnostic } from "../lib/diagnostics";
 
 const UPDATE_CHECK_INTERVAL_MS = 10_000;
 
@@ -17,18 +18,41 @@ export default function UpdateNotification() {
 	let isCheckingForUpdates = false;
 
 	const checkForUpdates = async () => {
-		if (isCheckingForUpdates || isDownloading()) return;
+		if (isCheckingForUpdates || isDownloading()) {
+			logDiagnostic("debug", "updater", "check_skipped", {
+				isCheckingForUpdates,
+				isDownloading: isDownloading(),
+			});
+			return;
+		}
 
 		isCheckingForUpdates = true;
-		const available = await Result.tryPromise(() => check());
-		if (Result.isOk(available) && available.value) {
-			setUpdate(available.value);
-			setIsVisible(true);
-		} else if (Result.isOk(available)) {
-			setUpdate(null);
-			setIsVisible(false);
+		const startedAt = Date.now();
+		logDiagnostic("debug", "updater", "check_started");
+		try {
+			const available = await Result.tryPromise(() => check());
+			if (Result.isOk(available) && available.value) {
+				logDiagnostic("info", "updater", "update_available", {
+					version: available.value.version,
+					elapsedMs: Date.now() - startedAt,
+				});
+				setUpdate(available.value);
+				setIsVisible(true);
+			} else if (Result.isOk(available)) {
+				logDiagnostic("debug", "updater", "no_update", {
+					elapsedMs: Date.now() - startedAt,
+				});
+				setUpdate(null);
+				setIsVisible(false);
+			} else {
+				logDiagnostic("error", "updater", "check_failed", {
+					elapsedMs: Date.now() - startedAt,
+					error: errorFields(available.error),
+				});
+			}
+		} finally {
+			isCheckingForUpdates = false;
 		}
-		isCheckingForUpdates = false;
 	};
 
 	onMount(() => {
@@ -60,24 +84,45 @@ export default function UpdateNotification() {
 		const updateInfo = update();
 		if (!updateInfo) return;
 
+		logDiagnostic("info", "updater", "download_and_restart_requested", {
+			version: updateInfo.version,
+		});
 		setIsDownloading(true);
+		let downloadedBytes = 0;
 		const installed = await Result.tryPromise({
 			try: async () => {
 				await updateInfo.downloadAndInstall((event) => {
 					if (event.event === "Started" && event.data.contentLength) {
+						downloadedBytes = 0;
+						logDiagnostic("info", "updater", "download_started", {
+							version: updateInfo.version,
+							contentLength: event.data.contentLength,
+						});
 						setDownloadProgress(0);
 					} else if (event.event === "Progress") {
+						downloadedBytes += event.data.chunkLength;
 						const progress = downloadProgress() + event.data.chunkLength;
 						setDownloadProgress(progress);
 					} else if (event.event === "Finished") {
+						logDiagnostic("info", "updater", "download_finished", {
+							version: updateInfo.version,
+							downloadedBytes,
+						});
 						setDownloadProgress(100);
 					}
+				});
+				logDiagnostic("warn", "updater", "relaunch_requested", {
+					version: updateInfo.version,
 				});
 				await relaunch();
 			},
 			catch: (cause) => cause,
 		});
 		if (Result.isError(installed)) {
+			logDiagnostic("error", "updater", "download_or_install_failed", {
+				version: updateInfo.version,
+				error: errorFields(installed.error),
+			});
 			setIsDownloading(false);
 		}
 	};

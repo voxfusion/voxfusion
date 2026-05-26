@@ -1,4 +1,5 @@
 import { useNavigate } from "@solidjs/router";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { Result } from "better-result";
 import { type ParentProps, Show, createSignal, onCleanup, onMount } from "solid-js";
@@ -9,6 +10,7 @@ import OnboardingWizard from "./components/onboarding/OnboardingWizard";
 import { listInstalledApps } from "./lib/commands/apps";
 import { listSiteDictionaries } from "./lib/commands/dictionary";
 import { checkModelStatus } from "./lib/commands/model";
+import { errorFields, logDiagnostic } from "./lib/diagnostics";
 import { preloadFavicons } from "./lib/favicons";
 import { MODEL_DOWNLOAD_STEP } from "./lib/onboarding";
 import { capture } from "./lib/posthog";
@@ -58,52 +60,112 @@ function App(props: ParentProps) {
 	};
 
 	onMount(async () => {
-		capture("app_opened");
-		await waitForTauriIPC();
-		await initSettings();
-
-		const modelReady = await checkModelStatus();
-		if (Result.isOk(modelReady) && !modelReady.value && settings().onboardingComplete) {
-			await resumeOnboardingAt(MODEL_DOWNLOAD_STEP);
-		}
-		if (Result.isError(modelReady)) {
-			console.error("Failed to verify Whisper model state:", modelReady.error);
-		}
-
-		setIsReady(true);
-
-		void listSiteDictionaries().then((result) => {
-			if (Result.isOk(result)) {
-				preloadFavicons(result.value.map((g) => g.domain));
-			}
-		});
-
-		void listInstalledApps();
-
-		const unlistenNavigate = await listen<string>("navigate", (event) => {
-			navigate(event.payload);
-		});
-		onCleanup(() => unlistenNavigate());
-
-		const unlistenMicrophone = await listen<string>("select-microphone", async (event) => {
-			const deviceName = event.payload;
-			await updateMicrophone(deviceName || null);
-		});
-		onCleanup(() => unlistenMicrophone());
-
-		const unlistenAccessibility = await listen("accessibility-permission-needed", () => {
-			setIsSettingsOpen(true);
-		});
-		onCleanup(() => unlistenAccessibility());
-
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.metaKey && e.key === ",") {
-				e.preventDefault();
-				setIsSettingsOpen(true);
-			}
+		const handleWindowError = (event: ErrorEvent) => {
+			logDiagnostic("error", "app", "window_error", {
+				message: event.message,
+				source: event.filename,
+				line: event.lineno,
+				column: event.colno,
+				error: errorFields(event.error),
+			});
 		};
-		window.addEventListener("keydown", handleKeyDown);
-		onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+		const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+			logDiagnostic("error", "app", "unhandled_rejection", {
+				reason: errorFields(event.reason),
+			});
+		};
+		window.addEventListener("error", handleWindowError);
+		window.addEventListener("unhandledrejection", handleUnhandledRejection);
+		onCleanup(() => {
+			window.removeEventListener("error", handleWindowError);
+			window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+		});
+
+		try {
+			logDiagnostic("info", "app", "mount_started");
+			capture("app_opened");
+			await waitForTauriIPC();
+
+			const appVersion = await Result.tryPromise(() => getVersion());
+			logDiagnostic("info", "app", "ipc_ready", {
+				version: Result.isOk(appVersion) ? appVersion.value : null,
+			});
+
+			await initSettings();
+			logDiagnostic("info", "app", "settings_initialized", {
+				onboardingComplete: settings().onboardingComplete,
+				onboardingStep: settings().onboardingStep,
+				defaultStyle: settings().defaultStyle,
+			});
+
+			const modelReady = await checkModelStatus();
+			if (Result.isOk(modelReady) && !modelReady.value && settings().onboardingComplete) {
+				logDiagnostic("warn", "app", "model_missing_resume_onboarding");
+				await resumeOnboardingAt(MODEL_DOWNLOAD_STEP);
+			}
+			if (Result.isError(modelReady)) {
+				logDiagnostic("error", "app", "model_status_failed", errorFields(modelReady.error));
+				console.error("Failed to verify Whisper model state:", modelReady.error);
+			}
+
+			setIsReady(true);
+			logDiagnostic("info", "app", "ready");
+
+			void listSiteDictionaries().then((result) => {
+				if (Result.isOk(result)) {
+					logDiagnostic("debug", "app", "site_dictionaries_loaded", {
+						count: result.value.length,
+					});
+					preloadFavicons(result.value.map((g) => g.domain));
+				} else {
+					logDiagnostic("error", "app", "site_dictionaries_failed", errorFields(result.error));
+				}
+			});
+
+			void listInstalledApps().then((result) => {
+				if (Result.isOk(result)) {
+					logDiagnostic("debug", "app", "installed_apps_loaded", {
+						count: result.value.length,
+					});
+				} else {
+					logDiagnostic("error", "app", "installed_apps_failed", errorFields(result.error));
+				}
+			});
+
+			const unlistenNavigate = await listen<string>("navigate", (event) => {
+				logDiagnostic("debug", "app", "navigate_event", { path: event.payload });
+				navigate(event.payload);
+			});
+			onCleanup(() => unlistenNavigate());
+
+			const unlistenMicrophone = await listen<string>("select-microphone", async (event) => {
+				const deviceName = event.payload;
+				logDiagnostic("debug", "app", "select_microphone_event", {
+					hasDeviceName: Boolean(deviceName),
+				});
+				await updateMicrophone(deviceName || null);
+			});
+			onCleanup(() => unlistenMicrophone());
+
+			const unlistenAccessibility = await listen("accessibility-permission-needed", () => {
+				logDiagnostic("warn", "app", "accessibility_permission_needed");
+				setIsSettingsOpen(true);
+			});
+			onCleanup(() => unlistenAccessibility());
+
+			const handleKeyDown = (e: KeyboardEvent) => {
+				if (e.metaKey && e.key === ",") {
+					e.preventDefault();
+					logDiagnostic("debug", "app", "settings_shortcut_pressed");
+					setIsSettingsOpen(true);
+				}
+			};
+			window.addEventListener("keydown", handleKeyDown);
+			onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+		} catch (error) {
+			logDiagnostic("error", "app", "mount_failed", errorFields(error));
+			throw error;
+		}
 	});
 
 	return (
