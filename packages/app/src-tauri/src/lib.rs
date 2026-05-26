@@ -47,52 +47,9 @@ fn install_panic_hook() {
     }));
 }
 
-#[cfg(target_os = "macos")]
-fn prevent_macos_quit_apple_event() {
-    use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
-    use objc2::{ffi, sel};
-
-    unsafe extern "C-unwind" fn application_should_terminate(
-        _: &AnyObject,
-        _: Sel,
-        _: *mut AnyObject,
-    ) -> isize {
-        log::warn!(target: "runtime", "macos_quit_apple_event_prevented");
-        0
-    }
-
-    let Some(delegate_class) = AnyClass::get(c"TaoAppDelegateParent") else {
-        log::warn!(target: "runtime", "macos_quit_delegate_class_missing");
-        return;
-    };
-
-    // Tao's macOS delegate does not currently expose applicationShouldTerminate
-    // through Tauri's ExitRequested event. Add it directly so external Quit
-    // AppleEvents keep the menu-bar app resident.
-    let added = unsafe {
-        ffi::class_addMethod(
-            delegate_class as *const AnyClass as *mut AnyClass,
-            sel!(applicationShouldTerminate:),
-            std::mem::transmute::<
-                unsafe extern "C-unwind" fn(&AnyObject, Sel, *mut AnyObject) -> isize,
-                Imp,
-            >(application_should_terminate),
-            c"q@:@".as_ptr(),
-        )
-    };
-
-    if added.as_bool() {
-        log::info!(target: "runtime", "macos_quit_apple_event_guard_installed");
-    } else {
-        log::warn!(target: "runtime", "macos_quit_apple_event_guard_not_installed");
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_panic_hook();
-    #[cfg(target_os = "macos")]
-    prevent_macos_quit_apple_event();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -215,17 +172,8 @@ pub fn run() {
                     log::info!(target: "runtime", "reopen_requested");
                     window::show_or_create_main_window(app);
                 }
-                tauri::RunEvent::ExitRequested { code, api, .. } => {
+                tauri::RunEvent::ExitRequested { code, .. } => {
                     log::warn!(target: "runtime", "exit_requested code={code:?}");
-                    // Keep the tray app resident when macOS or another app sends a Quit AppleEvent.
-                    // Explicit tray quits and updater restarts use a programmatic exit code.
-                    if code.is_none() {
-                        api.prevent_exit();
-                        log::warn!(
-                            target: "runtime",
-                            "exit_prevented reason=code_less_exit_request"
-                        );
-                    }
                 }
                 tauri::RunEvent::Exit => {
                     log::warn!(target: "runtime", "exit");

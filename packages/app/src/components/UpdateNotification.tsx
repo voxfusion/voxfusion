@@ -7,7 +7,7 @@ import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import { errorFields, logDiagnostic } from "../lib/diagnostics";
 
-const UPDATE_CHECK_INTERVAL_MS = 10_000;
+const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export default function UpdateNotification() {
 	const [t] = useI18n();
