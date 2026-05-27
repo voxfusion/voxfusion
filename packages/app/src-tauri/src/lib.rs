@@ -137,6 +137,11 @@ pub fn run() {
                 }));
 
             #[cfg(desktop)]
+            window::create_voice_control_window(app)?;
+            #[cfg(desktop)]
+            log::info!(target: "runtime", "voice_control_window_created");
+
+            #[cfg(desktop)]
             menu::setup(app)?;
             #[cfg(desktop)]
             log::info!(target: "runtime", "menu_setup");

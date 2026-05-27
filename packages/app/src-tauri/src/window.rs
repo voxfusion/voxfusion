@@ -2,6 +2,29 @@
 use tauri::Manager;
 
 #[cfg(desktop)]
+pub fn create_voice_control_window(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::WebviewWindowBuilder;
+
+    WebviewWindowBuilder::new(
+        app,
+        "voice-control",
+        tauri::WebviewUrl::App("voice-control.html".into()),
+    )
+    .title("Voice Control")
+    .inner_size(100.0, 28.0)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .visible(false)
+    .focused(false)
+    .accept_first_mouse(true)
+    .build()?;
+    Ok(())
+}
+
+#[cfg(desktop)]
 pub fn show_or_create_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
