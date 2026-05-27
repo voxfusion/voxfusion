@@ -16,6 +16,7 @@
 		"clipboard-manager:allow-write-text",
 		"store:default",
 		"core:window:allow-cursor-position",
-		"core:window:allow-monitor-from-point"
+		"core:window:allow-monitor-from-point",
+		"core:window:allow-set-size"
 	]
 }
