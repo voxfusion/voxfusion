@@ -44,6 +44,17 @@ export type Translations = {
 		holdToSpeakHotkeyDescription: string;
 		change: string;
 		cancel: string;
+		models: string;
+		modelsDescription: string;
+		modelInUse: string;
+		modelUse: string;
+		modelRecommended: string;
+		modelExperimental: string;
+		modelDownloaded: string;
+		modelDownload: string;
+		modelDownloading: string;
+		modelDownloadFailed: string;
+		modelExperimentalNote: string;
 	};
 	transcription: {
 		notAvailable: string;
@@ -251,6 +262,19 @@ export const en: Translations = {
 		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
 		change: "Change",
 		cancel: "Cancel",
+		models: "Models",
+		modelsDescription:
+			"Choose the speech-to-text model used for transcription. Download additional models to switch between them.",
+		modelInUse: "In use",
+		modelUse: "Use",
+		modelRecommended: "Recommended",
+		modelExperimental: "Experimental",
+		modelDownloaded: "Downloaded",
+		modelDownload: "Download",
+		modelDownloading: "Downloading…",
+		modelDownloadFailed: "Download failed",
+		modelExperimentalNote:
+			"On-device transcription with this model is experimental and not yet available.",
 	},
 	transcription: {
 		notAvailable: "N/A",

@@ -8,15 +8,16 @@ use tauri::Manager;
 
 use handlers::{
     add_app_dictionary_word, add_dictionary_word, add_site_dictionary_word,
-    check_accessibility_probe, check_model_status, delete_app_dictionary,
+    check_accessibility_probe, check_model_downloaded, check_model_status, delete_app_dictionary,
     delete_app_dictionary_word, delete_app_instruction, delete_dictionary_word,
-    delete_site_dictionary, delete_site_dictionary_word, delete_site_style, download_whisper_model,
-    get_dictionary_prompt, get_frontmost_app, list_app_dictionaries, list_app_instructions,
-    list_audio_devices, list_dictionary_words, list_installed_apps, list_site_dictionaries,
-    list_site_styles, list_transcriptions, mute_media_for_recording, process_audio_file,
-    read_audio_file, restore_media_after_recording, save_transcription, set_app_instruction,
-    set_site_style, start_recording_with_device, stop_recording_with_device, transcribe_audio,
-    type_text, update_app_dictionary_word, update_dictionary_word, update_site_dictionary_word,
+    delete_site_dictionary, delete_site_dictionary_word, delete_site_style, download_model,
+    download_whisper_model, get_active_model, get_dictionary_prompt, get_frontmost_app,
+    list_app_dictionaries, list_app_instructions, list_audio_devices, list_dictionary_words,
+    list_installed_apps, list_models, list_site_dictionaries, list_site_styles, list_transcriptions,
+    mute_media_for_recording, process_audio_file, read_audio_file, restore_media_after_recording,
+    save_transcription, set_active_model, set_app_instruction, set_site_style,
+    start_recording_with_device, stop_recording_with_device, transcribe_audio, type_text,
+    update_app_dictionary_word, update_dictionary_word, update_site_dictionary_word,
 };
 
 fn install_panic_hook() {
@@ -72,6 +73,11 @@ pub fn run() {
             check_model_status,
             download_whisper_model,
             transcribe_audio,
+            list_models,
+            get_active_model,
+            set_active_model,
+            download_model,
+            check_model_downloaded,
             list_installed_apps,
             get_frontmost_app,
             list_app_instructions,
@@ -127,6 +133,10 @@ pub fn run() {
             let db_state = handlers::db::init_db(app.handle())?;
             app.manage(db_state);
             log::info!(target: "runtime", "database_initialized");
+
+            let active_model = handlers::models::init_active_model(app.handle());
+            app.manage(active_model);
+            log::info!(target: "runtime", "active_model_initialized");
 
             #[cfg(desktop)]
             let _ = app

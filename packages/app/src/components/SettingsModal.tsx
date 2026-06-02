@@ -14,6 +14,7 @@ import AppearanceSettings from "./settings/AppearanceSettings";
 import AudioSettings from "./settings/AudioSettings";
 import HotkeySettings from "./settings/HotkeySettings";
 import LanguageSettings from "./settings/LanguageSettings";
+import ModelSettings from "./settings/ModelSettings";
 import SettingsSidebar from "./settings/SettingsSidebar";
 import type { SettingsSection } from "./settings/types";
 
@@ -24,6 +25,7 @@ interface SettingsModalProps {
 
 const sectionTitles: Record<SettingsSection, string> = {
 	audio: "// AUDIO_CONFIG",
+	model: "// MODEL_CONFIG",
 	hotkey: "// HOTKEY_CONFIG",
 	appearance: "// APPEARANCE_CONFIG",
 	language: "// LANGUAGE_CONFIG",
@@ -133,6 +135,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 									audioDevices={audioDevices()}
 									onRefreshDevices={fetchAudioDevices}
 								/>
+							</Show>
+							<Show when={activeSection() === "model"}>
+								<ModelSettings t={t} />
 							</Show>
 							<Show when={activeSection() === "hotkey"}>
 								<HotkeySettings
