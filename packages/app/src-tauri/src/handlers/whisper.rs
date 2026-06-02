@@ -1,8 +1,6 @@
-use futures_util::StreamExt;
-use std::fs;
-use std::path::PathBuf;
-use tauri::{Emitter, Manager};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
+
+use crate::handlers::models;
 
 fn cap_prompt_chars(s: &str, max_chars: usize) -> String {
     if s.chars().count() <= max_chars {
@@ -11,110 +9,23 @@ fn cap_prompt_chars(s: &str, max_chars: usize) -> String {
     s.chars().take(max_chars).collect()
 }
 
-const MODEL_FILENAME: &str = "ggml-large-v3-turbo.bin";
-const MODEL_URL: &str =
-    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin";
-const MODEL_EXPECTED_SIZE: u64 = 1_624_555_275;
 const WHISPER_BEAM_SIZE: i32 = 8;
 
-fn get_model_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
-    let model_dir = data_dir.join("models");
-    fs::create_dir_all(&model_dir).map_err(|e| e.to_string())?;
-    Ok(model_dir)
-}
-
-fn get_model_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(get_model_dir(app_handle)?.join(MODEL_FILENAME))
-}
-
 #[tauri::command]
-pub async fn check_model_status(app_handle: tauri::AppHandle) -> Result<bool, String> {
-    let model_path = get_model_path(&app_handle)?;
-    if !model_path.exists() {
-        return Ok(false);
-    }
-    let metadata = fs::metadata(&model_path).map_err(|e| e.to_string())?;
-    Ok(metadata.len() == MODEL_EXPECTED_SIZE)
+pub async fn check_model_status(
+    app_handle: tauri::AppHandle,
+    active: tauri::State<'_, models::ActiveModel>,
+) -> Result<bool, String> {
+    let active_id = models::active_model_id(&active);
+    let model = models::find_model(&active_id).ok_or_else(|| "Unknown active model".to_string())?;
+    Ok(models::is_downloaded(&app_handle, model))
 }
 
 #[tauri::command]
 pub async fn download_whisper_model(app_handle: tauri::AppHandle) -> Result<(), String> {
-    let model_path = get_model_path(&app_handle)?;
-
-    if model_path.exists() {
-        let metadata = fs::metadata(&model_path).map_err(|e| e.to_string())?;
-        if metadata.len() == MODEL_EXPECTED_SIZE {
-            let _ = app_handle.emit("model-download-progress", 100u32);
-            return Ok(());
-        }
-        let _ = fs::remove_file(&model_path);
-    }
-
-    let temp_path = model_path.with_extension("bin.tmp");
-    let _ = fs::remove_file(&temp_path);
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60 * 60))
-        .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
-    let response = client
-        .get(MODEL_URL)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to start download: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Download failed: HTTP {}", response.status()));
-    }
-
-    let total_size = response.content_length().unwrap_or(MODEL_EXPECTED_SIZE);
-
-    let mut file =
-        fs::File::create(&temp_path).map_err(|e| format!("Failed to create file: {}", e))?;
-
-    let mut stream = response.bytes_stream();
-    let mut downloaded: u64 = 0;
-
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| {
-            let _ = fs::remove_file(&temp_path);
-            format!("Download failed: {}", e)
-        })?;
-
-        std::io::Write::write_all(&mut file, &chunk).map_err(|e| {
-            let _ = fs::remove_file(&temp_path);
-            format!("Write failed: {}", e)
-        })?;
-
-        downloaded += chunk.len() as u64;
-
-        let progress = ((downloaded as f64 / total_size as f64) * 100.0).min(99.0) as u32;
-        let _ = app_handle.emit("model-download-progress", progress);
-    }
-
-    drop(file);
-
-    let actual_size = fs::metadata(&temp_path).map_err(|e| e.to_string())?.len();
-    if actual_size != MODEL_EXPECTED_SIZE {
-        let _ = fs::remove_file(&temp_path);
-        return Err(format!(
-            "Download incomplete: got {} bytes, expected {}",
-            actual_size, MODEL_EXPECTED_SIZE
-        ));
-    }
-
-    fs::rename(&temp_path, &model_path).map_err(|e| {
-        let _ = fs::remove_file(&temp_path);
-        format!("Failed to finalize model: {}", e)
-    })?;
-
-    let _ = app_handle.emit("model-download-progress", 100u32);
-
-    Ok(())
+    let model = models::find_model(models::DEFAULT_MODEL_ID)
+        .ok_or_else(|| "Default model not found".to_string())?;
+    models::download_model_file(&app_handle, model).await
 }
 
 fn read_wav_as_f32(path: &str) -> Result<Vec<f32>, String> {
@@ -220,15 +131,19 @@ fn fetch_dictionary_words(conn: &rusqlite::Connection) -> Option<String> {
 pub async fn transcribe_audio(
     app_handle: tauri::AppHandle,
     db_state: tauri::State<'_, crate::handlers::db::DbState>,
+    active: tauri::State<'_, models::ActiveModel>,
     audio_path: String,
     bundle_id: Option<String>,
     domain: Option<String>,
     fallback_style: Option<String>,
 ) -> Result<TranscriptionResult, String> {
-    let model_path = get_model_path(&app_handle)?;
+    let active_id = models::active_model_id(&active);
+    let model = models::find_model(&active_id)
+        .ok_or_else(|| format!("Unknown active model: {}", active_id))?;
+    let model_path = models::model_path(&app_handle, model)?;
 
     if !model_path.exists() {
-        return Err("Whisper model not found. Please download it first.".to_string());
+        return Err("Model not found. Please download it first.".to_string());
     }
 
     let start = std::time::Instant::now();
@@ -239,6 +154,23 @@ pub async fn transcribe_audio(
     } else {
         None
     };
+
+    // Engine dispatch. Whisper runs in-process via whisper-rs; Parakeet (a TDT
+    // transducer that whisper-rs cannot run) is transcribed by the crispasr
+    // engine on the already-downloaded GGUF. Style/dictionary prompts are
+    // whisper-only — Parakeet auto-detects language and takes no prompt.
+    if model.engine == models::Engine::Parakeet {
+        let text =
+            crate::handlers::parakeet::transcribe(&app_handle, &model_path, &audio_path, &audio_data)?;
+        let word_count = text.split_whitespace().count() as i64;
+        let processing_time_ms = start.elapsed().as_millis() as i64;
+        return Ok(TranscriptionResult {
+            text,
+            word_count,
+            processing_time_ms,
+            audio_duration_ms,
+        });
+    }
 
     let ctx_params = WhisperContextParameters::default();
     let ctx = WhisperContext::new_with_params(&model_path, ctx_params)

@@ -4,6 +4,8 @@ pub mod audio_processing;
 pub mod browser;
 pub mod db;
 pub mod media;
+pub mod models;
+pub mod parakeet;
 pub mod sites;
 pub mod text;
 pub mod whisper;
@@ -25,5 +27,8 @@ pub use db::{
     list_transcriptions, save_transcription, update_dictionary_word,
 };
 pub use media::{mute_media_for_recording, restore_media_after_recording};
+pub use models::{
+    check_model_downloaded, download_model, get_active_model, list_models, set_active_model,
+};
 pub use text::{check_accessibility_probe, read_audio_file, type_text};
 pub use whisper::{check_model_status, download_whisper_model, transcribe_audio};
