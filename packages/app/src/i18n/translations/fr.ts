@@ -50,6 +50,19 @@ export const fr: Translations = {
 		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
 		change: "Modifier",
 		cancel: "Annuler",
+		models: "Modèles",
+		modelsDescription:
+			"Choisissez le modèle de reconnaissance vocale utilisé pour la transcription. Téléchargez d'autres modèles pour passer de l'un à l'autre.",
+		modelInUse: "Utilisé",
+		modelUse: "Utiliser",
+		modelRecommended: "Recommandé",
+		modelExperimental: "Expérimental",
+		modelDownloaded: "Téléchargé",
+		modelDownload: "Télécharger",
+		modelDownloading: "Téléchargement…",
+		modelDownloadFailed: "Échec du téléchargement",
+		modelExperimentalNote:
+			"La transcription sur l'appareil avec ce modèle est expérimentale et pas encore disponible.",
 	},
 	transcription: {
 		notAvailable: "N/D",

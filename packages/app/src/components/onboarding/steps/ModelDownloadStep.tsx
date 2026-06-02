@@ -3,7 +3,12 @@ import { Result } from "better-result";
 import { AlertCircle, Check, Download, Loader } from "lucide-solid";
 import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../../../i18n";
-import { checkModelStatus, downloadWhisperModel } from "../../../lib/commands/model";
+import {
+	DEFAULT_MODEL_ID,
+	type ModelDownloadProgress,
+	checkModelStatus,
+	downloadWhisperModel,
+} from "../../../lib/commands/model";
 
 interface ModelDownloadStepProps {
 	onDownloadComplete: () => void;
@@ -25,9 +30,10 @@ export default function ModelDownloadStep(props: ModelDownloadStepProps) {
 			props.onDownloadComplete();
 		}
 
-		const unlisten = await listen<number>("model-download-progress", (event) => {
-			setDownloadProgress(event.payload);
-			if (event.payload >= 100) {
+		const unlisten = await listen<ModelDownloadProgress>("model-download-progress", (event) => {
+			if (event.payload.model_id !== DEFAULT_MODEL_ID) return;
+			setDownloadProgress(event.payload.progress);
+			if (event.payload.progress >= 100) {
 				setIsDownloaded(true);
 				props.onDownloadComplete();
 			}

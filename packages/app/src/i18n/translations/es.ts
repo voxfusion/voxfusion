@@ -49,6 +49,19 @@ export const es: Translations = {
 		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
 		change: "Cambiar",
 		cancel: "Cancelar",
+		models: "Modelos",
+		modelsDescription:
+			"Elige el modelo de voz a texto para la transcripción. Descarga modelos adicionales para alternar entre ellos.",
+		modelInUse: "En uso",
+		modelUse: "Usar",
+		modelRecommended: "Recomendado",
+		modelExperimental: "Experimental",
+		modelDownloaded: "Descargado",
+		modelDownload: "Descargar",
+		modelDownloading: "Descargando…",
+		modelDownloadFailed: "Error al descargar",
+		modelExperimentalNote:
+			"La transcripción en el dispositivo con este modelo es experimental y aún no está disponible.",
 	},
 	transcription: {
 		notAvailable: "N/D",

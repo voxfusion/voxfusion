@@ -49,6 +49,19 @@ export const ru: Translations = {
 		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
 		change: "Изменить",
 		cancel: "Отмена",
+		models: "Модели",
+		modelsDescription:
+			"Выберите модель распознавания речи для транскрипции. Загрузите дополнительные модели, чтобы переключаться между ними.",
+		modelInUse: "Используется",
+		modelUse: "Выбрать",
+		modelRecommended: "Рекомендуется",
+		modelExperimental: "Экспериментальная",
+		modelDownloaded: "Загружено",
+		modelDownload: "Загрузить",
+		modelDownloading: "Загрузка…",
+		modelDownloadFailed: "Не удалось загрузить",
+		modelExperimentalNote:
+			"Транскрипция этой моделью на устройстве экспериментальна и пока недоступна.",
 	},
 	transcription: {
 		notAvailable: "Н/Д",

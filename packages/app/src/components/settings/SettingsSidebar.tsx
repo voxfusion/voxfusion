@@ -5,6 +5,7 @@ import type { SettingsSection } from "./types";
 
 type SidebarLabelKey =
 	| "settings.audio"
+	| "settings.models"
 	| "settings.hotkeys"
 	| "settings.appearance"
 	| "settings.language";
@@ -25,9 +26,10 @@ interface SettingsSidebarProps {
 
 const sidebarItems: SidebarItem[] = [
 	{ id: "audio", num: "01", labelKey: "settings.audio" },
-	{ id: "hotkey", num: "02", labelKey: "settings.hotkeys" },
-	{ id: "appearance", num: "03", labelKey: "settings.appearance" },
-	{ id: "language", num: "04", labelKey: "settings.language" },
+	{ id: "model", num: "02", labelKey: "settings.models" },
+	{ id: "hotkey", num: "03", labelKey: "settings.hotkeys" },
+	{ id: "appearance", num: "04", labelKey: "settings.appearance" },
+	{ id: "language", num: "05", labelKey: "settings.language" },
 ];
 
 export default function SettingsSidebar(props: SettingsSidebarProps) {

@@ -1,4 +1,4 @@
-export type SettingsSection = "audio" | "hotkey" | "appearance" | "language";
+export type SettingsSection = "audio" | "model" | "hotkey" | "appearance" | "language";
 
 export interface SelectOption {
 	value: string;
