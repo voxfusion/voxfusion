@@ -1,4 +1,7 @@
 export const downloads = {
+	"downloads.meta.title": "Download VoxFusion for Mac - Free Offline Voice to Text",
+	"downloads.meta.description":
+		"Download VoxFusion free for macOS (Apple Silicon and Intel). Local, offline voice-to-text dictation: press a hotkey, speak, and text appears in any app.",
 	"downloads.title": "Download",
 	"downloads.subtitle": "Download VoxFusion for your platform.",
 	"downloads.macos.title": "macOS",

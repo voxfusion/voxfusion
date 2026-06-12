@@ -1,5 +1,5 @@
 export const common = {
-	"meta.title": "VoxFusion - Local-first voice to text for Mac.",
+	"meta.title": "VoxFusion - Local Voice to Text for Mac | Offline Dictation",
 	"meta.description":
 		"VoxFusion - Press a hotkey, speak, and text appears wherever you type. Fully local, offline-first dictation for Mac. Your voice never leaves your device.",
 

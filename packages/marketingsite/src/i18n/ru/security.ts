@@ -1,5 +1,7 @@
 export const security = {
 	"security.title": "Security",
+	"security.meta.description":
+		"How VoxFusion protects your data: on-device transcription, no server-side audio processing, signed and notarized builds, and local-only storage.",
 	"security.lastUpdated": "Last updated: May 11, 2026",
 	"security.intro":
 		"Protecting our users’ data is a priority for VoxFusion. VoxFusion is a local-first application — audio is transcribed on-device and never leaves your Mac. This document describes the measures we take to protect information in accordance with Federal Law No. 149-FZ dated July 27, 2006 “On Information, Information Technologies, and Information Protection.”",

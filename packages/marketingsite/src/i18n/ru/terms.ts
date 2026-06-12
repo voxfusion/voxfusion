@@ -1,5 +1,7 @@
 export const terms = {
 	"terms.title": "Terms of Use",
+	"terms.meta.description":
+		"Terms of Use for VoxFusion, the local-first voice-to-text app for Mac: license, permitted use, and your rights as a user.",
 	"terms.lastUpdated": "Last updated: May 11, 2026",
 	"terms.intro":
 		"These Terms of Use (the “Terms”) govern the relationship between Individual Entrepreneur Grigoriy Alekseevich Tokarev (the “Rights Holder”) and the user (the “User”) in connection with the use of the VoxFusion software (the “Service”). VoxFusion is a local-first application: all voice transcription runs on the User’s device, and the Rights Holder does not receive or store the User’s audio or transcribed text. The Terms are drafted in accordance with the Civil Code of the Russian Federation and Law of the Russian Federation No. 2300-1 dated February 7, 1992 “On Consumer Protection.”",

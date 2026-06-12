@@ -3,3 +3,5 @@ Disallow:
 
 User-agent: *
 Allow: /
+
+Sitemap: https://voxfusion.com/sitemap-index.xml

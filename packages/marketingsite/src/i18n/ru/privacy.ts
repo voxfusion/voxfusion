@@ -1,5 +1,7 @@
 export const privacy = {
 	"privacy.title": "Privacy Policy",
+	"privacy.meta.description":
+		"VoxFusion Privacy Policy: transcription runs entirely on your Mac. We never collect, transmit, or store your audio or transcribed text on any server.",
 	"privacy.lastUpdated": "Last updated: May 11, 2026",
 	"privacy.intro":
 		"VoxFusion is a local-first application. Voice transcription runs entirely on your Mac. We do not collect, transmit, or store your audio recordings or transcribed text on any server. This Privacy Policy explains the limited data we do process, in accordance with Federal Law No. 152-FZ dated July 27, 2006 “On Personal Data” and other applicable laws of the Russian Federation.",

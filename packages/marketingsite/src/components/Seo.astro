@@ -6,20 +6,24 @@ interface Props {
 	description: string;
 	lang?: keyof typeof languages;
 	type?: "website" | "article";
+	noindex?: boolean;
+	schema?: Record<string, unknown>;
 }
 
-const { title, description, lang = defaultLang, type = "website" } = Astro.props;
+const { title, description, lang = defaultLang, type = "website", noindex = false, schema } = Astro.props;
 const site = Astro.site ?? new URL("https://voxfusion.com");
 const canonicalUrl = new URL(Astro.url.pathname, site).toString();
 const imageUrl = new URL("/og.png?v=2026-05-15", site).toString();
 const imageAlt = "VoxFusion local-first voice to text app for Mac";
 const ogLocales: Partial<Record<string, string>> = {
+	en: "en_US",
 	ru: "ru_RU",
 };
 const locale = ogLocales[lang] ?? lang;
 ---
 
 <meta name="description" content={description} />
+{noindex && <meta name="robots" content="noindex, nofollow" />}
 <link rel="canonical" href={canonicalUrl} />
 <meta property="og:site_name" content="VoxFusion" />
 <meta property="og:type" content={type} />
@@ -39,3 +43,4 @@ const locale = ogLocales[lang] ?? lang;
 <meta name="twitter:description" content={description} />
 <meta name="twitter:image" content={imageUrl} />
 <meta name="twitter:image:alt" content={imageAlt} />
+{schema && <script is:inline type="application/ld+json" set:html={JSON.stringify(schema)} />}

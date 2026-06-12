@@ -10,18 +10,20 @@ import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
 import Footer from "../components/Footer.astro";
 import Umami from "../components/Umami.astro";
 import Seo from "../components/Seo.astro";
+import { softwareApplicationSchema } from "../seo";
 
 const lang = defaultLang;
 const t = useTranslations(lang);
 const title = t("meta.title");
 const description = t("meta.description");
+const schema = softwareApplicationSchema(description);
 ---
 
 <!doctype html>
 <html lang={lang}>
 <head>
 	<meta charset="UTF-8" />
-	<Seo title={title} description={description} lang={lang} />
+	<Seo title={title} description={description} lang={lang} schema={schema} />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
