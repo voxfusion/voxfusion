@@ -16,6 +16,7 @@ pub fn create_voice_control_window(app: &tauri::App) -> tauri::Result<()> {
     .decorations(false)
     .transparent(true)
     .always_on_top(true)
+    .visible_on_all_workspaces(true)
     .skip_taskbar(true)
     .visible(false)
     .focused(false)
