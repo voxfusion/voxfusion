@@ -12,9 +12,7 @@ const Dictionary: ParentComponent = (props) => {
 
 	const tabClass = (active: boolean) =>
 		`font-mono text-xs uppercase tracking-wider transition-colors py-2 ${
-			active
-				? "text-ac"
-				: "text-txt-secondary hover:text-txt-primary"
+			active ? "text-ac" : "text-txt-secondary hover:text-txt-primary"
 		}`;
 
 	return (

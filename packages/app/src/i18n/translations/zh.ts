@@ -142,7 +142,8 @@ export const zh: Translations = {
 		tabSites: "网站专属",
 		sitesDescription: "当浏览器标签页处于焦点时，该网站的词汇会与默认词典一起使用。",
 		sitesEmptyState: "未配置任何网站",
-		sitesEmptyStateDescription: "添加域名或捕获当前浏览器标签页，然后展开以为该网站添加自定义词汇。",
+		sitesEmptyStateDescription:
+			"添加域名或捕获当前浏览器标签页，然后展开以为该网站添加自定义词汇。",
 		sitesDomainPlaceholder: "example.com",
 		sitesAddSite: "添加网站",
 		sitesUseCurrent: "使用当前网站",

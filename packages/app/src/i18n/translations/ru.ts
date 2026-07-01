@@ -120,8 +120,7 @@ export const ru: Translations = {
 		searchPlaceholder: "Поиск установленных приложений...",
 		appCount: "{count} приложений",
 		emptyState: "Приложения не настроены",
-		emptyStateDescription:
-			"Найдите приложение выше и выберите стиль транскрипции.",
+		emptyStateDescription: "Найдите приложение выше и выберите стиль транскрипции.",
 		delete: "Удалить",
 		noAppsDetected: "Установленные приложения не найдены",
 		noMatches: "Совпадений нет",

@@ -10,7 +10,14 @@ interface Props {
 	schema?: Record<string, unknown>;
 }
 
-const { title, description, lang = defaultLang, type = "website", noindex = false, schema } = Astro.props;
+const {
+	title,
+	description,
+	lang = defaultLang,
+	type = "website",
+	noindex = false,
+	schema,
+} = Astro.props;
 const site = Astro.site ?? new URL("https://voxfusion.com");
 const canonicalUrl = new URL(Astro.url.pathname, site).toString();
 const imageUrl = new URL("/og.png?v=2026-05-15", site).toString();

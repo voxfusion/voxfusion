@@ -48,6 +48,16 @@ libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-
 
 Also requires `libstdc++.so` symlink: `sudo ln -sf /usr/lib/gcc/x86_64-linux-gnu/13/libstdc++.so /usr/lib/x86_64-linux-gnu/libstdc++.so`
 
+### System dependencies (macOS)
+
+Required for `bun dev` / Tauri builds (whisper-rs-sys uses CMake to compile whisper.cpp):
+
+```
+brew install cmake
+```
+
+Without CMake, `bun dev` fails during `whisper-rs-sys` with `is cmake not installed?`.
+
 ### Gotchas
 
 - Rust toolchain must be ≥1.85 (edition 2024 support). Run `rustup update stable && rustup default stable`.

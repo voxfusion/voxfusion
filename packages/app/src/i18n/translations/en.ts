@@ -333,8 +333,7 @@ export const en: Translations = {
 		searchPlaceholder: "Search installed applications...",
 		appCount: "{count} apps",
 		emptyState: "No apps configured",
-		emptyStateDescription:
-			"Search above to add an app and choose a transcription style for it.",
+		emptyStateDescription: "Search above to add an app and choose a transcription style for it.",
 		delete: "Remove",
 		noAppsDetected: "No installed applications detected",
 		noMatches: "No matching applications",

@@ -142,9 +142,7 @@ export default function DictionarySites() {
 		capture("site_dictionary_word_deleted");
 		setSiteDicts(
 			siteDicts().map((g) =>
-				g.domain === group.domain
-					? { ...g, words: g.words.filter((w) => w.id !== wordId) }
-					: g
+				g.domain === group.domain ? { ...g, words: g.words.filter((w) => w.id !== wordId) } : g
 			)
 		);
 		const result = await deleteSiteDictionaryWord(wordId);
@@ -214,10 +212,7 @@ export default function DictionarySites() {
 												<span class="text-txt-primary font-mono truncate">{group.domain}</span>
 											</div>
 											<span class="text-txt-muted font-mono text-xs uppercase tracking-wider shrink-0">
-												{t("dictionary.wordCount").replace(
-													"{count}",
-													String(group.words.length)
-												)}
+												{t("dictionary.wordCount").replace("{count}", String(group.words.length))}
 											</span>
 											<ChevronDown
 												class={`w-4 h-4 text-txt-muted shrink-0 transition-transform ${
@@ -278,9 +273,7 @@ export default function DictionarySites() {
 																		type="text"
 																		value={editingWord()}
 																		onInput={(e) => setEditingWord(e.currentTarget.value)}
-																		onKeyDown={(e) =>
-																			handleEditWordKeyDown(e, group, word.id)
-																		}
+																		onKeyDown={(e) => handleEditWordKeyDown(e, group, word.id)}
 																		class="flex-1 px-2 py-1 bg-th-base border border-border-strong text-txt-primary font-mono text-sm focus:outline-none focus:border-ac transition-colors"
 																		autofocus
 																	/>

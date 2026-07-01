@@ -2,11 +2,7 @@ import { Result } from "better-result";
 import { ChevronDown, Search } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
-import {
-	type InstalledApp,
-	getCachedInstalledApps,
-	listInstalledApps,
-} from "../lib/commands/apps";
+import { type InstalledApp, getCachedInstalledApps, listInstalledApps } from "../lib/commands/apps";
 import {
 	type AppDictionary,
 	addAppDictionaryWord,

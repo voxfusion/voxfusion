@@ -13,6 +13,7 @@ A local-first, offline-capable voice transcription desktop app. All transcriptio
 
 - [Bun](https://bun.sh/) (v1.0+)
 - [Rust](https://rustup.rs/) (for Tauri development)
+- [CMake](https://cmake.org/) (required to build whisper-rs; on macOS: `brew install cmake`)
 
 ## Getting Started
 

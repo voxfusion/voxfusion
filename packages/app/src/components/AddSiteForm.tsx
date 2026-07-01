@@ -8,13 +8,8 @@ const FAVICON_DEBOUNCE_MS = 400;
 export function normalizeDomain(input: string): string | null {
 	const trimmed = input.trim();
 	if (!trimmed) return null;
-	const withoutScheme = trimmed.includes("://") ? trimmed.split("://")[1] ?? "" : trimmed;
-	const hostWithPort = withoutScheme
-		.split("/")[0]
-		?.split("?")[0]
-		?.split("#")[0]
-		?.split("@")
-		.pop();
+	const withoutScheme = trimmed.includes("://") ? (trimmed.split("://")[1] ?? "") : trimmed;
+	const hostWithPort = withoutScheme.split("/")[0]?.split("?")[0]?.split("#")[0]?.split("@").pop();
 	if (!hostWithPort) return null;
 	const host = hostWithPort.split(":")[0]?.trim() ?? "";
 	if (!host) return null;

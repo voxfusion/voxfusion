@@ -11,7 +11,8 @@
  */
 const UMAMI_WEBSITE_ID =
 	import.meta.env.PUBLIC_UMAMI_WEBSITE_ID ?? "d882f732-3dfa-4adc-8382-1b62cf146a98";
-const UMAMI_SCRIPT_URL = import.meta.env.PUBLIC_UMAMI_SCRIPT_URL ?? "https://cloud.umami.is/script.js";
+const UMAMI_SCRIPT_URL =
+	import.meta.env.PUBLIC_UMAMI_SCRIPT_URL ?? "https://cloud.umami.is/script.js";
 ---
 
 <script is:inline async defer src={UMAMI_SCRIPT_URL} data-website-id={UMAMI_WEBSITE_ID}></script>
