@@ -5842,10 +5842,10 @@ name = "voxfusion-app"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "block2 0.6.2",
  "chrono",
  "core-foundation 0.10.1",
  "core-foundation-sys",
- "core-graphics 0.24.0",
  "cpal",
  "enigo",
  "futures-util",
