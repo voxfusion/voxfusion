@@ -21,6 +21,8 @@ import { typeText } from "../lib/commands/text";
 import { saveTranscription, transcribeAudio } from "../lib/commands/transcriptions";
 import { errorFields, logDiagnostic } from "../lib/diagnostics";
 import {
+	DEFAULT_HOLD_TO_SPEAK_HOTKEY,
+	DEFAULT_HOTKEY,
 	isValidHotkey,
 	registerDictationHotkeys,
 	unregisterDictationHotkey,
@@ -31,9 +33,6 @@ import {
 	updateHotkey,
 	useSettings,
 } from "../lib/settingsStore";
-
-const DEFAULT_HOTKEY = "LeftControl+LeftOption";
-const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
 
 const NUM_BARS = 10;
 const BAR_INDICES = Array.from({ length: NUM_BARS }, (_, i) => i);
@@ -176,6 +175,12 @@ export default function VoiceControl() {
 		setCurrentShortcut(`${toggleShortcut}|${holdShortcut}`);
 	};
 
+	const unregisterShortcuts = async () => {
+		if (currentShortcut() === null) return;
+		await unregisterDictationHotkey();
+		setCurrentShortcut(null);
+	};
+
 	onMount(async () => {
 		await repositionToCurrentMonitor();
 		const repositionInterval = setInterval(repositionToCurrentMonitor, 1000);
@@ -192,10 +197,12 @@ export default function VoiceControl() {
 			holdToSpeakHotkey = DEFAULT_HOLD_TO_SPEAK_HOTKEY;
 			await updateHoldToSpeakHotkey(holdToSpeakHotkey);
 		}
-		await registerShortcuts(hotkey, holdToSpeakHotkey);
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 		setMuteMediaWhileRecording(settings.muteMediaWhileRecording);
 		setIsOnboardingComplete(settings.onboardingComplete);
+		if (settings.onboardingComplete) {
+			await registerShortcuts(hotkey, holdToSpeakHotkey);
+		}
 
 		const unlistenSettings = await listen("settings-changed", async () => {
 			const newSettings = await loadSettings();
@@ -205,9 +212,15 @@ export default function VoiceControl() {
 				: DEFAULT_HOLD_TO_SPEAK_HOTKEY;
 			const wasOnboarding = !isOnboardingComplete();
 			const nowComplete = newSettings.onboardingComplete;
+			const shouldRegisterShortcuts = nowComplete || isLearningActive();
 			const shortcutKey = `${newHotkey}|${newHoldToSpeakHotkey}`;
-			if (shortcutKey !== currentShortcut() || (wasOnboarding && nowComplete)) {
+			if (
+				shouldRegisterShortcuts &&
+				(shortcutKey !== currentShortcut() || (wasOnboarding && nowComplete))
+			) {
 				await registerShortcuts(newHotkey, newHoldToSpeakHotkey);
+			} else if (!shouldRegisterShortcuts) {
+				await unregisterShortcuts();
 			}
 			setSelectedMicrophone(newSettings.selectedMicrophoneId);
 			setMuteMediaWhileRecording(newSettings.muteMediaWhileRecording);
@@ -218,8 +231,22 @@ export default function VoiceControl() {
 			setAudioLevel(event.payload);
 		});
 
-		const unlistenLearning = await listen<boolean>("learning-step-active", (event) => {
-			setIsLearningActive(event.payload);
+		const unlistenLearning = await listen<boolean>("learning-step-active", async (event) => {
+			const active = event.payload;
+			setIsLearningActive(active);
+			const newSettings = await loadSettings();
+			const newHotkey = isValidHotkey(newSettings.hotkey) ? newSettings.hotkey : DEFAULT_HOTKEY;
+			const newHoldToSpeakHotkey = isValidHotkey(newSettings.holdToSpeakHotkey)
+				? newSettings.holdToSpeakHotkey
+				: DEFAULT_HOLD_TO_SPEAK_HOTKEY;
+			if (active || isOnboardingComplete()) {
+				const shortcutKey = `${newHotkey}|${newHoldToSpeakHotkey}`;
+				if (shortcutKey !== currentShortcut()) {
+					await registerShortcuts(newHotkey, newHoldToSpeakHotkey);
+				}
+			} else {
+				await unregisterShortcuts();
+			}
 		});
 
 		const unlistenKeyboardKeyPressed = await listen<KeyboardKeyPressedPayload>(

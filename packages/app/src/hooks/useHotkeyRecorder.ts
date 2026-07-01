@@ -1,6 +1,7 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { Result } from "better-result";
 import { createEffect, createSignal, onCleanup } from "solid-js";
+import { startSystemKeyWatcher } from "../lib/commands/permissions";
 import {
 	hotkeyDisplayName,
 	isModifierCode,
@@ -64,10 +65,43 @@ const MOD_ORDER = [
 	"ShiftRight",
 ];
 
+const CODE_TO_HOTKEY_KEY: Record<string, string> = {
+	Backquote: "`",
+	Backslash: "\\",
+	BracketLeft: "[",
+	BracketRight: "]",
+	Comma: ",",
+	Equal: "=",
+	Minus: "-",
+	Period: ".",
+	Quote: "'",
+	Semicolon: ";",
+	Slash: "/",
+	Space: "Space",
+	Tab: "Tab",
+	Enter: "Enter",
+	Escape: "Escape",
+	Backspace: "Backspace",
+	Delete: "Delete",
+	CapsLock: "CapsLock",
+	ArrowDown: "ArrowDown",
+	ArrowLeft: "ArrowLeft",
+	ArrowRight: "ArrowRight",
+	ArrowUp: "ArrowUp",
+};
+
 interface UseHotkeyRecorderOptions {
 	onHotkeyRecorded?: (hotkey: string) => Promise<void>;
 	validator?: (hotkey: string) => string | null;
 	recorderId?: string;
+}
+
+function keyEventToHotkeyKey(e: KeyboardEvent): string {
+	if (/^Key[A-Z]$/.test(e.code)) return e.code.slice(3);
+	if (/^Digit[0-9]$/.test(e.code)) return e.code.slice(5);
+	if (/^Numpad/.test(e.code)) return e.code;
+	if (/^F[0-9]{1,2}$/.test(e.code)) return e.code;
+	return CODE_TO_HOTKEY_KEY[e.code] ?? (e.key.length === 1 ? e.key.toUpperCase() : e.key);
 }
 
 export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
@@ -79,6 +113,7 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 	// Track all currently held modifier codes for combo shortcuts
 	let heldModifierCodes = new Set<string>();
 	let pendingSystemHotkey = "";
+	let isStartingWatcher = false;
 
 	const resetTracking = () => {
 		heldModifierCodes = new Set<string>();
@@ -151,8 +186,7 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 				}
 			}
 
-			const key = e.key;
-			const keyPart = key.length === 1 ? key.toUpperCase() : key;
+			const keyPart = keyEventToHotkeyKey(e);
 			const hotkeyString = [...modifiers, keyPart].join("+");
 			setPendingHotkey(hotkeyString);
 		}
@@ -254,53 +288,49 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 		void Result.tryPromise(() => unlistenSystemReleasedPromise.then((unlisten) => unlisten()));
 	});
 
+	const startRecording = async () => {
+		if (activeRecordingId !== null && activeRecordingId !== recorderId) {
+			setError("Another hotkey is being recorded. Please finish or cancel it first.");
+			return;
+		}
+		if (isStartingWatcher) return;
+		isStartingWatcher = true;
+		const watcherStarted = await startSystemKeyWatcher();
+		isStartingWatcher = false;
+		if (Result.isError(watcherStarted)) {
+			setError(watcherStarted.error.message);
+			return;
+		}
+		activeRecordingId = recorderId;
+		setIsRecording(true);
+		setPendingHotkey("");
+		setError(null);
+		resetTracking();
+		setRecorderActive(true);
+	};
+
+	const stopRecording = () => {
+		if (activeRecordingId === recorderId) {
+			activeRecordingId = null;
+		}
+		setIsRecording(false);
+		setPendingHotkey("");
+		setError(null);
+		resetTracking();
+		setRecorderActive(false);
+	};
+
 	return {
 		isRecording,
 		pendingHotkey,
 		error,
-		startRecording: () => {
-			if (activeRecordingId !== null && activeRecordingId !== recorderId) {
-				setError("Another hotkey is being recorded. Please finish or cancel it first.");
-				return;
-			}
-			activeRecordingId = recorderId;
-			setIsRecording(true);
-			setPendingHotkey("");
-			setError(null);
-			resetTracking();
-			setRecorderActive(true);
-		},
-		stopRecording: () => {
-			if (activeRecordingId === recorderId) {
-				activeRecordingId = null;
-			}
-			setIsRecording(false);
-			setPendingHotkey("");
-			setError(null);
-			resetTracking();
-			setRecorderActive(false);
-		},
+		startRecording,
+		stopRecording,
 		toggleRecording: () => {
 			if (isRecording()) {
-				if (activeRecordingId === recorderId) {
-					activeRecordingId = null;
-				}
-				setIsRecording(false);
-				setPendingHotkey("");
-				setError(null);
-				resetTracking();
-				setRecorderActive(false);
+				stopRecording();
 			} else {
-				if (activeRecordingId !== null && activeRecordingId !== recorderId) {
-					setError("Another hotkey is being recorded. Please finish or cancel it first.");
-					return;
-				}
-				activeRecordingId = recorderId;
-				setIsRecording(true);
-				setPendingHotkey("");
-				setError(null);
-				resetTracking();
-				setRecorderActive(true);
+				void startRecording();
 			}
 		},
 	};

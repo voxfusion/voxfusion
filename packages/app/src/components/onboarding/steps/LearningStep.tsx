@@ -20,6 +20,7 @@ function parseHotkeyParts(hotkey: string): string[] {
 		RightOption: "Right \u2325",
 		LeftCommand: "Left \u2318",
 		RightCommand: "Right \u2318",
+		Space: "Space",
 	};
 	return hotkey.split("+").map((part) => DISPLAY_MAP[part] ?? part);
 }

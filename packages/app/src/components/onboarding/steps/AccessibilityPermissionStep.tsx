@@ -61,7 +61,7 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 		await new Promise((r) => setTimeout(r, 1000));
 		await checkPermission();
 		if (!isGranted()) {
-			// Both CGEventTapCreate and AXIsProcessTrusted are cached.
+			// AXIsProcessTrusted can lag behind the Settings notification.
 			// The notification itself is reliable — it fires when the user
 			// toggles the switch. Trust it.
 			markGranted();

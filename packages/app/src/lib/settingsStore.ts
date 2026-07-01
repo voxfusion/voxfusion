@@ -11,6 +11,7 @@ import {
 	ONBOARDING_STEP_COUNT,
 	normalizeOnboardingStep,
 } from "./onboarding";
+import { DEFAULT_HOLD_TO_SPEAK_HOTKEY, DEFAULT_HOTKEY } from "./hotkeyUtils";
 
 export type Theme = "dark" | "light" | "system";
 
@@ -28,8 +29,8 @@ export interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
-	hotkey: "LeftControl+LeftOption",
-	holdToSpeakHotkey: "RightCommand",
+	hotkey: DEFAULT_HOTKEY,
+	holdToSpeakHotkey: DEFAULT_HOLD_TO_SPEAK_HOTKEY,
 	selectedMicrophoneId: null,
 	language: "en",
 	muteMediaWhileRecording: false,

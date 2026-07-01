@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Result } from "better-result";
+import { startSystemKeyWatcher } from "./commands/permissions";
 
 type SystemKey =
 	| "fn"
@@ -40,6 +41,9 @@ type HotkeyRecorderActivePayload = {
 	active: boolean;
 };
 
+export const DEFAULT_HOTKEY = "LeftControl+LeftOption";
+export const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
+
 /**
  * Maps KeyboardEvent.code values to display-friendly modifier labels.
  * Used during recording to show the user what they're pressing.
@@ -73,7 +77,21 @@ const MODIFIER_CODES = new Set([
 	"Fn",
 ]);
 
-const COMBO_MODIFIER_NAMES = new Set(["Command", "Control", "Alt", "Shift", "CapsLock", "Fn"]);
+const COMBO_MODIFIER_NAMES = new Set([
+	"Command",
+	"Cmd",
+	"CommandOrControl",
+	"CommandOrCtrl",
+	"CmdOrCtrl",
+	"CmdOrControl",
+	"Control",
+	"Ctrl",
+	"Alt",
+	"Option",
+	"Shift",
+	"CapsLock",
+	"Fn",
+]);
 
 const SYSTEM_HOTKEY_TO_KEY: Record<string, SystemKey> = {
 	Fn: "fn",
@@ -178,12 +196,18 @@ export function isSystemOnlyHotkey(hotkey: string): boolean {
  */
 export function isValidHotkey(hotkey: string): boolean {
 	if (isSystemOnlyHotkey(hotkey)) return true;
-	if (!hotkey.includes("+")) return false;
 
-	const parts = hotkey.split("+");
+	const parts = hotkey
+		.split("+")
+		.map((part) => part.trim())
+		.filter(Boolean);
+	if (parts.length < 2) return false;
 	if (parts.some((part) => part in SYSTEM_HOTKEY_TO_KEY)) return false;
 
-	return parts.some((part) => !COMBO_MODIFIER_NAMES.has(part));
+	const key = parts[parts.length - 1];
+	if (!key || COMBO_MODIFIER_NAMES.has(key)) return false;
+
+	return parts.slice(0, -1).every((part) => COMBO_MODIFIER_NAMES.has(part));
 }
 
 async function registerSystemHotkey(
@@ -193,6 +217,11 @@ async function registerSystemHotkey(
 	const expectedKeys = systemKeysFromHotkey(hotkey);
 	if (!expectedKeys) {
 		throw new Error(`Unsupported system hotkey: ${hotkey}`);
+	}
+
+	const watcherStarted = await startSystemKeyWatcher();
+	if (Result.isError(watcherStarted)) {
+		throw watcherStarted.error;
 	}
 
 	let isHeld = false;
@@ -334,8 +363,9 @@ export function hotkeyDisplayName(hotkey: string): string {
  * Check if a hotkey is valid for hands-free (press) mode.
  * Returns null if valid, error message string if invalid.
  */
-export function validateHandsFreeHotkey(_hotkey: string): string | null {
-	return null;
+export function validateHandsFreeHotkey(hotkey: string): string | null {
+	if (isValidHotkey(hotkey)) return null;
+	return "Use modifier keys plus one regular key.";
 }
 
 /**
@@ -347,5 +377,5 @@ export function validateHoldToSpeakHotkey(hotkey: string): string | null {
 	if (hotkey === "Fn") {
 		return "FN cannot be used as hold-to-speak hotkey";
 	}
-	return null;
+	return validateHandsFreeHotkey(hotkey);
 }
