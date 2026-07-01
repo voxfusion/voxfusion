@@ -70,6 +70,19 @@ jobs:
           echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
           echo "Certificate imported: $CERT_ID"
 
+      - name: Verify Apple notarization secrets
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for secret_name in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!secret_name}" ]; then
+              echo "::error::Missing GitHub secret: $secret_name"
+              exit 1
+            fi
+          done
+
       - name: Build Tauri app
         working-directory: packages/app
         env:
@@ -79,10 +92,10 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MACOSX_DEPLOYMENT_TARGET: "11.0"
-          # APPLE_ID: ${{ secrets.APPLE_ID }}
-          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           bun run tauri build --target aarch64-apple-darwin
           bun run tauri build --target x86_64-apple-darwin
@@ -149,6 +162,50 @@ jobs:
             exit 1
           fi
           echo "INTEL_SIG_FILE=$INTEL_SIG_FILE" >> $GITHUB_OUTPUT
+
+      - name: Verify macOS signing and notarization
+        run: |
+          verify_dmg() {
+            local dmg_path="$1"
+            local assessment
+
+            echo "Verifying DMG signature and Gatekeeper assessment: $dmg_path"
+            if ! assessment=$(spctl -a -vvv -t open --context context:primary-signature "$dmg_path" 2>&1); then
+              echo "$assessment"
+              exit 1
+            fi
+            echo "$assessment"
+            if echo "$assessment" | grep -q "Unnotarized Developer ID"; then
+              echo "Error: DMG is signed but not notarized: $dmg_path"
+              exit 1
+            fi
+          }
+
+          verify_app_tarball() {
+            local tarball_path="$1"
+            local tmp_dir
+            tmp_dir=$(mktemp -d)
+
+            echo "Verifying app bundle in updater tarball: $tarball_path"
+            tar -xzf "$tarball_path" -C "$tmp_dir"
+
+            local app_path
+            app_path=$(find "$tmp_dir" -maxdepth 2 -name "*.app" -type d | head -1)
+            if [ -z "$app_path" ]; then
+              echo "Error: No .app bundle found in $tarball_path"
+              find "$tmp_dir" -maxdepth 3 -print
+              exit 1
+            fi
+
+            codesign --verify --deep --strict --verbose=2 "$app_path"
+            xcrun stapler validate "$app_path"
+            spctl -a -vvv -t exec "$app_path"
+          }
+
+          verify_dmg "${{ steps.artifacts.outputs.ARM_DMG_PATH }}"
+          verify_dmg "${{ steps.artifacts.outputs.INTEL_DMG_PATH }}"
+          verify_app_tarball "${{ steps.artifacts.outputs.ARM_TARBALL_PATH }}"
+          verify_app_tarball "${{ steps.artifacts.outputs.INTEL_TARBALL_PATH }}"
 
       - name: Prepare artifacts for upload
         run: |
