@@ -1,19 +1,26 @@
 use std::collections::BTreeSet;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
-use std::thread;
 
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
-use core_graphics::event::{
-    CGEvent, CGEventFlags, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-    CGEventTapProxy, CGEventType, EventField, KeyCode,
-};
+use block2::RcBlock;
+use objc2_app_kit::{NSEvent, NSEventMask, NSEventModifierFlags, NSEventType};
 use serde::Serialize;
 use tauri::Emitter;
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PRESSED_KEYS: OnceLock<Mutex<BTreeSet<SystemKey>>> = OnceLock::new();
 static WATCHER_RUNNING: AtomicBool = AtomicBool::new(false);
+
+// Virtual key codes for the modifier keys we track. These are stable,
+// hardware-independent key codes shared by Core Graphics and AppKit.
+const KEYCODE_FN: u16 = 0x3F;
+const KEYCODE_LEFT_CONTROL: u16 = 0x3B;
+const KEYCODE_RIGHT_CONTROL: u16 = 0x3E;
+const KEYCODE_LEFT_OPTION: u16 = 0x3A;
+const KEYCODE_RIGHT_OPTION: u16 = 0x3D;
+const KEYCODE_LEFT_COMMAND: u16 = 0x37;
+const KEYCODE_RIGHT_COMMAND: u16 = 0x36;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,45 +58,44 @@ fn pressed_keys() -> &'static Mutex<BTreeSet<SystemKey>> {
     PRESSED_KEYS.get_or_init(|| Mutex::new(BTreeSet::new()))
 }
 
-fn key_from_keycode(keycode: i64) -> Option<SystemKey> {
-    match keycode as u16 {
-        KeyCode::FUNCTION => Some(SystemKey::Fn),
-        KeyCode::CONTROL => Some(SystemKey::LeftControl),
-        KeyCode::RIGHT_CONTROL => Some(SystemKey::RightControl),
-        KeyCode::OPTION => Some(SystemKey::LeftOption),
-        KeyCode::RIGHT_OPTION => Some(SystemKey::RightOption),
-        KeyCode::COMMAND => Some(SystemKey::LeftCommand),
-        KeyCode::RIGHT_COMMAND => Some(SystemKey::RightCommand),
+fn key_from_keycode(keycode: u16) -> Option<SystemKey> {
+    match keycode {
+        KEYCODE_FN => Some(SystemKey::Fn),
+        KEYCODE_LEFT_CONTROL => Some(SystemKey::LeftControl),
+        KEYCODE_RIGHT_CONTROL => Some(SystemKey::RightControl),
+        KEYCODE_LEFT_OPTION => Some(SystemKey::LeftOption),
+        KEYCODE_RIGHT_OPTION => Some(SystemKey::RightOption),
+        KEYCODE_LEFT_COMMAND => Some(SystemKey::LeftCommand),
+        KEYCODE_RIGHT_COMMAND => Some(SystemKey::RightCommand),
         _ => None,
     }
 }
 
-fn key_is_down_in_flags(key: SystemKey, flags: CGEventFlags) -> bool {
+fn key_is_down_in_flags(key: SystemKey, flags: NSEventModifierFlags) -> bool {
     match key {
-        SystemKey::Fn => flags.contains(CGEventFlags::CGEventFlagSecondaryFn),
+        SystemKey::Fn => flags.contains(NSEventModifierFlags::Function),
         SystemKey::LeftControl | SystemKey::RightControl => {
-            flags.contains(CGEventFlags::CGEventFlagControl)
+            flags.contains(NSEventModifierFlags::Control)
         }
         SystemKey::LeftOption | SystemKey::RightOption => {
-            flags.contains(CGEventFlags::CGEventFlagAlternate)
+            flags.contains(NSEventModifierFlags::Option)
         }
         SystemKey::LeftCommand | SystemKey::RightCommand => {
-            flags.contains(CGEventFlags::CGEventFlagCommand)
+            flags.contains(NSEventModifierFlags::Command)
         }
     }
 }
 
-fn emit_system_key_event(event: &CGEvent) {
+fn emit_system_key_event(event: &NSEvent) {
     let Some(app_handle) = APP_HANDLE.get() else {
         return;
     };
 
-    let keycode = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
-    let Some(key) = key_from_keycode(keycode) else {
+    let Some(key) = key_from_keycode(event.keyCode()) else {
         return;
     };
 
-    let flags = event.get_flags();
+    let flags = event.modifierFlags();
     let is_down = key_is_down_in_flags(key, flags);
     let mut pressed = pressed_keys()
         .lock()
@@ -124,21 +130,28 @@ fn emit_system_key_event(event: &CGEvent) {
     }
 }
 
-fn emit_keyboard_key_pressed(event: &CGEvent) {
+fn emit_keyboard_key_pressed(event: &NSEvent) {
     let Some(app_handle) = APP_HANDLE.get() else {
         return;
     };
 
-    let is_repeat = event.get_integer_value_field(EventField::KEYBOARD_EVENT_AUTOREPEAT) != 0;
-    if is_repeat {
+    if event.isARepeat() {
         return;
     }
 
-    let key_code = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE);
+    let key_code = event.keyCode() as i64;
     let _ = app_handle.emit(
         "keyboard-key-pressed",
         KeyboardKeyPressedPayload { key_code },
     );
+}
+
+fn handle_event(event: &NSEvent) {
+    match event.r#type() {
+        NSEventType::FlagsChanged => emit_system_key_event(event),
+        NSEventType::KeyDown => emit_keyboard_key_pressed(event),
+        _ => {}
+    }
 }
 
 pub fn setup(app_handle: &tauri::AppHandle) {
@@ -148,39 +161,40 @@ pub fn setup(app_handle: &tauri::AppHandle) {
         return;
     }
 
-    thread::spawn(|| {
-        let tap = CGEventTap::new(
-            CGEventTapLocation::HID,
-            CGEventTapPlacement::HeadInsertEventTap,
-            CGEventTapOptions::ListenOnly,
-            vec![CGEventType::FlagsChanged, CGEventType::KeyDown],
-            |_proxy: CGEventTapProxy, event_type: CGEventType, event: &CGEvent| {
-                match event_type {
-                    CGEventType::FlagsChanged => emit_system_key_event(event),
-                    CGEventType::KeyDown => emit_keyboard_key_pressed(event),
-                    _ => {}
-                }
-                None
-            },
-        );
+    // NSEvent monitors must be installed on the main thread, where the
+    // application run loop dispatches them. Observing `FlagsChanged` (for
+    // modifier-only hotkeys) via NSEvent — rather than a Core Graphics event
+    // tap — means we no longer require the macOS Input Monitoring permission.
+    let scheduled = app_handle.run_on_main_thread(|| {
+        let mask = NSEventMask::FlagsChanged | NSEventMask::KeyDown;
 
-        let Ok(tap) = tap else {
-            WATCHER_RUNNING.store(false, Ordering::SeqCst);
-            return;
-        };
+        // Events delivered to *other* applications — the usual case while
+        // dictating into another app.
+        let global_block = RcBlock::new(|event: NonNull<NSEvent>| {
+            handle_event(unsafe { event.as_ref() });
+        });
+        let global_monitor =
+            NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &global_block);
 
-        unsafe {
-            let source = tap
-                .mach_port
-                .create_runloop_source(0)
-                .expect("failed to create system key run loop source");
+        // Events delivered to our own window — e.g. while recording a hotkey
+        // in Settings, or for keys AppKit doesn't surface to the DOM (Fn).
+        // The handler observes only and passes every event through unchanged.
+        let local_block = RcBlock::new(|event: NonNull<NSEvent>| -> *mut NSEvent {
+            handle_event(unsafe { event.as_ref() });
+            event.as_ptr()
+        });
+        // SAFETY: the block returns the event pointer it was given, so the
+        // event is always forwarded unchanged.
+        let local_monitor =
+            unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(mask, &local_block) };
 
-            let run_loop = CFRunLoop::get_current();
-            run_loop.add_source(&source, kCFRunLoopCommonModes);
-            tap.enable();
-            CFRunLoop::run_current();
-        }
-
-        WATCHER_RUNNING.store(false, Ordering::SeqCst);
+        // The monitors live for the entire lifetime of the app; leak the
+        // returned tokens so the monitors are never torn down.
+        std::mem::forget(global_monitor);
+        std::mem::forget(local_monitor);
     });
+
+    if scheduled.is_err() {
+        WATCHER_RUNNING.store(false, Ordering::SeqCst);
+    }
 }
