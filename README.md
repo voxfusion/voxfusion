@@ -60,7 +60,7 @@ bun run build
 On first launch, the app walks the user through onboarding:
 
 1. Microphone permission
-2. Accessibility permission (for global hotkeys and typing into other apps)
+2. Accessibility permission (for typing transcribed text into other apps)
 3. Microphone device selection
 4. Hotkey configuration
 5. **Whisper model download** (~1.5 GB, one-time, requires internet)
