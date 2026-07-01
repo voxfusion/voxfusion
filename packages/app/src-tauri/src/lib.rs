@@ -16,8 +16,9 @@ use handlers::{
     list_installed_apps, list_models, list_site_dictionaries, list_site_styles, list_transcriptions,
     mute_media_for_recording, process_audio_file, read_audio_file, restore_media_after_recording,
     save_transcription, set_active_model, set_app_instruction, set_site_style,
-    start_recording_with_device, stop_recording_with_device, transcribe_audio, type_text,
-    update_app_dictionary_word, update_dictionary_word, update_site_dictionary_word,
+    start_recording_with_device, start_system_key_watcher, stop_recording_with_device,
+    transcribe_audio, type_text, update_app_dictionary_word, update_dictionary_word,
+    update_site_dictionary_word,
 };
 
 fn install_panic_hook() {
@@ -58,6 +59,7 @@ pub fn run() {
             read_audio_file,
             process_audio_file,
             check_accessibility_probe,
+            start_system_key_watcher,
             list_audio_devices,
             mute_media_for_recording,
             restore_media_after_recording,
@@ -126,7 +128,6 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 listeners::accessibility_watcher::setup(app.handle());
-                listeners::system_key_watcher::setup(app.handle());
                 log::info!(target: "runtime", "macos_listeners_setup");
             }
 

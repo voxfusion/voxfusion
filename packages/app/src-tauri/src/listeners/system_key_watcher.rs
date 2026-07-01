@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 
@@ -12,6 +13,7 @@ use tauri::Emitter;
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 static PRESSED_KEYS: OnceLock<Mutex<BTreeSet<SystemKey>>> = OnceLock::new();
+static WATCHER_RUNNING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -142,6 +144,10 @@ fn emit_keyboard_key_pressed(event: &CGEvent) {
 pub fn setup(app_handle: &tauri::AppHandle) {
     APP_HANDLE.set(app_handle.clone()).ok();
 
+    if WATCHER_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
     thread::spawn(|| {
         let tap = CGEventTap::new(
             CGEventTapLocation::HID,
@@ -159,6 +165,7 @@ pub fn setup(app_handle: &tauri::AppHandle) {
         );
 
         let Ok(tap) = tap else {
+            WATCHER_RUNNING.store(false, Ordering::SeqCst);
             return;
         };
 
@@ -173,5 +180,7 @@ pub fn setup(app_handle: &tauri::AppHandle) {
             tap.enable();
             CFRunLoop::run_current();
         }
+
+        WATCHER_RUNNING.store(false, Ordering::SeqCst);
     });
 }

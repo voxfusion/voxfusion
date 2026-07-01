@@ -16,24 +16,6 @@ pub fn read_audio_file(path: String) -> Result<Vec<u8>, String> {
 #[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn check_accessibility_probe() -> bool {
-    use core_graphics::event::{
-        CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventType,
-    };
-
-    // Try a passive event tap first (won't trigger a system permission prompt)
-    let tap_result = CGEventTap::new(
-        CGEventTapLocation::Session,
-        CGEventTapPlacement::HeadInsertEventTap,
-        CGEventTapOptions::ListenOnly,
-        vec![CGEventType::KeyDown],
-        |_proxy, _event_type, event| Some(event.clone()),
-    );
-
-    if tap_result.is_ok() {
-        return true;
-    }
-
-    // Fall back to AXIsProcessTrusted (also silent, no prompt)
     #[link(name = "ApplicationServices", kind = "framework")]
     unsafe extern "C" {
         fn AXIsProcessTrusted() -> bool;

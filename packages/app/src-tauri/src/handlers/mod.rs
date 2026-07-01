@@ -3,6 +3,7 @@ pub mod audio;
 pub mod audio_processing;
 pub mod browser;
 pub mod db;
+pub mod hotkeys;
 pub mod media;
 pub mod models;
 pub mod parakeet;
@@ -26,6 +27,7 @@ pub use db::{
     add_dictionary_word, delete_dictionary_word, get_dictionary_prompt, list_dictionary_words,
     list_transcriptions, save_transcription, update_dictionary_word,
 };
+pub use hotkeys::start_system_key_watcher;
 pub use media::{mute_media_for_recording, restore_media_after_recording};
 pub use models::{
     check_model_downloaded, download_model, get_active_model, list_models, set_active_model,
