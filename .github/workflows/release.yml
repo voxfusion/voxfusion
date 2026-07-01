@@ -339,6 +339,8 @@ jobs:
         run: cp latest-legacy.json latest.json
 
       - name: Create release in legacy releases repository
+        id: legacy_release
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.RELEASES_GITHUB_TOKEN }}
@@ -365,3 +367,8 @@ jobs:
             release-artifacts/VoxFusion.app.tar.gz
             release-artifacts/VoxFusion-intel.app.tar.gz
             latest.json
+
+      - name: Warn if legacy releases repository publish failed
+        if: steps.legacy_release.outcome == 'failure'
+        run: |
+          echo "::warning::Publishing to ${{ env.LEGACY_RELEASES_REPO }} failed. The primary release in ${{ github.repository }} was already created successfully. Check RELEASES_GITHUB_TOKEN if the legacy mirror is still required."
