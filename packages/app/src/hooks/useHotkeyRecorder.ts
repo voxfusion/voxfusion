@@ -124,6 +124,22 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 		void Result.tryPromise(() => emit("hotkey-recorder-active", { active }));
 	};
 
+	/**
+	 * Tear down the recording session. Releases the shared `activeRecordingId`
+	 * lock so another recorder can start — this must run on every completion
+	 * path (successful save *and* cancel), otherwise the lock stays held and
+	 * the next recorder is wrongly told "another hotkey is being recorded".
+	 */
+	const finishRecording = () => {
+		if (activeRecordingId === recorderId) {
+			activeRecordingId = null;
+		}
+		setIsRecording(false);
+		setPendingHotkey("");
+		resetTracking();
+		setRecorderActive(false);
+	};
+
 	const saveRecordedHotkey = async (hotkey: string) => {
 		const validationError = options.validator?.(hotkey);
 		if (validationError) {
@@ -207,10 +223,7 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 			if (heldModifierCodes.size === 1 && heldModifierCodes.has(code) && systemHotkey) {
 				const success = await saveRecordedHotkey(systemHotkey);
 				if (success) {
-					setIsRecording(false);
-					setPendingHotkey("");
-					resetTracking();
-					setRecorderActive(false);
+					finishRecording();
 				}
 				return;
 			}
@@ -230,10 +243,7 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 			if (pending?.includes("+")) {
 				const success = await saveRecordedHotkey(pending);
 				if (success) {
-					setIsRecording(false);
-					setPendingHotkey("");
-					resetTracking();
-					setRecorderActive(false);
+					finishRecording();
 				}
 			}
 		}
@@ -257,10 +267,7 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 		void Result.tryPromise(() =>
 			saveRecordedHotkey(hotkey).then((success) => {
 				if (success) {
-					setIsRecording(false);
-					setPendingHotkey("");
-					resetTracking();
-					setRecorderActive(false);
+					finishRecording();
 				}
 			})
 		);
@@ -310,14 +317,8 @@ export function useHotkeyRecorder(options: UseHotkeyRecorderOptions = {}) {
 	};
 
 	const stopRecording = () => {
-		if (activeRecordingId === recorderId) {
-			activeRecordingId = null;
-		}
-		setIsRecording(false);
-		setPendingHotkey("");
+		finishRecording();
 		setError(null);
-		resetTracking();
-		setRecorderActive(false);
 	};
 
 	return {
