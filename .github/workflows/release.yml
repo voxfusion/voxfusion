@@ -163,6 +163,30 @@ jobs:
           fi
           echo "INTEL_SIG_FILE=$INTEL_SIG_FILE" >> $GITHUB_OUTPUT
 
+      - name: Notarize macOS DMGs
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          notarize_dmg() {
+            local dmg_path="$1"
+
+            echo "Submitting DMG for notarization: $dmg_path"
+            xcrun notarytool submit "$dmg_path" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+
+            echo "Stapling notarization ticket to DMG: $dmg_path"
+            xcrun stapler staple "$dmg_path"
+            xcrun stapler validate "$dmg_path"
+          }
+
+          notarize_dmg "${{ steps.artifacts.outputs.ARM_DMG_PATH }}"
+          notarize_dmg "${{ steps.artifacts.outputs.INTEL_DMG_PATH }}"
+
       - name: Verify macOS signing and notarization
         run: |
           verify_dmg() {
