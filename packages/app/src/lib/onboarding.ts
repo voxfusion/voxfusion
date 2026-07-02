@@ -1,6 +1,6 @@
-export const ONBOARDING_STEP_COUNT = 7;
-export const CURRENT_ONBOARDING_VERSION = 3;
-export const MODEL_DOWNLOAD_STEP = 5;
+export const ONBOARDING_STEP_COUNT = 8;
+export const CURRENT_ONBOARDING_VERSION = 4;
+export const MODEL_DOWNLOAD_STEP = 6;
 
 export function normalizeOnboardingStep(
 	step: number,

@@ -1,6 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Show, createEffect, createSignal } from "solid-js";
+import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { useHotkeyRecorder } from "../hooks/useHotkeyRecorder";
 import { useI18n } from "../i18n";
 import { validateHandsFreeHotkey, validateHoldToSpeakHotkey } from "../lib/hotkeyUtils";
@@ -15,6 +15,7 @@ import AudioSettings from "./settings/AudioSettings";
 import HotkeySettings from "./settings/HotkeySettings";
 import LanguageSettings from "./settings/LanguageSettings";
 import ModelSettings from "./settings/ModelSettings";
+import PrivacySettings from "./settings/PrivacySettings";
 import SettingsSidebar from "./settings/SettingsSidebar";
 import type { SettingsSection } from "./settings/types";
 
@@ -29,6 +30,7 @@ const sectionTitles: Record<SettingsSection, string> = {
 	hotkey: "// HOTKEY_CONFIG",
 	appearance: "// APPEARANCE_CONFIG",
 	language: "// LANGUAGE_CONFIG",
+	privacy: "// PRIVACY_CONFIG",
 };
 
 export default function SettingsModal(props: SettingsModalProps) {
@@ -88,7 +90,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 		};
 
 		window.addEventListener("keydown", handleEscape);
-		return () => window.removeEventListener("keydown", handleEscape);
+		onCleanup(() => window.removeEventListener("keydown", handleEscape));
 	});
 
 	const handleOverlayClick = (e: MouseEvent) => {
@@ -158,6 +160,9 @@ export default function SettingsModal(props: SettingsModalProps) {
 							</Show>
 							<Show when={activeSection() === "language"}>
 								<LanguageSettings locale={locale()} setLocale={setLocale} />
+							</Show>
+							<Show when={activeSection() === "privacy"}>
+								<PrivacySettings t={t} settings={settings} />
 							</Show>
 						</div>
 

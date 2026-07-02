@@ -11,6 +11,7 @@ import LearningStep from "./steps/LearningStep";
 import MicrophonePermissionStep from "./steps/MicrophonePermissionStep";
 import MicrophoneStep from "./steps/MicrophoneStep";
 import ModelDownloadStep from "./steps/ModelDownloadStep";
+import PrivacyStep from "./steps/PrivacyStep";
 
 interface OnboardingWizardProps {
 	initialStep: number;
@@ -30,6 +31,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 	const [learningCompleted, setLearningCompleted] = createSignal(false);
 
 	const goToNext = () => {
+		if (isAnimating()) return;
 		if (currentStep() < ONBOARDING_STEP_COUNT) {
 			capture("onboarding_step_completed", { step: currentStep() });
 			setAnimationDirection("forward");
@@ -44,6 +46,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 	};
 
 	const goToPrevious = () => {
+		if (isAnimating()) return;
 		if (currentStep() > 1) {
 			setAnimationDirection("backward");
 			setIsAnimating(true);
@@ -64,8 +67,8 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 		const step = currentStep();
 		if (step === 1) return micPermissionGranted();
 		if (step === 2) return accessibilityPermissionGranted();
-		if (step === 5) return modelDownloaded();
-		if (step === 6) return learningCompleted();
+		if (step === 6) return modelDownloaded();
+		if (step === 7) return learningCompleted();
 		return true;
 	};
 
@@ -93,7 +96,7 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 			</div>
 
 			<div
-				class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
+				class={`flex-1 flex items-center justify-center w-full transition-all duration-300 ${currentStep() === 7 ? "max-w-4xl" : "max-w-2xl"}`}
 			>
 				<div
 					class={`w-full transition-all duration-200 ${
@@ -117,19 +120,22 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 						<HotkeyStep />
 					</Show>
 					<Show when={currentStep() === 5}>
-						<ModelDownloadStep onDownloadComplete={() => setModelDownloaded(true)} />
+						<PrivacyStep />
 					</Show>
 					<Show when={currentStep() === 6}>
-						<LearningStep onTranscriptionComplete={() => setLearningCompleted(true)} />
+						<ModelDownloadStep onDownloadComplete={() => setModelDownloaded(true)} />
 					</Show>
 					<Show when={currentStep() === 7}>
+						<LearningStep onTranscriptionComplete={() => setLearningCompleted(true)} />
+					</Show>
+					<Show when={currentStep() === 8}>
 						<CompletionStep />
 					</Show>
 				</div>
 			</div>
 
 			<div
-				class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 6 ? "max-w-4xl" : "max-w-2xl"}`}
+				class={`flex items-center justify-between w-full mt-8 transition-all duration-300 ${currentStep() === 7 ? "max-w-4xl" : "max-w-2xl"}`}
 			>
 				<Show when={currentStep() > 1} fallback={<div />}>
 					<button

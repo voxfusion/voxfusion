@@ -52,10 +52,7 @@ pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     Ok(())
 }
 
-pub fn fetch_site_dictionary_words(
-    conn: &rusqlite::Connection,
-    domain: &str,
-) -> Option<String> {
+pub fn fetch_site_dictionary_words(conn: &rusqlite::Connection, domain: &str) -> Option<String> {
     let mut stmt = conn
         .prepare(
             "SELECT word FROM site_dictionary_words WHERE domain = ?1 \

@@ -8,15 +8,17 @@ import {
 } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Result } from "better-result";
-import { Check, X } from "lucide-solid";
+import { AlertCircle, Check, X } from "lucide-solid";
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import DotMatrixSpinner from "../components/DotMatrixSpinner";
+import { createAppI18n, getStoredLocale } from "../i18n";
 import { getFrontmostApp } from "../lib/commands/apps";
 import { startRecordingWithDevice, stopRecordingWithDevice } from "../lib/commands/audio";
 import {
 	muteMediaForRecording as muteMediaForRecordingCommand,
 	restoreMediaAfterRecording as restoreMediaAfterRecordingCommand,
 } from "../lib/commands/media";
+import { checkAccessibilityProbe } from "../lib/commands/permissions";
 import { typeText } from "../lib/commands/text";
 import { saveTranscription, transcribeAudio } from "../lib/commands/transcriptions";
 import { errorFields, logDiagnostic } from "../lib/diagnostics";
@@ -47,13 +49,23 @@ const WAVE_PATTERN = [
 
 const WINDOW_WIDTH_COMPACT = 100;
 const WINDOW_WIDTH_HANDS_FREE = 140;
+const WINDOW_WIDTH_ERROR = 260;
 const WINDOW_HEIGHT = 28;
 const BOTTOM_PADDING = 20;
 const ESCAPE_KEY_CODE = 53;
 const VOXFUSION_BUNDLE_ID = "io.voxfusion.app";
 
+/** How long a transcription error (with Retry) stays visible if untouched. */
+const TRANSCRIPTION_ERROR_HIDE_MS = 5000;
+/** How long a recording/typing error stays visible. */
+const RECORDING_ERROR_HIDE_MS = 4000;
+
 type KeyboardKeyPressedPayload = {
 	keyCode: number;
+};
+
+type RecordingErrorPayload = {
+	message: string;
 };
 
 let lastMonitorX: number | null = null;
@@ -97,6 +109,8 @@ async function repositionToCurrentMonitor() {
 }
 
 export default function VoiceControl() {
+	// The overlay window has no I18nProvider — create a standalone instance.
+	const [t, { setLocale }] = createAppI18n(getStoredLocale());
 	const settings = useSettings();
 	const [isRecording, setIsRecording] = createSignal(false);
 	const [loading, setLoading] = createSignal(false);
@@ -107,6 +121,9 @@ export default function VoiceControl() {
 	const [waveOffset, setWaveOffset] = createSignal(0);
 	const [isOnboardingComplete, setIsOnboardingComplete] = createSignal(false);
 	const [isLearningActive, setIsLearningActive] = createSignal(false);
+	const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
+	const [errorRetry, setErrorRetry] = createSignal<(() => void) | null>(null);
+	let errorHideTimer: number | undefined;
 
 	createEffect(() => {
 		if (!isRecording()) return;
@@ -127,6 +144,43 @@ export default function VoiceControl() {
 	let isStarting = false;
 	let activeAppBundleId: string | null = null;
 	let activeDomain: string | null = null;
+
+	const showErrorState = () => Boolean(errorMessage()) && !isRecording() && !loading();
+
+	const clearErrorState = () => {
+		if (errorHideTimer !== undefined) {
+			window.clearTimeout(errorHideTimer);
+			errorHideTimer = undefined;
+		}
+		setErrorMessage(null);
+		setErrorRetry(null);
+	};
+
+	const showError = async (
+		message: string,
+		options: { autoHideMs: number; retry?: () => void }
+	) => {
+		clearErrorState();
+		setErrorMessage(message);
+		setErrorRetry(() => options.retry ?? null);
+		await setWindowWidth(WINDOW_WIDTH_ERROR);
+		await showVoiceControlWindow();
+		// Let Escape dismiss the error pill (re-registering is a swallowed no-op
+		// when the shortcut is still held from the recording phase).
+		await registerEscapeShortcut();
+		errorHideTimer = window.setTimeout(() => {
+			void dismissError();
+		}, options.autoHideMs);
+	};
+
+	const dismissError = async () => {
+		if (!errorMessage()) return;
+		clearErrorState();
+		await unregisterEscapeShortcut();
+		if (!isRecording() && !loading()) {
+			await hideVoiceControlWindow();
+		}
+	};
 
 	const canUseShortcut = () => isOnboardingComplete() || isLearningActive();
 
@@ -182,9 +236,26 @@ export default function VoiceControl() {
 	};
 
 	onMount(async () => {
+		// Cleanups are collected into one synchronously-registered onCleanup:
+		// onCleanup calls after an `await` run outside the reactive owner and
+		// would silently never fire.
+		let disposed = false;
+		const disposers: (() => void)[] = [];
+		onCleanup(() => {
+			disposed = true;
+			for (const dispose of disposers) dispose();
+		});
+		const addDisposer = (dispose: () => void) => {
+			if (disposed) {
+				dispose();
+			} else {
+				disposers.push(dispose);
+			}
+		};
+
 		await repositionToCurrentMonitor();
 		const repositionInterval = setInterval(repositionToCurrentMonitor, 1000);
-		onCleanup(() => clearInterval(repositionInterval));
+		addDisposer(() => clearInterval(repositionInterval));
 
 		const settings = await loadSettings();
 		let hotkey = settings.hotkey;
@@ -204,69 +275,92 @@ export default function VoiceControl() {
 			await registerShortcuts(hotkey, holdToSpeakHotkey);
 		}
 
-		const unlistenSettings = await listen("settings-changed", async () => {
-			const newSettings = await loadSettings();
-			const newHotkey = isValidHotkey(newSettings.hotkey) ? newSettings.hotkey : DEFAULT_HOTKEY;
-			const newHoldToSpeakHotkey = isValidHotkey(newSettings.holdToSpeakHotkey)
-				? newSettings.holdToSpeakHotkey
-				: DEFAULT_HOLD_TO_SPEAK_HOTKEY;
-			const wasOnboarding = !isOnboardingComplete();
-			const nowComplete = newSettings.onboardingComplete;
-			const shouldRegisterShortcuts = nowComplete || isLearningActive();
-			const shortcutKey = `${newHotkey}|${newHoldToSpeakHotkey}`;
-			if (
-				shouldRegisterShortcuts &&
-				(shortcutKey !== currentShortcut() || (wasOnboarding && nowComplete))
-			) {
-				await registerShortcuts(newHotkey, newHoldToSpeakHotkey);
-			} else if (!shouldRegisterShortcuts) {
-				await unregisterShortcuts();
-			}
-			setSelectedMicrophone(newSettings.selectedMicrophoneId);
-			setMuteMediaWhileRecording(newSettings.muteMediaWhileRecording);
-			setIsOnboardingComplete(newSettings.onboardingComplete);
-		});
-
-		const unlistenAudio = await listen<number>("audio-level", (event) => {
-			setAudioLevel(event.payload);
-		});
-
-		const unlistenLearning = await listen<boolean>("learning-step-active", async (event) => {
-			const active = event.payload;
-			setIsLearningActive(active);
-			const newSettings = await loadSettings();
-			const newHotkey = isValidHotkey(newSettings.hotkey) ? newSettings.hotkey : DEFAULT_HOTKEY;
-			const newHoldToSpeakHotkey = isValidHotkey(newSettings.holdToSpeakHotkey)
-				? newSettings.holdToSpeakHotkey
-				: DEFAULT_HOLD_TO_SPEAK_HOTKEY;
-			if (active || isOnboardingComplete()) {
+		addDisposer(
+			await listen("settings-changed", async () => {
+				setLocale(getStoredLocale());
+				const newSettings = await loadSettings();
+				const newHotkey = isValidHotkey(newSettings.hotkey) ? newSettings.hotkey : DEFAULT_HOTKEY;
+				const newHoldToSpeakHotkey = isValidHotkey(newSettings.holdToSpeakHotkey)
+					? newSettings.holdToSpeakHotkey
+					: DEFAULT_HOLD_TO_SPEAK_HOTKEY;
+				const wasOnboarding = !isOnboardingComplete();
+				const nowComplete = newSettings.onboardingComplete;
+				const shouldRegisterShortcuts = nowComplete || isLearningActive();
 				const shortcutKey = `${newHotkey}|${newHoldToSpeakHotkey}`;
-				if (shortcutKey !== currentShortcut()) {
+				if (
+					shouldRegisterShortcuts &&
+					(shortcutKey !== currentShortcut() || (wasOnboarding && nowComplete))
+				) {
 					await registerShortcuts(newHotkey, newHoldToSpeakHotkey);
+				} else if (!shouldRegisterShortcuts) {
+					await unregisterShortcuts();
 				}
-			} else {
-				await unregisterShortcuts();
-			}
-		});
+				setSelectedMicrophone(newSettings.selectedMicrophoneId);
+				setMuteMediaWhileRecording(newSettings.muteMediaWhileRecording);
+				setIsOnboardingComplete(newSettings.onboardingComplete);
+			})
+		);
 
-		const unlistenKeyboardKeyPressed = await listen<KeyboardKeyPressedPayload>(
-			"keyboard-key-pressed",
-			(event) => {
+		addDisposer(
+			await listen<number>("audio-level", (event) => {
+				setAudioLevel(event.payload);
+			})
+		);
+
+		addDisposer(
+			await listen<boolean>("learning-step-active", async (event) => {
+				const active = event.payload;
+				setIsLearningActive(active);
+				const newSettings = await loadSettings();
+				const newHotkey = isValidHotkey(newSettings.hotkey) ? newSettings.hotkey : DEFAULT_HOTKEY;
+				const newHoldToSpeakHotkey = isValidHotkey(newSettings.holdToSpeakHotkey)
+					? newSettings.holdToSpeakHotkey
+					: DEFAULT_HOLD_TO_SPEAK_HOTKEY;
+				if (active || isOnboardingComplete()) {
+					const shortcutKey = `${newHotkey}|${newHoldToSpeakHotkey}`;
+					if (shortcutKey !== currentShortcut()) {
+						await registerShortcuts(newHotkey, newHoldToSpeakHotkey);
+					}
+				} else {
+					await unregisterShortcuts();
+				}
+			})
+		);
+
+		addDisposer(
+			await listen<KeyboardKeyPressedPayload>("keyboard-key-pressed", (event) => {
 				if (event.payload.keyCode === ESCAPE_KEY_CODE) return;
 				if (recordingMode() !== "hold") return;
 				cancelInterruptedHoldToSpeakRecording();
-			}
+			})
 		);
 
-		onCleanup(() => {
-			unlistenSettings();
-			unlistenAudio();
-			unlistenLearning();
-			unlistenKeyboardKeyPressed();
-		});
+		addDisposer(
+			await listen<RecordingErrorPayload>("recording-error", async (event) => {
+				// The mic stream died mid-recording. The backend has already
+				// cleared its recording state — reset ours so the next hotkey
+				// press starts fresh, and surface the failure.
+				logDiagnostic("error", "voice", "recording_error_event", {
+					message: event.payload.message,
+				});
+				if (!isRecording() && !isStarting) return;
+				setIsRecording(false);
+				setRecordingMode(null);
+				activeAppBundleId = null;
+				activeDomain = null;
+				isStarting = false;
+				isStopping = false;
+				setLoading(false);
+				await restoreMediaAfterRecording();
+				await showError(t("voiceControl.recordingFailed"), {
+					autoHideMs: RECORDING_ERROR_HIDE_MS,
+				});
+			})
+		);
 	});
 
 	onCleanup(async () => {
+		clearErrorState();
 		if (isRecording()) {
 			await cancelRecording();
 		}
@@ -274,6 +368,84 @@ export default function VoiceControl() {
 		await unregisterDictationHotkey();
 		setCurrentShortcut(null);
 	});
+
+	const transcribeAndType = async (
+		filePath: string,
+		bundleId: string | null,
+		domain: string | null
+	) => {
+		const result = await transcribeAudio(filePath, bundleId, domain, settings().defaultStyle);
+		if (Result.isError(result)) {
+			logDiagnostic("error", "voice", "transcription_failed", errorFields(result.error));
+			await showError(t("voiceControl.transcriptionFailed"), {
+				autoHideMs: TRANSCRIPTION_ERROR_HIDE_MS,
+				retry: () => void retryTranscription(filePath, bundleId, domain),
+			});
+			return;
+		}
+		await saveTranscription(result.value);
+		logDiagnostic("info", "voice", "transcription_completed", {
+			wordCount: result.value.word_count,
+			processingTimeMs: result.value.processing_time_ms,
+			audioDurationMs: result.value.audio_duration_ms,
+			hasAppContext: Boolean(bundleId),
+			hasSiteContext: Boolean(domain),
+			style: settings().defaultStyle,
+		});
+
+		const typed = await typeText(result.value.text ?? "");
+		if (Result.isError(typed)) {
+			logDiagnostic("error", "voice", "type_text_failed", errorFields(typed.error));
+			const probe = await checkAccessibilityProbe();
+			if (Result.isOk(probe) && !probe.value) {
+				// Accessibility was revoked after onboarding — the main window
+				// listens for this and opens Settings.
+				await emit("accessibility-permission-needed");
+			}
+			await showError(t("voiceControl.typingFailed"), {
+				autoHideMs: RECORDING_ERROR_HIDE_MS,
+			});
+		} else {
+			logDiagnostic("info", "voice", "text_typed", {
+				characterCount: result.value.text?.length ?? 0,
+			});
+		}
+
+		setTimeout(() => {
+			emit("transcription-created");
+		}, 1000);
+	};
+
+	const retryTranscription = async (
+		filePath: string,
+		bundleId: string | null,
+		domain: string | null
+	) => {
+		if (isStopping || loading()) return;
+		logDiagnostic("info", "voice", "transcription_retry_requested");
+		clearErrorState();
+		setLoading(true);
+		await setWindowWidth(WINDOW_WIDTH_COMPACT);
+		await showVoiceControlWindow();
+
+		const completed = await Result.tryPromise(() => transcribeAndType(filePath, bundleId, domain));
+		if (Result.isError(completed)) {
+			logDiagnostic("error", "voice", "transcription_retry_unhandled_failure", {
+				error: errorFields(completed.error),
+			});
+			setLoading(false);
+			await showError(t("voiceControl.transcriptionFailed"), {
+				autoHideMs: TRANSCRIPTION_ERROR_HIDE_MS,
+				retry: () => void retryTranscription(filePath, bundleId, domain),
+			});
+			return;
+		}
+		setLoading(false);
+		if (!errorMessage()) {
+			await unregisterEscapeShortcut();
+			await hideVoiceControlWindow();
+		}
+	};
 
 	const stopRecording = async () => {
 		if (isStopping) return;
@@ -292,6 +464,9 @@ export default function VoiceControl() {
 			const filePath = await stopRecordingWithDevice();
 			if (Result.isError(filePath)) {
 				logDiagnostic("error", "voice", "stop_recording_failed", errorFields(filePath.error));
+				await showError(t("voiceControl.recordingFailed"), {
+					autoHideMs: RECORDING_ERROR_HIDE_MS,
+				});
 				return;
 			}
 			await restoreMediaAfterRecording();
@@ -302,45 +477,23 @@ export default function VoiceControl() {
 			const domain = activeDomain;
 			activeAppBundleId = null;
 			activeDomain = null;
-			const result = await transcribeAudio(
-				filePath.value,
-				bundleId,
-				domain,
-				settings().defaultStyle
-			);
-			if (Result.isError(result)) {
-				logDiagnostic("error", "voice", "transcription_failed", errorFields(result.error));
-				return;
-			}
-			await saveTranscription(result.value);
-			logDiagnostic("info", "voice", "transcription_completed", {
-				wordCount: result.value.word_count,
-				processingTimeMs: result.value.processing_time_ms,
-				audioDurationMs: result.value.audio_duration_ms,
-				hasAppContext: Boolean(bundleId),
-				hasSiteContext: Boolean(domain),
-				style: settings().defaultStyle,
-			});
-
-			await typeText(result.value.text ?? "");
-			logDiagnostic("info", "voice", "text_typed", {
-				characterCount: result.value.text?.length ?? 0,
-			});
-
-			setTimeout(() => {
-				emit("transcription-created");
-			}, 1000);
+			await transcribeAndType(filePath.value, bundleId, domain);
 		});
 		if (Result.isError(completed)) {
 			logDiagnostic("error", "voice", "stop_recording_unhandled_failure", {
 				error: errorFields(completed.error),
 			});
 			console.error("Failed to stop recording:", completed.error);
+			await showError(t("voiceControl.recordingFailed"), {
+				autoHideMs: RECORDING_ERROR_HIDE_MS,
+			});
 		}
 		await restoreMediaAfterRecording();
 		setLoading(false);
 		isStopping = false;
-		await hideVoiceControlWindow();
+		if (!errorMessage()) {
+			await hideVoiceControlWindow();
+		}
 		logDiagnostic("info", "voice", "stop_recording_completed");
 	};
 
@@ -348,7 +501,11 @@ export default function VoiceControl() {
 		await Result.tryPromise(async () => {
 			await register("Escape", (evt) => {
 				if (evt.state !== "Pressed") return;
-				cancelRecording();
+				if (isRecording()) {
+					cancelRecording();
+					return;
+				}
+				void dismissError();
 			});
 		});
 	};
@@ -392,6 +549,7 @@ export default function VoiceControl() {
 			if (isRecording()) return;
 			if (isStopping || isStarting) return;
 			isStarting = true;
+			clearErrorState();
 			logDiagnostic("info", "voice", "start_recording_started", { mode });
 			activeAppBundleId = null;
 			activeDomain = null;
@@ -412,8 +570,10 @@ export default function VoiceControl() {
 					error: errorFields(started.error),
 					hasSelectedMicrophone: Boolean(deviceName && deviceName !== "default"),
 				});
-				await hideVoiceControlWindow();
 				isStarting = false;
+				await showError(t("voiceControl.recordingFailed"), {
+					autoHideMs: RECORDING_ERROR_HIDE_MS,
+				});
 				return;
 			}
 			void muteMediaForRecording();
@@ -432,15 +592,17 @@ export default function VoiceControl() {
 			logDiagnostic("error", "voice", "start_recording_unhandled_failure", {
 				error: errorFields(startedRecording.error),
 			});
-			await hideVoiceControlWindow();
 			isStopping = false;
 			isStarting = false;
+			await showError(t("voiceControl.recordingFailed"), {
+				autoHideMs: RECORDING_ERROR_HIDE_MS,
+			});
 		}
 	};
 
 	return (
 		<div
-			class={`min-h-2 mx-auto w-fit bg-th-base h-full rounded-2xl border border-border-strong flex align-center justify-center py-1 ${recordingMode() === "toggle" ? "px-2" : "px-4"} ${!isRecording() && !loading() ? "opacity-0" : ""}`}
+			class={`min-h-2 mx-auto w-fit bg-th-base h-full rounded-2xl border ${showErrorState() ? "border-ac" : "border-border-strong"} flex align-center justify-center py-1 ${recordingMode() === "toggle" || showErrorState() ? "px-2" : "px-4"} ${!isRecording() && !loading() && !errorMessage() ? "opacity-0" : ""}`}
 		>
 			<Show when={isRecording() && recordingMode() === "toggle" && !loading()}>
 				<button
@@ -462,6 +624,29 @@ export default function VoiceControl() {
 							/>
 						)}
 					</For>
+				</div>
+			</Show>
+			<Show when={showErrorState()}>
+				<div class="flex items-center gap-1.5 min-w-0 self-center">
+					<AlertCircle size={11} class="text-ac shrink-0" />
+					<span class="font-mono text-[10px] text-ac truncate">{errorMessage()}</span>
+					<Show when={errorRetry()}>
+						<button
+							type="button"
+							onClick={() => errorRetry()?.()}
+							class="shrink-0 font-mono text-[10px] uppercase tracking-wider px-1.5 border border-ac text-ac hover:bg-ac hover:text-ac-on transition-colors cursor-pointer"
+						>
+							{t("voiceControl.retry")}
+						</button>
+					</Show>
+					<button
+						type="button"
+						aria-label={t("settings.cancel")}
+						onClick={() => void dismissError()}
+						class="w-4 h-4 shrink-0 flex items-center justify-center rounded-full bg-th-elevated text-txt-secondary hover:text-txt-primary hover:bg-th-hover transition-colors cursor-pointer"
+					>
+						<X size={10} />
+					</button>
 				</div>
 			</Show>
 			<Show when={isRecording() && recordingMode() === "toggle" && !loading()}>

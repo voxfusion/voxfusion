@@ -1,8 +1,6 @@
 ---
-import Footer from "../components/Footer.astro";
-import Umami from "../components/Umami.astro";
-import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
-import Seo from "../components/Seo.astro";
+import { defaultLang, getLocalizedPath, useTranslations } from "../i18n/utils";
+import BaseLayout from "../layouts/BaseLayout.astro";
 
 const lang = defaultLang;
 const t = useTranslations(lang);
@@ -10,34 +8,14 @@ const title = `${t("terms.title")} - VoxFusion`;
 const description = t("terms.meta.description");
 ---
 
-<!doctype html>
-<html lang={lang}>
-<head>
-	<meta charset="UTF-8" />
-	<Seo title={title} description={description} lang={lang} />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-	<title>{title}</title>
-</head>
-<body>
-	<div class="grid-overlay"></div>
-
-	<nav class="nav">
-		<div class="nav-inner">
-			<a href={getLocalizedPath("/", lang)} class="logo">
-				<span class="logo-bracket">[</span>VOX<span class="logo-accent">FUSION</span><span class="logo-bracket">]</span>
-			</a>
-			<div class="nav-links">
-				<a href={getLocalizedPath("/", lang) + "#features"} class="nav-link"><span class="link-index">01</span>{t("nav.features")}</a>
-				<a href="https://github.com/voxfusion/voxfusion" target="_blank" rel="noopener noreferrer" class="nav-link"><span class="link-index">02</span>{t("nav.github")}</a>
-			</div>
-			<a href={getLocalizedPath("/", lang)} class="nav-cta">{t("legal.backToHome")}</a>
-		</div>
-	</nav>
-
+<BaseLayout
+	title={title}
+	description={description}
+	lang={lang}
+	showNavLinks
+	ctaHref={getLocalizedPath("/", lang)}
+	ctaLabel={t("legal.backToHome")}
+>
 	<main class="legal-page">
 		<div class="legal-header">
 			<span class="section-number">§</span>
@@ -107,113 +85,9 @@ const description = t("terms.meta.description");
 			<a href={getLocalizedPath("/", lang)} class="back-link">{t("legal.backToHome")}</a>
 		</div>
 	</main>
-
-	<Footer lang={lang} />
-	<Umami />
-</body>
-</html>
+</BaseLayout>
 
 <style>
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
-
-	a {
-		text-decoration: none;
-		color: inherit;
-	}
-
-	html {
-		font-family: "JetBrains Mono", "Space Mono", monospace;
-		background: #0a0a0a;
-		color: #e0e0e0;
-		scroll-behavior: smooth;
-		font-size: 15px;
-	}
-
-	body {
-		min-height: 100vh;
-		position: relative;
-	}
-
-	.grid-overlay {
-		position: fixed;
-		inset: 0;
-		background-image:
-			linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-		background-size: 40px 40px;
-		pointer-events: none;
-		z-index: 0;
-	}
-
-	.nav {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		z-index: 100;
-		border-bottom: 1px solid #222;
-		background: rgba(10, 10, 10, 0.95);
-		backdrop-filter: blur(10px);
-	}
-
-	.nav-inner {
-		max-width: 1400px;
-		margin: 0 auto;
-		padding: 16px 32px;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-
-	.logo {
-		font-size: 18px;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-		color: #e0e0e0;
-	}
-
-	.logo-bracket { color: #ff3e00; }
-	.logo-accent { color: #666; }
-
-	.nav-links {
-		display: flex;
-		gap: 32px;
-	}
-
-	.nav-link {
-		font-size: 13px;
-		color: #888;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		transition: color 0.2s;
-	}
-
-	.nav-link:hover { color: #fff; }
-
-	.link-index {
-		color: #ff3e00;
-		margin-right: 8px;
-	}
-
-	.nav-cta {
-		padding: 10px 20px;
-		border: 1px solid #ff3e00;
-		color: #ff3e00;
-		font-size: 13px;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		transition: all 0.2s;
-	}
-
-	.nav-cta:hover {
-		background: #ff3e00;
-		color: #000;
-	}
-
 	.legal-page {
 		max-width: 800px;
 		margin: 0 auto;
@@ -299,10 +173,6 @@ const description = t("terms.meta.description");
 	}
 
 	@media (max-width: 768px) {
-		.nav-links {
-			display: none;
-		}
-
 		.legal-page {
 			padding: 100px 24px 60px;
 		}

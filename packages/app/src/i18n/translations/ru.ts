@@ -3,7 +3,7 @@ import type { Translations } from "./en";
 export const ru: Translations = {
 	home: {
 		yourTranscriptions: "Ваши транскрипции",
-		pressToRecord: "Нажмите Left Control+Left Option, чтобы начать запись",
+		pressToRecord: "Нажмите {{hotkey}}, чтобы начать запись",
 	},
 	about: {
 		title: "О приложении",
@@ -43,6 +43,11 @@ export const ru: Translations = {
 		muteMediaWhileRecording: "Отключать медиа во время записи",
 		muteMediaWhileRecordingDescription:
 			"Временно отключать системный звук во время записи и восстанавливать его после.",
+		analytics: "Анонимная статистика использования",
+		analyticsDescription:
+			"Отправлять анонимные события использования, чтобы помочь улучшить VoxFusion. Изменения применяются сразу.",
+		analyticsNote:
+			"Собираются только метаданные событий — ни аудио, ни расшифрованный текст никогда не передаются.",
 		recordingHotkey: "Горячая клавиша записи",
 		pressHotkey: "Нажмите комбинацию клавиш...",
 		hotkeyDescription: "Нажмите эту комбинацию клавиш для начала или остановки записи.",
@@ -60,6 +65,10 @@ export const ru: Translations = {
 		modelDownload: "Загрузить",
 		modelDownloading: "Загрузка…",
 		modelDownloadFailed: "Не удалось загрузить",
+		modelDownloadedOfTotal: "{{downloaded}} / {{total}} МБ",
+		modelDownloadSpeed: "{{speed}} МБ/с",
+		modelEta: "осталось ~{{eta}}",
+		modelResumeNote: "Загрузка продолжится с места остановки.",
 		modelExperimentalNote:
 			"Транскрипция этой моделью на устройстве экспериментальна и пока недоступна.",
 	},
@@ -76,8 +85,7 @@ export const ru: Translations = {
 		failedToFetch: "Не удалось загрузить транскрипции",
 		errorOccurred: "Произошла ошибка",
 		noTranscriptions: "Пока нет транскрипций",
-		useCommandToRecord:
-			"Используйте Left Control+Left Option, чтобы начать запись и создать первую транскрипцию",
+		useCommandToRecord: "Используйте {{hotkey}}, чтобы начать запись и создать первую транскрипцию",
 		tryAgain: "Попробовать снова",
 		noMore: "Больше нет транскрипций",
 		today: "Сегодня",
@@ -195,6 +203,8 @@ export const ru: Translations = {
 			"VoxFusion нужен доступ к микрофону для записи и транскрипции голоса.",
 		micPermissionGranted: "Доступ к микрофону получен",
 		micPermissionNotGranted: "Требуется доступ к микрофону",
+		micPermissionDenied:
+			"В доступе к микрофону отказано. Включите VoxFusion в Системных настройках в разделе «Конфиденциальность и безопасность» → «Микрофон» — этот шаг продолжится автоматически после предоставления доступа.",
 		grantMicPermission: "Предоставить доступ",
 		checkingPermission: "Проверка...",
 		accessibilityTitle: "Универсальный доступ",
@@ -230,6 +240,17 @@ export const ru: Translations = {
 		retryDownload: "Повторить загрузку",
 		modelDownloadNote:
 			"Эта модель обеспечивает офлайн-транскрипцию. Для загрузки требуется подключение к интернету.",
+		privacyTitle: "Помогите улучшить VoxFusion",
+		privacyDescription:
+			"VoxFusion может отправлять анонимные события использования — например, какие функции используются и версию приложения. Только метаданные: ваши аудиозаписи и расшифрованный текст никогда не покидают устройство. Это можно изменить в любой момент в разделе Настройки → Приватность.",
+		privacyToggleLabel: "Делиться анонимными данными использования",
+		privacyToggleDescription: "Только метаданные — никакого аудио и никаких расшифровок.",
+	},
+	voiceControl: {
+		transcriptionFailed: "Ошибка транскрипции",
+		recordingFailed: "Ошибка записи",
+		typingFailed: "Не удалось ввести текст",
+		retry: "Повторить",
 	},
 	update: {
 		available: "Доступно обновление",

@@ -47,7 +47,7 @@ For full Tauri development with the native window:
 
 ```bash
 cd packages/app
-bun run tauri:dev
+bun run dev
 ```
 
 ### Build
@@ -64,11 +64,14 @@ On first launch, the app walks the user through onboarding:
 2. Accessibility permission (for typing transcribed text into other apps)
 3. Microphone device selection
 4. Hotkey configuration
-5. **Whisper model download** (~1.5 GB, one-time, requires internet)
-6. Try-it-out / learning step
-7. Completion
+5. Privacy choice (opt in or out of anonymous usage analytics)
+6. **Whisper model download** (~1.5 GB, one-time, requires internet)
+7. Try-it-out / learning step
+8. Completion
 
 After onboarding, the app is fully offline. All transcriptions and dictionary words are stored locally in a SQLite database under the app's data directory.
+
+The app can optionally send anonymous usage analytics (PostHog, EU-hosted, event metadata only — never audio or transcription text); you're asked about this during onboarding and can disable it anytime in Settings → Privacy.
 
 ## Linting & Formatting
 

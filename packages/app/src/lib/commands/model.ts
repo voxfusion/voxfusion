@@ -21,8 +21,11 @@ export interface ModelInfo {
 
 /** Payload of the `model-download-progress` event. */
 export interface ModelDownloadProgress {
-	model_id: string;
+	modelId: string;
+	/** Whole percentage, 0-100. */
 	progress: number;
+	downloadedBytes: number;
+	totalBytes: number;
 }
 
 export async function checkModelStatus(): Promise<CommandResult<boolean>> {
@@ -47,6 +50,14 @@ export async function setActiveModel(modelId: string): Promise<CommandResult<voi
 
 export async function downloadModel(modelId: string): Promise<CommandResult<void>> {
 	return invokeResult<void>("download_model", { modelId });
+}
+
+/**
+ * Requests cancellation of an in-flight download. The partial file is kept,
+ * so a later `downloadModel` call resumes where it left off.
+ */
+export async function cancelModelDownload(modelId: string): Promise<CommandResult<void>> {
+	return invokeResult<void>("cancel_model_download", { modelId });
 }
 
 export async function checkModelDownloaded(modelId: string): Promise<CommandResult<boolean>> {

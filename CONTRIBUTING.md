@@ -30,7 +30,7 @@ Run the full desktop app:
 
 ```sh
 cd packages/app
-bun run tauri:dev
+bun run dev
 ```
 
 Run the root development task:

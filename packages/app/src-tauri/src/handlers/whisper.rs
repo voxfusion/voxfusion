@@ -160,8 +160,12 @@ pub async fn transcribe_audio(
     // engine on the already-downloaded GGUF. Style/dictionary prompts are
     // whisper-only — Parakeet auto-detects language and takes no prompt.
     if model.engine == models::Engine::Parakeet {
-        let text =
-            crate::handlers::parakeet::transcribe(&app_handle, &model_path, &audio_path, &audio_data)?;
+        let text = crate::handlers::parakeet::transcribe(
+            &app_handle,
+            &model_path,
+            &audio_path,
+            &audio_data,
+        )?;
         let word_count = text.split_whitespace().count() as i64;
         let processing_time_ms = start.elapsed().as_millis() as i64;
         return Ok(TranscriptionResult {
@@ -234,10 +238,7 @@ pub async fn transcribe_audio(
                 .as_ref()
                 .map(|d| d.split(',').count())
                 .unwrap_or(0),
-            app_dict
-                .as_ref()
-                .map(|d| d.split(',').count())
-                .unwrap_or(0),
+            app_dict.as_ref().map(|d| d.split(',').count()).unwrap_or(0),
             site_dict
                 .as_ref()
                 .map(|d| d.split(',').count())
@@ -297,6 +298,11 @@ pub async fn transcribe_audio(
     let text = text.trim().to_string();
     let word_count = text.split_whitespace().count() as i64;
     let processing_time_ms = start.elapsed().as_millis() as i64;
+
+    crate::handlers::audio::cleanup_old_recordings(
+        &app_handle,
+        crate::handlers::audio::RECORDINGS_TO_KEEP,
+    );
 
     Ok(TranscriptionResult {
         text,

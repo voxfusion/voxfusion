@@ -3,9 +3,10 @@ FROM oven/bun:1 AS builder
 WORKDIR /app
 
 COPY package.json bun.lock* turbo.json tsconfig.json ./
+COPY packages/app/package.json ./packages/app/
 COPY packages/marketingsite/package.json ./packages/marketingsite/
 
-RUN bun install
+RUN bun install --frozen-lockfile
 
 COPY packages/marketingsite/ ./packages/marketingsite/
 

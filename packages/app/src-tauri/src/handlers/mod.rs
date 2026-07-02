@@ -16,11 +16,6 @@ pub use apps::{
     delete_app_instruction, get_frontmost_app, list_app_dictionaries, list_app_instructions,
     list_installed_apps, set_app_instruction, update_app_dictionary_word,
 };
-pub use sites::{
-    add_site_dictionary_word, delete_site_dictionary, delete_site_dictionary_word,
-    delete_site_style, list_site_dictionaries, list_site_styles, set_site_style,
-    update_site_dictionary_word,
-};
 pub use audio::{list_audio_devices, start_recording_with_device, stop_recording_with_device};
 pub use audio_processing::process_audio_file;
 pub use db::{
@@ -30,7 +25,13 @@ pub use db::{
 pub use hotkeys::start_system_key_watcher;
 pub use media::{mute_media_for_recording, restore_media_after_recording};
 pub use models::{
-    check_model_downloaded, download_model, get_active_model, list_models, set_active_model,
+    cancel_model_download, check_model_downloaded, download_model, get_active_model, list_models,
+    set_active_model,
+};
+pub use sites::{
+    add_site_dictionary_word, delete_site_dictionary, delete_site_dictionary_word,
+    delete_site_style, list_site_dictionaries, list_site_styles, set_site_style,
+    update_site_dictionary_word,
 };
 pub use text::{check_accessibility_probe, read_audio_file, type_text};
 pub use whisper::{check_model_status, download_whisper_model, transcribe_audio};

@@ -16,6 +16,7 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 	const [isRequesting, setIsRequesting] = createSignal(false);
 	let pollInterval: ReturnType<typeof setInterval> | undefined;
 	let unlistenFn: UnlistenFn | undefined;
+	let disposed = false;
 
 	const markGranted = () => {
 		setIsGranted(true);
@@ -70,20 +71,28 @@ export default function AccessibilityPermissionStep(props: AccessibilityPermissi
 
 	onMount(async () => {
 		await checkPermission();
+		if (disposed) return;
 
 		if (!isGranted()) {
 			// Poll as fallback
 			pollInterval = setInterval(checkPermission, 1000);
 
 			// Listen for macOS distributed notification when the user
-			// toggles accessibility in System Settings
-			unlistenFn = await listen("accessibility-changed", () => {
+			// toggles accessibility in System Settings. The component may
+			// unmount while `listen` resolves, so guard with the disposed flag.
+			const unlisten = await listen("accessibility-changed", () => {
 				checkWithRetries();
 			});
+			if (disposed) {
+				unlisten();
+			} else {
+				unlistenFn = unlisten;
+			}
 		}
 	});
 
 	onCleanup(() => {
+		disposed = true;
 		if (pollInterval) {
 			clearInterval(pollInterval);
 		}

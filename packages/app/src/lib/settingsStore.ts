@@ -6,12 +6,12 @@ import type { Locale } from "../i18n";
 import { type AppStyle, STYLE_LIST } from "./commands/apps";
 import { listAudioDevices } from "./commands/audio";
 import { saveBrowserValue, storageError } from "./errors";
+import { DEFAULT_HOLD_TO_SPEAK_HOTKEY, DEFAULT_HOTKEY } from "./hotkeyUtils";
 import {
 	CURRENT_ONBOARDING_VERSION,
 	ONBOARDING_STEP_COUNT,
 	normalizeOnboardingStep,
 } from "./onboarding";
-import { DEFAULT_HOLD_TO_SPEAK_HOTKEY, DEFAULT_HOTKEY } from "./hotkeyUtils";
 
 export type Theme = "dark" | "light" | "system";
 
@@ -23,6 +23,7 @@ export interface Settings {
 	language: Locale;
 	muteMediaWhileRecording: boolean;
 	defaultStyle: AppStyle;
+	analyticsEnabled: boolean;
 	onboardingComplete: boolean;
 	onboardingStep: number;
 }
@@ -35,6 +36,7 @@ const DEFAULT_SETTINGS: Settings = {
 	language: "en",
 	muteMediaWhileRecording: false,
 	defaultStyle: "default",
+	analyticsEnabled: true,
 	onboardingComplete: false,
 	onboardingStep: 1,
 };
@@ -54,6 +56,7 @@ async function getStore() {
 				language: DEFAULT_SETTINGS.language,
 				muteMediaWhileRecording: DEFAULT_SETTINGS.muteMediaWhileRecording,
 				defaultStyle: DEFAULT_SETTINGS.defaultStyle,
+				analyticsEnabled: DEFAULT_SETTINGS.analyticsEnabled,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
 				onboardingStep: DEFAULT_SETTINGS.onboardingStep,
 				onboardingVersion: CURRENT_ONBOARDING_VERSION,
@@ -77,6 +80,7 @@ export async function loadSettings(): Promise<Settings> {
 		storedDefaultStyle && STYLE_LIST.includes(storedDefaultStyle)
 			? storedDefaultStyle
 			: DEFAULT_SETTINGS.defaultStyle;
+	const analyticsEnabled = await store.get<boolean>("analyticsEnabled");
 	const onboardingComplete = await store.get<boolean>("onboardingComplete");
 	const onboardingStep = await store.get<number>("onboardingStep");
 	const onboardingVersion = await store.get<number>("onboardingVersion");
@@ -101,6 +105,7 @@ export async function loadSettings(): Promise<Settings> {
 		language: language ?? DEFAULT_SETTINGS.language,
 		muteMediaWhileRecording: muteMediaWhileRecording ?? DEFAULT_SETTINGS.muteMediaWhileRecording,
 		defaultStyle,
+		analyticsEnabled: analyticsEnabled ?? DEFAULT_SETTINGS.analyticsEnabled,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
 		onboardingStep: normalizedOnboardingStep,
 	};
@@ -140,6 +145,11 @@ export async function saveMuteMediaWhileRecording(enabled: boolean): Promise<voi
 export async function saveDefaultStyle(style: AppStyle): Promise<void> {
 	const store = await getStore();
 	await store.set("defaultStyle", style);
+}
+
+export async function saveAnalyticsEnabled(enabled: boolean): Promise<void> {
+	const store = await getStore();
+	await store.set("analyticsEnabled", enabled);
 }
 
 export interface AudioDevice {
@@ -212,6 +222,12 @@ export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<v
 export async function updateDefaultStyle(style: AppStyle): Promise<void> {
 	await saveDefaultStyle(style);
 	setSettingsInternal((prev) => ({ ...prev, defaultStyle: style }));
+	await emit("settings-changed");
+}
+
+export async function updateAnalyticsEnabled(enabled: boolean): Promise<void> {
+	await saveAnalyticsEnabled(enabled);
+	setSettingsInternal((prev) => ({ ...prev, analyticsEnabled: enabled }));
 	await emit("settings-changed");
 }
 

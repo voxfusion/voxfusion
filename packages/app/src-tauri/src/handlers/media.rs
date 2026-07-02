@@ -108,7 +108,8 @@ fn get_default_output_device() -> Result<AudioObjectId, String> {
 
 #[cfg(target_os = "macos")]
 fn size_of_val_u32<T>(value: &T) -> Result<u32, String> {
-    u32::try_from(std::mem::size_of_val(value)).map_err(|_| "CoreAudio data size overflow".to_string())
+    u32::try_from(std::mem::size_of_val(value))
+        .map_err(|_| "CoreAudio data size overflow".to_string())
 }
 
 #[cfg(target_os = "macos")]

@@ -49,6 +49,15 @@ pub struct AudioDevice {
     pub is_default: bool,
 }
 
+#[derive(Serialize, Clone)]
+struct RecordingErrorPayload {
+    message: String,
+}
+
+/// How many dictation WAVs to keep on disk (newest first). Everything older
+/// is pruned after each successful transcription.
+pub const RECORDINGS_TO_KEEP: usize = 20;
+
 #[tauri::command]
 pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
     let host = cpal::default_host();
@@ -84,26 +93,32 @@ pub async fn start_recording_with_device(
     if state.is_recording.load(Ordering::SeqCst) {
         return Err("Recording is already in progress.".to_string());
     }
-    state.is_recording.store(true, Ordering::SeqCst);
-
-    // Store app handle for emitting events
-    *state.app_handle.lock().map_err(|err| err.to_string())? = Some(app_handle.clone());
 
     let host = cpal::default_host();
 
-    let device = if let Some(ref name) = device_name {
-        if name == "default" || name.is_empty() {
-            host.default_input_device()
-                .ok_or("No default input device available")?
-        } else {
-            host.input_devices()
+    let device = match device_name {
+        Some(ref name) if name != "default" && !name.is_empty() => {
+            let found = host
+                .input_devices()
                 .map_err(|err| err.to_string())?
-                .find(|x| x.name().map(|y| y == *name).unwrap_or(false))
-                .ok_or(format!("No input device found with name: {}", name))?
+                .find(|x| x.name().map(|y| y == *name).unwrap_or(false));
+            match found {
+                Some(device) => device,
+                None => {
+                    // The saved device may have been unplugged; fall back to
+                    // the system default input instead of failing the dictation.
+                    log::warn!(
+                        target: "audio",
+                        "input device not found, falling back to default device_name={name:?}"
+                    );
+                    host.default_input_device()
+                        .ok_or("No input device available")?
+                }
+            }
         }
-    } else {
-        host.default_input_device()
-            .ok_or("No default input device available")?
+        _ => host
+            .default_input_device()
+            .ok_or("No default input device available")?,
     };
 
     let config = device
@@ -119,8 +134,19 @@ pub async fn start_recording_with_device(
     let app_handle_2 = state.app_handle.clone();
     let last_emit_time = state.last_emit_time.clone();
 
+    // Surface stream errors (e.g. mic unplugged mid-recording) to the frontend
+    // and unlatch the recorder so the next hotkey press can start fresh.
+    let err_app_handle = app_handle.clone();
+    let err_is_recording = state.is_recording.clone();
     let err_fn = move |err: cpal::StreamError| {
-        eprintln!("an error occurred on stream: {}", err);
+        log::error!(target: "audio", "recording stream error: {err}");
+        err_is_recording.store(false, Ordering::SeqCst);
+        let _ = err_app_handle.emit(
+            "recording-error",
+            RecordingErrorPayload {
+                message: err.to_string(),
+            },
+        );
     };
 
     let stream = match config.sample_format() {
@@ -189,9 +215,14 @@ pub async fn start_recording_with_device(
 
     stream.play().map_err(|err| err.to_string())?;
 
+    *state.app_handle.lock().map_err(|err| err.to_string())? = Some(app_handle);
     *state.save_path.lock().map_err(|err| err.to_string())? = Some(save_path);
     state.writer = writer;
     *state.stream.lock().map_err(|err| err.to_string())? = Some(SafeStream(stream));
+
+    // Only latch the recording state once the stream is running and all state
+    // is in place — any error above leaves the recorder ready for a retry.
+    state.is_recording.store(true, Ordering::SeqCst);
 
     Ok(())
 }
@@ -241,14 +272,18 @@ pub async fn stop_recording_with_device() -> Result<PathBuf, String> {
     Ok(save_path)
 }
 
-fn get_save_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+fn recordings_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     use tauri::Manager;
 
-    let save_dir = app_handle
+    Ok(app_handle
         .path()
         .app_data_dir()
         .map_err(|err| err.to_string())?
-        .join("recordings");
+        .join("recordings"))
+}
+
+fn get_save_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let save_dir = recordings_dir(app_handle)?;
 
     create_dir_all(&save_dir).map_err(|err| err.to_string())?;
 
@@ -256,6 +291,56 @@ fn get_save_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
     let save_path = save_dir.join(format!("{timestamp}.wav"));
 
     Ok(save_path)
+}
+
+/// Prunes the recordings directory down to the `keep` newest `.wav` files by
+/// modification time. Called after each successful transcription so dictation
+/// audio is not retained forever. IO failures are logged and otherwise
+/// ignored — cleanup must never fail a transcription.
+pub fn cleanup_old_recordings(app_handle: &tauri::AppHandle, keep: usize) {
+    let dir = match recordings_dir(app_handle) {
+        Ok(dir) => dir,
+        Err(err) => {
+            log::warn!(target: "audio", "recordings cleanup skipped: {err}");
+            return;
+        }
+    };
+
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(err) => {
+            log::warn!(target: "audio", "recordings cleanup failed to read dir: {err}");
+            return;
+        }
+    };
+
+    let mut recordings: Vec<(std::time::SystemTime, PathBuf)> = entries
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("wav") {
+                return None;
+            }
+            let modified = entry.metadata().ok()?.modified().ok()?;
+            Some((modified, path))
+        })
+        .collect();
+
+    if recordings.len() <= keep {
+        return;
+    }
+
+    // Newest first; everything past `keep` gets deleted.
+    recordings.sort_by(|a, b| b.0.cmp(&a.0));
+    for (_, path) in recordings.drain(keep..) {
+        if let Err(err) = std::fs::remove_file(&path) {
+            log::warn!(
+                target: "audio",
+                "failed to delete old recording {}: {err}",
+                path.display()
+            );
+        }
+    }
 }
 
 fn sample_format(format: cpal::SampleFormat) -> SampleFormat {

@@ -1,6 +1,7 @@
 import { useNavigate } from "@solidjs/router";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Result } from "better-result";
 import { type ParentProps, Show, createSignal, onCleanup, onMount } from "solid-js";
 import appIcon from "../src-tauri/icons/icon.svg";
@@ -60,6 +61,23 @@ function App(props: ParentProps) {
 	};
 
 	onMount(async () => {
+		// Cleanups are collected into one synchronously-registered onCleanup:
+		// onCleanup calls after an `await` run outside the reactive owner and
+		// would silently never fire (see UpdateNotification for the pattern).
+		let disposed = false;
+		const disposers: (() => void)[] = [];
+		onCleanup(() => {
+			disposed = true;
+			for (const dispose of disposers) dispose();
+		});
+		const addDisposer = (dispose: () => void) => {
+			if (disposed) {
+				dispose();
+			} else {
+				disposers.push(dispose);
+			}
+		};
+
 		const handleWindowError = (event: ErrorEvent) => {
 			logDiagnostic("error", "app", "window_error", {
 				message: event.message,
@@ -76,7 +94,7 @@ function App(props: ParentProps) {
 		};
 		window.addEventListener("error", handleWindowError);
 		window.addEventListener("unhandledrejection", handleUnhandledRejection);
-		onCleanup(() => {
+		addDisposer(() => {
 			window.removeEventListener("error", handleWindowError);
 			window.removeEventListener("unhandledrejection", handleUnhandledRejection);
 		});
@@ -132,26 +150,36 @@ function App(props: ParentProps) {
 				}
 			});
 
-			const unlistenNavigate = await listen<string>("navigate", (event) => {
-				logDiagnostic("debug", "app", "navigate_event", { path: event.payload });
-				navigate(event.payload);
-			});
-			onCleanup(() => unlistenNavigate());
+			addDisposer(
+				await listen<string>("navigate", (event) => {
+					logDiagnostic("debug", "app", "navigate_event", { path: event.payload });
+					navigate(event.payload);
+				})
+			);
 
-			const unlistenMicrophone = await listen<string>("select-microphone", async (event) => {
-				const deviceName = event.payload;
-				logDiagnostic("debug", "app", "select_microphone_event", {
-					hasDeviceName: Boolean(deviceName),
-				});
-				await updateMicrophone(deviceName || null);
-			});
-			onCleanup(() => unlistenMicrophone());
+			addDisposer(
+				await listen<string>("select-microphone", async (event) => {
+					const deviceName = event.payload;
+					logDiagnostic("debug", "app", "select_microphone_event", {
+						hasDeviceName: Boolean(deviceName),
+					});
+					await updateMicrophone(deviceName || null);
+				})
+			);
 
-			const unlistenAccessibility = await listen("accessibility-permission-needed", () => {
-				logDiagnostic("warn", "app", "accessibility_permission_needed");
-				setIsSettingsOpen(true);
-			});
-			onCleanup(() => unlistenAccessibility());
+			addDisposer(
+				await listen("accessibility-permission-needed", async () => {
+					logDiagnostic("warn", "app", "accessibility_permission_needed");
+					setIsSettingsOpen(true);
+					// The event is emitted from the overlay window while the main
+					// window may be hidden in the tray — surface it.
+					const mainWindow = getCurrentWindow();
+					await Result.tryPromise(async () => {
+						await mainWindow.show();
+						await mainWindow.setFocus();
+					});
+				})
+			);
 
 			const handleKeyDown = (e: KeyboardEvent) => {
 				if (e.metaKey && e.key === ",") {
@@ -161,7 +189,7 @@ function App(props: ParentProps) {
 				}
 			};
 			window.addEventListener("keydown", handleKeyDown);
-			onCleanup(() => window.removeEventListener("keydown", handleKeyDown));
+			addDisposer(() => window.removeEventListener("keydown", handleKeyDown));
 		} catch (error) {
 			logDiagnostic("error", "app", "mount_failed", errorFields(error));
 			throw error;

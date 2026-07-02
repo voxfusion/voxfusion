@@ -1,6 +1,7 @@
 import { Result } from "better-result";
-import { Search } from "lucide-solid";
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createMemo, createSignal, onMount } from "solid-js";
+import AppIcon from "../components/AppIcon";
+import AppSearchCombobox, { AppRowSkeleton, SKELETON_ROWS } from "../components/AppSearchCombobox";
 import StyleSelect from "../components/StyleSelect";
 import { useI18n } from "../i18n";
 import {
@@ -14,8 +15,7 @@ import {
 	setAppInstruction,
 } from "../lib/commands/apps";
 import { capture } from "../lib/posthog";
-
-const SKELETON_ROWS = Array.from({ length: 4 });
+import { makeStyleLabel } from "../lib/styleLabel";
 
 export default function StylePerApp() {
 	const [t] = useI18n();
@@ -24,10 +24,7 @@ export default function StylePerApp() {
 	const [instructions, setInstructions] = createSignal<AppInstruction[]>([]);
 	const [searchQuery, setSearchQuery] = createSignal("");
 	const [searchOpen, setSearchOpen] = createSignal(false);
-	const [highlightedIndex, setHighlightedIndex] = createSignal(0);
 	const [loading, setLoading] = createSignal(cachedApps === null);
-	let searchContainerRef: HTMLDivElement | undefined;
-	const optionRefs = new Map<number, HTMLButtonElement>();
 
 	const fetchInstructions = async () => {
 		const result = await listAppInstructions();
@@ -42,24 +39,6 @@ export default function StylePerApp() {
 		setLoading(false);
 	});
 
-	const handleClickOutside = (e: MouseEvent) => {
-		if (searchContainerRef && !searchContainerRef.contains(e.target as Node)) {
-			setSearchOpen(false);
-		}
-	};
-
-	createEffect(() => {
-		if (searchOpen()) {
-			document.addEventListener("click", handleClickOutside);
-		} else {
-			document.removeEventListener("click", handleClickOutside);
-		}
-	});
-
-	onCleanup(() => {
-		document.removeEventListener("click", handleClickOutside);
-	});
-
 	const configuredBundleIds = createMemo(() => new Set(instructions().map((i) => i.bundle_id)));
 
 	const iconByBundleId = createMemo(() => {
@@ -69,56 +48,6 @@ export default function StylePerApp() {
 		}
 		return map;
 	});
-
-	const filteredApps = createMemo(() => {
-		const query = searchQuery().trim().toLowerCase();
-		const configured = configuredBundleIds();
-		return installedApps()
-			.filter((app) => !configured.has(app.bundle_id))
-			.filter((app) => {
-				if (!query) return true;
-				return (
-					app.name.toLowerCase().includes(query) || app.bundle_id.toLowerCase().includes(query)
-				);
-			})
-			.slice(0, 50);
-	});
-
-	createEffect(() => {
-		filteredApps();
-		searchQuery();
-		setHighlightedIndex(0);
-	});
-
-	createEffect(() => {
-		if (!searchOpen()) return;
-		const el = optionRefs.get(highlightedIndex());
-		el?.scrollIntoView({ block: "nearest" });
-	});
-
-	const handleSearchKeyDown = (e: KeyboardEvent) => {
-		const items = filteredApps();
-		if (e.key === "ArrowDown") {
-			e.preventDefault();
-			setSearchOpen(true);
-			if (items.length === 0) return;
-			setHighlightedIndex((i) => Math.min(items.length - 1, i + 1));
-		} else if (e.key === "ArrowUp") {
-			e.preventDefault();
-			if (items.length === 0) return;
-			setHighlightedIndex((i) => Math.max(0, i - 1));
-		} else if (e.key === "Enter") {
-			if (!searchOpen() || items.length === 0) return;
-			e.preventDefault();
-			const idx = Math.min(highlightedIndex(), items.length - 1);
-			const target = items[idx];
-			if (target) handleAddApp(target);
-		} else if (e.key === "Escape") {
-			if (!searchOpen()) return;
-			e.preventDefault();
-			setSearchOpen(false);
-		}
-	};
 
 	const handleAddApp = async (app: InstalledApp) => {
 		const result = await setAppInstruction(app.bundle_id, app.name, "default");
@@ -143,18 +72,7 @@ export default function StylePerApp() {
 		if (Result.isError(result)) await fetchInstructions();
 	};
 
-	const styleLabel = (style: AppStyle) => {
-		switch (style) {
-			case "professional":
-				return t("appInstructions.styles.professional");
-			case "casual":
-				return t("appInstructions.styles.casual");
-			case "agents":
-				return t("appInstructions.styles.agents");
-			case "default":
-				return t("appInstructions.styles.default");
-		}
-	};
+	const styleLabel = makeStyleLabel(t);
 
 	return (
 		<div>
@@ -167,69 +85,22 @@ export default function StylePerApp() {
 				</Show>
 			</div>
 
-			<div ref={searchContainerRef} class="relative mb-6">
-				<div class="bg-th-surface border border-border p-4">
-					<div class="flex items-center gap-3">
-						<Search class="w-4 h-4 text-txt-muted shrink-0" />
-						<input
-							type="text"
-							value={searchQuery()}
-							onInput={(e) => {
-								setSearchQuery(e.currentTarget.value);
-								setSearchOpen(true);
-							}}
-							onFocus={() => setSearchOpen(true)}
-							onKeyDown={handleSearchKeyDown}
-							placeholder={t("appInstructions.searchPlaceholder")}
-							class="flex-1 bg-transparent text-txt-primary font-mono placeholder-txt-muted focus:outline-none"
-						/>
-					</div>
-				</div>
-
-				<Show when={searchOpen()}>
-					<div class="absolute z-50 w-full mt-1 bg-th-surface border border-border-strong max-h-72 overflow-auto">
-						<Show
-							when={!loading()}
-							fallback={<For each={SKELETON_ROWS}>{() => <AppRowSkeleton />}</For>}
-						>
-							<Show
-								when={filteredApps().length > 0}
-								fallback={
-									<div class="px-4 py-3 font-mono text-xs text-txt-muted uppercase tracking-wide">
-										{installedApps().length === 0
-											? t("appInstructions.noAppsDetected")
-											: t("appInstructions.noMatches")}
-									</div>
-								}
-							>
-								<For each={filteredApps()}>
-									{(app, index) => (
-										<button
-											type="button"
-											ref={(el) => optionRefs.set(index(), el)}
-											onClick={() => handleAddApp(app)}
-											onMouseEnter={() => setHighlightedIndex(index())}
-											class={`w-full px-4 py-2.5 text-left transition-colors font-mono text-sm flex items-center gap-3 ${
-												highlightedIndex() === index() ? "bg-th-hover" : ""
-											}`}
-										>
-											<AppIcon src={app.icon_data_url} alt={app.name} />
-											<div class="flex flex-col gap-0.5 min-w-0 flex-1">
-												<span class="text-txt-primary truncate">{app.name}</span>
-												<span class="text-txt-muted text-xs truncate">{app.bundle_id}</span>
-											</div>
-										</button>
-									)}
-								</For>
-							</Show>
-						</Show>
-					</div>
-				</Show>
-			</div>
+			<AppSearchCombobox
+				apps={installedApps()}
+				excludedIds={configuredBundleIds()}
+				loading={loading()}
+				searchQuery={searchQuery()}
+				searchOpen={searchOpen()}
+				onSearchQueryChange={setSearchQuery}
+				onSearchOpenChange={setSearchOpen}
+				onSelect={handleAddApp}
+			/>
 
 			<Show when={loading()}>
 				<div class="space-y-1">
-					<For each={SKELETON_ROWS}>{() => <AppRowSkeleton bordered />}</For>
+					<For each={SKELETON_ROWS}>
+						{() => <AppRowSkeleton bordered trailingClass="w-40 h-6" />}
+					</For>
 				</div>
 			</Show>
 
@@ -281,48 +152,5 @@ export default function StylePerApp() {
 				</div>
 			</Show>
 		</div>
-	);
-}
-
-interface AppRowSkeletonProps {
-	bordered?: boolean;
-}
-
-function AppRowSkeleton(props: AppRowSkeletonProps) {
-	return (
-		<div
-			class={`px-4 py-2.5 flex items-center gap-3 animate-pulse ${
-				props.bordered ? "bg-th-surface border border-border" : ""
-			}`}
-		>
-			<div class="w-8 h-8 shrink-0 bg-th-input" />
-			<div class="flex flex-col gap-1.5 min-w-0 flex-1">
-				<div class="h-3 w-32 bg-th-input" />
-				<div class="h-2.5 w-48 bg-th-input opacity-60" />
-			</div>
-			<Show when={props.bordered}>
-				<div class="w-40 h-6 bg-th-input shrink-0" />
-			</Show>
-		</div>
-	);
-}
-
-interface AppIconProps {
-	src: string | null;
-	alt: string;
-}
-
-function AppIcon(props: AppIconProps) {
-	return (
-		<Show
-			when={props.src}
-			fallback={
-				<div class="w-8 h-8 shrink-0 bg-th-input border border-border flex items-center justify-center text-txt-muted font-mono text-xs">
-					{props.alt.charAt(0).toUpperCase()}
-				</div>
-			}
-		>
-			{(src) => <img src={src()} alt={props.alt} class="w-8 h-8 shrink-0" draggable={false} />}
-		</Show>
 	);
 }

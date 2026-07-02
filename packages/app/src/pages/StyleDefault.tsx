@@ -3,6 +3,7 @@ import { useI18n } from "../i18n";
 import { type AppStyle, STYLE_LIST } from "../lib/commands/apps";
 import { capture } from "../lib/posthog";
 import { updateDefaultStyle, useSettings } from "../lib/settingsStore";
+import { makeStyleLabel } from "../lib/styleLabel";
 
 export default function StyleDefault() {
 	const [t] = useI18n();
@@ -17,18 +18,7 @@ export default function StyleDefault() {
 		capture("default_style_changed", { style });
 	};
 
-	const styleLabel = (style: AppStyle) => {
-		switch (style) {
-			case "professional":
-				return t("appInstructions.styles.professional");
-			case "casual":
-				return t("appInstructions.styles.casual");
-			case "agents":
-				return t("appInstructions.styles.agents");
-			case "default":
-				return t("appInstructions.styles.default");
-		}
-	};
+	const styleLabel = makeStyleLabel(t);
 
 	const styleDescription = (style: AppStyle) => {
 		switch (style) {

@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.3'
+
+      - name: Cache bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint (Biome)
+        run: bun run lint
+
+      - name: Typecheck app
+        run: bun run --filter @voxfusion/app typecheck
+
+      - name: Typecheck marketing site (astro check)
+        run: bun run --filter @voxfusion/marketingsite typecheck
+
+      - name: Build app frontend (Vite)
+        working-directory: packages/app
+        run: bunx vite build
+
+      - name: Build marketing site
+        run: bun run --filter @voxfusion/marketingsite build
+
+  rust:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app/src-tauri -> target'
+
+      - name: Ensure cmake is available
+        run: command -v cmake || brew install cmake
+
+      - name: Cargo check
+        working-directory: packages/app/src-tauri
+        run: cargo check
+
+      - name: Cargo test
+        working-directory: packages/app/src-tauri
+        run: cargo test

@@ -70,7 +70,7 @@ export default function LearningStep(props: LearningStepProps) {
 		<div class="w-full max-w-4xl mx-auto">
 			{/* Terminal-style header */}
 			<div class="font-mono text-ac text-sm mb-8 tracking-wider text-center">
-				[STEP_06] &gt; TRY_IT_OUT
+				[STEP_07] &gt; TRY_IT_OUT
 			</div>
 
 			<h2 class="font-mono text-xl uppercase tracking-wider text-txt-primary mb-2 text-center">

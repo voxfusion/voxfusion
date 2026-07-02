@@ -1,8 +1,8 @@
 import { Result } from "better-result";
-import { ChevronDown } from "lucide-solid";
-import { For, Show, createMemo, createSignal, onMount } from "solid-js";
+import { Show, createMemo, createSignal, onMount } from "solid-js";
 import AddSiteForm from "../components/AddSiteForm";
 import SiteIcon from "../components/SiteIcon";
+import WordListEditor from "../components/WordListEditor";
 import { useI18n } from "../i18n";
 import {
 	type SiteDictionary,
@@ -22,10 +22,6 @@ export default function DictionarySites() {
 	const [loading, setLoading] = createSignal(true);
 
 	const [expanded, setExpanded] = createSignal<Set<string>>(new Set());
-	const [newWordBySite, setNewWordBySite] = createSignal<Record<string, string>>({});
-	const [addingSite, setAddingSite] = createSignal<Set<string>>(new Set());
-	const [editingWordId, setEditingWordId] = createSignal<string | null>(null);
-	const [editingWord, setEditingWord] = createSignal("");
 
 	const fetchSiteDicts = async () => {
 		const result = await listSiteDictionaries();
@@ -78,47 +74,16 @@ export default function DictionarySites() {
 		});
 	};
 
-	const handleAddWord = async (group: SiteDictionary) => {
-		const word = (newWordBySite()[group.domain] ?? "").trim();
-		if (!word) return;
-		if (addingSite().has(group.domain)) return;
+	const addWord = (group: SiteDictionary, word: string) =>
+		addSiteDictionaryWord(group.domain, word);
 
-		setAddingSite((prev) => {
-			const next = new Set(prev);
-			next.add(group.domain);
-			return next;
-		});
-		const result = await addSiteDictionaryWord(group.domain, word);
-		if (Result.isOk(result)) {
-			capture("site_dictionary_word_added");
-			setNewWordBySite((prev) => ({ ...prev, [group.domain]: "" }));
-			setPendingSites((prev) => prev.filter((p) => p.domain !== group.domain));
-			await fetchSiteDicts();
-		}
-		setAddingSite((prev) => {
-			const next = new Set(prev);
-			next.delete(group.domain);
-			return next;
-		});
+	const handleWordAdded = async (group: SiteDictionary) => {
+		capture("site_dictionary_word_added");
+		setPendingSites((prev) => prev.filter((p) => p.domain !== group.domain));
+		await fetchSiteDicts();
 	};
 
-	const handleWordKeyDown = (e: KeyboardEvent, group: SiteDictionary) => {
-		if (e.key === "Enter") handleAddWord(group);
-	};
-
-	const startEditWord = (wordId: string, word: string) => {
-		setEditingWordId(wordId);
-		setEditingWord(word);
-	};
-
-	const cancelEditWord = () => {
-		setEditingWordId(null);
-		setEditingWord("");
-	};
-
-	const handleEditWord = async (group: SiteDictionary, wordId: string) => {
-		const word = editingWord().trim();
-		if (!word) return;
+	const handleEditWord = async (group: SiteDictionary, wordId: string, word: string) => {
 		capture("site_dictionary_word_edited");
 		setSiteDicts(
 			siteDicts().map((g) =>
@@ -127,15 +92,8 @@ export default function DictionarySites() {
 					: g
 			)
 		);
-		setEditingWordId(null);
-		setEditingWord("");
 		const result = await updateSiteDictionaryWord(wordId, word);
 		if (Result.isError(result)) await fetchSiteDicts();
-	};
-
-	const handleEditWordKeyDown = (e: KeyboardEvent, group: SiteDictionary, wordId: string) => {
-		if (e.key === "Enter") handleEditWord(group, wordId);
-		else if (e.key === "Escape") cancelEditWord();
 	};
 
 	const handleDeleteWord = async (group: SiteDictionary, wordId: string) => {
@@ -192,146 +150,19 @@ export default function DictionarySites() {
 			</Show>
 
 			<Show when={!loading() && allSiteGroups().length > 0}>
-				<div class="space-y-1">
-					<For each={allSiteGroups()}>
-						{(group) => {
-							const isOpen = () => expanded().has(group.domain);
-							const wordValue = () => newWordBySite()[group.domain] ?? "";
-							const isAdding = () => addingSite().has(group.domain);
-							return (
-								<div class="bg-th-surface border border-border group hover:border-border-strong transition-colors">
-									<div class="flex items-stretch">
-										<button
-											type="button"
-											onClick={() => toggleExpanded(group.domain)}
-											class="flex-1 px-4 py-3 flex items-center gap-3 text-left min-w-0"
-											title={isOpen() ? t("dictionary.collapse") : t("dictionary.expand")}
-										>
-											<SiteIcon domain={group.domain} sizeClass="w-8 h-8" />
-											<div class="flex flex-col min-w-0 flex-1">
-												<span class="text-txt-primary font-mono truncate">{group.domain}</span>
-											</div>
-											<span class="text-txt-muted font-mono text-xs uppercase tracking-wider shrink-0">
-												{t("dictionary.wordCount").replace("{count}", String(group.words.length))}
-											</span>
-											<ChevronDown
-												class={`w-4 h-4 text-txt-muted shrink-0 transition-transform ${
-													isOpen() ? "rotate-180" : ""
-												}`}
-											/>
-										</button>
-										<button
-											type="button"
-											onClick={() => handleRemoveSite(group)}
-											class="px-3 flex items-center text-txt-muted hover:text-ac opacity-0 group-hover:opacity-100 transition-all font-mono text-xs uppercase tracking-wider shrink-0"
-											title={t("appInstructions.delete")}
-										>
-											[DEL]
-										</button>
-									</div>
-									<Show when={isOpen()}>
-										<div class="border-t border-border px-4 py-3 space-y-2">
-											<div class="flex gap-2">
-												<input
-													type="text"
-													value={wordValue()}
-													onInput={(e) =>
-														setNewWordBySite((prev) => ({
-															...prev,
-															[group.domain]: e.currentTarget.value,
-														}))
-													}
-													onKeyDown={(e) => handleWordKeyDown(e, group)}
-													placeholder={t("dictionary.wordPlaceholder")}
-													class="flex-1 px-3 py-1.5 bg-th-input border border-border-strong text-txt-primary font-mono text-sm placeholder-txt-muted focus:outline-none focus:border-ac transition-colors"
-												/>
-												<button
-													type="button"
-													onClick={() => handleAddWord(group)}
-													disabled={!wordValue().trim() || isAdding()}
-													class="flex items-center gap-1 px-3 py-1.5 bg-ac text-ac-on font-mono uppercase tracking-wider text-xs hover:bg-ac-hover disabled:opacity-50 transition-colors"
-												>
-													<span>+</span>
-													{t("dictionary.addWord")}
-												</button>
-											</div>
-
-											<Show when={group.words.length > 0}>
-												<div class="space-y-1 pt-1">
-													<For each={group.words}>
-														{(word) => (
-															<div class="px-3 py-2 bg-th-input border border-border flex items-center justify-between gap-2 group/word">
-																<Show
-																	when={editingWordId() === word.id}
-																	fallback={
-																		<span class="text-txt-primary font-mono text-sm flex-1 min-w-0 truncate">
-																			{word.word}
-																		</span>
-																	}
-																>
-																	<input
-																		type="text"
-																		value={editingWord()}
-																		onInput={(e) => setEditingWord(e.currentTarget.value)}
-																		onKeyDown={(e) => handleEditWordKeyDown(e, group, word.id)}
-																		class="flex-1 px-2 py-1 bg-th-base border border-border-strong text-txt-primary font-mono text-sm focus:outline-none focus:border-ac transition-colors"
-																		autofocus
-																	/>
-																</Show>
-																<div class="flex items-center gap-2 font-mono text-xs shrink-0">
-																	<Show
-																		when={editingWordId() === word.id}
-																		fallback={
-																			<>
-																				<button
-																					type="button"
-																					onClick={() => startEditWord(word.id, word.word)}
-																					class="text-txt-muted hover:text-ac opacity-0 group-hover/word:opacity-100 transition-all uppercase tracking-wider"
-																					title={t("dictionary.edit")}
-																				>
-																					[EDIT]
-																				</button>
-																				<button
-																					type="button"
-																					onClick={() => handleDeleteWord(group, word.id)}
-																					class="text-txt-muted hover:text-ac opacity-0 group-hover/word:opacity-100 transition-all uppercase tracking-wider"
-																					title={t("dictionary.delete")}
-																				>
-																					[DEL]
-																				</button>
-																			</>
-																		}
-																	>
-																		<button
-																			type="button"
-																			onClick={() => handleEditWord(group, word.id)}
-																			class="text-success hover:opacity-80 uppercase tracking-wider"
-																			title={t("dictionary.save")}
-																		>
-																			[SAVE]
-																		</button>
-																		<button
-																			type="button"
-																			onClick={cancelEditWord}
-																			class="text-txt-muted hover:text-txt-secondary uppercase tracking-wider"
-																			title={t("dictionary.cancel")}
-																		>
-																			[CANCEL]
-																		</button>
-																	</Show>
-																</div>
-															</div>
-														)}
-													</For>
-												</div>
-											</Show>
-										</div>
-									</Show>
-								</div>
-							);
-						}}
-					</For>
-				</div>
+				<WordListEditor
+					groups={allSiteGroups()}
+					keyOf={(group) => group.domain}
+					icon={(group) => <SiteIcon domain={group.domain} sizeClass="w-8 h-8" />}
+					title={(group) => group.domain}
+					expanded={expanded()}
+					onToggle={toggleExpanded}
+					onRemoveGroup={handleRemoveSite}
+					addWord={addWord}
+					onWordAdded={handleWordAdded}
+					onEditWord={handleEditWord}
+					onDeleteWord={handleDeleteWord}
+				/>
 			</Show>
 		</div>
 	);

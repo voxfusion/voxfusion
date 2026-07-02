@@ -13,6 +13,7 @@ import {
 } from "../lib/commands/apps";
 import { preloadFavicons } from "../lib/favicons";
 import { capture } from "../lib/posthog";
+import { makeStyleLabel } from "../lib/styleLabel";
 
 export default function StylePerSite() {
 	const [t] = useI18n();
@@ -58,18 +59,7 @@ export default function StylePerSite() {
 		if (Result.isError(result)) await fetchSites();
 	};
 
-	const styleLabel = (style: AppStyle) => {
-		switch (style) {
-			case "professional":
-				return t("appInstructions.styles.professional");
-			case "casual":
-				return t("appInstructions.styles.casual");
-			case "agents":
-				return t("appInstructions.styles.agents");
-			case "default":
-				return t("appInstructions.styles.default");
-		}
-	};
+	const styleLabel = makeStyleLabel(t);
 
 	return (
 		<div>

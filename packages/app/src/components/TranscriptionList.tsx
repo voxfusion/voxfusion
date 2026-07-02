@@ -4,7 +4,9 @@ import { Loader } from "lucide-solid";
 import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../i18n";
 import { type Transcription, listTranscriptions } from "../lib/commands/transcriptions";
+import { hotkeyDisplayName } from "../lib/hotkeyUtils";
 import { capture } from "../lib/posthog";
+import { useSettings } from "../lib/settingsStore";
 import TranscriptionCard from "./TranscriptionCard";
 
 type GroupedTranscriptions = {
@@ -14,6 +16,7 @@ type GroupedTranscriptions = {
 
 export default function TranscriptionList() {
 	const [t, { locale }] = useI18n();
+	const settings = useSettings();
 	const [transcriptions, setTranscriptions] = createSignal<Transcription[]>([]);
 	const [loading, setLoading] = createSignal(false);
 	const [initialLoading, setInitialLoading] = createSignal(true);
@@ -24,6 +27,7 @@ export default function TranscriptionList() {
 	const [sentinelRef, setSentinelRef] = createSignal<HTMLDivElement | null>(null);
 	let observer: IntersectionObserver | null = null;
 	let unlisten: UnlistenFn | null = null;
+	let disposed = false;
 
 	const getDateLabel = (dateStr: string): string => {
 		const date = new Date(dateStr);
@@ -94,12 +98,18 @@ export default function TranscriptionList() {
 		setInitialLoading(false);
 	};
 
-	onMount(async () => {
+	onMount(() => {
 		fetchTranscriptions();
 
-		unlisten = await listen("transcription-created", () => {
+		void listen("transcription-created", () => {
 			capture("transcription_created");
 			fetchTranscriptions();
+		}).then((dispose) => {
+			if (disposed) {
+				dispose();
+			} else {
+				unlisten = dispose;
+			}
 		});
 	});
 
@@ -127,6 +137,7 @@ export default function TranscriptionList() {
 	});
 
 	onCleanup(() => {
+		disposed = true;
 		observer?.disconnect();
 		unlisten?.();
 	});
@@ -155,7 +166,11 @@ export default function TranscriptionList() {
 			<Show when={!initialLoading() && !error() && transcriptions().length === 0}>
 				<div class="text-center py-12 font-mono">
 					<p class="text-txt-secondary mb-2">[INFO] NO_TRANSCRIPTIONS</p>
-					<p class="text-txt-muted text-sm">{t("transcriptionList.useCommandToRecord")}</p>
+					<p class="text-txt-muted text-sm">
+						{t("transcriptionList.useCommandToRecord", {
+							hotkey: hotkeyDisplayName(settings().hotkey),
+						})}
+					</p>
 				</div>
 			</Show>
 

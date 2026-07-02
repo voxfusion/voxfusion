@@ -1,4 +1,4 @@
-If you got some instingt useful for future agents, while working on task please write it down.
+If you discover an insight useful for future agents while working on a task, please write it down.
 
 Use bun instead of Node.js, npm, pnpm, or vite.
 
@@ -17,15 +17,15 @@ VoxFusion is a Bun/Turborepo monorepo with two packages:
 |---------|---------|------|-------|
 | App frontend (Vite) | `cd packages/app && bunx vite --host 0.0.0.0` | 1420 | SolidJS UI only; Tauri IPC unavailable in standalone browser mode |
 | Marketing site (Astro) | `cd packages/marketingsite && bun run dev -- --host 0.0.0.0` | 4321 | Fully functional on Linux |
-| Full Tauri app | `cd packages/app && bun run tauri:dev` | — | Requires macOS (Metal, accessibility, tray) |
+| Full Tauri app | `cd packages/app && bun run dev` | — | Requires macOS (Metal, accessibility, tray) |
 
 ### Lint / typecheck / build
 
 Standard commands documented in `README.md` scripts section. Key notes:
 
-- `bun run check` — runs Biome across the whole repo. The marketing site has pre-existing lint warnings (unused imports).
+- `bun run check` — runs Biome across the whole repo.
 - `bun run --filter @voxfusion/app typecheck` — passes clean.
-- `bun run --filter @voxfusion/marketingsite typecheck` — runs `astro check` which currently reports ~1098 errors because it type-checks the app's SolidJS TSX files via workspace references. This is a pre-existing issue.
+- `bun run --filter @voxfusion/marketingsite typecheck` — runs `astro check`.
 - `bunx vite build` (from `packages/app`) — builds the frontend successfully on Linux.
 - `bun run build` (from `packages/marketingsite`) — builds all 6 static pages successfully.
 

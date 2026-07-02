@@ -38,6 +38,9 @@ export type Translations = {
 		microphoneDescription: string;
 		muteMediaWhileRecording: string;
 		muteMediaWhileRecordingDescription: string;
+		analytics: string;
+		analyticsDescription: string;
+		analyticsNote: string;
 		recordingHotkey: string;
 		pressHotkey: string;
 		hotkeyDescription: string;
@@ -54,6 +57,10 @@ export type Translations = {
 		modelDownload: string;
 		modelDownloading: string;
 		modelDownloadFailed: string;
+		modelDownloadedOfTotal: string;
+		modelDownloadSpeed: string;
+		modelEta: string;
+		modelResumeNote: string;
 		modelExperimentalNote: string;
 	};
 	transcription: {
@@ -172,6 +179,7 @@ export type Translations = {
 		micPermissionDescription: string;
 		micPermissionGranted: string;
 		micPermissionNotGranted: string;
+		micPermissionDenied: string;
 		grantMicPermission: string;
 		checkingPermission: string;
 		accessibilityTitle: string;
@@ -203,6 +211,16 @@ export type Translations = {
 		downloadModel: string;
 		retryDownload: string;
 		modelDownloadNote: string;
+		privacyTitle: string;
+		privacyDescription: string;
+		privacyToggleLabel: string;
+		privacyToggleDescription: string;
+	};
+	voiceControl: {
+		transcriptionFailed: string;
+		recordingFailed: string;
+		typingFailed: string;
+		retry: string;
 	};
 	update: {
 		available: string;
@@ -216,7 +234,7 @@ export type Translations = {
 export const en: Translations = {
 	home: {
 		yourTranscriptions: "Your Transcriptions",
-		pressToRecord: "Press Left Control+Left Option to start a new recording",
+		pressToRecord: "Press {{hotkey}} to start a new recording",
 	},
 	about: {
 		title: "About",
@@ -256,6 +274,11 @@ export const en: Translations = {
 		muteMediaWhileRecording: "Mute Media During Recording",
 		muteMediaWhileRecordingDescription:
 			"Temporarily mute system audio while recording and restore it afterward.",
+		analytics: "Anonymous Usage Analytics",
+		analyticsDescription:
+			"Share anonymous usage events to help improve VoxFusion. Changes apply immediately.",
+		analyticsNote:
+			"Only event metadata is collected — never your audio, never your transcribed text.",
 		recordingHotkey: "Recording Hotkey",
 		pressHotkey: "Press a key combination...",
 		hotkeyDescription: "Press this key combination to start or stop recording.",
@@ -273,6 +296,10 @@ export const en: Translations = {
 		modelDownload: "Download",
 		modelDownloading: "Downloading…",
 		modelDownloadFailed: "Download failed",
+		modelDownloadedOfTotal: "{{downloaded}} / {{total}} MB",
+		modelDownloadSpeed: "{{speed}} MB/s",
+		modelEta: "~{{eta}} remaining",
+		modelResumeNote: "The download will resume from where it left off.",
 		modelExperimentalNote:
 			"On-device transcription with this model is experimental and not yet available.",
 	},
@@ -289,8 +316,7 @@ export const en: Translations = {
 		failedToFetch: "Failed to fetch transcriptions",
 		errorOccurred: "An error occurred",
 		noTranscriptions: "No transcriptions yet",
-		useCommandToRecord:
-			"Use Left Control+Left Option to start recording and create your first transcription",
+		useCommandToRecord: "Use {{hotkey}} to start recording and create your first transcription",
 		tryAgain: "Try again",
 		noMore: "No more transcriptions",
 		today: "Today",
@@ -408,6 +434,8 @@ export const en: Translations = {
 			"VoxFusion needs access to your microphone to record and transcribe your voice.",
 		micPermissionGranted: "Microphone access granted",
 		micPermissionNotGranted: "Microphone access required",
+		micPermissionDenied:
+			"Microphone access was denied. Enable VoxFusion in System Settings under Privacy & Security → Microphone — this step continues automatically once access is granted.",
 		grantMicPermission: "Grant Microphone Access",
 		checkingPermission: "Checking...",
 		accessibilityTitle: "Accessibility Access",
@@ -443,6 +471,17 @@ export const en: Translations = {
 		retryDownload: "Retry Download",
 		modelDownloadNote:
 			"This model enables offline transcription. Download requires internet connection.",
+		privacyTitle: "Help Improve VoxFusion",
+		privacyDescription:
+			"VoxFusion can send anonymous usage events — things like which features are used and the app version. Metadata only: your audio and transcribed text never leave your device. You can change this anytime in Settings → Privacy.",
+		privacyToggleLabel: "Share Anonymous Usage Data",
+		privacyToggleDescription: "Metadata only — never audio, never transcriptions.",
+	},
+	voiceControl: {
+		transcriptionFailed: "Transcription failed",
+		recordingFailed: "Recording failed",
+		typingFailed: "Couldn't type text",
+		retry: "Retry",
 	},
 	update: {
 		available: "Update Available",

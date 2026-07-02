@@ -3,7 +3,7 @@ import type { Translations } from "./en";
 export const zh: Translations = {
 	home: {
 		yourTranscriptions: "你的转录",
-		pressToRecord: "按 Left Control+Left Option 开始新的录音",
+		pressToRecord: "按 {{hotkey}} 开始新的录音",
 	},
 	about: {
 		title: "关于",
@@ -40,6 +40,9 @@ export const zh: Translations = {
 		microphoneDescription: "选择用于语音录制的麦克风。",
 		muteMediaWhileRecording: "录音时静音媒体",
 		muteMediaWhileRecordingDescription: "录音期间临时静音系统音频，并在结束后恢复。",
+		analytics: "匿名使用统计",
+		analyticsDescription: "分享匿名使用事件，帮助改进 VoxFusion。更改立即生效。",
+		analyticsNote: "仅收集事件元数据——绝不收集您的音频或转录文本。",
 		recordingHotkey: "录音快捷键",
 		pressHotkey: "按下组合键...",
 		hotkeyDescription: "按此组合键开始或停止录音。",
@@ -56,6 +59,10 @@ export const zh: Translations = {
 		modelDownload: "下载",
 		modelDownloading: "下载中…",
 		modelDownloadFailed: "下载失败",
+		modelDownloadedOfTotal: "{{downloaded}} / {{total}} MB",
+		modelDownloadSpeed: "{{speed}} MB/s",
+		modelEta: "剩余约 {{eta}}",
+		modelResumeNote: "下载将从上次中断处继续。",
 		modelExperimentalNote: "该模型的设备端转录为实验功能，暂不可用。",
 	},
 	transcription: {
@@ -71,7 +78,7 @@ export const zh: Translations = {
 		failedToFetch: "获取转录失败",
 		errorOccurred: "发生错误",
 		noTranscriptions: "暂无转录",
-		useCommandToRecord: "使用 Left Control+Left Option 开始录音并创建你的第一个转录",
+		useCommandToRecord: "使用 {{hotkey}} 开始录音并创建你的第一个转录",
 		tryAgain: "重试",
 		noMore: "没有更多转录",
 		today: "今天",
@@ -175,6 +182,8 @@ export const zh: Translations = {
 		micPermissionDescription: "VoxFusion 需要访问你的麦克风来录制和转录语音。",
 		micPermissionGranted: "已获得麦克风权限",
 		micPermissionNotGranted: "需要麦克风权限",
+		micPermissionDenied:
+			"麦克风权限已被拒绝。请在系统设置的「隐私与安全性」→「麦克风」中启用 VoxFusion——授予权限后，此步骤将自动继续。",
 		grantMicPermission: "授予麦克风权限",
 		checkingPermission: "检查中...",
 		accessibilityTitle: "辅助功能权限",
@@ -206,6 +215,17 @@ export const zh: Translations = {
 		downloadModel: "下载模型",
 		retryDownload: "重试下载",
 		modelDownloadNote: "此模型可实现离线转录。下载需要互联网连接。",
+		privacyTitle: "帮助改进 VoxFusion",
+		privacyDescription:
+			"VoxFusion 可以发送匿名使用事件，例如使用了哪些功能以及应用版本。仅限元数据：您的音频和转录文本绝不会离开您的设备。您可以随时在“设置 → 隐私”中更改此选项。",
+		privacyToggleLabel: "分享匿名使用数据",
+		privacyToggleDescription: "仅元数据——绝不包含音频或转录内容。",
+	},
+	voiceControl: {
+		transcriptionFailed: "转录失败",
+		recordingFailed: "录音失败",
+		typingFailed: "无法输入文字",
+		retry: "重试",
 	},
 	update: {
 		available: "有可用更新",

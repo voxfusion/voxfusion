@@ -1,7 +1,12 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Result } from "better-result";
-import { AlertCircle, Check, Mic } from "lucide-solid";
-import { Show, createSignal, onMount } from "solid-js";
+import { AlertCircle, Check, ExternalLink, Mic } from "lucide-solid";
+import { Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../../../i18n";
+
+const MICROPHONE_SETTINGS_URL =
+	"x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
+const PERMISSION_POLL_INTERVAL_MS = 1000;
 
 interface MicrophonePermissionStepProps {
 	onPermissionChange: (granted: boolean) => void;
@@ -11,6 +16,21 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 	const [t] = useI18n();
 	const [isGranted, setIsGranted] = createSignal<boolean | null>(null);
 	const [isRequesting, setIsRequesting] = createSignal(false);
+	const [isDenied, setIsDenied] = createSignal(false);
+	let pollInterval: ReturnType<typeof setInterval> | undefined;
+	let disposed = false;
+
+	const stopPolling = () => {
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = undefined;
+		}
+	};
+
+	const startPolling = () => {
+		if (disposed || pollInterval) return;
+		pollInterval = setInterval(checkPermission, PERMISSION_POLL_INTERVAL_MS);
+	};
 
 	const checkPermission = async () => {
 		const result = await Result.tryPromise(() =>
@@ -24,12 +44,29 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 			return;
 		}
 		const granted = result.value.state === "granted";
+		if (result.value.state === "denied") {
+			setIsDenied(true);
+		}
+		if (granted) {
+			setIsDenied(false);
+			stopPolling();
+		}
 		setIsGranted(granted);
 		props.onPermissionChange(granted);
 	};
 
-	onMount(() => {
-		checkPermission();
+	onMount(async () => {
+		await checkPermission();
+		// Keep polling so the step advances by itself once access is granted
+		// in System Settings.
+		if (!disposed && isGranted() !== true) {
+			startPolling();
+		}
+	});
+
+	onCleanup(() => {
+		disposed = true;
+		stopPolling();
 	});
 
 	const handleRequest = async () => {
@@ -41,13 +78,26 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 			for (const track of stream.value.getTracks()) {
 				track.stop();
 			}
+			setIsDenied(false);
 			setIsGranted(true);
 			props.onPermissionChange(true);
+			stopPolling();
 		} else {
+			// A NotAllowedError is a permanent denial on macOS: re-requesting can
+			// never succeed, the user has to flip the switch in System Settings.
+			if (stream.error instanceof DOMException && stream.error.name === "NotAllowedError") {
+				setIsDenied(true);
+			}
 			setIsGranted(false);
 			props.onPermissionChange(false);
+			startPolling();
 		}
 		setIsRequesting(false);
+	};
+
+	const handleOpenSystemSettings = async () => {
+		await Result.tryPromise(() => openUrl(MICROPHONE_SETTINGS_URL));
+		startPolling();
 	};
 
 	return (
@@ -87,20 +137,39 @@ export default function MicrophonePermissionStep(props: MicrophonePermissionStep
 							<AlertCircle class="w-5 h-5" />
 							<span>{t("onboarding.micPermissionNotGranted")}</span>
 						</div>
+						<Show when={isDenied()}>
+							<p class="mt-4 font-mono text-xs text-txt-muted border-l-2 border-border-strong pl-3 text-left">
+								{t("onboarding.micPermissionDenied")}
+							</p>
+						</Show>
 					</Show>
 				</div>
 
 				<Show when={isGranted() !== true}>
-					<button
-						type="button"
-						onClick={handleRequest}
-						disabled={isRequesting() || isGranted() === null}
-						class="px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30"
+					<Show
+						when={isDenied()}
+						fallback={
+							<button
+								type="button"
+								onClick={handleRequest}
+								disabled={isRequesting() || isGranted() === null}
+								class="px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors disabled:opacity-30"
+							>
+								{isRequesting()
+									? t("onboarding.checkingPermission")
+									: t("onboarding.grantMicPermission")}
+							</button>
+						}
 					>
-						{isRequesting()
-							? t("onboarding.checkingPermission")
-							: t("onboarding.grantMicPermission")}
-					</button>
+						<button
+							type="button"
+							onClick={handleOpenSystemSettings}
+							class="inline-flex items-center gap-2 px-6 py-3 bg-ac text-ac-on font-mono font-bold uppercase tracking-wider text-sm hover:bg-ac-hover transition-colors"
+						>
+							<span>{t("onboarding.openSystemPreferences")}</span>
+							<ExternalLink class="w-4 h-4" />
+						</button>
+					</Show>
 				</Show>
 			</div>
 		</div>

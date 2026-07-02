@@ -14,7 +14,7 @@ export const privacy = {
 		"1.3. Use of the Service constitutes the User’s unconditional acceptance of this Policy.",
 	"privacy.section2.title": "2. What we do NOT collect",
 	"privacy.section2.p1":
-		"2.1. Audio recordings: your microphone audio is processed in memory on your device and is never uploaded, transmitted, or stored by the Operator.",
+		"2.1. Audio recordings: your microphone audio is processed and stored only on your device and is never uploaded or transmitted to the Operator.",
 	"privacy.section2.p2":
 		"2.2. Transcribed text: text produced by transcription is stored locally on your device only. It is never sent to the Operator and we have no ability to read it.",
 	"privacy.section2.p3":
@@ -22,9 +22,15 @@ export const privacy = {
 	"privacy.section2.p4": "2.4. We do not require an account, email, or any sign-up.",
 	"privacy.section3.title": "3. What we do process",
 	"privacy.section3.p1":
-		"3.1. Anonymous product analytics: the app may send anonymous events (e.g. which features are used, app version, OS version, crash reports) to help us improve the product. These events contain no audio, no transcribed text, and no information that personally identifies you.",
+		"3.1. App analytics: the app sends pseudonymous product-usage events (e.g. which features are used, app version, OS version, crash reports) to PostHog, an analytics service hosted in the European Union. These events are metadata only: they contain no audio, no transcribed text, and no content you dictate. Your audio recordings and transcriptions never leave your device.",
 	"privacy.section3.p2":
-		"3.2. Support correspondence: if you contact us at hello@voxfusion.com, we will process the contents of your message in order to reply.",
+		"3.2. Analytics identifier: to count unique installations, the app stores a randomly generated pseudonymous identifier (a “distinct_id”) in local storage on your device. It is not derived from your name, email, or any other identity data, and we make no attempt to link it to you.",
+	"privacy.section3.p3":
+		"3.3. Your choice: you are asked whether to enable app analytics during onboarding, and you can disable analytics at any time in the app’s settings (Privacy section).",
+	"privacy.section3.p4":
+		"3.4. Website analytics: the voxfusion.com website uses Umami, a privacy-focused analytics service, to collect anonymous, aggregate visit statistics.",
+	"privacy.section3.p5":
+		"3.5. Support correspondence: if you contact us at hello@voxfusion.com, we will process the contents of your message in order to reply.",
 	"privacy.section4.title": "4. Purposes of processing",
 	"privacy.section4.p1":
 		"4.1. Improving Service quality, fixing errors, and understanding aggregate usage.",
@@ -32,23 +38,23 @@ export const privacy = {
 	"privacy.section4.p3": "4.3. Complying with legal requirements of the Russian Federation.",
 	"privacy.section5.title": "5. Legal bases for processing",
 	"privacy.section5.p1":
-		"5.1. Anonymous analytics and support correspondence are processed on the basis of the operator’s legitimate interests (Article 6, Clause 1, Subclause 7 of Federal Law No. 152-FZ) and the data subject’s consent (Article 6, Clause 1, Subclause 1).",
+		"5.1. Analytics events and support correspondence are processed on the basis of the operator’s legitimate interests (Article 6, Clause 1, Subclause 7 of Federal Law No. 152-FZ) and the data subject’s consent (Article 6, Clause 1, Subclause 1).",
 	"privacy.section6.title": "6. Transfer of data to third parties",
 	"privacy.section6.p1":
 		"6.1. Audio and transcribed text are never transferred to any third party — they never leave your device.",
 	"privacy.section6.p2":
-		"6.2. Anonymous analytics events may be processed by a third-party analytics provider acting as a processor under a data processing agreement.",
+		"6.2. App analytics events are processed by PostHog (hosted in the European Union) and website visit statistics by Umami, each acting as a processor on the Operator’s behalf under a data processing agreement. Neither provider ever receives your audio recordings or transcriptions — those never leave your device.",
 	"privacy.section6.p3":
 		"6.3. We do not sell, exchange, or share personal data with third parties for marketing purposes.",
 	"privacy.section6.p4":
 		"6.4. Data may be disclosed upon request from authorized government authorities in cases required by Russian law.",
 	"privacy.section7.title": "7. Data retention",
 	"privacy.section7.p1":
-		"7.1. Audio is held in memory only and discarded as soon as transcription completes.",
+		"7.1. Audio recordings are stored locally on your device; the app keeps only the most recent recordings (currently the latest 20) and automatically deletes older ones after each transcription. They never leave your device.",
 	"privacy.section7.p2":
 		"7.2. Transcribed text and dictionary entries are retained on your device until you delete them or uninstall the app. The Operator has no copy.",
 	"privacy.section7.p3":
-		"7.3. Anonymous analytics events are retained for up to 12 months from the date of receipt.",
+		"7.3. Analytics events are retained for up to 12 months from the date of receipt.",
 	"privacy.section8.title": "8. User rights",
 	"privacy.section8.p1":
 		"8.1. Because we do not store your audio or transcripts, the most direct way to delete that data is to delete it on your device or uninstall the app.",

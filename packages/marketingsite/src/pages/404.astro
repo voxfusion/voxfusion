@@ -7,8 +7,8 @@
  * Think concrete architecture meets command-line interfaces.
  */
 
-import { useTranslations, defaultLang, getLocalizedPath } from "../i18n/utils";
-import Seo from "../components/Seo.astro";
+import { defaultLang, getLocalizedPath, useTranslations } from "../i18n/utils";
+import BaseLayout from "../layouts/BaseLayout.astro";
 
 const lang = defaultLang;
 const t = useTranslations(lang);
@@ -16,29 +16,14 @@ const title = `404 - ${t("notFound.title")}`;
 const description = t("notFound.description");
 ---
 
-<!doctype html>
-<html lang={lang}>
-<head>
-	<meta charset="UTF-8" />
-	<Seo title={title} description={description} lang={lang} noindex />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-	<link rel="preconnect" href="https://fonts.googleapis.com" />
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-	<title>{title}</title>
-</head>
-<body>
-	<div class="grid-overlay"></div>
-
-	<nav class="nav">
-		<div class="nav-inner">
-			<a href={getLocalizedPath("/", lang)} class="logo">
-				<span class="logo-bracket">[</span>VOX<span class="logo-accent">FUSION</span><span class="logo-bracket">]</span>
-			</a>
-		</div>
-	</nav>
-
+<BaseLayout
+	title={title}
+	description={description}
+	lang={lang}
+	noindex
+	bodyClass="not-found"
+	showFooter={false}
+>
 	<main class="error-page">
 		<div class="error-container">
 			<div class="terminal">
@@ -90,8 +75,14 @@ const description = t("notFound.description");
 			<span class="status"><span class="status-dot"></span> All systems operational</span>
 		</div>
 	</footer>
-</body>
-</html>
+</BaseLayout>
+
+<style is:global>
+	body.not-found {
+		display: flex;
+		flex-direction: column;
+	}
+</style>
 
 <style>
 	@keyframes blink {
@@ -109,73 +100,6 @@ const description = t("notFound.description");
 	@keyframes pulse {
 		0%, 100% { opacity: 0.5; }
 		50% { opacity: 1; }
-	}
-
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
-
-	html {
-		font-family: "JetBrains Mono", "Space Mono", monospace;
-		background: #0a0a0a;
-		color: #e0e0e0;
-		font-size: 15px;
-	}
-
-	body {
-		min-height: 100vh;
-		display: flex;
-		flex-direction: column;
-		position: relative;
-	}
-
-	.grid-overlay {
-		position: fixed;
-		inset: 0;
-		background-image:
-			linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-		background-size: 40px 40px;
-		pointer-events: none;
-		z-index: 0;
-	}
-
-	/* Navigation */
-	.nav {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		z-index: 100;
-		border-bottom: 1px solid #222;
-		background: rgba(10, 10, 10, 0.95);
-		backdrop-filter: blur(10px);
-	}
-
-	.nav-inner {
-		max-width: 1400px;
-		margin: 0 auto;
-		padding: 16px 32px;
-		display: flex;
-		align-items: center;
-	}
-
-	.logo {
-		font-size: 18px;
-		font-weight: 700;
-		letter-spacing: 0.1em;
-		text-decoration: none;
-		color: inherit;
-	}
-
-	.logo-bracket {
-		color: #ff3e00;
-	}
-
-	.logo-accent {
-		color: #666;
 	}
 
 	/* Error Page */

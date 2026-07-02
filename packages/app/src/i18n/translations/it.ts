@@ -3,7 +3,7 @@ import type { Translations } from "./en";
 export const it: Translations = {
 	home: {
 		yourTranscriptions: "Le tue trascrizioni",
-		pressToRecord: "Premi Left Control+Left Option per avviare una nuova registrazione",
+		pressToRecord: "Premi {{hotkey}} per avviare una nuova registrazione",
 	},
 	about: {
 		title: "Informazioni",
@@ -43,6 +43,11 @@ export const it: Translations = {
 		muteMediaWhileRecording: "Disattiva i media durante la registrazione",
 		muteMediaWhileRecordingDescription:
 			"Disattiva temporaneamente l'audio di sistema durante la registrazione e lo ripristina dopo.",
+		analytics: "Statistiche di utilizzo anonime",
+		analyticsDescription:
+			"Condividi eventi di utilizzo anonimi per aiutare a migliorare VoxFusion. Le modifiche hanno effetto immediato.",
+		analyticsNote:
+			"Vengono raccolti solo metadati degli eventi — mai il tuo audio né il tuo testo trascritto.",
 		recordingHotkey: "Scorciatoia di registrazione",
 		pressHotkey: "Premi una combinazione di tasti...",
 		hotkeyDescription:
@@ -61,6 +66,10 @@ export const it: Translations = {
 		modelDownload: "Scarica",
 		modelDownloading: "Download…",
 		modelDownloadFailed: "Download non riuscito",
+		modelDownloadedOfTotal: "{{downloaded}} / {{total}} MB",
+		modelDownloadSpeed: "{{speed}} MB/s",
+		modelEta: "~{{eta}} rimanente",
+		modelResumeNote: "Il download riprenderà da dove si era interrotto.",
 		modelExperimentalNote:
 			"La trascrizione sul dispositivo con questo modello è sperimentale e non ancora disponibile.",
 	},
@@ -78,7 +87,7 @@ export const it: Translations = {
 		errorOccurred: "Si è verificato un errore",
 		noTranscriptions: "Nessuna trascrizione ancora",
 		useCommandToRecord:
-			"Usa Left Control+Left Option per avviare la registrazione e creare la tua prima trascrizione",
+			"Usa {{hotkey}} per avviare la registrazione e creare la tua prima trascrizione",
 		tryAgain: "Riprova",
 		noMore: "Non ci sono altre trascrizioni",
 		today: "Oggi",
@@ -197,6 +206,8 @@ export const it: Translations = {
 			"VoxFusion ha bisogno dell'accesso al microfono per registrare e trascrivere la tua voce.",
 		micPermissionGranted: "Accesso al microfono concesso",
 		micPermissionNotGranted: "Accesso al microfono richiesto",
+		micPermissionDenied:
+			"L'accesso al microfono è stato negato. Attiva VoxFusion in Impostazioni di Sistema, in Privacy e sicurezza → Microfono — questo passaggio continuerà automaticamente una volta concesso l'accesso.",
 		grantMicPermission: "Concedi accesso al microfono",
 		checkingPermission: "Verifica in corso...",
 		accessibilityTitle: "Accesso accessibilità",
@@ -232,6 +243,17 @@ export const it: Translations = {
 		retryDownload: "Riprova il download",
 		modelDownloadNote:
 			"Questo modello consente la trascrizione offline. Il download richiede una connessione internet.",
+		privacyTitle: "Aiuta a migliorare VoxFusion",
+		privacyDescription:
+			"VoxFusion può inviare eventi di utilizzo anonimi — ad esempio quali funzioni vengono usate e la versione dell'app. Solo metadati: il tuo audio e il tuo testo trascritto non lasciano mai il tuo dispositivo. Puoi cambiare questa scelta in qualsiasi momento in Impostazioni → Privacy.",
+		privacyToggleLabel: "Condividi dati di utilizzo anonimi",
+		privacyToggleDescription: "Solo metadati — mai audio o trascrizioni.",
+	},
+	voiceControl: {
+		transcriptionFailed: "Trascrizione non riuscita",
+		recordingFailed: "Registrazione non riuscita",
+		typingFailed: "Impossibile digitare il testo",
+		retry: "Riprova",
 	},
 	update: {
 		available: "Aggiornamento disponibile",

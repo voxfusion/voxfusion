@@ -8,7 +8,8 @@ type SidebarLabelKey =
 	| "settings.models"
 	| "settings.hotkeys"
 	| "settings.appearance"
-	| "settings.language";
+	| "settings.language"
+	| "sidebar.privacy";
 
 interface SidebarItem {
 	id: SettingsSection;
@@ -30,6 +31,7 @@ const sidebarItems: SidebarItem[] = [
 	{ id: "hotkey", num: "03", labelKey: "settings.hotkeys" },
 	{ id: "appearance", num: "04", labelKey: "settings.appearance" },
 	{ id: "language", num: "05", labelKey: "settings.language" },
+	{ id: "privacy", num: "06", labelKey: "sidebar.privacy" },
 ];
 
 export default function SettingsSidebar(props: SettingsSidebarProps) {

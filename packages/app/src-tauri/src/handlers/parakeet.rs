@@ -112,5 +112,11 @@ pub fn transcribe(
     if text.is_empty() {
         return Err("Parakeet engine produced no transcription.".to_string());
     }
+
+    crate::handlers::audio::cleanup_old_recordings(
+        app_handle,
+        crate::handlers::audio::RECORDINGS_TO_KEEP,
+    );
+
     Ok(text)
 }

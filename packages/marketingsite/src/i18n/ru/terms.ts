@@ -16,7 +16,7 @@ export const terms = {
 	"terms.section2.p1":
 		"2.1. The User agrees to use the Service only for lawful purposes and in accordance with these Terms.",
 	"terms.section2.p2":
-		"2.2. The following are prohibited: decompiling, disassembling, or otherwise attempting to extract the source code of the Service; using the Service to violate third-party rights; transferring the license to third parties; or using the Service to create a competing product.",
+		"2.2. VoxFusion is open-source software distributed under the MIT License, with its source code publicly available on GitHub. The User may use, copy, modify, and redistribute the software under the terms of the MIT License. The following remain prohibited: using the Service to violate third-party rights; using the VoxFusion name or trademarks to misrepresent the origin of modified or derivative software; and removing or altering the copyright and license notices that the MIT License requires to be preserved.",
 	"terms.section2.p3":
 		"2.3. The User is responsible for the content of dictated text, for any transcribed text stored on their device, and for compliance with applicable law.",
 	"terms.section3.title": "3. Cost and data handling",

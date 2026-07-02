@@ -1,5 +1,6 @@
 import { Result } from "better-result";
 import { For, Show, createSignal, onMount } from "solid-js";
+import { AddWordForm, WordRow } from "../components/WordListEditor";
 import { useI18n } from "../i18n";
 import {
 	type DictionaryWord,
@@ -42,10 +43,6 @@ export default function DictionaryDefault() {
 		setAdding(false);
 	};
 
-	const handleKeyDown = (e: KeyboardEvent) => {
-		if (e.key === "Enter") handleAdd();
-	};
-
 	const handleDelete = async (id: string) => {
 		capture("dictionary_word_deleted");
 		setWords(words().filter((w) => w.id !== id));
@@ -76,11 +73,6 @@ export default function DictionaryDefault() {
 		if (Result.isError(result)) await fetchWords();
 	};
 
-	const handleEditKeyDown = (e: KeyboardEvent, id: string) => {
-		if (e.key === "Enter") handleEdit(id);
-		else if (e.key === "Escape") cancelEdit();
-	};
-
 	return (
 		<div>
 			<div class="mb-4 flex items-center justify-end">
@@ -92,25 +84,13 @@ export default function DictionaryDefault() {
 			</div>
 
 			<div class="bg-th-surface border border-border p-4 mb-6">
-				<div class="flex gap-3">
-					<input
-						type="text"
-						value={newWord()}
-						onInput={(e) => setNewWord(e.currentTarget.value)}
-						onKeyDown={handleKeyDown}
-						placeholder={t("dictionary.wordPlaceholder")}
-						class="flex-1 px-4 py-2 bg-th-input border border-border-strong text-txt-primary font-mono placeholder-txt-muted focus:outline-none focus:border-ac transition-colors"
-					/>
-					<button
-						type="button"
-						onClick={handleAdd}
-						disabled={!newWord().trim() || adding()}
-						class="flex items-center gap-2 px-4 py-2 bg-ac text-ac-on font-mono uppercase tracking-wider text-sm hover:bg-ac-hover disabled:opacity-50 transition-colors"
-					>
-						<span>+</span>
-						{t("dictionary.addWord")}
-					</button>
-				</div>
+				<AddWordForm
+					variant="page"
+					value={newWord()}
+					onValueChange={setNewWord}
+					onSubmit={handleAdd}
+					adding={adding()}
+				/>
 			</div>
 
 			<Show when={words().length === 0}>
@@ -131,64 +111,17 @@ export default function DictionaryDefault() {
 				<div class="space-y-1">
 					<For each={words()}>
 						{(word) => (
-							<div class="bg-th-surface border border-border px-4 py-3 flex items-center justify-between group hover:border-border-strong transition-colors">
-								<Show
-									when={editingId() === word.id}
-									fallback={<span class="text-txt-primary font-mono">{word.word}</span>}
-								>
-									<input
-										type="text"
-										value={editingWord()}
-										onInput={(e) => setEditingWord(e.currentTarget.value)}
-										onKeyDown={(e) => handleEditKeyDown(e, word.id)}
-										class="flex-1 px-2 py-1 bg-th-input border border-border-strong text-txt-primary font-mono focus:outline-none focus:border-ac transition-colors mr-4"
-										autofocus
-									/>
-								</Show>
-
-								<div class="flex items-center gap-2 font-mono text-xs">
-									<Show
-										when={editingId() === word.id}
-										fallback={
-											<>
-												<button
-													type="button"
-													onClick={() => startEdit(word)}
-													class="text-txt-muted hover:text-ac opacity-0 group-hover:opacity-100 transition-all uppercase tracking-wider"
-													title={t("dictionary.edit")}
-												>
-													[EDIT]
-												</button>
-												<button
-													type="button"
-													onClick={() => handleDelete(word.id)}
-													class="text-txt-muted hover:text-ac opacity-0 group-hover:opacity-100 transition-all uppercase tracking-wider"
-													title={t("dictionary.delete")}
-												>
-													[DEL]
-												</button>
-											</>
-										}
-									>
-										<button
-											type="button"
-											onClick={() => handleEdit(word.id)}
-											class="text-success hover:opacity-80 uppercase tracking-wider"
-											title={t("dictionary.save")}
-										>
-											[SAVE]
-										</button>
-										<button
-											type="button"
-											onClick={cancelEdit}
-											class="text-txt-muted hover:text-txt-secondary uppercase tracking-wider"
-											title={t("dictionary.cancel")}
-										>
-											[CANCEL]
-										</button>
-									</Show>
-								</div>
-							</div>
+							<WordRow
+								variant="flat"
+								word={word}
+								editing={editingId() === word.id}
+								editValue={editingWord()}
+								onEditValueChange={setEditingWord}
+								onStartEdit={() => startEdit(word)}
+								onSaveEdit={() => handleEdit(word.id)}
+								onCancelEdit={cancelEdit}
+								onDelete={() => handleDelete(word.id)}
+							/>
 						)}
 					</For>
 				</div>
