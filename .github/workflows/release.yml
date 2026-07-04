@@ -120,19 +120,22 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
           # Stage the matching engine build into src-tauri/engine, which
-          # tauri.conf.json bundles into Contents/Resources/bin.
+          # tauri.release.conf.json bundles into Contents/Resources/bin.
+          # (The resources entry lives in a release-only config overlay
+          # because Tauri's build script fails on an empty resources glob,
+          # which would break plain cargo check / tauri dev without the
+          # engine staged.)
           stage_engine() {
             rm -rf src-tauri/engine
             mkdir -p src-tauri/engine
             cp "$GITHUB_WORKSPACE/engine-staging/$1/"* src-tauri/engine/
           }
           stage_engine aarch64-apple-darwin
-          bun run tauri build --target aarch64-apple-darwin
+          bun run tauri build --config src-tauri/tauri.release.conf.json --target aarch64-apple-darwin
           stage_engine x86_64-apple-darwin
-          bun run tauri build --target x86_64-apple-darwin
+          bun run tauri build --config src-tauri/tauri.release.conf.json --target x86_64-apple-darwin
 
-      # The resources entry is a glob, so a missing engine would bundle nothing
-      # rather than fail the build — assert it made it into both app bundles.
+      # Belt and braces: assert the engine made it into both app bundles.
       - name: Verify bundled Parakeet engine
         run: |
           verify_engine() {

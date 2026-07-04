@@ -8,9 +8,6 @@
 		"createUpdaterArtifacts": true,
 		"targets": ["dmg", "app"],
 		"icon": ["icons/icon.icns", "icons/icon.png"],
-		"resources": {
-			"engine/*": "bin/"
-		},
 		"macOS": {
 			"entitlements": "entitlements.plist",
 			"minimumSystemVersion": "10.15",

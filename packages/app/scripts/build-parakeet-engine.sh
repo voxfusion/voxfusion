@@ -9,7 +9,7 @@
 # dir, which handlers::parakeet::resolve_binary discovers at runtime:
 #   - default (dev): the app's data dir under `bin/`
 #   - release CI: a staging dir copied to `src-tauri/engine/`, which
-#     tauri.conf.json bundles into `Contents/Resources/bin`
+#     tauri.release.conf.json bundles into `Contents/Resources/bin`
 #
 # Usage: packages/app/scripts/build-parakeet-engine.sh [dest_bin_dir]
 # Default dest: ~/Library/Application Support/io.voxfusion.app/bin  (macOS)

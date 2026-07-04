@@ -17,7 +17,7 @@ const BIN_NAME: &str = "crispasr";
 /// Resolves the `crispasr` engine binary. Search order:
 /// 1. `VOXFUSION_PARAKEET_BIN` env override (absolute path)
 /// 2. bundled resource: `<resources>/bin/crispasr` (release builds — CI stages
-///    the engine into `src-tauri/engine/`, bundled via tauri.conf.json)
+///    the engine into `src-tauri/engine/`, bundled via tauri.release.conf.json)
 /// 3. app data: `<app_data>/bin/crispasr` (dev — build-parakeet-engine.sh)
 fn resolve_binary(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     if let Ok(path) = std::env::var("VOXFUSION_PARAKEET_BIN") {
