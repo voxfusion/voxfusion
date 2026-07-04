@@ -16,29 +16,43 @@ const BIN_NAME: &str = "crispasr";
 
 /// Resolves the `crispasr` engine binary. Search order:
 /// 1. `VOXFUSION_PARAKEET_BIN` env override (absolute path)
-/// 2. bundled resource: `<resources>/bin/crispasr`
-/// 3. app data: `<app_data>/bin/crispasr`
-/// 4. bare name (resolved against `PATH`)
-fn resolve_binary(app_handle: &tauri::AppHandle) -> PathBuf {
+/// 2. bundled resource: `<resources>/bin/crispasr` (release builds — CI stages
+///    the engine into `src-tauri/engine/`, bundled via tauri.conf.json)
+/// 3. app data: `<app_data>/bin/crispasr` (dev — build-parakeet-engine.sh)
+fn resolve_binary(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     if let Ok(path) = std::env::var("VOXFUSION_PARAKEET_BIN") {
         let pb = PathBuf::from(path);
         if pb.exists() {
-            return pb;
+            return Some(pb);
         }
     }
     if let Ok(resources) = app_handle.path().resource_dir() {
         let pb = resources.join("bin").join(BIN_NAME);
         if pb.exists() {
-            return pb;
+            return Some(pb);
         }
     }
     if let Ok(data_dir) = app_handle.path().app_data_dir() {
         let pb = data_dir.join("bin").join(BIN_NAME);
         if pb.exists() {
-            return pb;
+            return Some(pb);
         }
     }
-    PathBuf::from(BIN_NAME)
+    None
+}
+
+/// Whether the engine binary exists at any known location. Checked before a
+/// Parakeet model can be made active — see [`crate::handlers::models`].
+pub fn engine_available(app_handle: &tauri::AppHandle) -> bool {
+    resolve_binary(app_handle).is_some()
+}
+
+/// Error for a missing engine, shown to the user when transcription or model
+/// selection is attempted without it.
+fn missing_engine_error() -> String {
+    "The crispasr engine that runs Parakeet models is missing from this build. \
+     Reinstall VoxFusion, or run packages/app/scripts/build-parakeet-engine.sh in development."
+        .to_string()
 }
 
 /// Writes mono 16 kHz f32 samples as a 16-bit PCM WAV the engine can read,
@@ -73,7 +87,7 @@ pub fn transcribe(
     audio_path: &str,
     samples: &[f32],
 ) -> Result<String, String> {
-    let binary = resolve_binary(app_handle);
+    let binary = resolve_binary(app_handle).ok_or_else(missing_engine_error)?;
     let wav_path = write_temp_wav_16k(audio_path, samples)?;
 
     let thread_count = std::thread::available_parallelism()

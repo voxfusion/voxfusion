@@ -41,3 +41,6 @@ target
 
 # Local OpenCode workspace
 .opencode/
+
+# Parakeet engine staged for bundling (built by build-parakeet-engine.sh)
+packages/app/src-tauri/engine/

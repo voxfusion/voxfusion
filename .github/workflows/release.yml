@@ -48,6 +48,18 @@ jobs:
           echo "Updated tauri.conf.json:"
           grep '"version"' tauri.conf.json
 
+      # Build the crispasr engine that runs Parakeet models (handlers::parakeet)
+      # for both architectures. Done before the certificate import so the large
+      # compile does not eat into the keychain's unlock window.
+      - name: Build Parakeet engine (crispasr)
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          PARAKEET_ARCH=arm64 PARAKEET_BUILD_DIR=/tmp/crispasr-arm64 \
+            bash packages/app/scripts/build-parakeet-engine.sh "$GITHUB_WORKSPACE/engine-staging/aarch64-apple-darwin"
+          PARAKEET_ARCH=x86_64 PARAKEET_BUILD_DIR=/tmp/crispasr-x86_64 \
+            bash packages/app/scripts/build-parakeet-engine.sh "$GITHUB_WORKSPACE/engine-staging/x86_64-apple-darwin"
+
       - name: Import Apple Developer Certificate
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -69,6 +81,16 @@ jobs:
           CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
           echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
           echo "Certificate imported: $CERT_ID"
+
+      # The engine binaries are bundled into Contents/Resources/bin, which the
+      # Tauri bundler does not sign for us. Notarization requires every Mach-O
+      # to be signed with hardened runtime, so sign them before staging.
+      - name: Sign Parakeet engine binaries
+        run: |
+          for f in engine-staging/*/*; do
+            codesign --force --options runtime --timestamp --sign "$CERT_ID" "$f"
+            codesign --verify --verbose=2 "$f"
+          done
 
       - name: Verify Apple notarization secrets
         env:
@@ -97,8 +119,36 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
+          # Stage the matching engine build into src-tauri/engine, which
+          # tauri.conf.json bundles into Contents/Resources/bin.
+          stage_engine() {
+            rm -rf src-tauri/engine
+            mkdir -p src-tauri/engine
+            cp "$GITHUB_WORKSPACE/engine-staging/$1/"* src-tauri/engine/
+          }
+          stage_engine aarch64-apple-darwin
           bun run tauri build --target aarch64-apple-darwin
+          stage_engine x86_64-apple-darwin
           bun run tauri build --target x86_64-apple-darwin
+
+      # The resources entry is a glob, so a missing engine would bundle nothing
+      # rather than fail the build — assert it made it into both app bundles.
+      - name: Verify bundled Parakeet engine
+        run: |
+          verify_engine() {
+            local target="$1" arch="$2" app_path engine
+            app_path=$(find "packages/app/src-tauri/target/$target/release/bundle/macos" -maxdepth 1 -name "*.app" -type d | head -1)
+            engine="$app_path/Contents/Resources/bin/crispasr"
+            if [ ! -f "$engine" ]; then
+              echo "::error::crispasr engine missing from $app_path"
+              exit 1
+            fi
+            lipo -archs "$engine" | grep -qw "$arch"
+            codesign --verify --verbose=2 "$engine"
+            echo "Bundled engine OK ($arch): $engine"
+          }
+          verify_engine aarch64-apple-darwin arm64
+          verify_engine x86_64-apple-darwin x86_64
 
       - name: Find build artifacts
         id: artifacts

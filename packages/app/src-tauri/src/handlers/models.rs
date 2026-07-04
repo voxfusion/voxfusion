@@ -520,6 +520,15 @@ pub async fn set_active_model(
     if !is_downloaded(&app_handle, model) {
         return Err(format!("{} is not downloaded yet.", model.name));
     }
+    // A Parakeet model is only usable when the crispasr engine is present
+    // (bundled in release builds); fail here rather than on every transcription.
+    if model.engine == Engine::Parakeet && !crate::handlers::parakeet::engine_available(&app_handle)
+    {
+        return Err(format!(
+            "{} cannot be activated: the crispasr engine that runs Parakeet models is missing from this build. Reinstall VoxFusion, or run packages/app/scripts/build-parakeet-engine.sh in development.",
+            model.name
+        ));
+    }
 
     {
         let mut guard = active.0.lock().map_err(|e| e.to_string())?;
