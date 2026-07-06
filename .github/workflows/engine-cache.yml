@@ -1,0 +1,41 @@
+# Seeds the Parakeet engine (crispasr) build cache from main.
+#
+# Release runs are triggered by tags, and GitHub Actions caches saved on a
+# tag ref are invisible to other tags — only caches created on the default
+# branch are readable by every ref. So the ~2h engine compile must be cached
+# from main for release.yml's "Cache Parakeet engine" step to ever hit.
+#
+# The cache key must stay identical to the one in release.yml.
+name: Engine cache
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/app/scripts/build-parakeet-engine.sh
+      - .github/workflows/engine-cache.yml
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Parakeet engine
+        id: engine-cache
+        uses: actions/cache@v4
+        with:
+          path: engine-staging
+          key: crispasr-engine-${{ runner.os }}-${{ hashFiles('packages/app/scripts/build-parakeet-engine.sh') }}
+
+      - name: Build Parakeet engine (crispasr)
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          PARAKEET_ARCH=arm64 PARAKEET_BUILD_DIR=/tmp/crispasr-arm64 \
+            bash packages/app/scripts/build-parakeet-engine.sh "$GITHUB_WORKSPACE/engine-staging/aarch64-apple-darwin"
+          PARAKEET_ARCH=x86_64 PARAKEET_BUILD_DIR=/tmp/crispasr-x86_64 \
+            bash packages/app/scripts/build-parakeet-engine.sh "$GITHUB_WORKSPACE/engine-staging/x86_64-apple-darwin"
