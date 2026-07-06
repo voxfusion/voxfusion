@@ -48,10 +48,24 @@ jobs:
           echo "Updated tauri.conf.json:"
           grep '"version"' tauri.conf.json
 
+      # The engine is a ~2h cold compile (two arches, every CrispASR backend),
+      # but its inputs are fully pinned: the build script embeds the engine
+      # commit, arch list, and deployment target. Cache the installed staging
+      # dir keyed on the script hash so releases that don't bump the engine
+      # skip the compile entirely. (The signing step later re-signs the cached
+      # binaries with --force, so restoring already-signed files is fine.)
+      - name: Cache Parakeet engine
+        id: engine-cache
+        uses: actions/cache@v4
+        with:
+          path: engine-staging
+          key: crispasr-engine-${{ runner.os }}-${{ hashFiles('packages/app/scripts/build-parakeet-engine.sh') }}
+
       # Build the crispasr engine that runs Parakeet models (handlers::parakeet)
       # for both architectures. Done before the certificate import so the large
       # compile does not eat into the keychain's unlock window.
       - name: Build Parakeet engine (crispasr)
+        if: steps.engine-cache.outputs.cache-hit != 'true'
         env:
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
