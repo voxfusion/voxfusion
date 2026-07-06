@@ -19,6 +19,8 @@ const KEYCODE_LEFT_CONTROL: u16 = 0x3B;
 const KEYCODE_RIGHT_CONTROL: u16 = 0x3E;
 const KEYCODE_LEFT_OPTION: u16 = 0x3A;
 const KEYCODE_RIGHT_OPTION: u16 = 0x3D;
+const KEYCODE_LEFT_SHIFT: u16 = 0x38;
+const KEYCODE_RIGHT_SHIFT: u16 = 0x3C;
 const KEYCODE_LEFT_COMMAND: u16 = 0x37;
 const KEYCODE_RIGHT_COMMAND: u16 = 0x36;
 
@@ -30,6 +32,8 @@ enum SystemKey {
     RightControl,
     LeftOption,
     RightOption,
+    LeftShift,
+    RightShift,
     LeftCommand,
     RightCommand,
 }
@@ -65,6 +69,8 @@ fn key_from_keycode(keycode: u16) -> Option<SystemKey> {
         KEYCODE_RIGHT_CONTROL => Some(SystemKey::RightControl),
         KEYCODE_LEFT_OPTION => Some(SystemKey::LeftOption),
         KEYCODE_RIGHT_OPTION => Some(SystemKey::RightOption),
+        KEYCODE_LEFT_SHIFT => Some(SystemKey::LeftShift),
+        KEYCODE_RIGHT_SHIFT => Some(SystemKey::RightShift),
         KEYCODE_LEFT_COMMAND => Some(SystemKey::LeftCommand),
         KEYCODE_RIGHT_COMMAND => Some(SystemKey::RightCommand),
         _ => None,
@@ -79,6 +85,9 @@ fn key_is_down_in_flags(key: SystemKey, flags: NSEventModifierFlags) -> bool {
         }
         SystemKey::LeftOption | SystemKey::RightOption => {
             flags.contains(NSEventModifierFlags::Option)
+        }
+        SystemKey::LeftShift | SystemKey::RightShift => {
+            flags.contains(NSEventModifierFlags::Shift)
         }
         SystemKey::LeftCommand | SystemKey::RightCommand => {
             flags.contains(NSEventModifierFlags::Command)

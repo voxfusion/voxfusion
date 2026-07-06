@@ -19,6 +19,8 @@ type SystemKey =
 	| "rightControl"
 	| "leftOption"
 	| "rightOption"
+	| "leftShift"
+	| "rightShift"
 	| "leftCommand"
 	| "rightCommand";
 

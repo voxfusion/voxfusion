@@ -9,6 +9,8 @@ type SystemKey =
 	| "rightControl"
 	| "leftOption"
 	| "rightOption"
+	| "leftShift"
+	| "rightShift"
 	| "leftCommand"
 	| "rightCommand";
 
@@ -43,6 +45,14 @@ type HotkeyRecorderActivePayload = {
 
 export const DEFAULT_HOTKEY = "LeftControl+LeftOption";
 export const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
+
+/**
+ * How long an exact hotkey match must stay held unchanged before it fires.
+ * Long enough to outlast synthetic modifier transients from key remappers
+ * (Karabiner posts a hyperkey's modifiers within ~1ms of each other), short
+ * enough to be imperceptible on a deliberate press.
+ */
+const HOTKEY_MATCH_STABILITY_MS = 60;
 
 /**
  * Maps KeyboardEvent.code values to display-friendly modifier labels.
@@ -99,6 +109,8 @@ const SYSTEM_HOTKEY_TO_KEY: Record<string, SystemKey> = {
 	RightControl: "rightControl",
 	LeftOption: "leftOption",
 	RightOption: "rightOption",
+	LeftShift: "leftShift",
+	RightShift: "rightShift",
 	LeftCommand: "leftCommand",
 	RightCommand: "rightCommand",
 };
@@ -109,6 +121,8 @@ const SYSTEM_HOTKEY_ORDER = [
 	"RightControl",
 	"LeftOption",
 	"RightOption",
+	"LeftShift",
+	"RightShift",
 	"LeftCommand",
 	"RightCommand",
 ];
@@ -119,6 +133,8 @@ const MODIFIER_CODE_TO_SYSTEM_HOTKEY: Record<string, string> = {
 	ControlRight: "RightControl",
 	AltLeft: "LeftOption",
 	AltRight: "RightOption",
+	ShiftLeft: "LeftShift",
+	ShiftRight: "RightShift",
 	MetaLeft: "LeftCommand",
 	MetaRight: "RightCommand",
 };
@@ -226,24 +242,48 @@ async function registerSystemHotkey(
 
 	let isHeld = false;
 	let isRecorderActive = false;
+	let pendingPressTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const cancelPendingPress = () => {
+		if (pendingPressTimer !== null) {
+			clearTimeout(pendingPressTimer);
+			pendingPressTimer = null;
+		}
+	};
 
 	const unlistenRecorderActive = await listen<HotkeyRecorderActivePayload>(
 		"hotkey-recorder-active",
 		(event) => {
 			isRecorderActive = event.payload.active;
+			if (isRecorderActive) cancelPendingPress();
 		}
 	);
 
 	const unlistenPressed = await listen<SystemKeyPressedPayload>("system-key-pressed", (event) => {
-		if (!systemKeySetsMatch(event.payload.pressedKeys, expectedKeys)) return;
+		if (!systemKeySetsMatch(event.payload.pressedKeys, expectedKeys)) {
+			// Another key joined the chord — a pending match was a transient
+			// state (e.g. Karabiner posting a hyperkey's modifiers one by one),
+			// not a deliberate press of this hotkey.
+			cancelPendingPress();
+			return;
+		}
 		if (isHeld) return;
 		if (isRecorderActive) return;
 
-		isHeld = true;
-		handlers.onPressed();
+		// Remappers like Karabiner-Elements synthesize modifier sequences that
+		// can pass through this exact combination for a millisecond on their
+		// way to a larger chord. Only fire once the match survives a short
+		// stability window.
+		cancelPendingPress();
+		pendingPressTimer = setTimeout(() => {
+			pendingPressTimer = null;
+			isHeld = true;
+			handlers.onPressed();
+		}, HOTKEY_MATCH_STABILITY_MS);
 	});
 
 	const unlistenReleased = await listen("system-keys-released", () => {
+		cancelPendingPress();
 		if (isHeld) handlers.onReleased?.();
 		isHeld = false;
 	});
@@ -252,6 +292,7 @@ async function registerSystemHotkey(
 		"system-key-released",
 		(event) => {
 			if (systemKeySetsMatch(event.payload.pressedKeys, expectedKeys)) return;
+			cancelPendingPress();
 			if (isHeld) handlers.onReleased?.();
 			isHeld = false;
 		}
@@ -260,6 +301,7 @@ async function registerSystemHotkey(
 	return {
 		hotkey,
 		dispose: async () => {
+			cancelPendingPress();
 			unlistenRecorderActive();
 			unlistenPressed();
 			unlistenKeyReleased();
