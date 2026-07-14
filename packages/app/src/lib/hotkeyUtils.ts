@@ -265,6 +265,8 @@ async function registerSystemHotkey(
 			// state (e.g. Karabiner posting a hyperkey's modifiers one by one),
 			// not a deliberate press of this hotkey.
 			cancelPendingPress();
+			if (isHeld) handlers.onReleased?.();
+			isHeld = false;
 			return;
 		}
 		if (isHeld) return;

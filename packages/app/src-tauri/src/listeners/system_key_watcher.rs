@@ -4,7 +4,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use block2::RcBlock;
-use objc2_app_kit::{NSEvent, NSEventMask, NSEventModifierFlags, NSEventType};
+use objc2_app_kit::{NSEvent, NSEventMask, NSEventType};
+use objc2_core_graphics::{CGEventSource, CGEventSourceStateID};
 use serde::Serialize;
 use tauri::Emitter;
 
@@ -23,6 +24,18 @@ const KEYCODE_LEFT_SHIFT: u16 = 0x38;
 const KEYCODE_RIGHT_SHIFT: u16 = 0x3C;
 const KEYCODE_LEFT_COMMAND: u16 = 0x37;
 const KEYCODE_RIGHT_COMMAND: u16 = 0x36;
+
+const TRACKED_SYSTEM_KEYS: [(SystemKey, u16); 9] = [
+    (SystemKey::Fn, KEYCODE_FN),
+    (SystemKey::LeftControl, KEYCODE_LEFT_CONTROL),
+    (SystemKey::RightControl, KEYCODE_RIGHT_CONTROL),
+    (SystemKey::LeftOption, KEYCODE_LEFT_OPTION),
+    (SystemKey::RightOption, KEYCODE_RIGHT_OPTION),
+    (SystemKey::LeftShift, KEYCODE_LEFT_SHIFT),
+    (SystemKey::RightShift, KEYCODE_RIGHT_SHIFT),
+    (SystemKey::LeftCommand, KEYCODE_LEFT_COMMAND),
+    (SystemKey::RightCommand, KEYCODE_RIGHT_COMMAND),
+];
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -77,22 +90,40 @@ fn key_from_keycode(keycode: u16) -> Option<SystemKey> {
     }
 }
 
-fn key_is_down_in_flags(key: SystemKey, flags: NSEventModifierFlags) -> bool {
-    match key {
-        SystemKey::Fn => flags.contains(NSEventModifierFlags::Function),
-        SystemKey::LeftControl | SystemKey::RightControl => {
-            flags.contains(NSEventModifierFlags::Control)
-        }
-        SystemKey::LeftOption | SystemKey::RightOption => {
-            flags.contains(NSEventModifierFlags::Option)
-        }
-        SystemKey::LeftShift | SystemKey::RightShift => {
-            flags.contains(NSEventModifierFlags::Shift)
-        }
-        SystemKey::LeftCommand | SystemKey::RightCommand => {
-            flags.contains(NSEventModifierFlags::Command)
-        }
+fn current_pressed_keys_with(mut key_is_down: impl FnMut(u16) -> bool) -> BTreeSet<SystemKey> {
+    TRACKED_SYSTEM_KEYS
+        .iter()
+        .filter_map(|(key, keycode)| key_is_down(*keycode).then_some(*key))
+        .collect()
+}
+
+fn current_pressed_keys() -> BTreeSet<SystemKey> {
+    current_pressed_keys_with(|keycode| {
+        CGEventSource::key_state(CGEventSourceStateID::CombinedSessionState, keycode)
+    })
+}
+
+/// A flags-changed event normally toggles exactly the key identified by its
+/// keycode. Any other difference means AppKit skipped at least one transition
+/// (for example across sleep, screen lock, or an agent-app lifecycle change).
+fn transition_is_contiguous(
+    previous: &BTreeSet<SystemKey>,
+    current: &BTreeSet<SystemKey>,
+    event_key: SystemKey,
+) -> bool {
+    let is_down = current.contains(&event_key);
+    if previous.contains(&event_key) == is_down {
+        return false;
     }
+
+    let mut expected = previous.clone();
+    if is_down {
+        expected.insert(event_key);
+    } else {
+        expected.remove(&event_key);
+    }
+
+    expected == *current
 }
 
 fn emit_system_key_event(event: &NSEvent) {
@@ -104,38 +135,51 @@ fn emit_system_key_event(event: &NSEvent) {
         return;
     };
 
-    let flags = event.modifierFlags();
-    let is_down = key_is_down_in_flags(key, flags);
+    // Rebuild the complete state on every event instead of accumulating
+    // transitions. CGEventSourceKeyState distinguishes left/right modifiers
+    // and repairs stale keys immediately after a missed release.
+    let current = current_pressed_keys();
     let mut pressed = pressed_keys()
         .lock()
         .expect("system key pressed state mutex poisoned");
+    let previous = pressed.clone();
+    let was_resynchronized = !transition_is_contiguous(&previous, &current, key);
 
-    if is_down {
-        let was_new_key = pressed.insert(key);
+    if was_resynchronized {
+        log::warn!(
+            target: "hotkey",
+            "system_key_state_resynchronized event_key={key:?} previous={previous:?} current={current:?}"
+        );
+        // Reset per-shortcut `isHeld` state before delivering the corrected
+        // snapshot. This also recovers when the missed transition was the
+        // release of the same key that is being pressed again now.
+        let _ = app_handle.emit("system-keys-released", ());
+    }
 
-        if was_new_key {
-            let _ = app_handle.emit(
-                "system-key-pressed",
-                SystemKeyPressedPayload {
-                    key,
-                    pressed_keys: pressed.iter().copied().collect(),
-                },
-            );
-        }
+    *pressed = current.clone();
+    drop(pressed);
 
+    if current.contains(&key) {
+        let _ = app_handle.emit(
+            "system-key-pressed",
+            SystemKeyPressedPayload {
+                key,
+                pressed_keys: current.iter().copied().collect(),
+            },
+        );
         return;
     }
 
-    if pressed.remove(&key) {
-        let pressed_keys = pressed.iter().copied().collect::<Vec<_>>();
-        let _ = app_handle.emit(
-            "system-key-released",
-            SystemKeyReleasedPayload { key, pressed_keys },
-        );
+    let _ = app_handle.emit(
+        "system-key-released",
+        SystemKeyReleasedPayload {
+            key,
+            pressed_keys: current.iter().copied().collect(),
+        },
+    );
 
-        if pressed.is_empty() {
-            let _ = app_handle.emit("system-keys-released", ());
-        }
+    if current.is_empty() && !was_resynchronized {
+        let _ = app_handle.emit("system-keys-released", ());
     }
 }
 
@@ -169,6 +213,12 @@ pub fn setup(app_handle: &tauri::AppHandle) {
     if WATCHER_RUNNING.swap(true, Ordering::SeqCst) {
         return;
     }
+
+    let initial_keys = current_pressed_keys();
+    *pressed_keys()
+        .lock()
+        .expect("system key pressed state mutex poisoned") = initial_keys.clone();
+    log::info!(target: "hotkey", "system_key_watcher_started pressed_keys={initial_keys:?}");
 
     // NSEvent monitors must be installed on the main thread, where the
     // application run loop dispatches them. Observing `FlagsChanged` (for
@@ -205,5 +255,75 @@ pub fn setup(app_handle: &tauri::AppHandle) {
 
     if scheduled.is_err() {
         WATCHER_RUNNING.store(false, Ordering::SeqCst);
+    }
+}
+
+pub fn resynchronize(app_handle: &tauri::AppHandle, reason: &str) {
+    let current = current_pressed_keys();
+    let mut pressed = pressed_keys()
+        .lock()
+        .expect("system key pressed state mutex poisoned");
+    let previous = std::mem::replace(&mut *pressed, current.clone());
+    drop(pressed);
+
+    log::info!(
+        target: "hotkey",
+        "system_key_state_lifecycle_resynchronized reason={reason} previous={previous:?} current={current:?}"
+    );
+    // Lifecycle changes can also strand the frontend's per-registration
+    // `isHeld` flag even when Core Graphics already reports no keys down.
+    let _ = app_handle.emit("system-keys-released", ());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn keys(keys: &[SystemKey]) -> BTreeSet<SystemKey> {
+        keys.iter().copied().collect()
+    }
+
+    #[test]
+    fn current_state_distinguishes_left_and_right_modifiers() {
+        let pressed = current_pressed_keys_with(|keycode| {
+            keycode == KEYCODE_LEFT_CONTROL || keycode == KEYCODE_RIGHT_OPTION
+        });
+
+        assert_eq!(
+            pressed,
+            keys(&[SystemKey::LeftControl, SystemKey::RightOption])
+        );
+    }
+
+    #[test]
+    fn accepts_a_normal_press_and_release_sequence() {
+        assert!(transition_is_contiguous(
+            &keys(&[]),
+            &keys(&[SystemKey::LeftControl]),
+            SystemKey::LeftControl,
+        ));
+        assert!(transition_is_contiguous(
+            &keys(&[SystemKey::LeftControl]),
+            &keys(&[]),
+            SystemKey::LeftControl,
+        ));
+    }
+
+    #[test]
+    fn detects_a_missed_release_before_the_same_key_is_pressed_again() {
+        assert!(!transition_is_contiguous(
+            &keys(&[SystemKey::LeftControl]),
+            &keys(&[SystemKey::LeftControl]),
+            SystemKey::LeftControl,
+        ));
+    }
+
+    #[test]
+    fn detects_an_unrelated_stale_modifier() {
+        assert!(!transition_is_contiguous(
+            &keys(&[SystemKey::Fn]),
+            &keys(&[SystemKey::LeftControl]),
+            SystemKey::LeftControl,
+        ));
     }
 }

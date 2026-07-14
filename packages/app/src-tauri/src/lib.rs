@@ -187,7 +187,14 @@ pub fn run() {
             match event {
                 tauri::RunEvent::Reopen { .. } => {
                     log::info!(target: "runtime", "reopen_requested");
+                    #[cfg(target_os = "macos")]
+                    listeners::system_key_watcher::resynchronize(app, "reopen");
                     window::show_or_create_main_window(app);
+                }
+                tauri::RunEvent::Resumed => {
+                    log::info!(target: "runtime", "resumed");
+                    #[cfg(target_os = "macos")]
+                    listeners::system_key_watcher::resynchronize(app, "resumed");
                 }
                 tauri::RunEvent::ExitRequested { code, .. } => {
                     log::warn!(target: "runtime", "exit_requested code={code:?}");
