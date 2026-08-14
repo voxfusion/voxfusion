@@ -27,6 +27,7 @@
         "@tauri-apps/plugin-store": "~2",
         "@tauri-apps/plugin-updater": "^2.9.0",
         "better-result": "^2.9.2",
+        "cuelume": "0.2.2",
         "lucide-solid": "^0.562.0",
         "posthog-js": "^1.342.1",
         "solid-js": "^1.9.3",
@@ -60,6 +61,9 @@
         "wrangler": "^3",
       },
     },
+  },
+  "patchedDependencies": {
+    "cuelume@0.2.2": "patches/cuelume@0.2.2.patch",
   },
   "packages": {
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
@@ -633,6 +637,8 @@
     "csso": ["csso@5.0.5", "", { "dependencies": { "css-tree": "~2.2.0" } }, "sha512-0LrrStPOdJj+SPCCrGhzryycLjwcgUSHBtxNA8aIDxf0GLsRh1cKYhB00Gd1lDOS4yGH69+SNn13+TWbVHETFQ=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
+
+    "cuelume": ["cuelume@0.2.2", "", {}, "sha512-TiNzJRjhddjC4jy4M7sv63V/86VaFhdIs6iHUCrc4CKhqypaxRBv1aedCBGebrz/cO7nroPkEfqHe/P7fOE2GQ=="],
 
     "data-uri-to-buffer": ["data-uri-to-buffer@2.0.2", "", {}, "sha512-ND9qDTLc6diwj+Xe5cdAgVTbLVdXbtxTJRXRhli8Mowuaan+0EJOtdqJ0QCHNSSPyoXGx9HX2/VMnKeC34AChA=="],
 

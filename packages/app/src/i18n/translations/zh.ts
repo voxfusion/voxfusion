@@ -40,6 +40,8 @@ export const zh: Translations = {
 		microphoneDescription: "选择用于语音录制的麦克风。",
 		muteMediaWhileRecording: "录音时静音媒体",
 		muteMediaWhileRecordingDescription: "录音期间临时静音系统音频，并在结束后恢复。",
+		recordingSounds: "录音提示音",
+		recordingSoundsDescription: "在录音开始、文本插入完成或出错时播放提示音。",
 		analytics: "匿名使用统计",
 		analyticsDescription: "分享匿名使用事件，帮助改进 VoxFusion。更改立即生效。",
 		analyticsNote: "仅收集事件元数据——绝不收集您的音频或转录文本。",

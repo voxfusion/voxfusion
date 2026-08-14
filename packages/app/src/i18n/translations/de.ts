@@ -43,6 +43,9 @@ export const de: Translations = {
 		muteMediaWhileRecording: "Medien bei Aufnahme stummschalten",
 		muteMediaWhileRecordingDescription:
 			"Schaltet Systemaudio während der Aufnahme vorübergehend stumm und stellt es danach wieder her.",
+		recordingSounds: "Aufnahmetöne",
+		recordingSoundsDescription:
+			"Spielt Töne beim Aufnahmestart, nach dem Einfügen des Textes oder bei einem Fehler ab.",
 		analytics: "Anonyme Nutzungsstatistiken",
 		analyticsDescription:
 			"Anonyme Nutzungsereignisse senden, um VoxFusion zu verbessern. Änderungen gelten sofort.",

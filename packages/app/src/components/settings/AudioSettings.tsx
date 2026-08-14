@@ -1,9 +1,13 @@
 import { RefreshCw } from "lucide-solid";
-import { createSignal, onCleanup, type Accessor } from "solid-js";
+import { type Accessor, createSignal, onCleanup } from "solid-js";
 import type { I18nContextType } from "../../i18n";
 import { capture } from "../../lib/posthog";
 import type { AudioDevice, Settings } from "../../lib/settingsStore";
-import { updateMicrophone, updateMuteMediaWhileRecording } from "../../lib/settingsStore";
+import {
+	updateMicrophone,
+	updateMuteMediaWhileRecording,
+	updateRecordingSoundsEnabled,
+} from "../../lib/settingsStore";
 import ToggleOption from "../ToggleOption";
 import Select from "./Select";
 import type { SelectOption } from "./types";
@@ -91,6 +95,16 @@ export default function AudioSettings(props: AudioSettingsProps) {
 				onChange={(enabled) => {
 					capture("settings_mute_media_while_recording_changed", { enabled });
 					updateMuteMediaWhileRecording(enabled);
+				}}
+			/>
+
+			<ToggleOption
+				label={props.t("settings.recordingSounds")}
+				description={props.t("settings.recordingSoundsDescription")}
+				isEnabled={props.settings().recordingSoundsEnabled}
+				onChange={(enabled) => {
+					capture("settings_recording_sounds_changed", { enabled });
+					updateRecordingSoundsEnabled(enabled);
 				}}
 			/>
 		</div>
