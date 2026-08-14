@@ -43,6 +43,9 @@ export const ru: Translations = {
 		muteMediaWhileRecording: "Отключать медиа во время записи",
 		muteMediaWhileRecordingDescription:
 			"Временно отключать системный звук во время записи и восстанавливать его после.",
+		recordingSounds: "Звуки записи",
+		recordingSoundsDescription:
+			"Воспроизводить звуки при начале записи, вставке текста или ошибке.",
 		analytics: "Анонимная статистика использования",
 		analyticsDescription:
 			"Отправлять анонимные события использования, чтобы помочь улучшить VoxFusion. Изменения применяются сразу.",

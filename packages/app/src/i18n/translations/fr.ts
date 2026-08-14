@@ -43,6 +43,9 @@ export const fr: Translations = {
 		muteMediaWhileRecording: "Couper les médias pendant l'enregistrement",
 		muteMediaWhileRecordingDescription:
 			"Coupe temporairement l'audio système pendant l'enregistrement, puis le restaure.",
+		recordingSounds: "Sons d'enregistrement",
+		recordingSoundsDescription:
+			"Joue des sons au début de l'enregistrement, après l'insertion du texte ou en cas d'erreur.",
 		analytics: "Statistiques d'utilisation anonymes",
 		analyticsDescription:
 			"Partagez des événements d'utilisation anonymes pour aider à améliorer VoxFusion. Les modifications prennent effet immédiatement.",

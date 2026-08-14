@@ -38,6 +38,8 @@ export type Translations = {
 		microphoneDescription: string;
 		muteMediaWhileRecording: string;
 		muteMediaWhileRecordingDescription: string;
+		recordingSounds: string;
+		recordingSoundsDescription: string;
 		analytics: string;
 		analyticsDescription: string;
 		analyticsNote: string;
@@ -274,6 +276,9 @@ export const en: Translations = {
 		muteMediaWhileRecording: "Mute Media During Recording",
 		muteMediaWhileRecordingDescription:
 			"Temporarily mute system audio while recording and restore it afterward.",
+		recordingSounds: "Recording Sounds",
+		recordingSoundsDescription:
+			"Play sounds when recording starts, text is inserted, or an error occurs.",
 		analytics: "Anonymous Usage Analytics",
 		analyticsDescription:
 			"Share anonymous usage events to help improve VoxFusion. Changes apply immediately.",

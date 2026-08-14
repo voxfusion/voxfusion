@@ -22,6 +22,7 @@ export interface Settings {
 	selectedMicrophoneId: string | null;
 	language: Locale;
 	muteMediaWhileRecording: boolean;
+	recordingSoundsEnabled: boolean;
 	defaultStyle: AppStyle;
 	analyticsEnabled: boolean;
 	onboardingComplete: boolean;
@@ -35,6 +36,7 @@ const DEFAULT_SETTINGS: Settings = {
 	selectedMicrophoneId: null,
 	language: "en",
 	muteMediaWhileRecording: false,
+	recordingSoundsEnabled: false,
 	defaultStyle: "default",
 	analyticsEnabled: true,
 	onboardingComplete: false,
@@ -55,6 +57,7 @@ async function getStore() {
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
 				muteMediaWhileRecording: DEFAULT_SETTINGS.muteMediaWhileRecording,
+				recordingSoundsEnabled: DEFAULT_SETTINGS.recordingSoundsEnabled,
 				defaultStyle: DEFAULT_SETTINGS.defaultStyle,
 				analyticsEnabled: DEFAULT_SETTINGS.analyticsEnabled,
 				onboardingComplete: DEFAULT_SETTINGS.onboardingComplete,
@@ -75,6 +78,7 @@ export async function loadSettings(): Promise<Settings> {
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
 	const muteMediaWhileRecording = await store.get<boolean>("muteMediaWhileRecording");
+	const recordingSoundsEnabled = await store.get<boolean>("recordingSoundsEnabled");
 	const storedDefaultStyle = await store.get<AppStyle>("defaultStyle");
 	const defaultStyle =
 		storedDefaultStyle && STYLE_LIST.includes(storedDefaultStyle)
@@ -104,6 +108,7 @@ export async function loadSettings(): Promise<Settings> {
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
 		muteMediaWhileRecording: muteMediaWhileRecording ?? DEFAULT_SETTINGS.muteMediaWhileRecording,
+		recordingSoundsEnabled: recordingSoundsEnabled ?? DEFAULT_SETTINGS.recordingSoundsEnabled,
 		defaultStyle,
 		analyticsEnabled: analyticsEnabled ?? DEFAULT_SETTINGS.analyticsEnabled,
 		onboardingComplete: onboardingComplete ?? DEFAULT_SETTINGS.onboardingComplete,
@@ -140,6 +145,11 @@ export async function saveLanguage(language: Locale): Promise<void> {
 export async function saveMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set("muteMediaWhileRecording", enabled);
+}
+
+export async function saveRecordingSoundsEnabled(enabled: boolean): Promise<void> {
+	const store = await getStore();
+	await store.set("recordingSoundsEnabled", enabled);
 }
 
 export async function saveDefaultStyle(style: AppStyle): Promise<void> {
@@ -216,6 +226,12 @@ export async function updateLanguage(
 export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	await saveMuteMediaWhileRecording(enabled);
 	setSettingsInternal((prev) => ({ ...prev, muteMediaWhileRecording: enabled }));
+	await emit("settings-changed");
+}
+
+export async function updateRecordingSoundsEnabled(enabled: boolean): Promise<void> {
+	await saveRecordingSoundsEnabled(enabled);
+	setSettingsInternal((prev) => ({ ...prev, recordingSoundsEnabled: enabled }));
 	await emit("settings-changed");
 }
 

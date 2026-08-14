@@ -43,6 +43,9 @@ export const es: Translations = {
 		muteMediaWhileRecording: "Silenciar medios durante la grabación",
 		muteMediaWhileRecordingDescription:
 			"Silencia temporalmente el audio del sistema mientras grabas y lo restaura después.",
+		recordingSounds: "Sonidos de grabación",
+		recordingSoundsDescription:
+			"Reproduce sonidos al iniciar la grabación, insertar el texto o producirse un error.",
 		analytics: "Estadísticas de uso anónimas",
 		analyticsDescription:
 			"Comparte eventos de uso anónimos para ayudar a mejorar VoxFusion. Los cambios se aplican de inmediato.",

@@ -1,0 +1,16 @@
+diff --git a/dist/audio/engine.js b/dist/audio/engine.js
+--- a/dist/audio/engine.js
++++ b/dist/audio/engine.js
+@@ -160,8 +160,10 @@
+ export function play(sound = "chime", options) {
+     if (!enabled || !isSoundName(sound))
+         return;
+-    if (typeof navigator !== "undefined" && navigator.userActivation?.hasBeenActive === false)
+-        return;
++    // VoxFusion receives recording gestures through Tauri's native global-shortcut
++    // bridge, so WebKit never marks this hidden webview as user-activated. Tauri
++    // enables media autoplay for the webview and AudioContext still enforces the
++    // platform policy when resume() runs below.
+     const playVolume = globalVolume * normalizeVolume(options?.volume, 1);
+     if (playVolume === 0)
+         return;
