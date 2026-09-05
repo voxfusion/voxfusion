@@ -1,5 +1,5 @@
 ---
-import { useTranslations, defaultLang, languages } from "../i18n/utils";
+import { defaultLang, type languages, useTranslations } from "../i18n/utils";
 
 interface Props {
 	lang?: keyof typeof languages;
@@ -31,16 +31,15 @@ const t = useTranslations(lang);
 		</div>
 	</div>
 	<div class="footer-bottom">
-		<span>&copy; 2025 {t("footer.copyright")}</span>
-		<span class="footer-status"><span class="status-dot"></span> {t("footer.status")}</span>
+		<span>&copy; {new Date().getFullYear()} {t("footer.copyright")}</span>
 	</div>
 </footer>
 
 <style>
 	.footer {
 		border-top: 1px solid #222;
-		padding: 60px 32px 40px;
-		max-width: 1400px;
+		padding: 56px 40px 28px;
+		max-width: 1280px;
 		margin: 0 auto;
 		font-family: "JetBrains Mono", "Space Mono", monospace;
 	}
@@ -52,7 +51,7 @@ const t = useTranslations(lang);
 
 	.footer-grid {
 		display: grid;
-		grid-template-columns: 1fr 2fr;
+		grid-template-columns: 1fr 1fr;
 		gap: 80px;
 		margin-bottom: 48px;
 	}
@@ -64,12 +63,12 @@ const t = useTranslations(lang);
 	}
 
 	.footer-logo span {
-		color: #666;
+		color: #888;
 	}
 
 	.footer-brand p {
 		font-size: 13px;
-		color: #666;
+		color: #888;
 		margin-top: 16px;
 		line-height: 1.6;
 	}
@@ -88,7 +87,7 @@ const t = useTranslations(lang);
 		align-items: center;
 		justify-content: center;
 		font-size: 11px;
-		color: #666;
+		color: #888;
 		transition: all 0.2s;
 	}
 
@@ -100,12 +99,12 @@ const t = useTranslations(lang);
 	.footer-links {
 		display: flex;
 		justify-content: flex-end;
-		gap: 40px;
+		gap: 80px;
 	}
 
 	.link-group h4 {
 		font-size: 11px;
-		color: #666;
+		color: #888;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
 		margin-bottom: 20px;
@@ -129,22 +128,14 @@ const t = useTranslations(lang);
 		padding-top: 24px;
 		border-top: 1px solid #222;
 		font-size: 12px;
-		color: #666;
+		color: #888;
 	}
 
-	.footer-status {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
 
-	.status-dot {
-		width: 8px;
-		height: 8px;
-		background: #00ff88;
-		border-radius: 50%;
+	@media (max-width: 540px) {
+		.footer { padding: 40px 20px 24px; }
+		.footer-bottom { flex-direction: column; gap: 18px; font-size: 10px; }
 	}
-
 	@media (max-width: 768px) {
 		.footer-grid {
 			grid-template-columns: 1fr;
@@ -152,7 +143,8 @@ const t = useTranslations(lang);
 		}
 
 		.footer-links {
-			grid-template-columns: repeat(2, 1fr);
+			justify-content: flex-start;
+			gap: 48px;
 		}
 	}
 </style>

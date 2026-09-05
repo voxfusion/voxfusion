@@ -11,7 +11,7 @@ const t = useTranslations(lang);
 const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download";
 ---
 
-<section class="downloads">
+<main class="downloads">
 	<div class="downloads-container">
 		<div class="section-header">
 			<span class="section-number">01</span>
@@ -26,7 +26,7 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 
 		<div class="platform-section">
 			<div class="platform-header">
-				<svg class="platform-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+				<svg class="platform-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
 					<path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
 				</svg>
 				<span class="platform-name">{t("downloads.macos.title")}</span>
@@ -43,7 +43,7 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 						<span class="terminal-prompt">$</span>
 						<span class="terminal-command">download --arch=arm64</span>
 					</div>
-					<a href={`${baseUrl}/VoxFusion-latest.dmg`} class="download-btn" data-umami-event="download_dmg" data-umami-event-variant="apple_silicon">
+					<a href={`${baseUrl}/VoxFusion-latest.dmg`} class="download-btn" aria-label="Download VoxFusion for Apple Silicon, DMG" data-umami-event="download_dmg" data-umami-event-variant="apple_silicon">
 						<span class="btn-icon">↓</span>
 						<span>.dmg</span>
 					</a>
@@ -59,7 +59,7 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 						<span class="terminal-prompt">$</span>
 						<span class="terminal-command">download --arch=x86_64</span>
 					</div>
-					<a href={`${baseUrl}/VoxFusion-latest-intel.dmg`} class="download-btn secondary" data-umami-event="download_dmg" data-umami-event-variant="intel">
+					<a href={`${baseUrl}/VoxFusion-latest-intel.dmg`} class="download-btn secondary" aria-label="Download VoxFusion for Intel, DMG" data-umami-event="download_dmg" data-umami-event-variant="intel">
 						<span class="btn-icon">↓</span>
 						<span>.dmg</span>
 					</a>
@@ -67,44 +67,13 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 			</div>
 		</div>
 
-		<div class="platform-section">
-			<!-- <div class="platform-header">
-				<svg class="platform-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-					<path d="M3 5.548l7.066-.966v6.822H3V5.548zm0 12.904l7.066.966v-6.822H3v5.856zm7.854 1.074L21 21V12.596H10.854v6.93zM10.854 4.474v6.93H21V3l-10.146 1.474z"/>
-				</svg>
-				<span class="platform-name">{t("downloads.windows.title")}</span>
-			</div> -->
-
-			<!-- <div class="warning-banner">
-				<span class="warning-icon">[!]</span>
-				<span>{t("downloads.windows.warning")}</span>
-			</div>
-
-			<div class="download-grid single">
-				<div class="download-card">
-					<div class="card-index">01</div>
-					<div class="card-content">
-						<h3 class="card-title">{t("downloads.windows.download")}</h3>
-						<p class="card-description">{t("downloads.windows.description")}</p>
-					</div>
-					<div class="card-terminal">
-						<span class="terminal-prompt">></span>
-						<span class="terminal-command">download --platform=win</span>
-					</div>
-					<a href={`${baseUrl}/VoxFusion-latest.exe`} class="download-btn secondary">
-						<span class="btn-icon">↓</span>
-						<span>.exe</span>
-					</a>
-				</div>
-			</div> -->
-		</div>
 	</div>
-</section>
+</main>
 
 <style>
 	.downloads {
 		padding: 140px 32px 120px;
-		min-height: 100vh;
+		min-height: 80vh;
 		position: relative;
 		z-index: 1;
 	}
@@ -132,7 +101,7 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 		font-size: 12px;
 		text-transform: uppercase;
 		letter-spacing: 0.2em;
-		color: #666;
+		color: #999;
 		font-family: "JetBrains Mono", "Space Mono", monospace;
 	}
 
@@ -191,9 +160,8 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 	.download-grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 1px;
-		background: #222;
-		border: 1px solid #222;
+		gap: 20px;
+		background: transparent;
 	}
 
 	.download-grid.single {
@@ -202,8 +170,9 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 	}
 
 	.download-card {
-		background: #0a0a0a;
+		background: #111;
 		padding: 32px;
+		border: 1px solid #383838;
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
@@ -226,15 +195,15 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 	}
 
 	.card-title {
-		font-size: 16px;
-		font-weight: 600;
+		font-size: 22px;
+		font-weight: 500;
 		margin-bottom: 8px;
 		font-family: "JetBrains Mono", "Space Mono", monospace;
 	}
 
 	.card-description {
 		font-size: 13px;
-		color: #666;
+		color: #999;
 		line-height: 1.7;
 		font-family: "JetBrains Mono", "Space Mono", monospace;
 	}
@@ -255,7 +224,7 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 	}
 
 	.terminal-command {
-		color: #666;
+		color: #999;
 	}
 
 	.download-btn {
@@ -289,7 +258,7 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 
 	.download-btn.secondary:hover {
 		color: #fff;
-		border-color: #666;
+		border-color: #999;
 	}
 
 	.btn-icon {

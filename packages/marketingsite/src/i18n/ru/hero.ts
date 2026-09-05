@@ -1,9 +1,9 @@
 export const hero = {
 	"hero.badge": "Local-first voice to text",
 	"hero.title.line1": "Type with your voice.",
-	"hero.title.line2": "100% local, on your Mac.",
+	"hero.title.line2": "In any app on Mac.",
 	"hero.subtitle":
-		"Press Ctrl+Option, speak naturally, and your words appear instantly in any app. VoxFusion runs entirely on your Mac — no cloud, no account, no audio leaves your device.",
+		"Press Ctrl+Option, speak naturally, and your words appear instantly in any app. VoxFusion runs entirely on your Mac. No cloud, no account, no audio leaves your device.",
 	"hero.stat.words.value": "100%",
 	"hero.stat.words.label": "local transcription",
 	"hero.stat.languages.value": "0",
