@@ -4,6 +4,8 @@ import { AlertCircle, Check, Download, Loader } from "lucide-solid";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import type { I18nContextType } from "../../i18n";
 import {
+	DOWNLOAD_CANCELLED_ERROR,
+	DOWNLOAD_IN_PROGRESS_ERROR,
 	type ModelDownloadProgress,
 	type ModelInfo,
 	cancelModelDownload,
@@ -11,6 +13,7 @@ import {
 	listModels,
 	setActiveModel,
 } from "../../lib/commands/model";
+import { formatEta, formatMb } from "../../lib/downloadFormat";
 import { capture } from "../../lib/posthog";
 
 interface ModelSettingsProps {
@@ -24,25 +27,6 @@ interface DownloadStats {
 	bytesPerSecond: number | null;
 	etaSeconds: number | null;
 }
-
-const BYTES_PER_MB = 1024 * 1024;
-/** Backend error for a duplicate `download_model` call. */
-const DOWNLOAD_IN_PROGRESS_ERROR = "download already in progress";
-/** Backend error a cancelled `download_model` call resolves with. */
-const DOWNLOAD_CANCELLED_ERROR = "Download cancelled";
-
-const formatMb = (bytes: number): string => (bytes / BYTES_PER_MB).toFixed(1);
-
-const formatEta = (etaSeconds: number): string => {
-	const total = Math.max(0, Math.round(etaSeconds));
-	const hours = Math.floor(total / 3600);
-	const minutes = Math.floor((total % 3600) / 60);
-	const seconds = total % 60;
-	if (hours > 0) {
-		return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-	}
-	return `${minutes}:${String(seconds).padStart(2, "0")}`;
-};
 
 export default function ModelSettings(props: ModelSettingsProps) {
 	const [models, setModels] = createSignal<ModelInfo[]>([]);
