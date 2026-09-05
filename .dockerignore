@@ -29,8 +29,9 @@ out
 # CI/CD
 .github
 
-# Other packages (monorepo)
-packages/app
+# Keep the workspace manifest required by the frozen Bun lockfile.
+packages/app/*
+!packages/app/package.json
 
 # Logs
 logs

@@ -60,6 +60,8 @@ Without CMake, `bun dev` fails during `whisper-rs-sys` with `is cmake not instal
 
 ### Gotchas
 
+- Railway builds the marketing Dockerfile from the repository root. Keep `packages/app/package.json` available in `.dockerignore` and copy `patches/` before `bun install --frozen-lockfile`; the workspace lockfile requires both even when building only the marketing site.
+
 - The marketing site's English strings live in `packages/marketingsite/src/i18n/ru/`; `translations.ts` maps those modules to the `en` locale despite the directory name. The homepage waveform uses deterministic heights and unitless animation scales; percentage values are invalid for `scaleY()`.
 
 - Rust toolchain must be ≥1.85 (edition 2024 support). Run `rustup update stable && rustup default stable`.

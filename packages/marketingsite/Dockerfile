@@ -5,6 +5,7 @@ WORKDIR /app
 COPY package.json bun.lock* turbo.json tsconfig.json ./
 COPY packages/app/package.json ./packages/app/
 COPY packages/marketingsite/package.json ./packages/marketingsite/
+COPY patches/ ./patches/
 
 RUN bun install --frozen-lockfile
 
