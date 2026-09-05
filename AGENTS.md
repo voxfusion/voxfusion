@@ -60,6 +60,8 @@ Without CMake, `bun dev` fails during `whisper-rs-sys` with `is cmake not instal
 
 ### Gotchas
 
+- The marketing site's English strings live in `packages/marketingsite/src/i18n/ru/`; `translations.ts` maps those modules to the `en` locale despite the directory name. The homepage waveform uses deterministic heights and unitless animation scales; percentage values are invalid for `scaleY()`.
+
 - Rust toolchain must be ≥1.85 (edition 2024 support). Run `rustup update stable && rustup default stable`.
 - The app frontend at localhost:1420 shows a loading spinner and never progresses in a browser because it waits for the Tauri IPC bridge. This is expected; UI component development still works by navigating directly to routes.
 - `turbo dev` runs both packages' dev scripts concurrently (uses TUI mode).

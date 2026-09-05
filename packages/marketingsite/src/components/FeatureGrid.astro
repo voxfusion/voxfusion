@@ -1,0 +1,143 @@
+---
+import { defaultLang, type languages, useTranslations } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
+---
+
+<div class="features-grid">
+	<article class="feature-card hotkey-card">
+		<div class="feature-heading">
+			<span class="feature-index">01 / SHORTCUT</span>
+			<h4>{t("features.globalHotkey.title")}</h4>
+			<p>{t("features.globalHotkey.description")}</p>
+		</div>
+		<div class="feature-preview keyboard-preview" aria-hidden="true">
+			<div class="keys"><span class="key"><b>⌃</b>control</span><span class="key-plus">+</span><span class="key"><b>⌥</b>option</span></div>
+			<div class="app-contexts"><span>Email</span><span>Documents</span><span>Code</span><span>Chats</span></div>
+		</div>
+	</article>
+
+	<article class="feature-card">
+		<div class="feature-heading">
+			<span class="feature-index">02 / ON DEVICE</span>
+			<h4>{t("features.instantTranscription.title")}</h4>
+			<p>{t("features.instantTranscription.description")}</p>
+		</div>
+		<div class="feature-preview local-preview" aria-hidden="true">
+			<div class="device-label"><span>YOUR MAC</span><span>[ OFFLINE ]</span></div>
+			<div class="local-pipeline"><span>Voice</span><span class="flow-arrow">→</span><span class="model">Whisper</span><span class="flow-arrow">→</span><span>Text</span></div>
+			<div class="device-footer">Everything happens here.</div>
+		</div>
+	</article>
+
+	<article class="feature-card">
+		<div class="feature-heading">
+			<span class="feature-index">03 / YOUR VOCABULARY</span>
+			<h4>{t("features.customDictionary.title")}</h4>
+			<p>{t("features.customDictionary.description")}</p>
+		</div>
+		<div class="feature-preview dictionary-preview" aria-hidden="true">
+			<div class="preview-label">WORDS TO RECOGNIZE</div>
+			<div class="dictionary-words"><span>VoxFusion</span><span>TypeScript</span><span>PostgreSQL</span></div>
+			<div class="dictionary-footer"><span class="example-check">[✓]</span> Names. Terms. The words you use.</div>
+		</div>
+	</article>
+
+	<article class="feature-card">
+		<div class="feature-heading">
+			<span class="feature-index">04 / ALWAYS WITH YOU</span>
+			<h4>{t("features.history.title")}</h4>
+			<p>{t("features.history.description")}</p>
+		</div>
+		<div class="feature-preview history-preview" aria-hidden="true">
+			<div class="preview-label">RECENT TRANSCRIPTIONS <span>EXAMPLE</span></div>
+			<div class="history-row"><span class="history-time">10:42</span><span>Let's schedule a quick sync for tomorrow.</span></div>
+			<div class="history-row"><span class="history-time">09:18</span><span>The pull request is ready for review.</span></div>
+		</div>
+	</article>
+</div>
+
+<style>
+	.features-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 20px;
+	}
+
+	.feature-card {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		padding: 36px;
+		border: 1px solid #343434;
+		background: #111;
+		transition: border-color .2s;
+	}
+
+	.feature-card:hover { border-color: #686058; }
+	.hotkey-card { background: #15110f; border-color: #61402f; }
+	.feature-index { display: block; margin-bottom: 24px; color: #ff754c; font-size: 11px; letter-spacing: .09em; }
+	.feature-heading h4 { margin-bottom: 14px; font-size: 26px; font-weight: 500; letter-spacing: -.045em; line-height: 1.3; }
+	.feature-heading p { margin-bottom: 32px; color: #aaa; font-size: 14px; line-height: 1.85; max-width: 480px; }
+	.feature-preview { min-height: 174px; margin-top: auto; border: 1px solid #333; background: #0c0c0c; }
+	.preview-label { display: flex; justify-content: space-between; gap: 12px; font-size: 10px; letter-spacing: .06em; color: #a0a0a0; }
+	.preview-label > span { color: #777; }
+
+	.keyboard-preview { display: flex; flex-direction: column; justify-content: center; gap: 24px; padding: 24px; border-color: #3c2e25; background: #100e0c; }
+	.keys { display: flex; align-items: center; justify-content: center; gap: 18px; }
+	.key { display: flex; flex-direction: column; justify-content: space-between; gap: 10px; width: 94px; padding: 12px 14px; color: #d0b5a7; background: #211a16; border: 1px solid #634433; border-bottom: 4px solid #634433; font-size: 11px; }
+	.key b { font-size: 26px; line-height: 1; font-weight: 400; color: #ff754c; }
+	.key-plus { color: #80685b; font-size: 18px; }
+	.app-contexts { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 16px; color: #a79183; font-size: 10px; }
+
+	.local-preview { display: flex; flex-direction: column; justify-content: space-between; padding: 20px 24px; }
+	.device-label { display: flex; justify-content: space-between; color: #a0a0a0; font-size: 10px; letter-spacing: .06em; }
+	.device-label span:last-child { color: #ff754c; }
+	.local-pipeline { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; }
+	.flow-arrow { color: #756456; }
+	.model { padding: 14px 18px; border: 1px solid #67422f; color: #ff754c; background: #1d1511; }
+	.device-footer { text-align: center; color: #888; font-size: 10px; }
+
+	.dictionary-preview { padding: 22px 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; }
+	.dictionary-words { display: flex; flex-wrap: wrap; gap: 8px; }
+	.dictionary-words span { padding: 8px 10px; color: #d2d2d2; border: 1px solid #3c3c3c; border-bottom-color: #9c593b; font-size: 12px; }
+	.dictionary-footer { display: flex; gap: 10px; font-size: 10px; color: #999; line-height: 1.7; }
+	.example-check { color: #ff754c; }
+
+	.history-preview { padding: 22px 24px 6px; }
+	.history-preview .preview-label { margin-bottom: 14px; }
+	.history-row { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 14px 0; border-top: 1px solid #2a2a2a; color: #bebebe; font-size: 11px; line-height: 1.8; }
+	.history-time { color: #ff754c; font-size: 10px; }
+
+	@media (max-width: 1050px) {
+		.feature-card { padding: 28px; }
+		.feature-heading h4 { font-size: 23px; }
+		.local-preview, .dictionary-preview, .history-preview { padding-inline: 18px; }
+		.local-pipeline { gap: 6px; font-size: 12px; }
+		.model { padding-inline: 10px; }
+	}
+
+	@media (max-width: 800px) {
+		.features-grid { grid-template-columns: 1fr; gap: 16px; }
+		.feature-heading p { max-width: none; }
+	}
+
+	@media (max-width: 540px) {
+		.feature-card { padding: 24px 20px; }
+		.feature-index { font-size: 10px; margin-bottom: 18px; }
+		.feature-heading h4 { font-size: 24px; }
+		.feature-heading p { font-size: 13px; margin-bottom: 24px; }
+		.feature-preview { min-height: 174px; }
+		.preview-label, .device-label { font-size: 9px; }
+		.local-preview, .dictionary-preview, .history-preview { padding-inline: 14px; }
+		.local-pipeline { font-size: 11px; }
+		.model { padding: 12px 8px; }
+		.history-row { gap: 8px; grid-template-columns: 36px 1fr; }
+		.dictionary-words span { font-size: 11px; }
+	}
+</style>

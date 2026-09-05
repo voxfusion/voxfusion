@@ -30,5 +30,4 @@ export const common = {
 	"footer.terms": "Terms of Use",
 	"footer.security": "Security",
 	"footer.copyright": "VoxFusion. All rights reserved.",
-	"footer.status": "All systems operational",
 } as const;

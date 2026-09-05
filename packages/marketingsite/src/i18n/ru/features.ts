@@ -2,7 +2,7 @@ export const features = {
 	"features.tag": "Features",
 	"features.title": "Fast, private dictation everywhere",
 	"features.description":
-		"No app switching. No copy and paste. No cloud. Just speak — and your audio never leaves your Mac.",
+		"No app switching. No copy and paste. No cloud. Just speak. Your audio never leaves your Mac.",
 	"features.globalHotkey.title": "Global hotkey",
 	"features.globalHotkey.description":
 		"Press Ctrl+Option anywhere on your Mac to dictate. It works in email, documents, chats, and code editors.",

@@ -58,7 +58,7 @@ const t = useTranslations(lang);
 	<title>{title}</title>
 </head>
 <body class={bodyClass}>
-	<div class="grid-overlay"></div>
+	<div class="grid-overlay" aria-hidden="true"></div>
 
 	<nav class="nav">
 		<div class="nav-inner">
@@ -112,9 +112,9 @@ const t = useTranslations(lang);
 		position: fixed;
 		inset: 0;
 		background-image:
-			linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-		background-size: 40px 40px;
+			linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px),
+			linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px);
+		background-size: 64px 64px;
 		pointer-events: none;
 		z-index: 0;
 	}
@@ -132,16 +132,16 @@ const t = useTranslations(lang);
 	}
 
 	.nav-inner {
-		max-width: 1400px;
+		max-width: 1280px;
 		margin: 0 auto;
-		padding: 16px 32px;
+		padding: 20px 40px;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 	}
 
 	.logo {
-		font-size: 18px;
+		font-size: 16px;
 		font-weight: 700;
 		letter-spacing: 0.1em;
 		color: #e0e0e0;
@@ -161,7 +161,7 @@ const t = useTranslations(lang);
 	}
 
 	.nav-link {
-		font-size: 13px;
+		font-size: 11px;
 		color: #888;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
@@ -178,10 +178,10 @@ const t = useTranslations(lang);
 	}
 
 	.nav-cta {
-		padding: 10px 20px;
+		padding: 10px 16px;
 		border: 1px solid #ff3e00;
 		color: #ff3e00;
-		font-size: 13px;
+		font-size: 11px;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
 		transition: all 0.2s;
@@ -192,6 +192,12 @@ const t = useTranslations(lang);
 		color: #000;
 	}
 
+
+	::selection { background: #ff4d19; color: #0a0a0a; }
+	a:focus-visible, button:focus-visible { outline: 2px solid #ff7045; outline-offset: 5px; }
+	@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+	@media (max-width: 1050px) { .nav-inner { padding-inline: 28px; } .nav-links { gap: 20px; } }
+	@media (max-width: 540px) { .nav-inner { padding: 18px 20px; } .logo { font-size: 13px; } .nav-cta { font-size: 10px; padding: 10px 12px; } }
 	@media (max-width: 768px) {
 		.nav-links {
 			display: none;
