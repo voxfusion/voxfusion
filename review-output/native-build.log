@@ -1,0 +1,79 @@
+$ tauri build --debug --bundles app --no-sign --config "{\"identifier\":\"io.voxfusion.audit.e10d29e5\",\"productName\":\"VoxFusion Audit\"}"
+        Warn --no-sign flag detected: Signing will be skipped.
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `bun run build`
+$ vite build
+vite v6.4.1 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 2041 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                            1.34 kB │ gzip:  0.66 kB
+dist/voice-control.html                    1.35 kB │ gzip:  0.69 kB
+dist/assets/transcriptions-DYR6U_1V.css   20.79 kB │ gzip:  4.90 kB
+dist/assets/voice-control-1mOGJZbm.js     19.32 kB │ gzip:  6.48 kB
+dist/assets/transcriptions-AxRHC5EO.js   135.84 kB │ gzip: 42.00 kB
+dist/assets/main-CgIw-AEe.js             304.92 kB │ gzip: 89.72 kB
+✓ built in 2.48s
+   Compiling objc2-exception-helper v0.1.1
+   Compiling tauri v2.9.5
+   Compiling tauri-macros v2.5.2
+   Compiling ring v0.17.14
+   Compiling libsqlite3-sys v0.28.0
+   Compiling voxfusion-app v0.1.0 (/Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri)
+   Compiling objc2 v0.6.3
+   Compiling tauri-plugin-log v2.8.0
+   Compiling tauri-plugin-clipboard-manager v2.3.2
+   Compiling tauri-plugin-global-shortcut v2.3.1
+   Compiling tauri-plugin-macos-permissions v2.3.0
+   Compiling tauri-plugin-store v2.4.2
+   Compiling tauri-plugin-opener v2.5.2
+   Compiling tauri-plugin-process v2.3.1
+   Compiling tauri-plugin-updater v2.9.0
+   Compiling rustls v0.23.36
+   Compiling rustls-webpki v0.103.9
+   Compiling objc2-core-foundation v0.3.2
+   Compiling block2 v0.6.2
+   Compiling dispatch2 v0.3.0
+   Compiling objc2-javascript-core v0.3.2
+   Compiling rusqlite v0.31.0
+   Compiling objc2-foundation v0.3.2
+   Compiling objc2-core-video v0.3.2
+   Compiling objc2-core-text v0.3.2
+   Compiling objc2-security v0.3.2
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.12.28
+   Compiling objc2-metal v0.3.2
+   Compiling objc2-quartz-core v0.3.2
+   Compiling objc2-core-image v0.3.2
+   Compiling objc2-core-data v0.3.2
+   Compiling objc2-cloud-kit v0.3.2
+   Compiling objc2-core-graphics v0.3.2
+   Compiling objc2-app-kit v0.3.2
+   Compiling objc2-web-kit v0.3.2
+   Compiling muda v0.17.1
+   Compiling tao v0.34.5
+   Compiling window-vibrancy v0.6.0
+   Compiling objc2-osa-kit v0.3.2
+   Compiling arboard v3.6.1
+   Compiling global-hotkey v0.7.0
+   Compiling osakit v0.3.1
+   Compiling tray-icon v0.21.2
+   Compiling wry v0.53.5
+   Compiling tauri-runtime v2.9.2
+   Compiling tauri-runtime-wry v2.9.3
+   Compiling tauri-plugin-single-instance v2.3.6
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 24.25s
+       Built application at: /Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri/target/debug/voxfusion-app
+    Bundling VoxFusion Audit.app (/Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri/target/debug/bundle/macos/VoxFusion Audit.app)
+        Warn Skipping signing due to --no-sign flag.
+    Bundling /Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri/target/debug/bundle/macos/VoxFusion Audit.app.tar.gz (/Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri/target/debug/bundle/macos/VoxFusion Audit.app.tar.gz)
+    Finished 1 bundle at:
+        /Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri/target/debug/bundle/macos/VoxFusion Audit.app
+        /Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri/target/debug/bundle/macos/VoxFusion Audit.app.tar.gz (updater)
+
+        Warn Updater signing is skipped due to --no-sign flag.

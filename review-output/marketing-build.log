@@ -1,0 +1,31 @@
+@voxfusion/marketingsite build: 14:41:44 [content] Syncing content
+@voxfusion/marketingsite build: 14:41:44 [content] Synced content
+@voxfusion/marketingsite build: 14:41:44 [types] Generated 12ms
+@voxfusion/marketingsite build: 14:41:44 [build] output: "static"
+@voxfusion/marketingsite build: 14:41:44 [build] mode: "static"
+@voxfusion/marketingsite build: 14:41:44 [build] directory: /Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/marketingsite/dist/
+@voxfusion/marketingsite build: 14:41:44 [build] Collecting build info...
+@voxfusion/marketingsite build: 14:41:44 [build] ✓ Completed in 20ms.
+@voxfusion/marketingsite build: 14:41:44 [build] Building static entrypoints...
+@voxfusion/marketingsite build: 14:41:45 [vite] ✓ built in 917ms
+@voxfusion/marketingsite build: 14:41:45 [build] ✓ Completed in 927ms.
+@voxfusion/marketingsite build: 
+@voxfusion/marketingsite build:  generating static routes 
+@voxfusion/marketingsite build: 14:41:45 ▶ src/pages/404.astro
+@voxfusion/marketingsite build: 14:41:45   └─ /404.html (+3ms) 
+@voxfusion/marketingsite build: 14:41:45 ▶ src/pages/download.astro
+@voxfusion/marketingsite build: 14:41:45   └─ /download/index.html (+1ms) 
+@voxfusion/marketingsite build: 14:41:45 ▶ src/pages/privacy.astro
+@voxfusion/marketingsite build: 14:41:45   └─ /privacy/index.html (+1ms) 
+@voxfusion/marketingsite build: 14:41:45 ▶ src/pages/security.astro
+@voxfusion/marketingsite build: 14:41:45   └─ /security/index.html (+1ms) 
+@voxfusion/marketingsite build: 14:41:45 ▶ src/pages/terms.astro
+@voxfusion/marketingsite build: 14:41:45   └─ /terms/index.html (+1ms) 
+@voxfusion/marketingsite build: 14:41:45 ▶ src/pages/index.astro
+@voxfusion/marketingsite build: 14:41:45   └─ /index.html (+1ms) 
+@voxfusion/marketingsite build: 14:41:45 ✓ Completed in 11ms.
+@voxfusion/marketingsite build: 
+@voxfusion/marketingsite build: 14:41:45 [@astrojs/sitemap] `sitemap-index.xml` created at `dist`
+@voxfusion/marketingsite build: 14:41:45 [build] 6 page(s) built in 966ms
+@voxfusion/marketingsite build: 14:41:45 [build] Complete!
+@voxfusion/marketingsite build: Exited with code 0

@@ -1,0 +1,16 @@
+$ turbo lint
+• turbo 2.8.0
+• Packages in scope: @voxfusion/app, @voxfusion/marketingsite
+• Running lint in 2 packages
+• Remote caching disabled, using shared worktree cache
+@voxfusion/marketingsite:lint: cache miss, executing 1309d132fc16c47d
+@voxfusion/app:lint: cache miss, executing dbde3bd55c4cdd3a
+@voxfusion/marketingsite:lint: $ biome lint ./src
+@voxfusion/app:lint: $ biome lint ./src
+@voxfusion/marketingsite:lint: Checked 23 files in 3ms. No fixes applied.
+@voxfusion/app:lint: Checked 78 files in 7ms. No fixes applied.
+
+ Tasks:    2 successful, 2 total
+Cached:    0 cached, 2 total
+  Time:    98ms 
+

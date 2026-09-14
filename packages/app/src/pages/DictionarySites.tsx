@@ -12,7 +12,6 @@ import {
 	listSiteDictionaries,
 	updateSiteDictionaryWord,
 } from "../lib/commands/dictionary";
-import { preloadFavicons } from "../lib/favicons";
 import { capture } from "../lib/posthog";
 
 export default function DictionarySites() {
@@ -27,7 +26,6 @@ export default function DictionarySites() {
 		const result = await listSiteDictionaries();
 		if (Result.isOk(result)) {
 			setSiteDicts(result.value);
-			preloadFavicons(result.value.map((g) => g.domain));
 		}
 	};
 

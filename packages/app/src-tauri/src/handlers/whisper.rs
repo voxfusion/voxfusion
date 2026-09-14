@@ -155,29 +155,75 @@ pub async fn transcribe_audio(
         None
     };
 
-    // Engine dispatch. Whisper runs in-process via whisper-rs; Parakeet (a TDT
-    // transducer that whisper-rs cannot run) is transcribed by the crispasr
-    // engine on the already-downloaded GGUF. Style/dictionary prompts are
-    // whisper-only — Parakeet auto-detects language and takes no prompt.
-    if model.engine == models::Engine::Parakeet {
-        let text = crate::handlers::parakeet::transcribe(
+    let (style_key, dictionary) = {
+        let conn = db_state.conn.lock().map_err(|e| e.to_string())?;
+        let style_key = crate::handlers::apps::resolve_style_key(
+            &conn,
+            bundle_id.as_deref(),
+            domain.as_deref(),
+            fallback_style.as_deref(),
+        );
+        (
+            style_key,
+            resolve_dictionary(&conn, bundle_id.as_deref(), domain.as_deref()),
+        )
+    };
+
+    let text = match model.engine {
+        models::Engine::Parakeet => crate::handlers::parakeet::transcribe(
             &app_handle,
             &model_path,
             &audio_path,
             &audio_data,
-        )?;
-        let word_count = text.split_whitespace().count() as i64;
-        let processing_time_ms = start.elapsed().as_millis() as i64;
-        return Ok(TranscriptionResult {
-            text,
-            word_count,
-            processing_time_ms,
-            audio_duration_ms,
-        });
-    }
+            dictionary.as_deref(),
+        ),
+        models::Engine::Whisper => {
+            transcribe_whisper(&model_path, &audio_data, &style_key, dictionary.as_deref())
+        }
+    }?;
+    let processing_time_ms = start.elapsed().as_millis() as i64;
 
+    // One successful-transcription lifecycle for both engines. Failures retain
+    // their source audio so the existing Retry action can still use it.
+    crate::handlers::audio::cleanup_old_recordings(
+        &app_handle,
+        crate::handlers::audio::RECORDINGS_TO_KEEP,
+    );
+    Ok(TranscriptionResult {
+        word_count: text.split_whitespace().count() as i64,
+        text,
+        processing_time_ms,
+        audio_duration_ms,
+    })
+}
+
+fn resolve_dictionary(
+    conn: &rusqlite::Connection,
+    bundle_id: Option<&str>,
+    domain: Option<&str>,
+) -> Option<String> {
+    let default_dict = fetch_dictionary_words(conn);
+    let app_dict = bundle_id
+        .filter(|s| !s.is_empty())
+        .and_then(|id| crate::handlers::apps::fetch_app_dictionary_words(conn, id));
+    let site_dict = domain
+        .filter(|s| !s.is_empty())
+        .and_then(|site| crate::handlers::sites::fetch_site_dictionary_words(conn, site));
+    merge_dictionaries(
+        default_dict.as_deref(),
+        app_dict.as_deref(),
+        site_dict.as_deref(),
+    )
+}
+
+fn transcribe_whisper(
+    model_path: &std::path::Path,
+    audio_data: &[f32],
+    style_key: &str,
+    dictionary: Option<&str>,
+) -> Result<String, String> {
     let ctx_params = WhisperContextParameters::default();
-    let ctx = WhisperContext::new_with_params(&model_path, ctx_params)
+    let ctx = WhisperContext::new_with_params(model_path, ctx_params)
         .map_err(|e| format!("Failed to load model: {}", e))?;
 
     let thread_count = std::thread::available_parallelism()
@@ -190,7 +236,7 @@ pub async fn transcribe_audio(
 
     // Step 1: encode mel + detect language so we can pick a same-language prompt.
     state
-        .pcm_to_mel(&audio_data, thread_count as usize)
+        .pcm_to_mel(audio_data, thread_count as usize)
         .map_err(|e| format!("Failed to compute mel: {:?}", e))?;
     let detected_lang = match state.lang_detect(0, thread_count as usize) {
         Ok((lang_id, _probs)) => whisper_rs::get_lang_str(lang_id)
@@ -202,50 +248,9 @@ pub async fn transcribe_audio(
         }
     };
 
-    // Step 2: resolve the style key and compose the prompt in the detected language.
-    let composed_prompt = {
-        let conn = db_state.conn.lock().map_err(|e| e.to_string())?;
-        let style_key = crate::handlers::apps::resolve_style_key(
-            &conn,
-            bundle_id.as_deref(),
-            domain.as_deref(),
-            fallback_style.as_deref(),
-        );
-        let style_text =
-            crate::handlers::apps::style_prompt_text(&style_key, &detected_lang).to_string();
-        let default_dict = fetch_dictionary_words(&conn);
-        let app_dict = bundle_id
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .and_then(|bid| crate::handlers::apps::fetch_app_dictionary_words(&conn, bid));
-        let site_dict = domain
-            .as_deref()
-            .filter(|s| !s.is_empty())
-            .and_then(|d| crate::handlers::sites::fetch_site_dictionary_words(&conn, d));
-        let dictionary = merge_dictionaries(
-            default_dict.as_deref(),
-            app_dict.as_deref(),
-            site_dict.as_deref(),
-        );
-        eprintln!(
-            "[style] bundle={:?} domain={:?} style={} lang={} style_chars={} dict_words={} app_dict_words={} site_dict_words={}",
-            bundle_id,
-            domain,
-            style_key,
-            detected_lang,
-            style_text.chars().count(),
-            default_dict
-                .as_ref()
-                .map(|d| d.split(',').count())
-                .unwrap_or(0),
-            app_dict.as_ref().map(|d| d.split(',').count()).unwrap_or(0),
-            site_dict
-                .as_ref()
-                .map(|d| d.split(',').count())
-                .unwrap_or(0)
-        );
-        compose_prompt(&style_text, dictionary.as_deref())
-    };
+    // Step 2: compose the selected style and vocabulary in the detected language.
+    let style_text = crate::handlers::apps::style_prompt_text(style_key, &detected_lang);
+    let composed_prompt = compose_prompt(style_text, dictionary);
 
     // Step 3: run full transcription with the resolved prompt.
     let mut params = FullParams::new(SamplingStrategy::BeamSearch {
@@ -280,7 +285,7 @@ pub async fn transcribe_audio(
     }
 
     state
-        .full(params, &audio_data)
+        .full(params, audio_data)
         .map_err(|e| format!("Transcription failed: {}", e))?;
 
     let num_segments = state.full_n_segments();
@@ -295,21 +300,7 @@ pub async fn transcribe_audio(
         }
     }
 
-    let text = text.trim().to_string();
-    let word_count = text.split_whitespace().count() as i64;
-    let processing_time_ms = start.elapsed().as_millis() as i64;
-
-    crate::handlers::audio::cleanup_old_recordings(
-        &app_handle,
-        crate::handlers::audio::RECORDINGS_TO_KEEP,
-    );
-
-    Ok(TranscriptionResult {
-        text,
-        word_count,
-        processing_time_ms,
-        audio_duration_ms,
-    })
+    Ok(text.trim().to_string())
 }
 
 fn merge_dictionaries(
@@ -341,5 +332,65 @@ fn compose_prompt(style_text: &str, dictionary: Option<&str>) -> Option<String> 
         None
     } else {
         Some(parts.join("\n\n"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dictionary_db() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE dictionary_words (word TEXT, created_at TEXT);
+             CREATE TABLE app_dictionary_words (bundle_id TEXT, word TEXT, created_at TEXT);
+             CREATE TABLE site_dictionary_words (domain TEXT, word TEXT, created_at TEXT);
+             INSERT INTO dictionary_words VALUES ('VoxFusion', '2026-01-01');
+             INSERT INTO app_dictionary_words VALUES ('test.editor', 'SolidJS', '2026-01-01');
+             INSERT INTO app_dictionary_words VALUES ('other.app', 'UnrelatedApp', '2026-01-01');
+             INSERT INTO site_dictionary_words VALUES ('project.test', 'CrispASR', '2026-01-01');
+             INSERT INTO site_dictionary_words VALUES ('other.test', 'UnrelatedSite', '2026-01-01');",
+        ).unwrap();
+        conn
+    }
+
+    #[test]
+    fn dictionary_includes_only_global_and_matching_contexts() {
+        let conn = dictionary_db();
+        assert_eq!(
+            resolve_dictionary(&conn, Some("test.editor"), Some("project.test")).as_deref(),
+            Some("VoxFusion, SolidJS, CrispASR"),
+        );
+        assert_eq!(
+            resolve_dictionary(&conn, Some("test.editor"), None).as_deref(),
+            Some("VoxFusion, SolidJS"),
+        );
+        assert_eq!(
+            resolve_dictionary(&conn, None, Some("project.test")).as_deref(),
+            Some("VoxFusion, CrispASR"),
+        );
+    }
+
+    #[test]
+    fn missing_context_keeps_global_dictionary_and_empty_dictionary_has_no_prompt() {
+        let conn = dictionary_db();
+        for context in [None, Some(""), Some("unknown")] {
+            assert_eq!(
+                resolve_dictionary(&conn, context, context).as_deref(),
+                Some("VoxFusion")
+            );
+        }
+        conn.execute("DELETE FROM dictionary_words", []).unwrap();
+        assert_eq!(resolve_dictionary(&conn, None, None), None);
+        assert_eq!(compose_prompt("", None), None);
+    }
+
+    #[test]
+    fn whisper_keeps_style_and_dictionary_in_its_prompt() {
+        assert_eq!(
+            compose_prompt("Example prose.", Some("VoxFusion, SolidJS")).as_deref(),
+            Some("Example prose.\n\nVoxFusion, SolidJS")
+        );
+        assert_eq!(cap_prompt_chars("Привет", 3), "При");
     }
 }

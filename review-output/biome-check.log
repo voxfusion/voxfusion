@@ -1,0 +1,27 @@
+reporter/format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The following files needs to be formatted.
+  
+  - ./packages/app/src-tauri/gen/schemas/acl-manifests.json
+  - ./packages/app/src-tauri/gen/schemas/capabilities.json
+  - ./packages/app/src-tauri/gen/schemas/desktop-schema.json
+  - ./packages/app/src-tauri/gen/schemas/macOS-schema.json
+  - ./packages/app/src-tauri/tauri.conf.json
+  
+reporter/organizeImports ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  i The following files needs to have their imports sorted.
+  
+  - ./packages/app/src/components/settings/HotkeySettings.tsx
+  
+
+Skipped 1 suggested fixes.
+If you wish to apply the suggested (unsafe) fixes, use the command biome check --write --unsafe
+
+Checked 122 files in 14ms. No fixes applied.
+Found 6 errors.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+

@@ -1,9 +1,6 @@
-import { Show, createEffect, createSignal, onCleanup } from "solid-js";
+import { Show, createMemo, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
-import { preloadFavicons } from "../lib/favicons";
 import SiteIcon from "./SiteIcon";
-
-const FAVICON_DEBOUNCE_MS = 400;
 
 export function normalizeDomain(input: string): string | null {
 	const trimmed = input.trim();
@@ -27,21 +24,7 @@ export default function AddSiteForm(props: AddSiteFormProps) {
 	const [t] = useI18n();
 	const [input, setInput] = createSignal("");
 	const [error, setError] = createSignal<string | null>(null);
-	const [debouncedDomain, setDebouncedDomain] = createSignal<string | null>(null);
-
-	createEffect(() => {
-		const value = input();
-		const normalized = normalizeDomain(value);
-		if (!normalized) {
-			setDebouncedDomain(null);
-			return;
-		}
-		const timer = setTimeout(() => {
-			setDebouncedDomain(normalized);
-			preloadFavicons([normalized]);
-		}, FAVICON_DEBOUNCE_MS);
-		onCleanup(() => clearTimeout(timer));
-	});
+	const domain = createMemo(() => normalizeDomain(input()));
 
 	const handleAdd = async () => {
 		const normalized = normalizeDomain(input());
@@ -61,7 +44,7 @@ export default function AddSiteForm(props: AddSiteFormProps) {
 	return (
 		<div class="mb-6 bg-th-surface border border-border p-4 space-y-3">
 			<div class="flex items-center gap-3">
-				<SiteIcon domain={debouncedDomain()} sizeClass="w-5 h-5" />
+				<SiteIcon domain={domain()} sizeClass="w-5 h-5" />
 				<input
 					type="text"
 					value={input()}
