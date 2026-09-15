@@ -9,10 +9,8 @@ import Sidebar from "./components/Navigation";
 import SettingsModal from "./components/SettingsModal";
 import OnboardingWizard from "./components/onboarding/OnboardingWizard";
 import { listInstalledApps } from "./lib/commands/apps";
-import { listSiteDictionaries } from "./lib/commands/dictionary";
 import { checkModelStatus } from "./lib/commands/model";
 import { errorFields, logDiagnostic } from "./lib/diagnostics";
-import { preloadFavicons } from "./lib/favicons";
 import { MODEL_DOWNLOAD_STEP } from "./lib/onboarding";
 import { capture } from "./lib/posthog";
 import {
@@ -128,17 +126,6 @@ function App(props: ParentProps) {
 
 			setIsReady(true);
 			logDiagnostic("info", "app", "ready");
-
-			void listSiteDictionaries().then((result) => {
-				if (Result.isOk(result)) {
-					logDiagnostic("debug", "app", "site_dictionaries_loaded", {
-						count: result.value.length,
-					});
-					preloadFavicons(result.value.map((g) => g.domain));
-				} else {
-					logDiagnostic("error", "app", "site_dictionaries_failed", errorFields(result.error));
-				}
-			});
 
 			void listInstalledApps().then((result) => {
 				if (Result.isOk(result)) {

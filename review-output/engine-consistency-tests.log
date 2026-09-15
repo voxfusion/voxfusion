@@ -1,0 +1,33 @@
+   Compiling voxfusion-app v0.1.0 (/Users/egortokarev/.t3/worktrees/voxfusion/t3code-e10d29e5/packages/app/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.36s
+     Running unittests src/lib.rs (packages/app/src-tauri/target/debug/deps/voxfusion_app_lib-563cef3b1b7ecfcb)
+
+running 13 tests
+test handlers::browser::tests::applescript_dispatch ... ok
+test handlers::browser::tests::known_browsers ... ok
+test handlers::browser::tests::rejects_empty ... ok
+test handlers::browser::tests::handles_no_scheme ... ok
+test handlers::whisper::tests::whisper_keeps_style_and_dictionary_in_its_prompt ... ok
+test listeners::system_key_watcher::tests::accepts_a_normal_press_and_release_sequence ... ok
+test handlers::browser::tests::keeps_subdomains ... ok
+test handlers::browser::tests::normalizes_basic_url ... ok
+test listeners::system_key_watcher::tests::current_state_distinguishes_left_and_right_modifiers ... ok
+test listeners::system_key_watcher::tests::detects_a_missed_release_before_the_same_key_is_pressed_again ... ok
+test listeners::system_key_watcher::tests::detects_an_unrelated_stale_modifier ... ok
+test handlers::whisper::tests::missing_context_keeps_global_dictionary_and_empty_dictionary_has_no_prompt ... ok
+test handlers::whisper::tests::dictionary_includes_only_global_and_matching_contexts ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (packages/app/src-tauri/target/debug/deps/voxfusion_app-c9ec33dec67edc6b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests voxfusion_app_lib
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

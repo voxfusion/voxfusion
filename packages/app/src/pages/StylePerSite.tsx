@@ -11,7 +11,6 @@ import {
 	listSiteStyles,
 	setSiteStyle,
 } from "../lib/commands/apps";
-import { preloadFavicons } from "../lib/favicons";
 import { capture } from "../lib/posthog";
 import { makeStyleLabel } from "../lib/styleLabel";
 
@@ -24,7 +23,6 @@ export default function StylePerSite() {
 		const result = await listSiteStyles();
 		if (Result.isOk(result)) {
 			setSites(result.value);
-			preloadFavicons(result.value.map((s) => s.domain));
 		}
 	};
 

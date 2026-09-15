@@ -86,6 +86,7 @@ pub fn transcribe(
     model_path: &Path,
     audio_path: &str,
     samples: &[f32],
+    dictionary: Option<&str>,
 ) -> Result<String, String> {
     let binary = resolve_binary(app_handle).ok_or_else(missing_engine_error)?;
     let wav_path = write_temp_wav_16k(audio_path, samples)?;
@@ -95,7 +96,8 @@ pub fn transcribe(
         .unwrap_or(4)
         .to_string();
 
-    let result = Command::new(&binary)
+    let mut command = Command::new(&binary);
+    command
         .arg("-m")
         .arg(model_path)
         .arg("-f")
@@ -103,8 +105,13 @@ pub fn transcribe(
         .arg("-t")
         .arg(&thread_count)
         .arg("-nt") // no timestamps
-        .arg("-np") // print only the transcription
-        .output();
+        .arg("-np"); // print only the transcription
+    if let Some(words) = dictionary.filter(|words| !words.trim().is_empty()) {
+        // Parakeet uses contextual vocabulary biasing, not Whisper prompts.
+        // Pass one literal argument so spaces and shell characters stay data.
+        command.arg("--hotwords").arg(words);
+    }
+    let result = command.output();
 
     let _ = std::fs::remove_file(&wav_path);
 
@@ -126,11 +133,6 @@ pub fn transcribe(
     if text.is_empty() {
         return Err("Parakeet engine produced no transcription.".to_string());
     }
-
-    crate::handlers::audio::cleanup_old_recordings(
-        app_handle,
-        crate::handlers::audio::RECORDINGS_TO_KEEP,
-    );
 
     Ok(text)
 }
