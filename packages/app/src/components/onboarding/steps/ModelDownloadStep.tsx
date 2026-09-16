@@ -13,6 +13,7 @@ import {
 	downloadWhisperModel,
 } from "../../../lib/commands/model";
 import { formatEta, formatMb } from "../../../lib/downloadFormat";
+import { isLinux } from "../../../lib/platform";
 
 interface ModelDownloadStepProps {
 	onDownloadComplete: () => void;
@@ -28,7 +29,7 @@ export default function ModelDownloadStep(props: ModelDownloadStepProps) {
 	const [isDownloading, setIsDownloading] = createSignal(false);
 	const [isDownloaded, setIsDownloaded] = createSignal(false);
 	const [error, setError] = createSignal<string | null>(null);
-	const downloadSize = "~1.5 GB";
+	const downloadSize = isLinux ? "~148 MB" : "~1.5 GB";
 	let lastSample: { at: number; bytes: number } | null = null;
 	let cancelRequested = false;
 
@@ -143,7 +144,9 @@ export default function ModelDownloadStep(props: ModelDownloadStepProps) {
 				</h2>
 
 				<p class="font-mono text-sm text-txt-secondary mb-8">
-					{t("onboarding.modelDownloadDescription")}
+					{isLinux
+						? "Download Whisper Base for local CPU transcription. You can choose the larger model for better accuracy in Settings."
+						: t("onboarding.modelDownloadDescription")}
 				</p>
 
 				<div class="mb-6">

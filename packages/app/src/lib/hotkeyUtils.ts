@@ -1,7 +1,9 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Result } from "better-result";
 import { startSystemKeyWatcher } from "./commands/permissions";
+import { getPlatformInfo, isMacOS } from "./platform";
 
 type SystemKey =
 	| "fn"
@@ -43,8 +45,8 @@ type HotkeyRecorderActivePayload = {
 	active: boolean;
 };
 
-export const DEFAULT_HOTKEY = "LeftControl+LeftOption";
-export const DEFAULT_HOLD_TO_SPEAK_HOTKEY = "RightCommand";
+export const DEFAULT_HOTKEY = isMacOS ? "LeftControl+LeftOption" : "Control+Alt+V";
+export const DEFAULT_HOLD_TO_SPEAK_HOTKEY = isMacOS ? "RightCommand" : "Control+Alt+B";
 
 /**
  * How long an exact hotkey match must stay held unchanged before it fires.
@@ -154,7 +156,9 @@ export function isModifierCode(code: string): boolean {
  * Returns undefined for non-modifier codes.
  */
 export function modifierCodeToDisplay(code: string): string | undefined {
-	return CODE_TO_DISPLAY[code];
+	return isMacOS
+		? CODE_TO_DISPLAY[code]
+		: code.replace("Meta", "Super").replace("Left", " (left)").replace("Right", " (right)");
 }
 
 /**
@@ -162,7 +166,7 @@ export function modifierCodeToDisplay(code: string): string | undefined {
  * persisted in settings, when the native watcher supports it.
  */
 export function modifierCodeToSystemHotkey(code: string): string | undefined {
-	return MODIFIER_CODE_TO_SYSTEM_HOTKEY[code];
+	return isMacOS ? MODIFIER_CODE_TO_SYSTEM_HOTKEY[code] : undefined;
 }
 
 export function systemHotkeyFromKeys(keys: Iterable<SystemKey>): string {
@@ -211,7 +215,7 @@ export function isSystemOnlyHotkey(hotkey: string): boolean {
  * Check if a hotkey string can be registered by one of the supported backends.
  */
 export function isValidHotkey(hotkey: string): boolean {
-	if (isSystemOnlyHotkey(hotkey)) return true;
+	if (isSystemOnlyHotkey(hotkey)) return isMacOS;
 
 	const parts = hotkey
 		.split("+")
@@ -312,10 +316,40 @@ async function registerSystemHotkey(
 	};
 }
 
-async function registerGlobalHotkey(
+export async function registerGlobalHotkey(
 	hotkey: string,
 	handlers: HotkeyHandlers
 ): Promise<RegisteredHotkey> {
+	const platform = await getPlatformInfo();
+	if (platform.wayland) {
+		let recorderActive = false;
+		const unlistenRecorder = await listen<{ active: boolean }>(
+			"hotkey-recorder-active",
+			(event) => {
+				recorderActive = event.payload.active;
+			}
+		);
+		const unlisten = await listen<{ hotkey: string; state: string }>("linux-shortcut", (event) => {
+			if (event.payload.hotkey !== hotkey || recorderActive) return;
+			if (event.payload.state === "Pressed") handlers.onPressed();
+			else handlers.onReleased?.();
+		});
+		try {
+			await invoke("register_linux_shortcut", { hotkey, onRelease: Boolean(handlers.onReleased) });
+		} catch (error) {
+			unlisten();
+			unlistenRecorder();
+			throw error;
+		}
+		return {
+			hotkey,
+			dispose: async () => {
+				unlisten();
+				unlistenRecorder();
+				await invoke("unregister_linux_shortcut", { hotkey });
+			},
+		};
+	}
 	await Result.tryPromise(() => unregister(hotkey));
 
 	await register(hotkey, (event: GlobalShortcutEvent) => {
@@ -395,6 +429,11 @@ export async function unregisterDictationHotkey(): Promise<void> {
  * Handles combo shortcuts like "Command+;" by mapping modifier names to symbols.
  */
 export function hotkeyDisplayName(hotkey: string): string {
+	if (!isMacOS)
+		return hotkey
+			.replace(/Command/g, "Super")
+			.replace(/Control/g, "Ctrl")
+			.replace(/Option/g, "Alt");
 	return hotkey
 		.replace(/Command/g, "\u2318")
 		.replace(/Control/g, "\u2303")

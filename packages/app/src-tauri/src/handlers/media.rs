@@ -4,6 +4,8 @@ use std::sync::{LazyLock, Mutex};
 struct MediaMuteState {
     active: bool,
     was_muted: bool,
+    #[cfg(target_os = "linux")]
+    output_device: Option<String>,
 }
 
 static MEDIA_MUTE_STATE: LazyLock<Mutex<MediaMuteState>> =
@@ -185,10 +187,34 @@ pub fn mute_media_for_recording() -> Result<(), String> {
         state.active = true;
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
     {
+        let sink_name = pactl(&["get-default-sink"])?;
+        let sinks: serde_json::Value =
+            serde_json::from_str(&pactl(&["--format=json", "list", "sinks"])?)
+                .map_err(|e| e.to_string())?;
+        let sink = sinks
+            .as_array()
+            .and_then(|sinks| {
+                sinks
+                    .iter()
+                    .find(|sink| sink["name"].as_str() == Some(sink_name.as_str()))
+            })
+            .ok_or("Default audio output not found")?;
+        let id = sink["index"]
+            .as_u64()
+            .ok_or("Audio output has no index")?
+            .to_string();
+        state.was_muted = sink["mute"].as_bool().ok_or("Unknown output mute state")?;
+        if !state.was_muted {
+            pactl(&["set-sink-mute", &id, "1"])?;
+        }
+        state.output_device = Some(id);
         state.active = true;
-        state.was_muted = false;
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        return Err("Output muting is unavailable on this platform".into());
     }
 
     Ok(())
@@ -208,7 +234,29 @@ pub fn restore_media_after_recording() -> Result<(), String> {
         }
     }
 
+    #[cfg(target_os = "linux")]
+    if !state.was_muted {
+        if let Some(id) = &state.output_device {
+            pactl(&["set-sink-mute", id, "0"])?;
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        state.output_device = None;
+    }
     state.active = false;
     state.was_muted = false;
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn pactl(args: &[&str]) -> Result<String, String> {
+    let output = std::process::Command::new("pactl")
+        .args(args)
+        .output()
+        .map_err(|e| format!("Audio control requires pactl (libpulse): {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }

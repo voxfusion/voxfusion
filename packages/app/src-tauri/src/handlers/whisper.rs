@@ -222,7 +222,8 @@ fn transcribe_whisper(
     style_key: &str,
     dictionary: Option<&str>,
 ) -> Result<String, String> {
-    let ctx_params = WhisperContextParameters::default();
+    let mut ctx_params = WhisperContextParameters::default();
+    ctx_params.use_gpu(cfg!(target_os = "macos"));
     let ctx = WhisperContext::new_with_params(model_path, ctx_params)
         .map_err(|e| format!("Failed to load model: {}", e))?;
 

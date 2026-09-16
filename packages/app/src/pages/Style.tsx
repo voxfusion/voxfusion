@@ -1,6 +1,7 @@
 import { A, useLocation } from "@solidjs/router";
-import type { ParentComponent } from "solid-js";
+import { type ParentComponent, Show } from "solid-js";
 import { useI18n } from "../i18n";
+import { isLinux } from "../lib/platform";
 
 const Style: ParentComponent = (props) => {
 	const [t] = useI18n();
@@ -38,6 +39,12 @@ const Style: ParentComponent = (props) => {
 					</A>
 				</div>
 
+				<Show when={isLinux && isSites()}>
+					<p class="font-mono text-sm text-txt-muted mb-6">
+						Website detection is unavailable on Linux. Default and per-app rules apply when
+						dictating in a browser.
+					</p>
+				</Show>
 				{props.children}
 			</div>
 		</div>

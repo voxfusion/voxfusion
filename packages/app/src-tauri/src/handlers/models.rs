@@ -49,10 +49,26 @@ pub struct ModelInfo {
     pub recommended: bool,
 }
 
+#[cfg(target_os = "linux")]
+pub const DEFAULT_MODEL_ID: &str = "whisper-base";
+#[cfg(not(target_os = "linux"))]
 pub const DEFAULT_MODEL_ID: &str = "whisper-large-v3-turbo";
 
 /// The model registry — the single source of truth for available models.
 const MODELS: &[ModelInfo] = &[
+    ModelInfo {
+        id: "whisper-base",
+        name: "Whisper Base",
+        engine: Engine::Whisper,
+        filename: "ggml-base.bin",
+        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+        expected_size: Some(147_951_465),
+        sha256: Some("60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe"),
+        size_label: "~148 MB",
+        languages: "99 languages",
+        experimental: false,
+        recommended: cfg!(target_os = "linux"),
+    },
     ModelInfo {
         id: "whisper-large-v3-turbo",
         name: "Whisper Large v3 Turbo",
@@ -64,7 +80,7 @@ const MODELS: &[ModelInfo] = &[
         size_label: "~1.5 GB",
         languages: "99 languages",
         experimental: false,
-        recommended: true,
+        recommended: !cfg!(target_os = "linux"),
     },
     ModelInfo {
         id: "parakeet-tdt-0.6b-v3",
@@ -490,7 +506,9 @@ pub async fn list_models(
             engine: model.engine.as_str().to_string(),
             size_label: model.size_label.to_string(),
             languages: model.languages.to_string(),
-            experimental: model.experimental,
+            experimental: model.experimental
+                || (model.engine == Engine::Parakeet
+                    && !crate::handlers::parakeet::engine_available(&app_handle)),
             recommended: model.recommended,
             downloaded: is_downloaded(&app_handle, model),
             active: model.id == active_id,

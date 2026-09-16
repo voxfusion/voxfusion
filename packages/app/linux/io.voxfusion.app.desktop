@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=VoxFusion
+Comment=Offline voice dictation
+Exec=voxfusion-app
+Icon=io.voxfusion.app
+Terminal=false
+Categories=AudioVideo;Audio;Utility;
+StartupWMClass=voxfusion-app

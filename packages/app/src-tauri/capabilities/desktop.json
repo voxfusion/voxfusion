@@ -16,7 +16,6 @@
 		"core:event:default",
 		"core:path:default",
 		"log:default",
-		"store:default",
-		"macos-permissions:default"
+		"store:default"
 	]
 }

@@ -15,6 +15,10 @@ A local-first, offline-capable voice transcription desktop app. All transcriptio
 - [Rust](https://rustup.rs/) (for Tauri development)
 - [CMake](https://cmake.org/) (required to build whisper-rs; on macOS: `brew install cmake`)
 
+## Linux / Omarchy
+
+See the [Linux guide](docs/linux.md) for dependencies, native builds, installation, Hyprland shortcuts and platform limits. Build an installable Arch archive with `bun run --filter @voxfusion/app build:linux`. Linux defaults to Whisper Base for CPU transcription; macOS keeps Large v3 Turbo with Metal.
+
 ## Getting Started
 
 ### Install dependencies

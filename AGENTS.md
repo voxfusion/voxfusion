@@ -8,7 +8,7 @@ Use bun instead of Node.js, npm, pnpm, or vite.
 
 VoxFusion is a Bun/Turborepo monorepo with two packages:
 
-- `@voxfusion/app` — Tauri v2 desktop app (SolidJS + Rust). **macOS-only** for full native builds.
+- `@voxfusion/app` — Tauri v2 desktop app (SolidJS + Rust). Native builds support macOS and Linux; Omarchy/Hyprland is the primary Linux target.
 - `@voxfusion/marketingsite` — Astro static marketing website.
 
 ### Running services
@@ -17,7 +17,7 @@ VoxFusion is a Bun/Turborepo monorepo with two packages:
 |---------|---------|------|-------|
 | App frontend (Vite) | `cd packages/app && bunx vite --host 0.0.0.0` | 1420 | SolidJS UI only; Tauri IPC unavailable in standalone browser mode |
 | Marketing site (Astro) | `cd packages/marketingsite && bun run dev -- --host 0.0.0.0` | 4321 | Fully functional on Linux |
-| Full Tauri app | `cd packages/app && bun run dev` | — | Requires macOS (Metal, accessibility, tray) |
+| Full Tauri app | `cd packages/app && bun run dev` | — | macOS or Linux with the native dependencies below |
 
 ### Lint / typecheck / build
 
@@ -31,22 +31,17 @@ Standard commands documented in `README.md` scripts section. Key notes:
 
 ### Rust / Tauri backend on Linux
 
-`cargo check` in `packages/app/src-tauri` **will fail** on Linux because:
-
-1. `whisper-rs` is compiled with `features = ["metal"]` which requires macOS Metal framework.
-2. Several dependencies (`core-graphics`, `objc2`, `objc2-app-kit`) are macOS-only.
-
-For frontend-only development on Linux, use the Vite dev server directly (`bunx vite`). The Rust backend requires macOS for compilation.
+`cargo check` and `cargo test` now run on Linux. Metal and macOS permissions are target-specific dependencies. Linux uses CPU Whisper (Base by default), `wtype` for Wayland typing and temporary Hyprland bindings forwarding through a private Unix socket. See `docs/linux.md`; build the Arch archive with `bun run --filter @voxfusion/app build:linux`.
 
 ### System dependencies (Linux)
 
-Required for `cargo check` to proceed as far as possible (before the macOS-specific failure):
+Ubuntu/Debian native development dependencies:
 
 ```
-libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev libasound2-dev
+libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev libasound2-dev cmake clang
 ```
 
-Also requires `libstdc++.so` symlink: `sudo ln -sf /usr/lib/gcc/x86_64-linux-gnu/13/libstdc++.so /usr/lib/x86_64-linux-gnu/libstdc++.so`
+Omarchy/Arch: `base-devel rust cmake clang pkgconf webkit2gtk-4.1 libappindicator-gtk3 alsa-lib libpulse xdotool wtype`. A stale Omarchy snapshot may have package URLs returning 404; exact packages from archive.archlinux.org avoid a partial system upgrade.
 
 ### System dependencies (macOS)
 
@@ -71,3 +66,9 @@ Without CMake, `bun dev` fails during `whisper-rs-sys` with `is cmake not instal
 - `turbo dev` runs both packages' dev scripts concurrently (uses TUI mode).
 - Production macOS logs are written to `~/Library/Logs/io.voxfusion.app/voxfusion.log`. Tauri's file timestamps are UTC even when macOS is in another timezone; correlate them with `log show`/wall-clock times accordingly. For hidden-window shortcut failures, also inspect the macOS unified log's `com.apple.WebKit:ProcessSuspension` events: the shortcut callbacks currently live in the hidden `voice-control` webview, and `LSUIElement=true` builds can place its WebContent process in the background suspension lifecycle. Releases through v0.9.10 also accumulated `PRESSED_KEYS` from transitions without resynchronizing after activation, screen lock, or sleep/wake; the watcher now rebuilds state from `CGEventSourceKeyState` and logs `system_key_state_resynchronized` when it repairs a discontinuity.
 - Cuelume 0.2.2 normally skips playback until `navigator.userActivation.hasBeenActive` is true. Native global-shortcut callbacks do not activate the hidden `voice-control` webview, even though Tauri enables media autoplay. Keep the tracked `patches/cuelume@0.2.2.patch` in place for shortcut-triggered recording cues. Play the start cue before microphone setup because `muteMediaForRecording` mutes the default output device and can cut off a cue scheduled immediately beforehand.
+
+- Linux QA: terminal tools may omit the active GUI environment. Discover `hyprctl instances -j` and the sockets under `$XDG_RUNTIME_DIR`, then pass `WAYLAND_DISPLAY`, `DISPLAY`, and `HYPRLAND_INSTANCE_SIGNATURE` explicitly. Use isolated XDG data/config/cache directories and explicit PipeWire links from a temporary source to the app capture stream to test a known speech sample without changing the user's microphone selection. `wtype`'s synthetic keymap may not trigger Hyprland global shortcuts; an evdev/uinput keyboard does. `wf-recorder` can record the actual native window on a separate workspace.
+- `whisper-rs-sys` forwards `GGML_*` environment flags but its Cargo cache does not always invalidate when those flags change. When switching an existing target directory from a native CPU build to a portable one, run `cargo clean -p whisper-rs-sys --release` once from `packages/app/src-tauri`, then rebuild and inspect its `CMakeCache.txt`. Fresh builds use the tracked `.cargo/config.toml` (`GGML_NATIVE=OFF`).
+- Hyprland 0.52 move rules only subtract offsets with the `100%-` anchor; `50%-130` is accepted but ignores the subtraction. The Linux overlay uses the documented `100%-w-20` bottom/right anchors. Hyprland 0.53+ requires the newer window-rule effect names and expression syntax; select the rules by compositor version.
+
+- User preference: do not add a browser extension for Linux website detection.

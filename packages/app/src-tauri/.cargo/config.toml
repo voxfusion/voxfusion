@@ -1,0 +1,3 @@
+[env]
+# Distributable speech inference builds must not use -march=native.
+GGML_NATIVE = "OFF"

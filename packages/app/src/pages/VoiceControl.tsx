@@ -6,7 +6,6 @@ import {
 	getCurrentWindow,
 	monitorFromPoint,
 } from "@tauri-apps/api/window";
-import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Result } from "better-result";
 import { play } from "cuelume";
 import { AlertCircle, Check, X } from "lucide-solid";
@@ -28,8 +27,10 @@ import {
 	DEFAULT_HOTKEY,
 	isValidHotkey,
 	registerDictationHotkeys,
+	registerGlobalHotkey,
 	unregisterDictationHotkey,
 } from "../lib/hotkeyUtils";
+import { getPlatformInfo, isWayland } from "../lib/platform";
 import {
 	loadSettings,
 	updateHoldToSpeakHotkey,
@@ -76,6 +77,7 @@ let lastMonitorY: number | null = null;
 let currentWindowWidth = WINDOW_WIDTH_COMPACT;
 
 async function setWindowWidth(width: number) {
+	if (isWayland()) return;
 	if (currentWindowWidth === width) return;
 	currentWindowWidth = width;
 	await getCurrentWindow().setSize(new LogicalSize(width, WINDOW_HEIGHT));
@@ -94,6 +96,7 @@ async function hideVoiceControlWindow() {
 }
 
 async function repositionToCurrentMonitor() {
+	if (isWayland()) return;
 	const cursor = await cursorPosition();
 	const monitor = await monitorFromPoint(cursor.x, cursor.y);
 	if (!monitor) return;
@@ -210,14 +213,20 @@ export default function VoiceControl() {
 		}
 	};
 
+	let holdReleasedWhileStarting = false;
 	const startHoldToSpeakRecording = () => {
 		if (!canUseShortcut()) return;
 		if (isStarting || isStopping || isRecording()) return;
+		holdReleasedWhileStarting = false;
 		startRecording("hold");
 	};
 
 	const stopHoldToSpeakRecording = () => {
 		if (!canUseShortcut()) return;
+		if (isStarting) {
+			holdReleasedWhileStarting = true;
+			return;
+		}
 		if (isStarting || isStopping || !isRecording()) return;
 		if (recordingMode() !== "hold") return;
 		stopRecording();
@@ -239,7 +248,17 @@ export default function VoiceControl() {
 		};
 		const hotkeys = toggleShortcut === holdShortcut ? [toggleHotkey] : [toggleHotkey, holdHotkey];
 
-		await registerDictationHotkeys(hotkeys);
+		const registered = await Result.tryPromise(() => registerDictationHotkeys(hotkeys));
+		if (Result.isError(registered)) {
+			logDiagnostic(
+				"error",
+				"voice",
+				"shortcut_registration_failed",
+				errorFields(registered.error)
+			);
+			await emit("shortcut-error", String(registered.error));
+			return;
+		}
 		setCurrentShortcut(`${toggleShortcut}|${holdShortcut}`);
 	};
 
@@ -267,10 +286,24 @@ export default function VoiceControl() {
 			}
 		};
 
+		await getPlatformInfo();
 		await repositionToCurrentMonitor();
 		const repositionInterval = setInterval(repositionToCurrentMonitor, 1000);
 		addDisposer(() => clearInterval(repositionInterval));
 
+		addDisposer(
+			await listen<{ hotkey: string; state: string }>("linux-shortcut", (event) => {
+				const { hotkey, state } = event.payload;
+				if (hotkey === "toggle" && state === "Pressed") toggleRecording();
+				if (hotkey === "hold" && state === "Pressed") startHoldToSpeakRecording();
+				if (hotkey === "hold" && state === "Released") stopHoldToSpeakRecording();
+			})
+		);
+		addDisposer(
+			await listen<string>("shortcut-error", (event) => {
+				void showError(event.payload, { autoHideMs: RECORDING_ERROR_HIDE_MS });
+			})
+		);
 		const settings = await loadSettings();
 		let hotkey = settings.hotkey;
 		if (!isValidHotkey(hotkey)) {
@@ -516,21 +549,23 @@ export default function VoiceControl() {
 		logDiagnostic("info", "voice", "stop_recording_completed");
 	};
 
+	let escapeRegistration: Awaited<ReturnType<typeof registerGlobalHotkey>> | null = null;
 	const registerEscapeShortcut = async () => {
-		await Result.tryPromise(async () => {
-			await register("Escape", (evt) => {
-				if (evt.state !== "Pressed") return;
-				if (isRecording()) {
-					cancelRecording();
-					return;
-				}
-				void dismissError();
+		const result = await Result.tryPromise(async () => {
+			escapeRegistration = await registerGlobalHotkey("Escape", {
+				onPressed: () => {
+					if (isRecording()) void cancelRecording();
+					else void dismissError();
+				},
 			});
 		});
+		if (Result.isError(result))
+			logDiagnostic("warn", "voice", "escape_shortcut_unavailable", errorFields(result.error));
 	};
-
 	const unregisterEscapeShortcut = async () => {
-		await Result.tryPromise(() => unregister("Escape"));
+		const registration = escapeRegistration;
+		escapeRegistration = null;
+		if (registration) await Result.tryPromise(() => registration.dispose());
 	};
 
 	const cancelRecording = async () => {
@@ -619,6 +654,10 @@ export default function VoiceControl() {
 					: Math.max(0, RECORDING_START_CUE_MUTE_DELAY_MS - (performance.now() - cueStartedAt));
 			scheduleMediaMuteForRecording(mediaMuteDelay);
 			await registerEscapeShortcut();
+			if (mode === "hold" && holdReleasedWhileStarting) {
+				await stopRecording();
+				return;
+			}
 			logDiagnostic("info", "voice", "start_recording_completed", {
 				mode,
 				hasAppContext: Boolean(activeAppBundleId),
