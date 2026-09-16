@@ -7,7 +7,16 @@
 	},
 	"files": {
 		"ignoreUnknown": true,
-		"ignore": ["node_modules", "dist", "build", ".output", "src-tauri/target", ".astro", ".cursor"]
+		"ignore": [
+			"node_modules",
+			"dist",
+			"build",
+			".output",
+			"src-tauri/target",
+			".astro",
+			".cursor",
+			"**/src-tauri/gen/schemas/**"
+		]
 	},
 	"formatter": {
 		"enabled": true,

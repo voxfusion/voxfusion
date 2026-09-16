@@ -12,6 +12,7 @@ import {
 	ONBOARDING_STEP_COUNT,
 	normalizeOnboardingStep,
 } from "./onboarding";
+import { getPlatformInfo } from "./platform";
 
 export type Theme = "dark" | "light" | "system";
 
@@ -71,6 +72,7 @@ async function getStore() {
 }
 
 export async function loadSettings(): Promise<Settings> {
+	await getPlatformInfo();
 	const store = await getStore();
 	const theme = await store.get<Theme>("theme");
 	const hotkey = await store.get<string>("hotkey");

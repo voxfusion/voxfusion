@@ -12,7 +12,9 @@
 		"tauri:build": "tauri build",
 		"lint": "biome lint ./src",
 		"lint:fix": "biome lint --write ./src",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"build:linux": "bash scripts/build-linux.sh",
+		"frontend:dev": "bunx --bun vite"
 	},
 	"dependencies": {
 		"@nanostores/solid": "^1.1.1",

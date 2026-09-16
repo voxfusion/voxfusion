@@ -1,8 +1,9 @@
+import { isLinux } from "../platform";
 import type { CommandResult } from "./invokeResult";
 import { invokeResult } from "./invokeResult";
 
 /** Id of the default Whisper model downloaded during onboarding. */
-export const DEFAULT_MODEL_ID = "whisper-large-v3-turbo";
+export const DEFAULT_MODEL_ID = isLinux ? "whisper-base" : "whisper-large-v3-turbo";
 
 /** Backend error for a duplicate `download_model` call. */
 export const DOWNLOAD_IN_PROGRESS_ERROR = "download already in progress";

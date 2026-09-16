@@ -44,13 +44,16 @@ jobs:
 
       - name: Build app frontend (Vite)
         working-directory: packages/app
-        run: bunx vite build
+        run: bun run build
 
       - name: Build marketing site
         run: bun run --filter @voxfusion/marketingsite build
 
   rust:
-    runs-on: macos-latest
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,7 +66,14 @@ jobs:
         with:
           workspaces: './packages/app/src-tauri -> target'
 
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev libasound2-dev cmake clang
+
       - name: Ensure cmake is available
+        if: runner.os == 'macOS'
         run: command -v cmake || brew install cmake
 
       - name: Cargo check

@@ -1,4 +1,4 @@
-import { Show, type Accessor } from "solid-js";
+import { type Accessor, Show } from "solid-js";
 import type { I18nContextType } from "../../i18n";
 import { hotkeyDisplayName } from "../../lib/hotkeyUtils";
 import type { Settings } from "../../lib/settingsStore";

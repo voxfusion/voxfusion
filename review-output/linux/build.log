@@ -1,0 +1,58 @@
+@voxfusion/app build:linux: $ tauri build --no-bundle
+@voxfusion/app build:linux:         Info Looking up installed tauri packages to check mismatched versions...
+@voxfusion/app build:linux:         Warn The bundle identifier "io.voxfusion.app" set in `tauri.conf.json identifier` ends with `.app`. This is not recommended because it conflicts with the application bundle extension on macOS.
+@voxfusion/app build:linux:      Running beforeBuildCommand `bun run build`
+@voxfusion/app build:linux: $ vite build
+@voxfusion/app build:linux: vite v6.4.1 building for production...
+@voxfusion/app build:linux: transforming...
+@voxfusion/app build:linux: Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+@voxfusion/app build:linux:   npx update-browserslist-db@latest
+@voxfusion/app build:linux:   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+@voxfusion/app build:linux: ✓ 2042 modules transformed.
+@voxfusion/app build:linux: rendering chunks...
+@voxfusion/app build:linux: computing gzip size...
+@voxfusion/app build:linux: dist/index.html                            1.34 kB │ gzip:  0.67 kB
+@voxfusion/app build:linux: dist/voice-control.html                    1.35 kB │ gzip:  0.69 kB
+@voxfusion/app build:linux: dist/assets/transcriptions-YV1PhAM3.css   20.93 kB │ gzip:  4.95 kB
+@voxfusion/app build:linux: dist/assets/voice-control-D7Cczdkn.js     19.92 kB │ gzip:  6.67 kB
+@voxfusion/app build:linux: dist/assets/transcriptions-BtSG2_l5.js   136.80 kB │ gzip: 42.70 kB
+@voxfusion/app build:linux: dist/assets/main-BsYsgGEg.js             308.31 kB │ gzip: 90.99 kB
+@voxfusion/app build:linux: ✓ built in 9.61s
+@voxfusion/app build:linux:    Compiling voxfusion-app v0.1.0 (/home/gregor/.t3/worktrees/voxfusion/t3code-33c53735/packages/app/src-tauri)
+@voxfusion/app build:linux: warning: constant `SAFARI_BUNDLES` is never used
+@voxfusion/app build:linux:  --> src/handlers/browser.rs:1:7
+@voxfusion/app build:linux:   |
+@voxfusion/app build:linux: 1 | const SAFARI_BUNDLES: &[&str] = &["com.apple.Safari", "com.apple.SafariTechnologyPreview"];
+@voxfusion/app build:linux:   |       ^^^^^^^^^^^^^^
+@voxfusion/app build:linux:   |
+@voxfusion/app build:linux:   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+@voxfusion/app build:linux: 
+@voxfusion/app build:linux: warning: constant `CHROMIUM_BUNDLES` is never used
+@voxfusion/app build:linux:  --> src/handlers/browser.rs:3:7
+@voxfusion/app build:linux:   |
+@voxfusion/app build:linux: 3 | const CHROMIUM_BUNDLES: &[&str] = &[
+@voxfusion/app build:linux:   |       ^^^^^^^^^^^^^^^^
+@voxfusion/app build:linux: 
+@voxfusion/app build:linux: warning: function `is_known_browser` is never used
+@voxfusion/app build:linux:   --> src/handlers/browser.rs:24:8
+@voxfusion/app build:linux:    |
+@voxfusion/app build:linux: 24 | pub fn is_known_browser(bundle_id: &str) -> bool {
+@voxfusion/app build:linux:    |        ^^^^^^^^^^^^^^^^
+@voxfusion/app build:linux: 
+@voxfusion/app build:linux: warning: function `applescript_for_bundle` is never used
+@voxfusion/app build:linux:   --> src/handlers/browser.rs:31:4
+@voxfusion/app build:linux:    |
+@voxfusion/app build:linux: 31 | fn applescript_for_bundle(bundle_id: &str) -> Option<String> {
+@voxfusion/app build:linux:    |    ^^^^^^^^^^^^^^^^^^^^^^
+@voxfusion/app build:linux: 
+@voxfusion/app build:linux: warning: function `get_frontmost_browser_url` is never used
+@voxfusion/app build:linux:    --> src/handlers/browser.rs:153:8
+@voxfusion/app build:linux:     |
+@voxfusion/app build:linux: 153 | pub fn get_frontmost_browser_url(_bundle_id: &str, _pid: i32) -> Option<String> {
+@voxfusion/app build:linux:     |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+@voxfusion/app build:linux: 
+@voxfusion/app build:linux: warning: `voxfusion-app` (lib) generated 5 warnings
+@voxfusion/app build:linux:     Finished `release` profile [optimized] target(s) in 3m 29s
+@voxfusion/app build:linux:        Built application at: /home/gregor/.t3/worktrees/voxfusion/t3code-33c53735/packages/app/src-tauri/target/release/voxfusion-app
+@voxfusion/app build:linux: Linux package: /home/gregor/.t3/worktrees/voxfusion/t3code-33c53735/packages/app/src-tauri/target/release/voxfusion-linux-x86_64.tar.gz
+@voxfusion/app build:linux: Exited with code 0

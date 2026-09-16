@@ -4,6 +4,8 @@ pub mod audio_processing;
 pub mod browser;
 pub mod db;
 pub mod hotkeys;
+#[cfg(target_os = "linux")]
+pub mod linux_apps;
 pub mod media;
 pub mod models;
 pub mod parakeet;

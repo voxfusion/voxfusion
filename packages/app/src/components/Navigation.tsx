@@ -1,6 +1,8 @@
 import { A, useLocation } from "@solidjs/router";
 import { BookOpen, Home, Settings, Wand2 } from "lucide-solid";
+import { Show } from "solid-js";
 import { useI18n } from "../i18n";
+import { isLinux } from "../lib/platform";
 import UpdateNotification from "./UpdateNotification";
 
 interface SidebarProps {
@@ -54,7 +56,9 @@ export default function Sidebar(props: SidebarProps) {
 				</A>
 			</nav>
 
-			<UpdateNotification />
+			<Show when={!isLinux}>
+				<UpdateNotification />
+			</Show>
 
 			<div class="p-3 border-t border-border">
 				<button

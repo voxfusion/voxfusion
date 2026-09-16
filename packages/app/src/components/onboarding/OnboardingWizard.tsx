@@ -1,6 +1,7 @@
 import { Show, createSignal } from "solid-js";
 import { useI18n } from "../../i18n";
 import { ONBOARDING_STEP_COUNT } from "../../lib/onboarding";
+import { isLinux } from "../../lib/platform";
 import { capture } from "../../lib/posthog";
 import { updateOnboardingStep } from "../../lib/settingsStore";
 import StepIndicator from "./StepIndicator";
@@ -8,6 +9,7 @@ import AccessibilityPermissionStep from "./steps/AccessibilityPermissionStep";
 import CompletionStep from "./steps/CompletionStep";
 import HotkeyStep from "./steps/HotkeyStep";
 import LearningStep from "./steps/LearningStep";
+import LinuxSetupStep from "./steps/LinuxSetupStep";
 import MicrophonePermissionStep from "./steps/MicrophonePermissionStep";
 import MicrophoneStep from "./steps/MicrophoneStep";
 import ModelDownloadStep from "./steps/ModelDownloadStep";
@@ -108,10 +110,27 @@ export default function OnboardingWizard(props: OnboardingWizardProps) {
 					}`}
 				>
 					<Show when={currentStep() === 1}>
-						<MicrophonePermissionStep onPermissionChange={setMicPermissionGranted} />
+						<Show
+							when={isLinux}
+							fallback={<MicrophonePermissionStep onPermissionChange={setMicPermissionGranted} />}
+						>
+							<LinuxSetupStep kind="microphone" onPermissionChange={setMicPermissionGranted} />
+						</Show>
 					</Show>
 					<Show when={currentStep() === 2}>
-						<AccessibilityPermissionStep onPermissionChange={setAccessibilityPermissionGranted} />
+						<Show
+							when={isLinux}
+							fallback={
+								<AccessibilityPermissionStep
+									onPermissionChange={setAccessibilityPermissionGranted}
+								/>
+							}
+						>
+							<LinuxSetupStep
+								kind="desktop"
+								onPermissionChange={setAccessibilityPermissionGranted}
+							/>
+						</Show>
 					</Show>
 					<Show when={currentStep() === 3}>
 						<MicrophoneStep />

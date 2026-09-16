@@ -2,6 +2,8 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { Send } from "lucide-solid";
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js";
 import { useI18n } from "../../../i18n";
+import { hotkeyDisplayName } from "../../../lib/hotkeyUtils";
+import { isMacOS } from "../../../lib/platform";
 import { useSettings } from "../../../lib/settingsStore";
 
 interface LearningStepProps {
@@ -9,6 +11,7 @@ interface LearningStepProps {
 }
 
 function parseHotkeyParts(hotkey: string): string[] {
+	if (!isMacOS) return hotkeyDisplayName(hotkey).split("+");
 	const DISPLAY_MAP: Record<string, string> = {
 		Command: "\u2318",
 		Control: "\u2303",

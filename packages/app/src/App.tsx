@@ -12,6 +12,7 @@ import { listInstalledApps } from "./lib/commands/apps";
 import { checkModelStatus } from "./lib/commands/model";
 import { errorFields, logDiagnostic } from "./lib/diagnostics";
 import { MODEL_DOWNLOAD_STEP } from "./lib/onboarding";
+import { isMacOS } from "./lib/platform";
 import { capture } from "./lib/posthog";
 import {
 	initSettings,
@@ -52,6 +53,7 @@ function App(props: ParentProps) {
 	const navigate = useNavigate();
 	const [isSettingsOpen, setIsSettingsOpen] = createSignal(false);
 	const [isReady, setIsReady] = createSignal(false);
+	const [shortcutError, setShortcutError] = createSignal("");
 
 	const shouldShowOnboarding = () => {
 		if (FORCE_SHOW_ONBOARDING) return true;
@@ -124,6 +126,9 @@ function App(props: ParentProps) {
 				console.error("Failed to verify Whisper model state:", modelReady.error);
 			}
 
+			addDisposer(
+				await listen<string>("shortcut-error", (event) => setShortcutError(event.payload))
+			);
 			setIsReady(true);
 			logDiagnostic("info", "app", "ready");
 
@@ -169,7 +174,7 @@ function App(props: ParentProps) {
 			);
 
 			const handleKeyDown = (e: KeyboardEvent) => {
-				if (e.metaKey && e.key === ",") {
+				if ((isMacOS ? e.metaKey : e.ctrlKey) && e.key === ",") {
 					e.preventDefault();
 					logDiagnostic("debug", "app", "settings_shortcut_pressed");
 					setIsSettingsOpen(true);
@@ -194,6 +199,17 @@ function App(props: ParentProps) {
 				}}
 			/>
 			<div class="absolute top-0 left-0 right-0 h-6 z-50" data-tauri-drag-region />
+			<Show when={shortcutError()}>
+				<div
+					role="alert"
+					class="absolute top-6 left-4 right-4 z-50 p-4 border border-ac bg-th-surface font-mono text-xs text-ac flex gap-4 items-center"
+				>
+					<span class="flex-1">{shortcutError()}</span>
+					<button type="button" onClick={() => setShortcutError("")}>
+						Dismiss
+					</button>
+				</div>
+			</Show>
 			<Show when={!isReady()}>
 				<div class="h-full flex flex-col items-center justify-center">
 					<img src={appIcon} alt="VoxFusion" class="w-16 h-16 mb-8" />

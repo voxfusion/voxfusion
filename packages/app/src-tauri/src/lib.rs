@@ -1,6 +1,10 @@
 mod handlers;
+#[cfg(target_os = "linux")]
+pub mod linux;
 mod listeners;
+#[cfg(target_os = "macos")]
 mod menu;
+mod platform;
 mod tray;
 mod window;
 
@@ -53,8 +57,27 @@ fn install_panic_hook() {
 pub fn run() {
     install_panic_hook();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_macos_permissions::init());
+
+    // Wayland shortcuts are owned by the compositor; initializing the X11
+    // shortcut plugin would require DISPLAY even in a pure Wayland session.
+    let builder = if cfg!(target_os = "linux") && std::env::var_os("WAYLAND_DISPLAY").is_some() {
+        builder
+    } else {
+        builder.plugin(tauri_plugin_global_shortcut::Builder::new().build())
+    };
+
+    builder
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            window::show_or_create_main_window(app);
+        }))
         .invoke_handler(tauri::generate_handler![
+            platform::platform_info,
+            platform::check_microphone,
+            platform::register_linux_shortcut,
+            platform::unregister_linux_shortcut,
             type_text,
             read_audio_file,
             process_audio_file,
@@ -101,10 +124,8 @@ pub fn run() {
             delete_site_style,
         ])
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(
@@ -140,20 +161,15 @@ pub fn run() {
             app.manage(active_model);
             log::info!(target: "runtime", "active_model_initialized");
 
-            #[cfg(desktop)]
-            let _ = app
-                .handle()
-                .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-                    log::info!(target: "runtime", "single_instance_requested");
-                    window::show_or_create_main_window(app);
-                }));
+            #[cfg(target_os = "linux")]
+            linux::setup(app.handle())?;
 
             #[cfg(desktop)]
             window::create_voice_control_window(app)?;
             #[cfg(desktop)]
             log::info!(target: "runtime", "voice_control_window_created");
 
-            #[cfg(desktop)]
+            #[cfg(target_os = "macos")]
             menu::setup(app)?;
             #[cfg(desktop)]
             log::info!(target: "runtime", "menu_setup");
@@ -185,6 +201,7 @@ pub fn run() {
         .run(|app, event| {
             #[cfg(desktop)]
             match event {
+                #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
                     log::info!(target: "runtime", "reopen_requested");
                     #[cfg(target_os = "macos")]
@@ -201,6 +218,8 @@ pub fn run() {
                 }
                 tauri::RunEvent::Exit => {
                     log::warn!(target: "runtime", "exit");
+                    #[cfg(target_os = "linux")]
+                    linux::cleanup(app);
                 }
                 _ => {}
             }
