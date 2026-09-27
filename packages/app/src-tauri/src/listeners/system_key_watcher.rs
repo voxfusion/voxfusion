@@ -25,16 +25,19 @@ const KEYCODE_RIGHT_SHIFT: u16 = 0x3C;
 const KEYCODE_LEFT_COMMAND: u16 = 0x37;
 const KEYCODE_RIGHT_COMMAND: u16 = 0x36;
 
-const TRACKED_SYSTEM_KEYS: [(SystemKey, u16); 9] = [
-    (SystemKey::Fn, KEYCODE_FN),
-    (SystemKey::LeftControl, KEYCODE_LEFT_CONTROL),
-    (SystemKey::RightControl, KEYCODE_RIGHT_CONTROL),
-    (SystemKey::LeftOption, KEYCODE_LEFT_OPTION),
-    (SystemKey::RightOption, KEYCODE_RIGHT_OPTION),
-    (SystemKey::LeftShift, KEYCODE_LEFT_SHIFT),
-    (SystemKey::RightShift, KEYCODE_RIGHT_SHIFT),
-    (SystemKey::LeftCommand, KEYCODE_LEFT_COMMAND),
-    (SystemKey::RightCommand, KEYCODE_RIGHT_COMMAND),
+// NX_DEVICE*KEYMASK and NX_SECONDARYFNMASK from IOKit/hidsystem/IOLLEvent.h.
+// Keep the device-dependent bits: the public Command/Control/Option/Shift
+// flags each combine both sides of the keyboard.
+const SYSTEM_KEY_FLAGS: [(SystemKey, u64); 9] = [
+    (SystemKey::Fn, 0x0080_0000),
+    (SystemKey::LeftControl, 0x0000_0001),
+    (SystemKey::RightControl, 0x0000_2000),
+    (SystemKey::LeftOption, 0x0000_0020),
+    (SystemKey::RightOption, 0x0000_0040),
+    (SystemKey::LeftShift, 0x0000_0002),
+    (SystemKey::RightShift, 0x0000_0004),
+    (SystemKey::LeftCommand, 0x0000_0008),
+    (SystemKey::RightCommand, 0x0000_0010),
 ];
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -90,17 +93,24 @@ fn key_from_keycode(keycode: u16) -> Option<SystemKey> {
     }
 }
 
-fn current_pressed_keys_with(mut key_is_down: impl FnMut(u16) -> bool) -> BTreeSet<SystemKey> {
-    TRACKED_SYSTEM_KEYS
+fn pressed_keys_from_flags(flags: u64) -> BTreeSet<SystemKey> {
+    SYSTEM_KEY_FLAGS
         .iter()
-        .filter_map(|(key, keycode)| key_is_down(*keycode).then_some(*key))
+        .filter_map(|(key, mask)| (flags & mask != 0).then_some(*key))
         .collect()
 }
 
 fn current_pressed_keys() -> BTreeSet<SystemKey> {
-    current_pressed_keys_with(|keycode| {
-        CGEventSource::key_state(CGEventSourceStateID::CombinedSessionState, keycode)
-    })
+    pressed_keys_from_flags(
+        CGEventSource::flags_state(CGEventSourceStateID::CombinedSessionState).bits(),
+    )
+}
+
+fn pressed_keys_for_event(event: &NSEvent) -> BTreeSet<SystemKey> {
+    // Read the snapshot attached to this event, not the live keycode table.
+    // CGEventSourceKeyState can report right Command as left Command, and
+    // polling at delivery time can see later transitions already queued up.
+    pressed_keys_from_flags(event.modifierFlags().bits() as u64)
 }
 
 /// A flags-changed event normally toggles exactly the key identified by its
@@ -136,9 +146,9 @@ fn emit_system_key_event(event: &NSEvent) {
     };
 
     // Rebuild the complete state on every event instead of accumulating
-    // transitions. CGEventSourceKeyState distinguishes left/right modifiers
-    // and repairs stale keys immediately after a missed release.
-    let current = current_pressed_keys();
+    // transitions. The event's side-specific flags also repair stale keys
+    // immediately after a missed release.
+    let current = pressed_keys_for_event(event);
     let mut pressed = pressed_keys()
         .lock()
         .expect("system key pressed state mutex poisoned");
@@ -278,21 +288,127 @@ pub fn resynchronize(app_handle: &tauri::AppHandle, reason: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use objc2::rc::Retained;
+    use objc2_app_kit::NSEventModifierFlags;
+    use objc2_foundation::{NSPoint, ns_string};
 
     fn keys(keys: &[SystemKey]) -> BTreeSet<SystemKey> {
         keys.iter().copied().collect()
     }
 
+    fn event(keycode: u16, flags: u64) -> Retained<NSEvent> {
+        NSEvent::keyEventWithType_location_modifierFlags_timestamp_windowNumber_context_characters_charactersIgnoringModifiers_isARepeat_keyCode(
+            NSEventType::FlagsChanged,
+            NSPoint::new(0.0, 0.0),
+            NSEventModifierFlags::from_bits_retain(flags as usize),
+            0.0,
+            0,
+            None,
+            ns_string!(""),
+            ns_string!(""),
+            false,
+            keycode,
+        )
+        .expect("flags-changed event")
+    }
+
     #[test]
-    fn current_state_distinguishes_left_and_right_modifiers() {
-        let pressed = current_pressed_keys_with(|keycode| {
-            keycode == KEYCODE_LEFT_CONTROL || keycode == KEYCODE_RIGHT_OPTION
-        });
+    fn right_command_press_and_release_use_the_event_snapshot() {
+        // These events are not posted to the OS. The live keycode table
+        // cannot describe them, just as it cannot describe a queued event.
+        let pressed = event(KEYCODE_RIGHT_COMMAND, 0x0010_0010);
+        let released = event(KEYCODE_RIGHT_COMMAND, 0);
 
         assert_eq!(
-            pressed,
-            keys(&[SystemKey::LeftControl, SystemKey::RightOption])
+            key_from_keycode(pressed.keyCode()),
+            Some(SystemKey::RightCommand)
         );
+        assert_eq!(
+            pressed_keys_for_event(&pressed),
+            keys(&[SystemKey::RightCommand])
+        );
+        assert_eq!(pressed_keys_for_event(&released), keys(&[]));
+        // Constructing a later release must not alter the earlier press.
+        assert_eq!(
+            pressed_keys_for_event(&pressed),
+            keys(&[SystemKey::RightCommand])
+        );
+    }
+
+    #[test]
+    fn releasing_right_command_preserves_a_held_left_command() {
+        let both = pressed_keys_for_event(&event(KEYCODE_RIGHT_COMMAND, 0x0010_0018));
+        let left = pressed_keys_for_event(&event(KEYCODE_RIGHT_COMMAND, 0x0010_0008));
+
+        assert_eq!(
+            both,
+            keys(&[SystemKey::LeftCommand, SystemKey::RightCommand])
+        );
+        assert_eq!(left, keys(&[SystemKey::LeftCommand]));
+        assert!(transition_is_contiguous(
+            &both,
+            &left,
+            SystemKey::RightCommand
+        ));
+    }
+
+    #[test]
+    fn flags_distinguish_every_supported_modifier() {
+        for (flags, key) in [
+            (0x0080_0000, SystemKey::Fn),
+            (0x0004_0001, SystemKey::LeftControl),
+            (0x0004_2000, SystemKey::RightControl),
+            (0x0008_0020, SystemKey::LeftOption),
+            (0x0008_0040, SystemKey::RightOption),
+            (0x0002_0002, SystemKey::LeftShift),
+            (0x0002_0004, SystemKey::RightShift),
+            (0x0010_0008, SystemKey::LeftCommand),
+            (0x0010_0010, SystemKey::RightCommand),
+        ] {
+            assert_eq!(pressed_keys_from_flags(flags), keys(&[key]));
+        }
+    }
+
+    #[test]
+    fn queued_chord_events_preserve_their_own_modifier_state() {
+        let control = event(KEYCODE_LEFT_CONTROL, 0x0004_0001);
+        let option = event(KEYCODE_LEFT_OPTION, 0x000c_0021);
+        let shift = event(KEYCODE_LEFT_SHIFT, 0x000e_0023);
+        let command = event(KEYCODE_LEFT_COMMAND, 0x001e_002b);
+
+        let mut previous = keys(&[]);
+        for event in [control, option, shift, command] {
+            let current = pressed_keys_for_event(&event);
+            let key = key_from_keycode(event.keyCode()).unwrap();
+            assert!(transition_is_contiguous(&previous, &current, key));
+            previous = current;
+        }
+        assert_eq!(
+            previous,
+            keys(&[
+                SystemKey::LeftControl,
+                SystemKey::LeftOption,
+                SystemKey::LeftShift,
+                SystemKey::LeftCommand,
+            ])
+        );
+    }
+
+    #[test]
+    fn event_snapshot_removes_a_stale_modifier_before_right_command() {
+        let current = pressed_keys_for_event(&event(KEYCODE_RIGHT_COMMAND, 0x0010_0010));
+        assert_eq!(current, keys(&[SystemKey::RightCommand]));
+        assert!(!transition_is_contiguous(
+            &keys(&[SystemKey::Fn]),
+            &current,
+            SystemKey::RightCommand,
+        ));
+    }
+
+    #[test]
+    fn unrelated_flags_do_not_create_a_modifier_hotkey() {
+        // Caps Lock, numeric pad, help and event-coalescing flags.
+        assert_eq!(pressed_keys_from_flags(0x0061_0100), keys(&[]));
     }
 
     #[test]
