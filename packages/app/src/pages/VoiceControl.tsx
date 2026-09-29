@@ -1,11 +1,5 @@
 import { emit, listen } from "@tauri-apps/api/event";
-import {
-	LogicalPosition,
-	LogicalSize,
-	cursorPosition,
-	getCurrentWindow,
-	monitorFromPoint,
-} from "@tauri-apps/api/window";
+import { LogicalSize, getCurrentWindow } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Result } from "better-result";
 import { play } from "cuelume";
@@ -36,6 +30,10 @@ import {
 	updateHotkey,
 	useSettings,
 } from "../lib/settingsStore";
+import {
+	VOICE_CONTROL_WINDOW_HEIGHT,
+	repositionVoiceControlWindow,
+} from "../lib/voiceControlPosition";
 
 const NUM_BARS = 10;
 const BAR_INDICES = Array.from({ length: NUM_BARS }, (_, i) => i);
@@ -51,8 +49,6 @@ const WAVE_PATTERN = [
 const WINDOW_WIDTH_COMPACT = 100;
 const WINDOW_WIDTH_HANDS_FREE = 140;
 const WINDOW_WIDTH_ERROR = 260;
-const WINDOW_HEIGHT = 28;
-const BOTTOM_PADDING = 20;
 const ESCAPE_KEY_CODE = 53;
 const VOXFUSION_BUNDLE_ID = "io.voxfusion.app";
 
@@ -71,16 +67,12 @@ type RecordingErrorPayload = {
 	message: string;
 };
 
-let lastMonitorX: number | null = null;
-let lastMonitorY: number | null = null;
 let currentWindowWidth = WINDOW_WIDTH_COMPACT;
 
 async function setWindowWidth(width: number) {
 	if (currentWindowWidth === width) return;
+	await getCurrentWindow().setSize(new LogicalSize(width, VOICE_CONTROL_WINDOW_HEIGHT));
 	currentWindowWidth = width;
-	await getCurrentWindow().setSize(new LogicalSize(width, WINDOW_HEIGHT));
-	lastMonitorX = null;
-	lastMonitorY = null;
 	await repositionToCurrentMonitor();
 }
 
@@ -94,21 +86,7 @@ async function hideVoiceControlWindow() {
 }
 
 async function repositionToCurrentMonitor() {
-	const cursor = await cursorPosition();
-	const monitor = await monitorFromPoint(cursor.x, cursor.y);
-	if (!monitor) return;
-
-	const pos = monitor.position.toLogical(monitor.scaleFactor);
-	const size = monitor.size.toLogical(monitor.scaleFactor);
-
-	if (pos.x === lastMonitorX && pos.y === lastMonitorY) return;
-	lastMonitorX = pos.x;
-	lastMonitorY = pos.y;
-
-	const x = pos.x + (size.width - currentWindowWidth) / 2;
-	const y = pos.y + size.height - WINDOW_HEIGHT - BOTTOM_PADDING;
-
-	await getCurrentWindow().setPosition(new LogicalPosition(x, y));
+	await repositionVoiceControlWindow(currentWindowWidth);
 }
 
 export default function VoiceControl() {
