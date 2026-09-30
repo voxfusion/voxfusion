@@ -381,15 +381,21 @@ pub fn restore_media_after_recording() -> Result<(), String> {
     // to another device since (e.g. a headset was plugged in or pulled out).
     #[cfg(target_os = "macos")]
     {
-        if let Some(device) = state.muted_device.take()
-            && let Err(err) = set_output_muted(device.id, false)
-        {
-            log::warn!(
-                target: "media",
-                "restore_output_mute_failed device_id={} error={err}",
-                device.id
-            );
-            state.pending_unmute_uids.extend(device.uid);
+        if let Some(device) = state.muted_device.take() {
+            // A device unplugged and reconnected mid-recording can come back
+            // under a new ID, so look it up by UID first.
+            let device_id = device
+                .uid
+                .as_deref()
+                .and_then(find_device_by_uid)
+                .unwrap_or(device.id);
+            if let Err(err) = set_output_muted(device_id, false) {
+                log::warn!(
+                    target: "media",
+                    "restore_output_mute_failed device_id={device_id} error={err}"
+                );
+                state.pending_unmute_uids.extend(device.uid);
+            }
         }
     }
 
