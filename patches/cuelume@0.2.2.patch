@@ -1,7 +1,55 @@
+diff --git a/dist/audio/engine.d.ts b/dist/audio/engine.d.ts
+index dfeba7ce63a68cc41dd6a50d1204a488f33de2b7..26748dcd16ed15618f562a66c2d422407c664a80 100644
+--- a/dist/audio/engine.d.ts
++++ b/dist/audio/engine.d.ts
+@@ -9,6 +9,11 @@ import { type SoundName } from "../sounds/recipes.js";
+ export declare function setEnabled(value: boolean): void;
+ /** Sets the volume multiplier for future playback. Preference storage stays with the app. */
+ export declare function setVolume(value: number): void;
++/**
++ * Makes the next sound open a new `AudioContext`, e.g. after the default
++ * output device changed.
++ */
++export declare function resetAudioContext(): void;
+ /**
+  * Plays a sound immediately. Safe to call from anywhere — lazily creates
+  * the shared `AudioContext` on first use, resumes it if the browser
 diff --git a/dist/audio/engine.js b/dist/audio/engine.js
+index 4b338838b9f1d8b75da18734c3f6759870afddcc..724e22e1037a2e8966c59e554cb656d7746a11bf 100644
 --- a/dist/audio/engine.js
 +++ b/dist/audio/engine.js
-@@ -160,8 +160,10 @@
+@@ -118,6 +118,7 @@ function renderRecipe(context, recipe, volume) {
+     }, cleanupAfterMs);
+ }
+ let sharedContext = null;
++let sharedContextStale = false;
+ let enabled = true;
+ let globalVolume = 1;
+ function normalizeVolume(value, fallback) {
+@@ -134,7 +135,22 @@ export function setEnabled(value) {
+ export function setVolume(value) {
+     globalVolume = normalizeVolume(value, globalVolume);
+ }
++/**
++ * Makes the next sound open a new `AudioContext`. VoxFusion calls this when
++ * audio devices change: an open context can stay bound to an output device
++ * that is gone and play nothing. The old context is closed lazily so a sound
++ * that is already playing is not cut off.
++ */
++export function resetAudioContext() {
++    sharedContextStale = true;
++}
+ function getAudioContext() {
++    if (sharedContext && (sharedContextStale || sharedContext.state === "closed")) {
++        void sharedContext.close().catch(() => { });
++        sharedContext = null;
++        sharedOutput = null;
++    }
++    sharedContextStale = false;
+     if (sharedContext)
+         return sharedContext;
+     if (typeof window === "undefined")
+@@ -160,8 +176,10 @@ function getAudioContext() {
  export function play(sound = "chime", options) {
      if (!enabled || !isSoundName(sound))
          return;
@@ -14,3 +62,25 @@ diff --git a/dist/audio/engine.js b/dist/audio/engine.js
      const playVolume = globalVolume * normalizeVolume(options?.volume, 1);
      if (playVolume === 0)
          return;
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index b4d7d6ffd268273af3fc8cae0d3c21853ca39a1a..0a3cfdd44e2cf1a8b670424d585553cf26932bf4 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -12,5 +12,5 @@
+  */
+ export type { SoundName } from "./sounds/recipes.js";
+ export { sounds } from "./sounds/recipes.js";
+-export { play, setEnabled, setVolume } from "./audio/engine.js";
++export { play, resetAudioContext, setEnabled, setVolume } from "./audio/engine.js";
+ export { bind } from "./interactions/bind.js";
+diff --git a/dist/index.js b/dist/index.js
+index 4729141a5b0c146d03b6a610edad82bf0b9ad47b..a03c2220f94a3e8e7a6b3a0a55f5a5f549289d71 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -11,5 +11,5 @@
+  *   play("droplet");
+  */
+ export { sounds } from "./sounds/recipes.js";
+-export { play, setEnabled, setVolume } from "./audio/engine.js";
++export { play, resetAudioContext, setEnabled, setVolume } from "./audio/engine.js";
+ export { bind } from "./interactions/bind.js";

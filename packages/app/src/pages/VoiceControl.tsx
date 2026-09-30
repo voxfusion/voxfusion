@@ -2,7 +2,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { LogicalSize, getCurrentWindow } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { Result } from "better-result";
-import { play } from "cuelume";
+import { play, resetAudioContext } from "cuelume";
 import { AlertCircle, Check, X } from "lucide-solid";
 import { For, Show, createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import DotMatrixSpinner from "../components/DotMatrixSpinner";
@@ -330,6 +330,14 @@ export default function VoiceControl() {
 		);
 
 		addDisposer(
+			await listen("audio-devices-changed", () => {
+				// The default output may have moved; let the next cue open a fresh
+				// AudioContext instead of playing into one bound to a gone device.
+				resetAudioContext();
+			})
+		);
+
+		addDisposer(
 			await listen<RecordingErrorPayload>("recording-error", async (event) => {
 				// The mic stream died mid-recording. The backend has already
 				// cleared its recording state — reset ours so the next hotkey
@@ -456,6 +464,9 @@ export default function VoiceControl() {
 		setRecordingMode(null);
 		await unregisterEscapeShortcut();
 		await setWindowWidth(WINDOW_WIDTH_COMPACT);
+		// Unmute before touching the recorder so a failed stop cannot leave the
+		// output muted.
+		await restoreMediaAfterRecording();
 
 		const completed = await Result.tryPromise(async () => {
 			const filePath = await stopRecordingWithDevice();
@@ -466,7 +477,6 @@ export default function VoiceControl() {
 				});
 				return;
 			}
-			await restoreMediaAfterRecording();
 
 			setLoading(true);
 
@@ -527,8 +537,8 @@ export default function VoiceControl() {
 		await unregisterEscapeShortcut();
 		await setWindowWidth(WINDOW_WIDTH_COMPACT);
 
-		await stopRecordingWithDevice();
 		await restoreMediaAfterRecording();
+		await stopRecordingWithDevice();
 		isStopping = false;
 		await hideVoiceControlWindow();
 	};
@@ -588,6 +598,8 @@ export default function VoiceControl() {
 				});
 				return;
 			}
+			// The input already failed and the recording-error handler reported it.
+			if (!isStarting) return;
 			setRecordingMode(mode);
 			setIsRecording(true);
 			isStarting = false;

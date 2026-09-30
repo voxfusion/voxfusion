@@ -129,6 +129,7 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 listeners::accessibility_watcher::setup(app.handle());
+                handlers::media::watch_audio_devices(app.handle());
                 log::info!(target: "runtime", "macos_listeners_setup");
             }
 
