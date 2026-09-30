@@ -1,14 +1,14 @@
 use chrono::Local;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{FromSample, Sample, Stream};
+use cpal::{Stream, StreamError};
 use hound::{SampleFormat, WavSpec, WavWriter};
 use serde::Serialize;
 use std::fs::{File, create_dir_all};
 use std::io::BufWriter;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 
 type WavWriterHandle = Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>;
@@ -18,30 +18,28 @@ struct SafeStream(Stream);
 unsafe impl Send for SafeStream {}
 unsafe impl Sync for SafeStream {}
 
-struct RecordingState {
-    is_recording: Arc<AtomicBool>,
-    save_path: Arc<Mutex<Option<PathBuf>>>,
+/// The dictation currently being captured. Stream callbacks and the input
+/// watchdog carry the recording `id`, so late events from an earlier stream
+/// cannot touch a newer recording.
+struct Recording {
+    id: u64,
+    stream: SafeStream,
     writer: WavWriterHandle,
-    stream: Arc<Mutex<Option<SafeStream>>>,
-    app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
-    last_emit_time: Arc<AtomicU64>,
+    save_path: PathBuf,
 }
 
-impl RecordingState {
-    fn new() -> Self {
-        Self {
-            is_recording: Arc::new(AtomicBool::new(false)),
-            save_path: Arc::new(Mutex::new(None)),
-            writer: Arc::new(Mutex::new(None)),
-            stream: Arc::new(Mutex::new(None)),
-            app_handle: Arc::new(Mutex::new(None)),
-            last_emit_time: Arc::new(AtomicU64::new(0)),
-        }
-    }
-}
+static RECORDING: Mutex<Option<Recording>> = Mutex::new(None);
+static NEXT_RECORDING_ID: AtomicU64 = AtomicU64::new(1);
 
-static RECORDING_STATE: LazyLock<Arc<Mutex<RecordingState>>> =
-    LazyLock::new(|| Arc::new(Mutex::new(RecordingState::new())));
+/// How long a newly opened input may take to deliver its first samples.
+/// Bluetooth microphones switch profiles when opened and can take seconds.
+const FIRST_INPUT_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a running input may stop delivering samples before the device
+/// is treated as lost. cpal does not report an unplugged device when it is
+/// also the system default input; the stream only goes quiet.
+const INPUT_STALL_TIMEOUT: Duration = Duration::from_secs(2);
+const INPUT_WATCHDOG_INTERVAL: Duration = Duration::from_millis(250);
+const NO_INPUT_YET: u64 = u64::MAX;
 
 #[derive(Serialize, Clone, Default)]
 pub struct AudioDevice {
@@ -58,17 +56,26 @@ struct RecordingErrorPayload {
 /// is pruned after each successful transcription.
 pub const RECORDINGS_TO_KEEP: usize = 20;
 
+fn read_device_name(device: &cpal::Device) -> Option<String> {
+    device
+        .description()
+        .ok()
+        .map(|description| description.name().to_string())
+}
+
 #[tauri::command]
 pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
     let host = cpal::default_host();
 
-    let default_device_name = host.default_input_device().and_then(|d| d.name().ok());
+    let default_device_name = host
+        .default_input_device()
+        .and_then(|d| read_device_name(&d));
 
     let devices = host
         .input_devices()
         .map_err(|e| e.to_string())?
         .filter_map(|device| {
-            device.name().ok().and_then(|name| {
+            read_device_name(&device).and_then(|name| {
                 // Filter out inactive capture devices
                 if name.contains("Capture Inactive") {
                     return None;
@@ -84,192 +91,235 @@ pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
     Ok(devices)
 }
 
+fn input_device(host: &cpal::Host, device_name: Option<&str>) -> Result<cpal::Device, String> {
+    if let Some(name) = device_name.filter(|name| *name != "default" && !name.is_empty()) {
+        let found = host
+            .input_devices()
+            .map_err(|err| err.to_string())?
+            .find(|device| read_device_name(device).as_deref() == Some(name));
+        if let Some(device) = found {
+            return Ok(device);
+        }
+        // The saved device may have been unplugged; fall back to the system
+        // default input instead of failing the dictation.
+        log::warn!(
+            target: "audio",
+            "input device not found, falling back to default device_name={name:?}"
+        );
+    }
+
+    host.default_input_device()
+        .ok_or_else(|| "No input device available".to_string())
+}
+
 #[tauri::command]
 pub async fn start_recording_with_device(
     app_handle: tauri::AppHandle,
     device_name: Option<String>,
 ) -> Result<(), String> {
-    let mut state = RECORDING_STATE.lock().map_err(|err| err.to_string())?;
-    if state.is_recording.load(Ordering::SeqCst) {
+    let mut active = RECORDING.lock().map_err(|err| err.to_string())?;
+    if active.is_some() {
         return Err("Recording is already in progress.".to_string());
     }
 
     let host = cpal::default_host();
-
-    let device = match device_name {
-        Some(ref name) if name != "default" && !name.is_empty() => {
-            let found = host
-                .input_devices()
-                .map_err(|err| err.to_string())?
-                .find(|x| x.name().map(|y| y == *name).unwrap_or(false));
-            match found {
-                Some(device) => device,
-                None => {
-                    // The saved device may have been unplugged; fall back to
-                    // the system default input instead of failing the dictation.
-                    log::warn!(
-                        target: "audio",
-                        "input device not found, falling back to default device_name={name:?}"
-                    );
-                    host.default_input_device()
-                        .ok_or("No input device available")?
-                }
-            }
-        }
-        _ => host
-            .default_input_device()
-            .ok_or("No default input device available")?,
-    };
-
-    let config = device
+    let device = input_device(&host, device_name.as_deref())?;
+    let config: cpal::StreamConfig = device
         .default_input_config()
-        .map_err(|err| err.to_string())?;
+        .map_err(|err| err.to_string())?
+        .config();
 
+    // Capture as f32 whatever the hardware format is; CoreAudio converts, and
+    // the WAV spec stays independent of the device.
+    let spec = WavSpec {
+        channels: config.channels,
+        sample_rate: config.sample_rate,
+        bits_per_sample: 32,
+        sample_format: SampleFormat::Float,
+    };
     let save_path = get_save_path(&app_handle)?;
-    let spec = wav_spec_from_config(&config);
     let writer = WavWriter::create(&save_path, spec).map_err(|err| err.to_string())?;
-    let writer = Arc::new(Mutex::new(Some(writer)));
+    let writer: WavWriterHandle = Arc::new(Mutex::new(Some(writer)));
 
-    let writer_2 = writer.clone();
-    let app_handle_2 = state.app_handle.clone();
-    let last_emit_time = state.last_emit_time.clone();
+    let id = NEXT_RECORDING_ID.fetch_add(1, Ordering::Relaxed);
+    let last_input_ms = Arc::new(AtomicU64::new(NO_INPUT_YET));
+
+    let data_writer = writer.clone();
+    let data_app_handle = app_handle.clone();
+    let data_last_input_ms = last_input_ms.clone();
+    let mut last_level_emit_ms = 0;
 
     // Surface stream errors (e.g. mic unplugged mid-recording) to the frontend
-    // and unlatch the recorder so the next hotkey press can start fresh.
+    // and release the recorder so the next hotkey press can start fresh.
     let err_app_handle = app_handle.clone();
-    let err_is_recording = state.is_recording.clone();
-    let err_fn = move |err: cpal::StreamError| {
-        log::error!(target: "audio", "recording stream error: {err}");
-        err_is_recording.store(false, Ordering::SeqCst);
-        let _ = err_app_handle.emit(
-            "recording-error",
-            RecordingErrorPayload {
-                message: err.to_string(),
+    let err_fn = move |err: StreamError| {
+        if matches!(err, StreamError::BufferUnderrun) {
+            log::warn!(target: "audio", "recording stream overrun id={id}");
+            return;
+        }
+        // Errors can arrive on CoreAudio's realtime thread; tear down elsewhere.
+        let app_handle = err_app_handle.clone();
+        let message = err.to_string();
+        std::thread::spawn(move || fail_recording(id, &app_handle, message));
+    };
+
+    let stream = device
+        .build_input_stream(
+            &config,
+            move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                data_last_input_ms.store(elapsed_ms(), Ordering::Relaxed);
+                write_input_data_with_levels(
+                    data,
+                    &data_writer,
+                    &data_app_handle,
+                    &mut last_level_emit_ms,
+                );
             },
-        );
+            err_fn,
+            None,
+        )
+        .map_err(|err| err.to_string())
+        .and_then(|stream| {
+            stream.play().map_err(|err| err.to_string())?;
+            Ok(stream)
+        });
+    let stream = match stream {
+        Ok(stream) => stream,
+        Err(err) => {
+            discard_recording_file(&writer, &save_path);
+            return Err(err);
+        }
     };
 
-    let stream = match config.sample_format() {
-        cpal::SampleFormat::I8 => device
-            .build_input_stream(
-                &config.into(),
-                move |data, _: &_| {
-                    write_input_data_with_levels::<i8, i8>(
-                        data,
-                        &writer_2,
-                        &app_handle_2,
-                        &last_emit_time,
-                    )
-                },
-                err_fn,
-                None,
-            )
-            .map_err(|err| err.to_string())?,
-        cpal::SampleFormat::I16 => device
-            .build_input_stream(
-                &config.into(),
-                move |data, _: &_| {
-                    write_input_data_with_levels::<i16, i16>(
-                        data,
-                        &writer_2,
-                        &app_handle_2,
-                        &last_emit_time,
-                    )
-                },
-                err_fn,
-                None,
-            )
-            .map_err(|err| err.to_string())?,
-        cpal::SampleFormat::I32 => device
-            .build_input_stream(
-                &config.into(),
-                move |data, _: &_| {
-                    write_input_data_with_levels::<i32, i32>(
-                        data,
-                        &writer_2,
-                        &app_handle_2,
-                        &last_emit_time,
-                    )
-                },
-                err_fn,
-                None,
-            )
-            .map_err(|err| err.to_string())?,
-        cpal::SampleFormat::F32 => device
-            .build_input_stream(
-                &config.into(),
-                move |data, _: &_| {
-                    write_input_data_with_levels::<f32, f32>(
-                        data,
-                        &writer_2,
-                        &app_handle_2,
-                        &last_emit_time,
-                    )
-                },
-                err_fn,
-                None,
-            )
-            .map_err(|err| err.to_string())?,
-        _ => return Err("Unsupported sample format".to_string()),
-    };
+    // Only publish the recording once the stream is running — any error above
+    // leaves the recorder ready for a retry.
+    *active = Some(Recording {
+        id,
+        stream: SafeStream(stream),
+        writer,
+        save_path,
+    });
+    drop(active);
 
-    stream.play().map_err(|err| err.to_string())?;
+    log::info!(
+        target: "audio",
+        "recording_started id={id} device={:?} sample_rate={} channels={}",
+        read_device_name(&device).unwrap_or_default(),
+        config.sample_rate,
+        config.channels
+    );
 
-    *state.app_handle.lock().map_err(|err| err.to_string())? = Some(app_handle);
-    *state.save_path.lock().map_err(|err| err.to_string())? = Some(save_path);
-    state.writer = writer;
-    *state.stream.lock().map_err(|err| err.to_string())? = Some(SafeStream(stream));
-
-    // Only latch the recording state once the stream is running and all state
-    // is in place — any error above leaves the recorder ready for a retry.
-    state.is_recording.store(true, Ordering::SeqCst);
+    let spawned = std::thread::Builder::new()
+        .name("audio-input-watchdog".into())
+        .spawn(move || watch_input(id, app_handle, last_input_ms));
+    if let Err(err) = spawned {
+        log::warn!(target: "audio", "input watchdog not started id={id} error={err}");
+    }
 
     Ok(())
 }
 
 #[tauri::command]
 pub async fn stop_recording_with_device() -> Result<PathBuf, String> {
-    // Extract resources while holding the lock, then release lock before dropping
-    let (stream_to_drop, writer_to_finalize, save_path) = {
-        let state = RECORDING_STATE.lock().map_err(|err| err.to_string())?;
-        if !state.is_recording.load(Ordering::SeqCst) {
-            return Err("No recording in progress.".to_string());
-        }
-        state.is_recording.store(false, Ordering::SeqCst);
+    let recording = RECORDING
+        .lock()
+        .map_err(|err| err.to_string())?
+        .take()
+        .ok_or("No recording in progress.".to_string())?;
 
-        // Take the stream
-        let stream = state.stream.lock().map_err(|err| err.to_string())?.take();
+    // Take the writer first so callbacks still in flight stop writing.
+    let writer = recording
+        .writer
+        .lock()
+        .map_err(|err| err.to_string())?
+        .take();
+    close_stream(recording.stream);
 
-        // Take the writer
-        let writer = state.writer.lock().map_err(|err| err.to_string())?.take();
-
-        // Clear app handle
-        *state.app_handle.lock().map_err(|err| err.to_string())? = None;
-
-        // Get and clear the save path
-        let save_path = state
-            .save_path
-            .lock()
-            .map_err(|err| err.to_string())?
-            .take()
-            .ok_or("No recording in progress or save path not set.".to_string())?;
-
-        (stream, writer, save_path)
-    };
-    // Lock is now released
-
-    // Stop the stream - pause first, then drop to ensure macOS releases microphone
-    if let Some(stream) = stream_to_drop {
-        let _ = stream.0.pause();
-        drop(stream.0);
-    }
-
-    // Finalize the writer
-    if let Some(writer) = writer_to_finalize {
+    if let Some(writer) = writer {
         writer.finalize().map_err(|err| err.to_string())?;
     }
 
-    Ok(save_path)
+    Ok(recording.save_path)
+}
+
+/// Ends recording `id` after its input failed: releases the device, drops the
+/// partial WAV and tells the frontend. A no-op if that recording already ended.
+fn fail_recording(id: u64, app_handle: &tauri::AppHandle, message: String) {
+    let recording = match RECORDING.lock() {
+        Ok(mut active) if active.as_ref().is_some_and(|recording| recording.id == id) => {
+            active.take()
+        }
+        _ => None,
+    };
+    let Some(recording) = recording else {
+        return;
+    };
+
+    log::error!(target: "audio", "recording stream error id={id}: {message}");
+    discard_recording_file(&recording.writer, &recording.save_path);
+    close_stream(recording.stream);
+    let _ = app_handle.emit("recording-error", RecordingErrorPayload { message });
+}
+
+/// Pauses and drops a capture stream on a detached thread. CoreAudio teardown
+/// can block on a device that has just disappeared, and that must not wedge
+/// the recorder or the command that stopped it.
+fn close_stream(stream: SafeStream) {
+    let spawned = std::thread::Builder::new()
+        .name("audio-stream-close".into())
+        .spawn(move || {
+            let _ = stream.0.pause();
+            drop(stream);
+        });
+    if let Err(err) = spawned {
+        log::warn!(target: "audio", "failed to spawn stream close thread: {err}");
+    }
+}
+
+fn discard_recording_file(writer: &WavWriterHandle, save_path: &Path) {
+    if let Ok(mut writer) = writer.lock() {
+        writer.take();
+    }
+    if let Err(err) = std::fs::remove_file(save_path) {
+        log::warn!(
+            target: "audio",
+            "failed to delete discarded recording {}: {err}",
+            save_path.display()
+        );
+    }
+}
+
+/// Fails recording `id` if its input stops delivering samples, which is how
+/// an unplugged system-default microphone shows up.
+fn watch_input(id: u64, app_handle: tauri::AppHandle, last_input_ms: Arc<AtomicU64>) {
+    let started_ms = elapsed_ms();
+    loop {
+        std::thread::sleep(INPUT_WATCHDOG_INTERVAL);
+
+        let is_active = RECORDING
+            .lock()
+            .map(|active| active.as_ref().is_some_and(|recording| recording.id == id))
+            .unwrap_or(false);
+        if !is_active {
+            return;
+        }
+
+        let now_ms = elapsed_ms();
+        let last_ms = last_input_ms.load(Ordering::Relaxed);
+        let (silent_for, timeout) = if last_ms == NO_INPUT_YET {
+            (now_ms.saturating_sub(started_ms), FIRST_INPUT_TIMEOUT)
+        } else {
+            (now_ms.saturating_sub(last_ms), INPUT_STALL_TIMEOUT)
+        };
+        if silent_for > timeout.as_millis() as u64 {
+            fail_recording(
+                id,
+                &app_handle,
+                format!("Input device delivered no audio for {silent_for} ms"),
+            );
+            return;
+        }
+    }
 }
 
 fn recordings_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -343,35 +393,22 @@ pub fn cleanup_old_recordings(app_handle: &tauri::AppHandle, keep: usize) {
     }
 }
 
-fn sample_format(format: cpal::SampleFormat) -> SampleFormat {
-    if format.is_float() {
-        SampleFormat::Float
-    } else {
-        SampleFormat::Int
-    }
-}
-
-fn wav_spec_from_config(config: &cpal::SupportedStreamConfig) -> WavSpec {
-    WavSpec {
-        channels: config.channels() as _,
-        sample_rate: config.sample_rate().0 as _,
-        bits_per_sample: (config.sample_format().sample_size() * 8) as _,
-        sample_format: sample_format(config.sample_format()),
-    }
-}
-
 // Timestamp tracking for throttling - using a static Instant for reference
 static START_TIME: LazyLock<Instant> = LazyLock::new(Instant::now);
 
-fn write_input_data_with_levels<T, U>(
-    input: &[T],
+fn elapsed_ms() -> u64 {
+    START_TIME.elapsed().as_millis() as u64
+}
+
+fn write_input_data_with_levels(
+    input: &[f32],
     writer: &WavWriterHandle,
-    app_handle: &Arc<Mutex<Option<tauri::AppHandle>>>,
-    last_emit_time: &Arc<AtomicU64>,
-) where
-    T: Sample,
-    U: Sample + hound::Sample + FromSample<T>,
-{
+    app_handle: &tauri::AppHandle,
+    last_emit_ms: &mut u64,
+) {
+    if input.is_empty() {
+        return;
+    }
     if let Ok(mut guard) = writer.try_lock() {
         if let Some(writer) = guard.as_mut() {
             // Calculate RMS (root mean square) for audio level
@@ -379,12 +416,9 @@ fn write_input_data_with_levels<T, U>(
             let mut peak: f64 = 0.0;
 
             for &sample in input.iter() {
-                let sample_u: U = U::from_sample(sample);
-                writer.write_sample(sample_u).ok();
+                writer.write_sample(sample).ok();
 
-                // Convert to f32 first, then to f64 for level calculation
-                let value: f32 = sample.to_float_sample().to_sample();
-                let value_f64 = value as f64;
+                let value_f64 = sample as f64;
                 sum += value_f64 * value_f64;
                 peak = peak.max(value_f64.abs());
             }
@@ -395,17 +429,10 @@ fn write_input_data_with_levels<T, U>(
             let level = ((rms * 0.7 + peak * 0.3) * 150.0).min(100.0);
 
             // Throttle to ~30fps (every ~33ms)
-            let now = START_TIME.elapsed().as_millis() as u64;
-            let last = last_emit_time.load(Ordering::Relaxed);
-            if now - last >= 33 {
-                last_emit_time.store(now, Ordering::Relaxed);
-
-                // Emit to frontend
-                if let Ok(handle_guard) = app_handle.try_lock() {
-                    if let Some(h) = handle_guard.as_ref() {
-                        let _ = h.emit("audio-level", level);
-                    }
-                }
+            let now = elapsed_ms();
+            if now - *last_emit_ms >= 33 {
+                *last_emit_ms = now;
+                let _ = app_handle.emit("audio-level", level);
             }
         }
     }

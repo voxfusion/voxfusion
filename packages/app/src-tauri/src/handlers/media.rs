@@ -3,11 +3,28 @@ use std::sync::{LazyLock, Mutex};
 #[derive(Default)]
 struct MediaMuteState {
     active: bool,
-    was_muted: bool,
+    /// Output device muted for the current recording. `None` when it was
+    /// already muted, so restoring leaves it alone.
+    #[cfg(target_os = "macos")]
+    muted_device: Option<MutedDevice>,
+    /// UIDs of devices that were unplugged while muted. macOS can restore a
+    /// device's saved mute state when it reconnects, so they are unmuted once
+    /// they are back.
+    #[cfg(target_os = "macos")]
+    pending_unmute_uids: Vec<String>,
+}
+
+#[cfg(target_os = "macos")]
+struct MutedDevice {
+    id: AudioObjectId,
+    uid: Option<String>,
 }
 
 static MEDIA_MUTE_STATE: LazyLock<Mutex<MediaMuteState>> =
     LazyLock::new(|| Mutex::new(MediaMuteState::default()));
+
+#[cfg(target_os = "macos")]
+static APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
 #[cfg(target_os = "macos")]
 type AudioObjectId = u32;
@@ -23,6 +40,14 @@ type AudioObjectPropertyElement = u32;
 
 #[cfg(target_os = "macos")]
 type OsStatus = i32;
+
+#[cfg(target_os = "macos")]
+type AudioObjectPropertyListenerProc = unsafe extern "C" fn(
+    in_object_id: AudioObjectId,
+    in_number_addresses: u32,
+    in_addresses: *const AudioObjectPropertyAddress,
+    in_client_data: *mut std::ffi::c_void,
+) -> OsStatus;
 
 #[cfg(target_os = "macos")]
 #[repr(C)]
@@ -52,14 +77,34 @@ unsafe extern "C" {
         in_data_size: u32,
         in_data: *const std::ffi::c_void,
     ) -> OsStatus;
+
+    fn AudioObjectAddPropertyListener(
+        in_object_id: AudioObjectId,
+        in_address: *const AudioObjectPropertyAddress,
+        in_listener: AudioObjectPropertyListenerProc,
+        in_client_data: *mut std::ffi::c_void,
+    ) -> OsStatus;
 }
 
 #[cfg(target_os = "macos")]
 const AUDIO_OBJECT_SYSTEM_OBJECT: AudioObjectId = 1;
 
 #[cfg(target_os = "macos")]
+const AUDIO_OBJECT_UNKNOWN: AudioObjectId = 0;
+
+#[cfg(target_os = "macos")]
+const AUDIO_HARDWARE_PROPERTY_DEVICES: AudioObjectPropertySelector = u32::from_be_bytes(*b"dev#");
+
+#[cfg(target_os = "macos")]
 const AUDIO_HARDWARE_PROPERTY_DEFAULT_OUTPUT_DEVICE: AudioObjectPropertySelector =
     u32::from_be_bytes(*b"dOut");
+
+#[cfg(target_os = "macos")]
+const AUDIO_HARDWARE_PROPERTY_TRANSLATE_UID_TO_DEVICE: AudioObjectPropertySelector =
+    u32::from_be_bytes(*b"uidd");
+
+#[cfg(target_os = "macos")]
+const AUDIO_DEVICE_PROPERTY_DEVICE_UID: AudioObjectPropertySelector = u32::from_be_bytes(*b"uid ");
 
 #[cfg(target_os = "macos")]
 const AUDIO_DEVICE_PROPERTY_MUTE: AudioObjectPropertySelector = u32::from_be_bytes(*b"mute");
@@ -79,12 +124,17 @@ fn core_audio_error(context: &str, status: OsStatus) -> String {
 }
 
 #[cfg(target_os = "macos")]
-fn get_default_output_device() -> Result<AudioObjectId, String> {
-    let address = AudioObjectPropertyAddress {
-        selector: AUDIO_HARDWARE_PROPERTY_DEFAULT_OUTPUT_DEVICE,
+fn global_address(selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
+    AudioObjectPropertyAddress {
+        selector,
         scope: AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
         element: AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
-    };
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn get_default_output_device() -> Result<AudioObjectId, String> {
+    let address = global_address(AUDIO_HARDWARE_PROPERTY_DEFAULT_OUTPUT_DEVICE);
     let mut device_id: AudioObjectId = 0;
     let mut data_size = size_of_val_u32(&device_id)?;
 
@@ -107,14 +157,69 @@ fn get_default_output_device() -> Result<AudioObjectId, String> {
 }
 
 #[cfg(target_os = "macos")]
+fn get_device_uid(device_id: AudioObjectId) -> Result<String, String> {
+    use core_foundation::base::TCFType;
+    use core_foundation::string::{CFString, CFStringRef};
+
+    let address = global_address(AUDIO_DEVICE_PROPERTY_DEVICE_UID);
+    let mut uid: CFStringRef = std::ptr::null();
+    let mut data_size = size_of_val_u32(&uid)?;
+
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            device_id,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut data_size,
+            (&mut uid as *mut CFStringRef).cast(),
+        )
+    };
+
+    if status != 0 {
+        return Err(core_audio_error("Getting device UID", status));
+    }
+    if uid.is_null() {
+        return Err("Device UID is null".to_string());
+    }
+
+    // The HAL returns a retained copy of the UID string.
+    Ok(unsafe { CFString::wrap_under_create_rule(uid) }.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn find_device_by_uid(uid: &str) -> Option<AudioObjectId> {
+    use core_foundation::base::TCFType;
+    use core_foundation::string::{CFString, CFStringRef};
+
+    let address = global_address(AUDIO_HARDWARE_PROPERTY_TRANSLATE_UID_TO_DEVICE);
+    let uid = CFString::new(uid);
+    let uid_ref: CFStringRef = uid.as_concrete_TypeRef();
+    let mut device_id: AudioObjectId = AUDIO_OBJECT_UNKNOWN;
+    let mut data_size = size_of_val_u32(&device_id).ok()?;
+
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            AUDIO_OBJECT_SYSTEM_OBJECT,
+            &address,
+            size_of_val_u32(&uid_ref).ok()?,
+            (&uid_ref as *const CFStringRef).cast(),
+            &mut data_size,
+            (&mut device_id as *mut AudioObjectId).cast(),
+        )
+    };
+
+    (status == 0 && device_id != AUDIO_OBJECT_UNKNOWN).then_some(device_id)
+}
+
+#[cfg(target_os = "macos")]
 fn size_of_val_u32<T>(value: &T) -> Result<u32, String> {
     u32::try_from(std::mem::size_of_val(value))
         .map_err(|_| "CoreAudio data size overflow".to_string())
 }
 
 #[cfg(target_os = "macos")]
-fn get_output_muted() -> Result<bool, String> {
-    let device_id = get_default_output_device()?;
+fn get_output_muted(device_id: AudioObjectId) -> Result<bool, String> {
     let address = AudioObjectPropertyAddress {
         selector: AUDIO_DEVICE_PROPERTY_MUTE,
         scope: AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT,
@@ -142,8 +247,7 @@ fn get_output_muted() -> Result<bool, String> {
 }
 
 #[cfg(target_os = "macos")]
-fn set_output_muted(muted: bool) -> Result<(), String> {
-    let device_id = get_default_output_device()?;
+fn set_output_muted(device_id: AudioObjectId, muted: bool) -> Result<(), String> {
     let address = AudioObjectPropertyAddress {
         selector: AUDIO_DEVICE_PROPERTY_MUTE,
         scope: AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT,
@@ -169,6 +273,79 @@ fn set_output_muted(muted: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Unmutes devices that were unplugged while muted for a recording, now that
+/// they are connected again.
+#[cfg(target_os = "macos")]
+fn unmute_returned_devices() {
+    let Ok(mut state) = MEDIA_MUTE_STATE.lock() else {
+        return;
+    };
+    state.pending_unmute_uids.retain(|uid| {
+        let Some(device_id) = find_device_by_uid(uid) else {
+            return true;
+        };
+        match set_output_muted(device_id, false) {
+            Ok(()) => {
+                log::info!(target: "media", "returned_output_unmuted device_id={device_id}");
+                false
+            }
+            Err(err) => {
+                log::warn!(target: "media", "returned_output_unmute_failed device_id={device_id} error={err}");
+                true
+            }
+        }
+    });
+}
+
+#[cfg(target_os = "macos")]
+unsafe extern "C" fn on_audio_devices_changed(
+    _in_object_id: AudioObjectId,
+    _in_number_addresses: u32,
+    _in_addresses: *const AudioObjectPropertyAddress,
+    _in_client_data: *mut std::ffi::c_void,
+) -> OsStatus {
+    use tauri::Emitter;
+
+    // Runs on a CoreAudio notification thread; do the work elsewhere.
+    std::thread::spawn(|| {
+        unmute_returned_devices();
+        if let Some(handle) = APP_HANDLE.get() {
+            let _ = handle.emit("audio-devices-changed", ());
+        }
+    });
+    0
+}
+
+/// Watches for audio devices being connected or disconnected and for default
+/// output changes. Emits `audio-devices-changed` so webviews can reopen audio
+/// output on the new device.
+#[cfg(target_os = "macos")]
+pub fn watch_audio_devices(app_handle: &tauri::AppHandle) {
+    APP_HANDLE.set(app_handle.clone()).ok();
+
+    for selector in [
+        AUDIO_HARDWARE_PROPERTY_DEVICES,
+        AUDIO_HARDWARE_PROPERTY_DEFAULT_OUTPUT_DEVICE,
+    ] {
+        let address = global_address(selector);
+        let status = unsafe {
+            AudioObjectAddPropertyListener(
+                AUDIO_OBJECT_SYSTEM_OBJECT,
+                &address,
+                on_audio_devices_changed,
+                std::ptr::null_mut(),
+            )
+        };
+        if status != 0 {
+            log::warn!(
+                target: "media",
+                "{}",
+                core_audio_error("Adding audio device listener", status)
+            );
+        }
+    }
+}
+
 #[tauri::command]
 pub fn mute_media_for_recording() -> Result<(), String> {
     let mut state = MEDIA_MUTE_STATE.lock().map_err(|err| err.to_string())?;
@@ -178,19 +355,17 @@ pub fn mute_media_for_recording() -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        state.was_muted = get_output_muted()?;
-        if !state.was_muted {
-            set_output_muted(true)?;
+        let device_id = get_default_output_device()?;
+        if !get_output_muted(device_id)? {
+            set_output_muted(device_id, true)?;
+            state.muted_device = Some(MutedDevice {
+                id: device_id,
+                uid: get_device_uid(device_id).ok(),
+            });
         }
-        state.active = true;
     }
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        state.active = true;
-        state.was_muted = false;
-    }
-
+    state.active = true;
     Ok(())
 }
 
@@ -200,15 +375,23 @@ pub fn restore_media_after_recording() -> Result<(), String> {
     if !state.active {
         return Ok(());
     }
+    state.active = false;
 
+    // Unmute the device that was muted, even if the default output has moved
+    // to another device since (e.g. a headset was plugged in or pulled out).
     #[cfg(target_os = "macos")]
     {
-        if !state.was_muted {
-            set_output_muted(false)?;
+        if let Some(device) = state.muted_device.take()
+            && let Err(err) = set_output_muted(device.id, false)
+        {
+            log::warn!(
+                target: "media",
+                "restore_output_mute_failed device_id={} error={err}",
+                device.id
+            );
+            state.pending_unmute_uids.extend(device.uid);
         }
     }
 
-    state.active = false;
-    state.was_muted = false;
     Ok(())
 }
