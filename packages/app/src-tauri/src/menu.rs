@@ -7,7 +7,7 @@ use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
 use tauri::{Emitter, Manager};
 
 #[cfg(desktop)]
-const CHECK_FOR_UPDATES_ID: &str = "check_for_updates";
+pub const CHECK_FOR_UPDATES_ID: &str = "check_for_updates";
 
 #[cfg(desktop)]
 pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -32,6 +32,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.set_menu(menu)?;
     app.on_menu_event(|app, event| {
         if event.id().as_ref() == CHECK_FOR_UPDATES_ID {
+            log::info!(target: "runtime", "check_for_updates_requested");
             show_or_create_main_window(app);
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.emit("check-for-updates", ());

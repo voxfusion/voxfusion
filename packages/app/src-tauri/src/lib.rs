@@ -53,7 +53,8 @@ fn install_panic_hook() {
 pub fn run() {
     install_panic_hook();
 
-    tauri::Builder::default()
+    #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
+    let mut app = tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             type_text,
             read_audio_file,
@@ -182,28 +183,36 @@ pub fn run() {
             }
         })
         .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app, event| {
-            #[cfg(desktop)]
-            match event {
-                tauri::RunEvent::Reopen { .. } => {
-                    log::info!(target: "runtime", "reopen_requested");
-                    #[cfg(target_os = "macos")]
-                    listeners::system_key_watcher::resynchronize(app, "reopen");
-                    window::show_or_create_main_window(app);
-                }
-                tauri::RunEvent::Resumed => {
-                    log::info!(target: "runtime", "resumed");
-                    #[cfg(target_os = "macos")]
-                    listeners::system_key_watcher::resynchronize(app, "resumed");
-                }
-                tauri::RunEvent::ExitRequested { code, .. } => {
-                    log::warn!(target: "runtime", "exit_requested code={code:?}");
-                }
-                tauri::RunEvent::Exit => {
-                    log::warn!(target: "runtime", "exit");
-                }
-                _ => {}
+        .expect("error while building tauri application");
+
+    // Tao applies its activation policy when the app finishes launching, and
+    // its default `Regular` policy overrides `LSUIElement`, adding a Dock icon.
+    // Setting it before `run` applies `Accessory` at launch instead; setting it
+    // in `setup` would run after launch and briefly show the Dock icon.
+    #[cfg(target_os = "macos")]
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+    app.run(|app, event| {
+        #[cfg(desktop)]
+        match event {
+            tauri::RunEvent::Reopen { .. } => {
+                log::info!(target: "runtime", "reopen_requested");
+                #[cfg(target_os = "macos")]
+                listeners::system_key_watcher::resynchronize(app, "reopen");
+                window::show_or_create_main_window(app);
             }
-        });
+            tauri::RunEvent::Resumed => {
+                log::info!(target: "runtime", "resumed");
+                #[cfg(target_os = "macos")]
+                listeners::system_key_watcher::resynchronize(app, "resumed");
+            }
+            tauri::RunEvent::ExitRequested { code, .. } => {
+                log::warn!(target: "runtime", "exit_requested code={code:?}");
+            }
+            tauri::RunEvent::Exit => {
+                log::warn!(target: "runtime", "exit");
+            }
+            _ => {}
+        }
+    });
 }
