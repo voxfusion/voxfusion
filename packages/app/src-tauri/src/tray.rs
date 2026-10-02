@@ -1,6 +1,8 @@
 #[cfg(desktop)]
 use crate::handlers;
 #[cfg(desktop)]
+use crate::menu::CHECK_FOR_UPDATES_ID;
+#[cfg(desktop)]
 use crate::window::show_or_create_main_window;
 
 #[cfg(desktop)]
@@ -48,9 +50,27 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let mic_submenu = build_microphone_submenu(&handle, selected_mic, vec![])?;
 
     let home_item = MenuItem::with_id(app, "home", "Home", true, None::<&str>)?;
+    // Without a Dock icon VoxFusion has no menu bar, so the tray is where an
+    // update check can be requested. Menu events reach every menu handler, and
+    // the app menu's handler in `menu::setup` responds to this id.
+    let check_for_updates_item = MenuItem::with_id(
+        app,
+        CHECK_FOR_UPDATES_ID,
+        "Check for Updates",
+        true,
+        None::<&str>,
+    )?;
     let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[&home_item, &mic_submenu, &quit_item])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &home_item,
+            &mic_submenu,
+            &check_for_updates_item,
+            &quit_item,
+        ],
+    )?;
 
     let mic_submenu_for_menu = mic_submenu.clone();
     let mic_submenu_for_listener = mic_submenu.clone();
