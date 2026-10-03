@@ -753,6 +753,22 @@ pub fn muffle_media_for_recording() {
     muffle::muffle();
 }
 
+/// Runs instead of the app when it was started only to ask for the System
+/// Audio Recording permission. Returns whether it did.
+pub fn run_permission_request_if_asked() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        let mut args = std::env::args().skip(1);
+        if args.next().as_deref() == Some(tap::REQUEST_PERMISSION_FLAG) {
+            if let Some(device_uid) = args.next() {
+                tap::hold_permission_request(&device_uid);
+            }
+            return true;
+        }
+    }
+    false
+}
+
 /// Asks for the System Audio Recording permission that the muffle filter
 /// needs, if it was not asked yet. Returns at once.
 #[tauri::command]

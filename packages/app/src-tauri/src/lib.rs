@@ -51,6 +51,9 @@ fn install_panic_hook() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if handlers::media::run_permission_request_if_asked() {
+        return;
+    }
     install_panic_hook();
 
     #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]

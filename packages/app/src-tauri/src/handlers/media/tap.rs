@@ -218,45 +218,56 @@ pub(super) fn audio_capture_permission() -> Permission {
     }
 }
 
-/// Shows the System Audio Recording prompt without changing any audio, by
-/// reading an unmuted tap on the output until the prompt is answered. macOS
-/// only asks once a tap is read for a moment, so a tap that must not hold the
-/// audio back cannot wait for the answer itself.
+/// Command-line flag that starts the app only to ask for the System Audio
+/// Recording permission.
+pub(super) const REQUEST_PERMISSION_FLAG: &str = "--request-audio-capture-permission";
+
+/// Shows the System Audio Recording prompt without changing any audio. macOS
+/// only asks once a tap has been read for a moment. Reading one in the app
+/// process does not bring the prompt up, while reading it in a separate
+/// process does, so the app runs itself again just for that; the permission
+/// still belongs to the app.
 pub(super) fn request_permission(device_uid: &str) {
     static REQUESTING: AtomicBool = AtomicBool::new(false);
     if REQUESTING.swap(true, Ordering::AcqRel) {
         return;
     }
-    let device_uid = device_uid.to_string();
-    let spawned = std::thread::Builder::new()
-        .name("media-permission".to_string())
-        .spawn(move || {
-            match OutputTap::open(&device_uid, TAP_UNMUTED, false, 0.0) {
-                Ok(probe) => {
-                    let deadline = Instant::now() + PERMISSION_REQUEST_TIMEOUT;
-                    while audio_capture_permission() == Permission::Undetermined
-                        && Instant::now() < deadline
-                    {
-                        std::thread::sleep(PERMISSION_POLL_INTERVAL);
-                    }
-                    drop(probe);
-                    log::info!(
-                        target: "media",
-                        "audio_capture_permission_requested result={:?}",
-                        audio_capture_permission()
-                    );
-                }
-                Err(err) => log::warn!(
-                    target: "media",
-                    "audio_capture_permission_request_failed error={err}"
-                ),
-            }
+    let child = std::env::current_exe().and_then(|executable| {
+        std::process::Command::new(executable)
+            .arg(REQUEST_PERMISSION_FLAG)
+            .arg(device_uid)
+            .spawn()
+    });
+    let mut child = match child {
+        Ok(child) => child,
+        Err(err) => {
+            log::warn!(target: "media", "audio_capture_permission_request_failed error={err}");
             REQUESTING.store(false, Ordering::Release);
-        });
-    if let Err(err) = spawned {
-        log::warn!(target: "media", "audio_capture_permission_request_failed error={err}");
+            return;
+        }
+    };
+    std::thread::spawn(move || {
+        let _ = child.wait();
+        log::info!(
+            target: "media",
+            "audio_capture_permission_requested result={:?}",
+            audio_capture_permission()
+        );
         REQUESTING.store(false, Ordering::Release);
+    });
+}
+
+/// Runs in the process started with [`REQUEST_PERMISSION_FLAG`]: reads an
+/// unmuted tap on the output until the prompt is answered.
+pub(super) fn hold_permission_request(device_uid: &str) {
+    let Ok(probe) = OutputTap::open(device_uid, TAP_UNMUTED, false, 0.0) else {
+        return;
+    };
+    let deadline = Instant::now() + PERMISSION_REQUEST_TIMEOUT;
+    while audio_capture_permission() == Permission::Undetermined && Instant::now() < deadline {
+        std::thread::sleep(PERMISSION_POLL_INTERVAL);
     }
+    drop(probe);
 }
 
 fn own_process_object() -> Result<AudioObjectId, String> {
