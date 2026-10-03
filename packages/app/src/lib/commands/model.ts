@@ -9,7 +9,7 @@ export const DOWNLOAD_IN_PROGRESS_ERROR = "download already in progress";
 /** Backend error a cancelled `download_model` call resolves with. */
 export const DOWNLOAD_CANCELLED_ERROR = "Download cancelled";
 
-export type ModelEngine = "whisper" | "parakeet";
+type ModelEngine = "whisper" | "parakeet";
 
 /** A transcription model as reported by the backend registry (`list_models`). */
 export interface ModelInfo {
@@ -45,10 +45,6 @@ export async function listModels(): Promise<CommandResult<ModelInfo[]>> {
 	return invokeResult<ModelInfo[]>("list_models");
 }
 
-export async function getActiveModel(): Promise<CommandResult<string>> {
-	return invokeResult<string>("get_active_model");
-}
-
 export async function setActiveModel(modelId: string): Promise<CommandResult<void>> {
 	return invokeResult<void>("set_active_model", { modelId });
 }
@@ -63,8 +59,4 @@ export async function downloadModel(modelId: string): Promise<CommandResult<void
  */
 export async function cancelModelDownload(modelId: string): Promise<CommandResult<void>> {
 	return invokeResult<void>("cancel_model_download", { modelId });
-}
-
-export async function checkModelDownloaded(modelId: string): Promise<CommandResult<boolean>> {
-	return invokeResult<boolean>("check_model_downloaded", { modelId });
 }

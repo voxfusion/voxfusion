@@ -1,6 +1,4 @@
-import { Result, TaggedError, type UnhandledException } from "better-result";
-
-export type AppError = CommandError | StorageError | BrowserStorageError | UnhandledException;
+import { Result, TaggedError } from "better-result";
 
 export class CommandError extends TaggedError("CommandError")<{
 	command: string;
@@ -14,13 +12,13 @@ export class StorageError extends TaggedError("StorageError")<{
 	message: string;
 }>() {}
 
-export class BrowserStorageError extends TaggedError("BrowserStorageError")<{
+class BrowserStorageError extends TaggedError("BrowserStorageError")<{
 	key: string;
 	cause: unknown;
 	message: string;
 }>() {}
 
-export function errorMessage(error: unknown): string {
+function errorMessage(error: unknown): string {
 	if (error instanceof Error) return error.message;
 	if (typeof error === "string") return error;
 	return "Unexpected error";

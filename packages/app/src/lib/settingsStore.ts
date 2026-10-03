@@ -122,53 +122,53 @@ export async function loadSettings(): Promise<Settings> {
 	};
 }
 
-export async function saveTheme(theme: Theme): Promise<void> {
+async function saveTheme(theme: Theme): Promise<void> {
 	const store = await getStore();
 	await store.set("theme", theme);
 	saveBrowserValue("voxfusion-theme", theme);
 }
 
-export async function saveHotkey(hotkey: string): Promise<void> {
+async function saveHotkey(hotkey: string): Promise<void> {
 	const store = await getStore();
 	await store.set("hotkey", hotkey);
 }
 
-export async function saveHoldToSpeakHotkey(hotkey: string): Promise<void> {
+async function saveHoldToSpeakHotkey(hotkey: string): Promise<void> {
 	const store = await getStore();
 	await store.set("holdToSpeakHotkey", hotkey);
 }
 
-export async function saveMicrophone(microphoneId: string | null): Promise<void> {
+async function saveMicrophone(microphoneId: string | null): Promise<void> {
 	const store = await getStore();
 	await store.set("selectedMicrophoneId", microphoneId);
 }
 
-export async function saveLanguage(language: Locale): Promise<void> {
+async function saveLanguage(language: Locale): Promise<void> {
 	const store = await getStore();
 	await store.set("language", language);
 }
 
-export async function saveMuteMediaWhileRecording(enabled: boolean): Promise<void> {
+async function saveMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set("muteMediaWhileRecording", enabled);
 }
 
-export async function saveMuffleMediaWhileRecording(enabled: boolean): Promise<void> {
+async function saveMuffleMediaWhileRecording(enabled: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set("muffleMediaWhileRecording", enabled);
 }
 
-export async function saveRecordingSoundsEnabled(enabled: boolean): Promise<void> {
+async function saveRecordingSoundsEnabled(enabled: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set("recordingSoundsEnabled", enabled);
 }
 
-export async function saveDefaultStyle(style: AppStyle): Promise<void> {
+async function saveDefaultStyle(style: AppStyle): Promise<void> {
 	const store = await getStore();
 	await store.set("defaultStyle", style);
 }
 
-export async function saveAnalyticsEnabled(enabled: boolean): Promise<void> {
+async function saveAnalyticsEnabled(enabled: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set("analyticsEnabled", enabled);
 }
@@ -322,12 +322,6 @@ export async function markOnboardingComplete(): Promise<void> {
 	if (Result.isError(result)) {
 		console.error("Failed to persist onboarding completion:", result.error);
 	}
-}
-
-export async function resetOnboarding(): Promise<void> {
-	const store = await getStore();
-	await store.set("onboardingComplete", false);
-	setSettingsInternal((prev) => ({ ...prev, onboardingComplete: false }));
 }
 
 export async function resumeOnboardingAt(step: number): Promise<void> {

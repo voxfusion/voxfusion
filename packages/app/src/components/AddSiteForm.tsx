@@ -2,7 +2,7 @@ import { Show, createMemo, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
 import SiteIcon from "./SiteIcon";
 
-export function normalizeDomain(input: string): string | null {
+function normalizeDomain(input: string): string | null {
 	const trimmed = input.trim();
 	if (!trimmed) return null;
 	const withoutScheme = trimmed.includes("://") ? (trimmed.split("://")[1] ?? "") : trimmed;

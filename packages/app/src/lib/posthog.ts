@@ -45,7 +45,7 @@ function initPostHogClient() {
  * Applies the user's analytics choice immediately: enabling lazily
  * initializes PostHog and opts back in, disabling opts out of capturing.
  */
-export function applyAnalyticsEnabled(enabled: boolean) {
+function applyAnalyticsEnabled(enabled: boolean) {
 	analyticsEnabled = enabled;
 
 	if (enabled) {
