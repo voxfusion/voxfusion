@@ -1,5 +1,6 @@
 //! Muffling turns the system output down for the length of a recording
-//! instead of muting it.
+//! instead of muting it. Outputs without a mute control are muted here too,
+//! by turning them all the way down.
 //!
 //! A single worker thread owns every volume change. Commands only post a
 //! message, so they return at once and never delay the start of a recording.
@@ -34,6 +35,7 @@ pub(super) trait OutputVolume {
 
 enum Command {
     Muffle,
+    Silence,
     Restore,
     /// Restores without a fade, then acknowledges.
     RestoreNow(Sender<()>),
@@ -42,9 +44,18 @@ enum Command {
 
 static COMMANDS: OnceLock<Sender<Command>> = OnceLock::new();
 
+fn send(command: Command) {
+    let commands = COMMANDS.get_or_init(|| spawn(super::CoreAudioVolume::default()));
+    let _ = commands.send(command);
+}
+
 pub(super) fn muffle() {
-    let commands = COMMANDS.get_or_init(|| spawn(super::CoreAudioVolume));
-    let _ = commands.send(Command::Muffle);
+    send(Command::Muffle);
+}
+
+/// Mutes an output that has no mute control.
+pub(super) fn silence() {
+    send(Command::Silence);
 }
 
 /// Messages the worker only if muffling has ever started it; otherwise there
@@ -112,7 +123,8 @@ struct Fade {
 
 impl Fade {
     fn volume_at(&self, now: Instant) -> f32 {
-        if self.duration.is_zero() {
+        // Ends exactly on the target, so a restore puts back the original.
+        if self.is_done(now) {
             return self.to;
         }
         let elapsed = now.saturating_duration_since(self.started);
@@ -125,9 +137,47 @@ impl Fade {
     }
 }
 
+#[derive(Clone, Copy)]
+enum Quieting {
+    Muffle,
+    /// Down to zero, at once, like a mute.
+    Silence,
+}
+
+impl Quieting {
+    fn name(self) -> &'static str {
+        match self {
+            Quieting::Muffle => "muffle",
+            Quieting::Silence => "mute",
+        }
+    }
+
+    fn volume(self, original: f32) -> f32 {
+        match self {
+            Quieting::Muffle => original * MUFFLED_VOLUME_RATIO,
+            Quieting::Silence => 0.0,
+        }
+    }
+
+    fn fade_down(self) -> Duration {
+        match self {
+            Quieting::Muffle => FADE_DOWN,
+            Quieting::Silence => Duration::ZERO,
+        }
+    }
+
+    fn fade_up(self) -> Duration {
+        match self {
+            Quieting::Muffle => FADE_UP,
+            Quieting::Silence => Duration::ZERO,
+        }
+    }
+}
+
 struct Session {
     device: DeviceId,
     uid: Option<String>,
+    quieting: Quieting,
     original: f32,
     /// Volume last set on the device.
     current: f32,
@@ -174,10 +224,11 @@ impl<V: OutputVolume> Muffler<V> {
 
     fn handle(&mut self, command: Command, now: Instant) {
         match command {
-            Command::Muffle => self.muffle(now),
-            Command::Restore => self.restore(FADE_UP, now),
+            Command::Muffle => self.quiet(Quieting::Muffle, now),
+            Command::Silence => self.quiet(Quieting::Silence, now),
+            Command::Restore => self.restore(false, now),
             Command::RestoreNow(done) => {
-                self.restore(Duration::ZERO, now);
+                self.restore(true, now);
                 self.step(now);
                 let _ = done.send(());
             }
@@ -185,7 +236,7 @@ impl<V: OutputVolume> Muffler<V> {
         }
     }
 
-    fn muffle(&mut self, now: Instant) {
+    fn quiet(&mut self, quieting: Quieting, now: Instant) {
         self.restore_returned_devices();
         let default_device = self.volume.default_output_device();
 
@@ -198,48 +249,51 @@ impl<V: OutputVolume> Muffler<V> {
                 .as_ref()
                 .is_ok_and(|device| *device == session.device)
             {
+                session.quieting = quieting;
                 session.restoring = false;
-                session.fade_to(session.original * MUFFLED_VOLUME_RATIO, FADE_DOWN, now);
+                session.fade_to(quieting.volume(session.original), quieting.fade_down(), now);
                 return;
             }
         }
         if self.session.is_some() {
             // The output moved to another device; finish restoring the old one.
-            self.restore(Duration::ZERO, now);
+            self.restore(true, now);
             self.step(now);
         }
 
+        let name = quieting.name();
         let device = match default_device {
             Ok(device) => device,
             Err(err) => {
-                log::warn!(target: "media", "muffle_failed error={err}");
+                log::warn!(target: "media", "{name}_failed error={err}");
                 return;
             }
         };
         let original = match self.volume.adjustable_volume(device) {
             Ok(volume) => volume,
             Err(err) => {
-                log::warn!(target: "media", "muffle_unsupported device_id={device} error={err}");
+                log::warn!(target: "media", "{name}_unsupported device_id={device} error={err}");
                 return;
             }
         };
         let mut session = Session {
             device,
             uid: self.volume.device_uid(device),
+            quieting,
             original,
             current: original,
             restoring: false,
             fade: None,
         };
-        session.fade_to(original * MUFFLED_VOLUME_RATIO, FADE_DOWN, now);
+        session.fade_to(quieting.volume(original), quieting.fade_down(), now);
         self.session = Some(session);
     }
 
-    fn restore(&mut self, duration: Duration, now: Instant) {
+    fn restore(&mut self, immediately: bool, now: Instant) {
         let Some(session) = self.session.as_mut() else {
             return;
         };
-        if session.restoring && !duration.is_zero() {
+        if session.restoring && !immediately {
             return;
         }
         // A device unplugged and reconnected mid-recording can come back
@@ -258,6 +312,11 @@ impl<V: OutputVolume> Muffler<V> {
             session.device = device;
         }
         session.restoring = true;
+        let duration = if immediately {
+            Duration::ZERO
+        } else {
+            session.quieting.fade_up()
+        };
         session.fade_to(session.original, duration, now);
     }
 
@@ -274,7 +333,8 @@ impl<V: OutputVolume> Muffler<V> {
         if let Err(err) = self.volume.set_volume(session.device, volume) {
             log::warn!(
                 target: "media",
-                "muffle_volume_failed device_id={} error={err}",
+                "{}_volume_failed device_id={} error={err}",
+                session.quieting.name(),
                 session.device
             );
             // Most likely unplugged. A failed fade down is restored with the
@@ -565,6 +625,58 @@ mod tests {
         output.set_connected(1, true);
         muffler.handle(Command::DevicesChanged, ms(start, 900));
         assert_volume(output.volume(1), 0.5);
+    }
+
+    #[test]
+    fn silence_mutes_at_once_and_restores_the_exact_volume() {
+        let output = FakeOutput::with_device(1, 0.6);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Silence, start);
+        muffler.step(start);
+        assert_eq!(output.volume(1), 0.0);
+        assert!(!muffler.is_fading());
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1000));
+        assert_eq!(output.volume(1), 0.6);
+        assert!(muffler.session.is_none());
+    }
+
+    #[test]
+    fn a_fade_back_up_ends_on_the_exact_original_volume() {
+        let output = FakeOutput::with_device(1, 0.7);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        muffler.handle(Command::Restore, ms(start, 200));
+        muffler.step(ms(start, 350));
+        muffler.step(ms(start, 517));
+        assert_eq!(output.volume(1), 0.7);
+    }
+
+    #[test]
+    fn a_silence_during_the_fade_up_mutes_and_still_restores() {
+        let output = FakeOutput::with_device(1, 0.5);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        muffler.handle(Command::Restore, ms(start, 200));
+        muffler.step(ms(start, 300));
+
+        muffler.handle(Command::Silence, ms(start, 300));
+        muffler.step(ms(start, 300));
+        assert_eq!(output.volume(1), 0.0);
+
+        muffler.handle(Command::Restore, ms(start, 900));
+        muffler.step(ms(start, 900));
+        assert_eq!(output.volume(1), 0.5);
+        assert!(muffler.session.is_none());
     }
 
     #[test]
