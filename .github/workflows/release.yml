@@ -61,11 +61,23 @@ jobs:
           path: engine-staging
           key: crispasr-engine-${{ runner.os }}-${{ hashFiles('packages/app/scripts/build-parakeet-engine.sh') }}
 
+      # On a cache miss (see engine-cache.yml), reuse the engine bundled in the
+      # newest release built from the same build script before compiling.
+      - name: Restore Parakeet engine from a release
+        id: engine-release
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if bash packages/app/scripts/fetch-released-parakeet-engine.sh "$GITHUB_WORKSPACE/engine-staging"; then
+            echo "restored=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # Build the crispasr engine that runs Parakeet models (handlers::parakeet)
       # for both architectures. Done before the certificate import so the large
       # compile does not eat into the keychain's unlock window.
       - name: Build Parakeet engine (crispasr)
-        if: steps.engine-cache.outputs.cache-hit != 'true'
+        if: steps.engine-cache.outputs.cache-hit != 'true' && steps.engine-release.outputs.restored != 'true'
         env:
           MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: |
