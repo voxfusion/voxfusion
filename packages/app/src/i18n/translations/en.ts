@@ -10,30 +10,10 @@ export type Translations = {
 	};
 	settings: {
 		title: string;
-		theme: string;
-		dark: string;
-		light: string;
-		auto: string;
-		system: string;
-		currentTheme: string;
 		language: string;
-		english: string;
-		russian: string;
-		spanish: string;
-		chinese: string;
-		japanese: string;
-		korean: string;
-		german: string;
-		french: string;
-		italian: string;
-		swedish: string;
-		hindi: string;
-		ukrainian: string;
 		audio: string;
-		hotkey: string;
 		hotkeys: string;
 		appearance: string;
-		microphone: string;
 		defaultMicrophone: string;
 		microphoneDescription: string;
 		muteMediaWhileRecording: string;
@@ -45,11 +25,8 @@ export type Translations = {
 		analytics: string;
 		analyticsDescription: string;
 		analyticsNote: string;
-		recordingHotkey: string;
-		pressHotkey: string;
 		hotkeyDescription: string;
 		holdToSpeakHotkeyDescription: string;
-		change: string;
 		cancel: string;
 		models: string;
 		modelsDescription: string;
@@ -68,20 +45,12 @@ export type Translations = {
 		modelExperimentalNote: string;
 	};
 	transcription: {
-		notAvailable: string;
-		processing: string;
-		duration: string;
 		copy: string;
 		copied: string;
-		goodTranscription: string;
-		poorTranscription: string;
 	};
 	transcriptionList: {
-		failedToFetch: string;
 		errorOccurred: string;
-		noTranscriptions: string;
 		useCommandToRecord: string;
-		tryAgain: string;
 		noMore: string;
 		today: string;
 		yesterday: string;
@@ -90,14 +59,11 @@ export type Translations = {
 		home: string;
 		dictionary: string;
 		style: string;
-		account: string;
 		settings: string;
 		privacy: string;
 	};
 	style: {
-		defaultStyleTitle: string;
 		defaultStyleDescription: string;
-		perAppTitle: string;
 		tabDefault: string;
 		tabPerApp: string;
 		tabSites: string;
@@ -128,7 +94,6 @@ export type Translations = {
 		};
 	};
 	dictionary: {
-		title: string;
 		description: string;
 		addWord: string;
 		wordPlaceholder: string;
@@ -139,8 +104,6 @@ export type Translations = {
 		emptyState: string;
 		emptyStateDescription: string;
 		wordCount: string;
-		defaultSectionTitle: string;
-		perAppTitle: string;
 		perAppDescription: string;
 		perAppEmptyState: string;
 		perAppEmptyStateDescription: string;
@@ -154,14 +117,10 @@ export type Translations = {
 		sitesEmptyStateDescription: string;
 		sitesDomainPlaceholder: string;
 		sitesAddSite: string;
-		sitesUseCurrent: string;
 		sitesInvalidDomain: string;
-		sitesNoCurrentSite: string;
 		siteCount: string;
 	};
 	onboarding: {
-		step: string;
-		of: string;
 		next: string;
 		back: string;
 		getStarted: string;
@@ -171,7 +130,6 @@ export type Translations = {
 		refreshDevices: string;
 		hotkeyTitle: string;
 		hotkeyDescription: string;
-		currentHotkey: string;
 		handsFreeHotkey: string;
 		holdToSpeakHotkey: string;
 		recordHotkey: string;
@@ -202,11 +160,7 @@ export type Translations = {
 		learningStep4: string;
 		learningHoldToSpeakPrefix: string;
 		learningHoldToSpeakSuffix: string;
-		learningReady: string;
-		learningRecording: string;
-		learningProcessing: string;
 		learningPlaceholder: string;
-		learningError: string;
 		modelDownloadTitle: string;
 		modelDownloadDescription: string;
 		modelDownloadComplete: string;
@@ -249,30 +203,10 @@ export const en: Translations = {
 	},
 	settings: {
 		title: "Settings",
-		theme: "Theme",
-		dark: "Dark",
-		light: "Light",
-		auto: "Auto",
-		system: "System",
-		currentTheme: "Current theme:",
 		language: "Language",
-		english: "English",
-		russian: "Russian",
-		spanish: "Spanish",
-		chinese: "Chinese",
-		japanese: "Japanese",
-		korean: "Korean",
-		german: "German",
-		french: "French",
-		italian: "Italian",
-		swedish: "Swedish",
-		hindi: "Hindi",
-		ukrainian: "Ukrainian",
 		audio: "Audio",
-		hotkey: "Hotkey",
 		hotkeys: "Hotkeys",
 		appearance: "Appearance",
-		microphone: "Microphone",
 		defaultMicrophone: "System Default",
 		microphoneDescription: "Select the microphone to use for voice recording.",
 		muteMediaWhileRecording: "Mute Media During Recording",
@@ -289,11 +223,8 @@ export const en: Translations = {
 			"Share anonymous usage events to help improve VoxFusion. Changes apply immediately.",
 		analyticsNote:
 			"Only event metadata is collected — never your audio, never your transcribed text.",
-		recordingHotkey: "Recording Hotkey",
-		pressHotkey: "Press a key combination...",
 		hotkeyDescription: "Press this key combination to start or stop recording.",
 		holdToSpeakHotkeyDescription: "Hold this key combination to record, then release it to stop.",
-		change: "Change",
 		cancel: "Cancel",
 		models: "Models",
 		modelsDescription:
@@ -314,20 +245,12 @@ export const en: Translations = {
 			"On-device transcription with this model is experimental and not yet available.",
 	},
 	transcription: {
-		notAvailable: "N/A",
-		processing: "Processing:",
-		duration: "Duration:",
 		copy: "Copy",
 		copied: "Copied!",
-		goodTranscription: "Good transcription",
-		poorTranscription: "Poor transcription",
 	},
 	transcriptionList: {
-		failedToFetch: "Failed to fetch transcriptions",
 		errorOccurred: "An error occurred",
-		noTranscriptions: "No transcriptions yet",
 		useCommandToRecord: "Use {{hotkey}} to start recording and create your first transcription",
-		tryAgain: "Try again",
 		noMore: "No more transcriptions",
 		today: "Today",
 		yesterday: "Yesterday",
@@ -336,15 +259,12 @@ export const en: Translations = {
 		home: "Home",
 		dictionary: "Dictionary",
 		style: "Style",
-		account: "Account",
 		settings: "Settings",
 		privacy: "Privacy",
 	},
 	style: {
-		defaultStyleTitle: "Default Style",
 		defaultStyleDescription:
 			"Used everywhere except for apps or sites configured on the other tabs. Switch between styles to preview what each one does.",
-		perAppTitle: "Per-App Override",
 		tabDefault: "Default",
 		tabPerApp: "Per-App",
 		tabSites: "Per-Site",
@@ -381,7 +301,6 @@ export const en: Translations = {
 		},
 	},
 	dictionary: {
-		title: "Dictionary",
 		description: "Add custom words for better transcription accuracy",
 		addWord: "Add",
 		wordPlaceholder: "Enter a word or phrase...",
@@ -393,8 +312,6 @@ export const en: Translations = {
 		emptyStateDescription:
 			"Add words to improve transcription accuracy for specialized terms, names, or phrases you use often.",
 		wordCount: "{count} words",
-		defaultSectionTitle: "Default Dictionary",
-		perAppTitle: "Per-App Dictionary",
 		perAppDescription:
 			"When an app is focused, its words are used alongside the default dictionary above.",
 		perAppEmptyState: "No apps configured",
@@ -412,14 +329,10 @@ export const en: Translations = {
 			"Add a domain or capture the current browser tab, then expand it to add custom words for that site.",
 		sitesDomainPlaceholder: "example.com",
 		sitesAddSite: "Add Site",
-		sitesUseCurrent: "Use current site",
 		sitesInvalidDomain: "Enter a valid domain",
-		sitesNoCurrentSite: "No browser site detected",
 		siteCount: "{count} sites",
 	},
 	onboarding: {
-		step: "Step",
-		of: "of",
 		next: "Next",
 		back: "Back",
 		getStarted: "Get Started",
@@ -431,7 +344,6 @@ export const en: Translations = {
 		hotkeyTitle: "Set Your Hotkey",
 		hotkeyDescription:
 			"Set a hands-free shortcut and an optional hold-to-speak shortcut for quick dictation.",
-		currentHotkey: "Current hotkey",
 		handsFreeHotkey: "Hands-free shortcut",
 		holdToSpeakHotkey: "Hold-to-speak shortcut",
 		recordHotkey: "Record New Hotkey",
@@ -466,11 +378,7 @@ export const en: Translations = {
 		learningStep4: "See your transcription appear",
 		learningHoldToSpeakPrefix: "Or hold",
 		learningHoldToSpeakSuffix: "while speaking, then release to stop",
-		learningReady: "Ready",
-		learningRecording: "Recording",
-		learningProcessing: "Processing",
 		learningPlaceholder: "Your transcriptions will appear here",
-		learningError: "Transcription failed. Try again.",
 		modelDownloadTitle: "Download Whisper Model",
 		modelDownloadDescription:
 			"Download the Whisper V3 Large Turbo model for local, offline transcription.",

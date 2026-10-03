@@ -499,11 +499,6 @@ pub async fn list_models(
 }
 
 #[tauri::command]
-pub async fn get_active_model(active: tauri::State<'_, ActiveModel>) -> Result<String, String> {
-    Ok(active_model_id(&active))
-}
-
-#[tauri::command]
 pub async fn set_active_model(
     app_handle: tauri::AppHandle,
     active: tauri::State<'_, ActiveModel>,
@@ -537,18 +532,7 @@ pub async fn set_active_model(
 
     let file = active_model_file(&app_handle)?;
     fs::write(&file, model.id).map_err(|e| format!("Failed to persist model selection: {}", e))?;
-
-    let _ = app_handle.emit("active-model-changed", model.id);
     Ok(())
-}
-
-#[tauri::command]
-pub async fn check_model_downloaded(
-    app_handle: tauri::AppHandle,
-    model_id: String,
-) -> Result<bool, String> {
-    let model = find_model(&model_id).ok_or_else(|| format!("Unknown model: {}", model_id))?;
-    Ok(is_downloaded(&app_handle, model))
 }
 
 #[tauri::command]

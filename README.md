@@ -7,7 +7,7 @@ A local-first, offline-capable voice transcription desktop app. All transcriptio
 | Package                    | Description              | Stack                                                           |
 | -------------------------- | ------------------------ | --------------------------------------------------------------- |
 | `@voxfusion/app`           | Desktop application      | Tauri v2, SolidJS, Tailwind CSS, TypeScript, whisper-rs, SQLite |
-| `@voxfusion/marketingsite` | Public marketing website | Astro, TypeScript, Wrangler                                     |
+| `@voxfusion/marketingsite` | Public marketing website | Astro, TypeScript                                               |
 
 ## Prerequisites
 

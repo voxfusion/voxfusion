@@ -4,7 +4,7 @@
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],
-			"outputs": ["dist/**", "build/**", ".output/**", "src-tauri/target/**"]
+			"outputs": ["dist/**"]
 		},
 		"dev": {
 			"cache": false,
@@ -15,12 +15,6 @@
 		},
 		"lint:fix": {
 			"dependsOn": ["^lint:fix"]
-		},
-		"format": {
-			"cache": false
-		},
-		"check": {
-			"dependsOn": ["^check"]
 		},
 		"typecheck": {
 			"dependsOn": ["^typecheck"]

@@ -6,8 +6,6 @@ export type AppStyle = "professional" | "casual" | "agents" | "default";
 
 export const STYLE_LIST: readonly AppStyle[] = ["professional", "casual", "agents", "default"];
 
-export const DEFAULT_STYLE: AppStyle = "default";
-
 export interface InstalledApp {
 	name: string;
 	bundle_id: string;

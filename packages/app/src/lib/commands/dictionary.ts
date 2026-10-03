@@ -40,10 +40,6 @@ export async function deleteDictionaryWord(id: string): Promise<CommandResult<vo
 	return invokeResult<void>("delete_dictionary_word", { id });
 }
 
-export async function getDictionaryPrompt(): Promise<CommandResult<string | null>> {
-	return invokeResult<string | null>("get_dictionary_prompt");
-}
-
 export async function listAppDictionaries(): Promise<CommandResult<AppDictionary[]>> {
 	return invokeResult<AppDictionary[]>("list_app_dictionaries");
 }

@@ -139,7 +139,6 @@ const MODIFIER_CODE_TO_SYSTEM_HOTKEY: Record<string, string> = {
 	MetaRight: "RightCommand",
 };
 
-let registeredDictationHotkey: RegisteredHotkey | null = null;
 let registeredDictationHotkeys: RegisteredHotkey[] = [];
 
 /**
@@ -203,7 +202,7 @@ function systemKeySetsMatch(a: Iterable<SystemKey>, b: Iterable<SystemKey>): boo
 /**
  * Check if a hotkey should be handled by the native system key watcher.
  */
-export function isSystemOnlyHotkey(hotkey: string): boolean {
+function isSystemOnlyHotkey(hotkey: string): boolean {
 	return systemKeysFromHotkey(hotkey) !== undefined;
 }
 
@@ -334,22 +333,6 @@ async function registerGlobalHotkey(
 	};
 }
 
-/**
- * Register the dictation hotkey using the best backend for the configured hotkey.
- * Combo hotkeys use Tauri global-shortcut; supported system-only hotkeys use
- * the native macOS system key watcher.
- */
-export async function registerDictationHotkey(
-	hotkey: string,
-	handler: HotkeyHandler
-): Promise<void> {
-	await unregisterDictationHotkey();
-
-	registeredDictationHotkey = isSystemOnlyHotkey(hotkey)
-		? await registerSystemHotkey(hotkey, { onPressed: handler })
-		: await registerGlobalHotkey(hotkey, { onPressed: handler });
-}
-
 export async function registerDictationHotkeys(
 	hotkeys: { hotkey: string; onPressed: HotkeyHandler; onReleased?: HotkeyHandler }[]
 ): Promise<void> {
@@ -375,17 +358,12 @@ export async function registerDictationHotkeys(
 }
 
 /**
- * Unregister the currently active dictation hotkey, regardless of backend.
+ * Unregister the active dictation hotkeys, regardless of backend.
  */
 export async function unregisterDictationHotkey(): Promise<void> {
-	const registered = registeredDictationHotkey;
-	const registeredMany = registeredDictationHotkeys;
-	if (!registered && registeredMany.length === 0) return;
-
-	registeredDictationHotkey = null;
+	const registered = registeredDictationHotkeys;
 	registeredDictationHotkeys = [];
-	if (registered) await registered.dispose();
-	for (const registration of registeredMany) {
+	for (const registration of registered) {
 		await registration.dispose();
 	}
 }

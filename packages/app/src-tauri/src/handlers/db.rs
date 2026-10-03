@@ -270,23 +270,3 @@ pub fn delete_dictionary_word(state: tauri::State<'_, DbState>, id: String) -> R
         .map_err(|e| e.to_string())?;
     Ok(())
 }
-
-#[tauri::command]
-pub fn get_dictionary_prompt(state: tauri::State<'_, DbState>) -> Result<Option<String>, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare("SELECT word FROM dictionary_words ORDER BY created_at DESC LIMIT 50")
-        .map_err(|e| e.to_string())?;
-
-    let words: Vec<String> = stmt
-        .query_map([], |row| row.get(0))
-        .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
-
-    if words.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(words.join(", ")))
-    }
-}

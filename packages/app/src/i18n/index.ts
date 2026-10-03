@@ -2,7 +2,7 @@ import { flatten, resolveTemplate, translator } from "@solid-primitives/i18n";
 import { createSignal } from "solid-js";
 import { createContext, useContext } from "solid-js";
 import { de } from "./translations/de";
-import { type Translations, en } from "./translations/en";
+import { en } from "./translations/en";
 import { es } from "./translations/es";
 import { fr } from "./translations/fr";
 import { it } from "./translations/it";
@@ -12,16 +12,6 @@ import { zh } from "./translations/zh";
 export type Locale = "en" | "ru" | "es" | "zh" | "de" | "fr" | "it";
 
 const ALL_LOCALES: Locale[] = ["en", "ru", "es", "zh", "de", "fr", "it"];
-
-const dictionaries: Record<Locale, Translations> = {
-	en,
-	ru,
-	es,
-	zh,
-	de,
-	fr,
-	it,
-};
 
 const flattenedDictionaries = {
 	en: flatten(en),
@@ -68,8 +58,6 @@ export function getStoredLocale(): Locale {
 	return "en";
 }
 
-export function setStoredLocale(locale: Locale) {
+function setStoredLocale(locale: Locale) {
 	localStorage.setItem("locale", locale);
 }
-
-export { dictionaries };

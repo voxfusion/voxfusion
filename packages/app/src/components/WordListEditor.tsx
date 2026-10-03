@@ -4,7 +4,7 @@ import { For, type JSX, Show, createSignal } from "solid-js";
 import { useI18n } from "../i18n";
 import type { CommandResult } from "../lib/commands/invokeResult";
 
-export interface EditableWord {
+interface EditableWord {
 	id: string;
 	word: string;
 }

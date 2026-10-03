@@ -25,12 +25,7 @@ export const common = {
 
 	"footer.tagline": "Voice to text that runs entirely on your Mac. Free and open source.",
 	"footer.product": "Product",
-	"footer.company": "Company",
 	"footer.legal": "Legal",
-	"footer.about": "About",
-	"footer.blog": "Blog",
-	"footer.careers": "Careers",
-	"footer.contact": "Contact",
 	"footer.privacy": "Privacy Policy",
 	"footer.terms": "Terms of Use",
 	"footer.security": "Security",
