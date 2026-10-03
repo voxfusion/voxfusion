@@ -542,9 +542,12 @@ impl CoreAudioOutput {
     /// which would mute instead of muffle.
     fn start_muffle_tap(device: AudioObjectId, uid: &str) -> Result<tap::OutputTap, String> {
         match tap::audio_capture_permission() {
-            tap::Permission::Granted | tap::Permission::Unknown => {}
+            tap::Permission::Granted => {}
             tap::Permission::Denied => {
                 return Err("System Audio Recording permission is off".to_string());
+            }
+            tap::Permission::Unknown => {
+                return Err("System Audio Recording permission cannot be checked".to_string());
             }
             tap::Permission::Undetermined => {
                 // Ask now; the filter works from the next recording on.

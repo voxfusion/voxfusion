@@ -45,6 +45,13 @@ const AUDIO_HARDWARE_PROPERTY_TRANSLATE_PID_TO_PROCESS_OBJECT: AudioObjectProper
 
 const AUDIO_TAP_PROPERTY_FORMAT: AudioObjectPropertySelector = u32::from_be_bytes(*b"tfmt");
 
+const AUDIO_DEVICE_PROPERTY_DEVICE_IS_ALIVE: AudioObjectPropertySelector =
+    u32::from_be_bytes(*b"livn");
+
+/// How long a new aggregate device may take to come up.
+const AGGREGATE_DEVICE_READY_TIMEOUT: Duration = Duration::from_secs(1);
+const AGGREGATE_DEVICE_READY_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
 const AUDIO_FORMAT_LINEAR_PCM: u32 = u32::from_be_bytes(*b"lpcm");
 
 const AUDIO_FORMAT_FLAG_IS_FLOAT: u32 = 1;
@@ -436,6 +443,34 @@ fn create_aggregate_device(device_uid: &str, tap_uid: &str) -> Result<AudioObjec
     Ok(device)
 }
 
+/// A new aggregate device comes up asynchronously. Started before then, it can
+/// deliver silence, which would mute instead of muffle.
+fn wait_until_alive(device: AudioObjectId) -> Result<(), String> {
+    let address = global_address(AUDIO_DEVICE_PROPERTY_DEVICE_IS_ALIVE);
+    let deadline = Instant::now() + AGGREGATE_DEVICE_READY_TIMEOUT;
+    loop {
+        let mut alive: u32 = 0;
+        let mut data_size = size_of_val_u32(&alive)?;
+        let status = unsafe {
+            AudioObjectGetPropertyData(
+                device,
+                &address,
+                0,
+                std::ptr::null(),
+                &mut data_size,
+                (&mut alive as *mut u32).cast(),
+            )
+        };
+        if status == 0 && alive != 0 {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err("The output tap device did not come up".to_string());
+        }
+        std::thread::sleep(AGGREGATE_DEVICE_READY_POLL_INTERVAL);
+    }
+}
+
 /// An output made of other devices, such as an Aggregate or Multi-Output
 /// Device, cannot be nested in the playback device, which then has no output
 /// to play the tap on.
@@ -620,6 +655,7 @@ impl OutputTap {
         }
 
         output_tap.aggregate_device = create_aggregate_device(device_uid, &tap.uid)?;
+        wait_until_alive(output_tap.aggregate_device)?;
         // Without playback the tapped audio is only held back, which mutes
         // but cannot play anything.
         if play && volume > 0.0 && !has_output_stream(output_tap.aggregate_device)? {

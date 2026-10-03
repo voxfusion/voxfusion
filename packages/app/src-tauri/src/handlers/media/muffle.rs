@@ -294,18 +294,21 @@ impl<O: Output> Muffler<O> {
             self.step(now);
         }
 
-        let name = quieting.name();
-        let device = match default_device {
-            Ok(device) => device,
-            Err(err) => {
-                log::warn!(target: "media", "{name}_failed error={err}");
-                return;
-            }
-        };
+        match default_device {
+            Ok(device) => self.start_session(quieting, device, now),
+            Err(err) => log::warn!(target: "media", "{}_failed error={err}", quieting.name()),
+        }
+    }
+
+    fn start_session(&mut self, quieting: Quieting, device: DeviceId, now: Instant) {
         let (control, original) = match self.choose_control(quieting, device) {
             Ok(choice) => choice,
             Err(err) => {
-                log::warn!(target: "media", "{name}_unsupported device_id={device} error={err}");
+                log::warn!(
+                    target: "media",
+                    "{}_unsupported device_id={device} error={err}",
+                    quieting.name()
+                );
                 return;
             }
         };
@@ -405,20 +408,19 @@ impl<O: Output> Muffler<O> {
             return;
         }
         self.output.stop_tap(session.device);
-        if let Err(err) = self.output.start_tap(device, effect) {
-            log::info!(
-                target: "media",
-                "{}_follow_failed device_id={device} error={err}",
-                session.quieting.name()
-            );
-            self.session = None;
+        if self.output.start_tap(device, effect).is_ok() {
+            session.device = device;
+            session.uid = self.output.device_uid(device);
+            // The new tap starts with no effect.
+            session.current = session.original;
+            session.fade_to(session.target(), session.quieting.fade_down(), now);
             return;
         }
-        session.device = device;
-        session.uid = self.output.device_uid(device);
-        // The new tap starts with no effect.
-        session.current = session.original;
-        session.fade_to(session.target(), session.quieting.fade_down(), now);
+        // Quiet the new output as a new recording would, such as by turning
+        // its volume down.
+        let quieting = session.quieting;
+        self.session = None;
+        self.start_session(quieting, device, now);
     }
 
     fn step(&mut self, now: Instant) {
@@ -943,6 +945,28 @@ mod tests {
         assert_eq!(output.tap(2), None);
         assert_eq!(output.volume(1), 0.8);
         assert_eq!(output.volume(2), 0.6);
+    }
+
+    #[test]
+    fn moving_to_an_output_without_a_filter_turns_its_volume_down() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.connect(2, 0.6);
+        output.allow_taps(1);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        output.set_default(2);
+        muffler.handle(Command::DevicesChanged, ms(start, 500));
+        assert_eq!(output.tap(1), None);
+        muffler.step(ms(start, 650));
+        assert_volume(output.volume(2), 0.6 * MUFFLED_VOLUME_RATIO);
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1300));
+        assert_volume(output.volume(2), 0.6);
+        assert_eq!(output.volume(1), 0.8);
     }
 
     #[test]
