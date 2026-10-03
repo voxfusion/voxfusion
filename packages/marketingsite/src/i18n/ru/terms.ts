@@ -53,5 +53,5 @@ export const terms = {
 	"terms.section8.p1":
 		"8.1. The Rights Holder may amend these Terms by notifying the User through the Service or by email at least 14 days before the changes take effect.",
 	"terms.section8.p2": "8.2. These Terms are governed by the laws of the Russian Federation.",
-	"terms.section8.p3": "8.3. Contact details: hello@voxfusion.com.",
+	"terms.section8.p3": "8.3. Contact details: hello@voxfusion.io.",
 } as const;

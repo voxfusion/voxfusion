@@ -28,9 +28,9 @@ export const privacy = {
 	"privacy.section3.p3":
 		"3.3. Your choice: you are asked whether to enable app analytics during onboarding, and you can disable analytics at any time in the app’s settings (Privacy section).",
 	"privacy.section3.p4":
-		"3.4. Website analytics: the voxfusion.com website uses Umami, a privacy-focused analytics service, to collect anonymous, aggregate visit statistics.",
+		"3.4. Website analytics: the voxfusion.io website uses Umami, a privacy-focused analytics service, to collect anonymous, aggregate visit statistics.",
 	"privacy.section3.p5":
-		"3.5. Support correspondence: if you contact us at hello@voxfusion.com, we will process the contents of your message in order to reply.",
+		"3.5. Support correspondence: if you contact us at hello@voxfusion.io, we will process the contents of your message in order to reply.",
 	"privacy.section4.title": "4. Purposes of processing",
 	"privacy.section4.p1":
 		"4.1. Improving Service quality, fixing errors, and understanding aggregate usage.",
@@ -59,7 +59,7 @@ export const privacy = {
 	"privacy.section8.p1":
 		"8.1. Because we do not store your audio or transcripts, the most direct way to delete that data is to delete it on your device or uninstall the app.",
 	"privacy.section8.p2":
-		"8.2. You may also request information about, correction of, or deletion of any personal data the Operator processes, and withdraw consent at any time. Contact: hello@voxfusion.com.",
+		"8.2. You may also request information about, correction of, or deletion of any personal data the Operator processes, and withdraw consent at any time. Contact: hello@voxfusion.io.",
 	"privacy.section9.title": "9. Policy changes",
 	"privacy.section9.p1":
 		"9.1. The Operator may amend this Policy. The current version is published on this page with the date of the latest update.",

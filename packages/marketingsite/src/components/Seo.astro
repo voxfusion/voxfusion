@@ -18,10 +18,10 @@ const {
 	noindex = false,
 	schema,
 } = Astro.props;
-const site = Astro.site ?? new URL("https://voxfusion.com");
+const site = Astro.site ?? new URL("https://voxfusion.io");
 const canonicalUrl = new URL(Astro.url.pathname, site).toString();
-const imageUrl = new URL("/og.png?v=2026-05-15", site).toString();
-const imageAlt = "VoxFusion local-first voice to text app for Mac";
+const imageUrl = new URL("/og.png?v=2026-10-03", site).toString();
+const imageAlt = "VoxFusion: you talk, it types. Free offline dictation for Mac.";
 const ogLocales: Partial<Record<string, string>> = {
 	en: "en_US",
 	ru: "ru_RU",

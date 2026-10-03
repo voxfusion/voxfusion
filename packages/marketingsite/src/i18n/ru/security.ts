@@ -28,11 +28,11 @@ export const security = {
 		"3.3. The app runs with the minimum macOS privileges required to operate.",
 	"security.section4.title": "4. Incident response",
 	"security.section4.p1":
-		"4.1. If you discover a security vulnerability, please report it to security@voxfusion.com.",
+		"4.1. If you discover a security vulnerability, please report it to security@voxfusion.io.",
 	"security.section4.p2":
 		"4.2. We commit to confirming receipt within 24 hours, providing an assessment within 72 hours, and issuing fixes for critical vulnerabilities as quickly as possible.",
 	"security.section5.title": "5. Compliance",
 	"security.section5.p1":
 		"5.1. Because no personal data is processed on our servers, the Service minimizes data-processing risk by design.",
-	"security.section5.p2": "5.2. Security contact: security@voxfusion.com.",
+	"security.section5.p2": "5.2. Security contact: security@voxfusion.io.",
 } as const;

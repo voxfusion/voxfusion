@@ -1,11 +1,12 @@
 export const hero = {
-	"hero.label": "LOCAL VOICE TO TEXT / macOS",
+	"hero.label": "DICTATION FOR macOS / RUNS ON YOUR MAC",
 	"hero.title.line1": "You talk.",
 	"hero.title.line2": "It types.",
 	"hero.title.line3": "In any Mac app.",
 	"hero.subtitle":
-		"Press a hotkey, say what you mean, and your words land right at the cursor: in Mail, Slack, your editor, anywhere you can type. VoxFusion transcribes on your Mac, so your voice never leaves it.",
+		"Press a shortcut, say what you mean, and the words land at your cursor: in Mail, Slack, your editor, anywhere you can type. Transcription runs on your Mac, so your voice never leaves it.",
 	"hero.cta.download": "Download for Mac",
+	"hero.cta.github": "View source",
 	"hero.note.free": "Free & open source",
 	"hero.note.account": "No account",
 	"hero.note.platform": "Apple Silicon & Intel",

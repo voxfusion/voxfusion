@@ -3,7 +3,7 @@ import { defineConfig } from "astro/config";
 
 // https://astro.build/config
 export default defineConfig({
-	site: "https://voxfusion.com",
+	site: "https://voxfusion.io",
 	output: "static",
 	integrations: [
 		sitemap({
