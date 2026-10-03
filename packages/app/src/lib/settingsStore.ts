@@ -234,27 +234,32 @@ export async function updateLanguage(
 	setLocale(language);
 }
 
+let mediaWhileRecordingSaves: Promise<void> = Promise.resolve();
+
 // Muting and muffling are alternatives: turning one on turns the other off.
-export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<void> {
-	await saveMuteMediaWhileRecording(enabled);
-	if (enabled) await saveMuffleMediaWhileRecording(false);
+// The pair is decided from the current state at click time and saved in
+// order, so quick toggling persists the last choice instead of interleaving.
+async function updateMediaWhileRecording(mute: boolean, muffle: boolean): Promise<void> {
 	setSettingsInternal((prev) => ({
 		...prev,
-		muteMediaWhileRecording: enabled,
-		muffleMediaWhileRecording: enabled ? false : prev.muffleMediaWhileRecording,
+		muteMediaWhileRecording: mute,
+		muffleMediaWhileRecording: muffle,
 	}));
-	await emit("settings-changed");
+	const saved = mediaWhileRecordingSaves.then(async () => {
+		await saveMuteMediaWhileRecording(mute);
+		await saveMuffleMediaWhileRecording(muffle);
+		await emit("settings-changed");
+	});
+	mediaWhileRecordingSaves = saved.catch(() => {});
+	await saved;
+}
+
+export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<void> {
+	await updateMediaWhileRecording(enabled, !enabled && settings().muffleMediaWhileRecording);
 }
 
 export async function updateMuffleMediaWhileRecording(enabled: boolean): Promise<void> {
-	await saveMuffleMediaWhileRecording(enabled);
-	if (enabled) await saveMuteMediaWhileRecording(false);
-	setSettingsInternal((prev) => ({
-		...prev,
-		muffleMediaWhileRecording: enabled,
-		muteMediaWhileRecording: enabled ? false : prev.muteMediaWhileRecording,
-	}));
-	await emit("settings-changed");
+	await updateMediaWhileRecording(!enabled && settings().muteMediaWhileRecording, enabled);
 }
 
 export async function updateRecordingSoundsEnabled(enabled: boolean): Promise<void> {
