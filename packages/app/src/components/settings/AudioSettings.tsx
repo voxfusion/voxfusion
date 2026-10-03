@@ -5,6 +5,7 @@ import { capture } from "../../lib/posthog";
 import type { AudioDevice, Settings } from "../../lib/settingsStore";
 import {
 	updateMicrophone,
+	updateMuffleMediaWhileRecording,
 	updateMuteMediaWhileRecording,
 	updateRecordingSoundsEnabled,
 } from "../../lib/settingsStore";
@@ -95,6 +96,16 @@ export default function AudioSettings(props: AudioSettingsProps) {
 				onChange={(enabled) => {
 					capture("settings_mute_media_while_recording_changed", { enabled });
 					updateMuteMediaWhileRecording(enabled);
+				}}
+			/>
+
+			<ToggleOption
+				label={props.t("settings.muffleMediaWhileRecording")}
+				description={props.t("settings.muffleMediaWhileRecordingDescription")}
+				isEnabled={props.settings().muffleMediaWhileRecording}
+				onChange={(enabled) => {
+					capture("settings_muffle_media_while_recording_changed", { enabled });
+					updateMuffleMediaWhileRecording(enabled);
 				}}
 			/>
 

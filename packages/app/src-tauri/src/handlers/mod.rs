@@ -23,7 +23,9 @@ pub use db::{
     list_transcriptions, save_transcription, update_dictionary_word,
 };
 pub use hotkeys::start_system_key_watcher;
-pub use media::{mute_media_for_recording, restore_media_after_recording};
+pub use media::{
+    muffle_media_for_recording, mute_media_for_recording, restore_media_after_recording,
+};
 pub use models::{
     cancel_model_download, check_model_downloaded, download_model, get_active_model, list_models,
     set_active_model,

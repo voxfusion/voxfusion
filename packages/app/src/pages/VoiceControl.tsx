@@ -10,6 +10,7 @@ import { createAppI18n, getStoredLocale } from "../i18n";
 import { getFrontmostApp } from "../lib/commands/apps";
 import { startRecordingWithDevice, stopRecordingWithDevice } from "../lib/commands/audio";
 import {
+	muffleMediaForRecording as muffleMediaForRecordingCommand,
 	muteMediaForRecording as muteMediaForRecordingCommand,
 	restoreMediaAfterRecording as restoreMediaAfterRecordingCommand,
 } from "../lib/commands/media";
@@ -56,8 +57,8 @@ const VOXFUSION_BUNDLE_ID = "io.voxfusion.app";
 const TRANSCRIPTION_ERROR_HIDE_MS = 5000;
 /** How long a recording/typing error stays visible. */
 const RECORDING_ERROR_HIDE_MS = 4000;
-/** Keep media audible until the primary scan cue has finished. */
-const RECORDING_START_CUE_MUTE_DELAY_MS = 180;
+/** Keep media at full volume until the primary scan cue has finished. */
+const RECORDING_START_CUE_MEDIA_DELAY_MS = 180;
 
 type KeyboardKeyPressedPayload = {
 	keyCode: number;
@@ -98,6 +99,7 @@ export default function VoiceControl() {
 	const [currentShortcut, setCurrentShortcut] = createSignal<string | null>(null);
 	const [selectedMicrophone, setSelectedMicrophone] = createSignal<string | null>(null);
 	const [muteMediaWhileRecording, setMuteMediaWhileRecording] = createSignal(false);
+	const [muffleMediaWhileRecording, setMuffleMediaWhileRecording] = createSignal(false);
 	const [recordingSoundsEnabled, setRecordingSoundsEnabled] = createSignal(false);
 	const [audioLevel, setAudioLevel] = createSignal(0);
 	const [waveOffset, setWaveOffset] = createSignal(0);
@@ -106,7 +108,7 @@ export default function VoiceControl() {
 	const [errorMessage, setErrorMessage] = createSignal<string | null>(null);
 	const [errorRetry, setErrorRetry] = createSignal<(() => void) | null>(null);
 	let errorHideTimer: number | undefined;
-	let mediaMuteTimer: number | undefined;
+	let mediaQuietTimer: number | undefined;
 
 	createEffect(() => {
 		if (!isRecording()) return;
@@ -130,10 +132,10 @@ export default function VoiceControl() {
 
 	const showErrorState = () => Boolean(errorMessage()) && !isRecording() && !loading();
 
-	const cancelPendingMediaMute = () => {
-		if (mediaMuteTimer === undefined) return;
-		window.clearTimeout(mediaMuteTimer);
-		mediaMuteTimer = undefined;
+	const cancelPendingMediaQuiet = () => {
+		if (mediaQuietTimer === undefined) return;
+		window.clearTimeout(mediaQuietTimer);
+		mediaQuietTimer = undefined;
 	};
 
 	const clearErrorState = () => {
@@ -150,7 +152,7 @@ export default function VoiceControl() {
 		options: { autoHideMs: number; retry?: () => void }
 	) => {
 		clearErrorState();
-		cancelPendingMediaMute();
+		cancelPendingMediaQuiet();
 		await restoreMediaAfterRecordingCommand();
 		if (recordingSoundsEnabled()) play("error");
 		setErrorMessage(message);
@@ -262,6 +264,7 @@ export default function VoiceControl() {
 		}
 		setSelectedMicrophone(settings.selectedMicrophoneId);
 		setMuteMediaWhileRecording(settings.muteMediaWhileRecording);
+		setMuffleMediaWhileRecording(settings.muffleMediaWhileRecording);
 		setRecordingSoundsEnabled(settings.recordingSoundsEnabled);
 		setIsOnboardingComplete(settings.onboardingComplete);
 		if (settings.onboardingComplete) {
@@ -290,6 +293,7 @@ export default function VoiceControl() {
 				}
 				setSelectedMicrophone(newSettings.selectedMicrophoneId);
 				setMuteMediaWhileRecording(newSettings.muteMediaWhileRecording);
+				setMuffleMediaWhileRecording(newSettings.muffleMediaWhileRecording);
 				setRecordingSoundsEnabled(newSettings.recordingSoundsEnabled);
 				setIsOnboardingComplete(newSettings.onboardingComplete);
 			})
@@ -363,7 +367,7 @@ export default function VoiceControl() {
 
 	onCleanup(async () => {
 		clearErrorState();
-		cancelPendingMediaMute();
+		cancelPendingMediaQuiet();
 		if (isRecording()) {
 			await cancelRecording();
 		}
@@ -458,14 +462,14 @@ export default function VoiceControl() {
 		logDiagnostic("info", "voice", "stop_recording_started", {
 			mode: recordingMode(),
 		});
-		cancelPendingMediaMute();
+		cancelPendingMediaQuiet();
 		isStopping = true;
 		setIsRecording(false);
 		setRecordingMode(null);
 		await unregisterEscapeShortcut();
 		await setWindowWidth(WINDOW_WIDTH_COMPACT);
-		// Unmute before touching the recorder so a failed stop cannot leave the
-		// output muted.
+		// Restore media before touching the recorder so a failed stop cannot
+		// leave the output muted or muffled.
 		await restoreMediaAfterRecording();
 
 		const completed = await Result.tryPromise(async () => {
@@ -528,7 +532,7 @@ export default function VoiceControl() {
 		logDiagnostic("warn", "voice", "recording_cancelled", {
 			mode: recordingMode(),
 		});
-		cancelPendingMediaMute();
+		cancelPendingMediaQuiet();
 		isStopping = true;
 		setIsRecording(false);
 		setRecordingMode(null);
@@ -543,19 +547,29 @@ export default function VoiceControl() {
 		await hideVoiceControlWindow();
 	};
 
-	const scheduleMediaMuteForRecording = (delayMs: number) => {
-		cancelPendingMediaMute();
-		if (!muteMediaWhileRecording()) return;
+	// Fire-and-forget: the recording is already running, and muffling fades on
+	// a backend thread, so neither ever holds up the recording.
+	const quietMediaForRecording = () => {
+		if (muteMediaWhileRecording()) {
+			void muteMediaForRecordingCommand();
+		} else if (muffleMediaWhileRecording()) {
+			void muffleMediaForRecordingCommand();
+		}
+	};
+
+	const scheduleMediaQuietForRecording = (delayMs: number) => {
+		cancelPendingMediaQuiet();
+		if (!muteMediaWhileRecording() && !muffleMediaWhileRecording()) return;
 
 		if (delayMs <= 0) {
-			void muteMediaForRecordingCommand();
+			quietMediaForRecording();
 			return;
 		}
 
-		mediaMuteTimer = window.setTimeout(() => {
-			mediaMuteTimer = undefined;
-			if (!isRecording() || !muteMediaWhileRecording()) return;
-			void muteMediaForRecordingCommand();
+		mediaQuietTimer = window.setTimeout(() => {
+			mediaQuietTimer = undefined;
+			if (!isRecording()) return;
+			quietMediaForRecording();
 		}, delayMs);
 	};
 
@@ -569,7 +583,7 @@ export default function VoiceControl() {
 			if (isStopping || isStarting) return;
 			isStarting = true;
 			clearErrorState();
-			cancelPendingMediaMute();
+			cancelPendingMediaQuiet();
 			logDiagnostic("info", "voice", "start_recording_started", { mode });
 			const cueStartedAt = recordingSoundsEnabled() ? performance.now() : null;
 			if (cueStartedAt !== null) play("scan");
@@ -603,11 +617,11 @@ export default function VoiceControl() {
 			setRecordingMode(mode);
 			setIsRecording(true);
 			isStarting = false;
-			const mediaMuteDelay =
+			const mediaQuietDelay =
 				cueStartedAt === null
 					? 0
-					: Math.max(0, RECORDING_START_CUE_MUTE_DELAY_MS - (performance.now() - cueStartedAt));
-			scheduleMediaMuteForRecording(mediaMuteDelay);
+					: Math.max(0, RECORDING_START_CUE_MEDIA_DELAY_MS - (performance.now() - cueStartedAt));
+			scheduleMediaQuietForRecording(mediaQuietDelay);
 			await registerEscapeShortcut();
 			logDiagnostic("info", "voice", "start_recording_completed", {
 				mode,
