@@ -2,12 +2,15 @@ use std::sync::{LazyLock, Mutex};
 
 #[cfg(target_os = "macos")]
 mod muffle;
+#[cfg(target_os = "macos")]
+mod tap;
 
 #[derive(Default)]
 struct MediaMuteState {
     active: bool,
     /// Output device muted for the current recording. `None` when it was
-    /// already muted, so restoring leaves it alone.
+    /// already muted, so restoring leaves it alone, or when it has no mute
+    /// control and the muffle worker silenced it instead.
     #[cfg(target_os = "macos")]
     muted_device: Option<MutedDevice>,
     /// UIDs of devices that were unplugged while muted. macOS can restore a
@@ -119,7 +122,8 @@ const AUDIO_DEVICE_PROPERTY_DEVICE_UID: AudioObjectPropertySelector = u32::from_
 const AUDIO_DEVICE_PROPERTY_MUTE: AudioObjectPropertySelector = u32::from_be_bytes(*b"mute");
 
 /// The volume behind the system volume slider, from 0 to 1. Unlike a device's
-/// per-channel volumes it exists on any output with adjustable volume.
+/// per-channel volumes it exists on any output with adjustable volume, but not
+/// on outputs whose volume is fixed, such as many USB audio interfaces.
 #[cfg(target_os = "macos")]
 const AUDIO_HARDWARE_SERVICE_DEVICE_PROPERTY_VIRTUAL_MAIN_VOLUME: AudioObjectPropertySelector =
     u32::from_be_bytes(*b"vmvc");
@@ -234,12 +238,26 @@ fn size_of_val_u32<T>(value: &T) -> Result<u32, String> {
 }
 
 #[cfg(target_os = "macos")]
-fn get_output_muted(device_id: AudioObjectId) -> Result<bool, String> {
-    let address = AudioObjectPropertyAddress {
+fn output_mute_address() -> AudioObjectPropertyAddress {
+    AudioObjectPropertyAddress {
         selector: AUDIO_DEVICE_PROPERTY_MUTE,
         scope: AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT,
         element: AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
-    };
+    }
+}
+
+/// USB audio interfaces and displays often have no mute control at all.
+#[cfg(target_os = "macos")]
+fn has_output_mute_control(device_id: AudioObjectId) -> bool {
+    let address = output_mute_address();
+    let mut settable: u8 = 0;
+    let status = unsafe { AudioObjectIsPropertySettable(device_id, &address, &mut settable) };
+    status == 0 && settable != 0
+}
+
+#[cfg(target_os = "macos")]
+fn get_output_muted(device_id: AudioObjectId) -> Result<bool, String> {
+    let address = output_mute_address();
     let mut muted: u32 = 0;
     let mut data_size = size_of_val_u32(&muted)?;
 
@@ -263,11 +281,7 @@ fn get_output_muted(device_id: AudioObjectId) -> Result<bool, String> {
 
 #[cfg(target_os = "macos")]
 fn set_output_muted(device_id: AudioObjectId, muted: bool) -> Result<(), String> {
-    let address = AudioObjectPropertyAddress {
-        selector: AUDIO_DEVICE_PROPERTY_MUTE,
-        scope: AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT,
-        element: AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
-    };
+    let address = output_mute_address();
     let value = u32::from(muted);
 
     let status = unsafe {
@@ -359,7 +373,49 @@ fn set_output_volume(device_id: AudioObjectId, volume: f32) -> Result<(), String
 }
 
 #[cfg(target_os = "macos")]
-struct CoreAudioVolume;
+fn has_output_volume_control(device_id: AudioObjectId) -> bool {
+    is_output_volume_settable(device_id).unwrap_or(false)
+}
+
+/// Changes the output's own volume where it has one, and otherwise turns
+/// other apps' audio down with a tap.
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+struct CoreAudioVolume {
+    /// Taps by device UID, with the ID the device last had.
+    taps: std::cell::RefCell<std::collections::HashMap<String, (AudioObjectId, tap::OutputTap)>>,
+}
+
+#[cfg(target_os = "macos")]
+impl CoreAudioVolume {
+    fn set_tap_volume(&self, device: AudioObjectId, volume: f32) -> Result<(), String> {
+        let mut taps = self.taps.borrow_mut();
+        let uid = match get_device_uid(device) {
+            Ok(uid) => uid,
+            Err(err) => {
+                // Most likely unplugged; its tap stopped with it.
+                taps.retain(|_, (tapped, _)| *tapped != device);
+                return Err(err);
+            }
+        };
+        // A tap at full volume only adds latency.
+        if volume >= 1.0 {
+            if taps.remove(&uid).is_some() {
+                log::info!(target: "media", "output_tap_stopped device_id={device}");
+            }
+            return Ok(());
+        }
+        if let Some((tapped, output_tap)) = taps.get_mut(&uid) {
+            *tapped = device;
+            output_tap.set_volume(volume);
+            return Ok(());
+        }
+        let output_tap = tap::OutputTap::start(&uid, volume)?;
+        log::info!(target: "media", "output_tap_started device_id={device}");
+        taps.insert(uid, (device, output_tap));
+        Ok(())
+    }
+}
 
 #[cfg(target_os = "macos")]
 impl muffle::OutputVolume for CoreAudioVolume {
@@ -376,14 +432,21 @@ impl muffle::OutputVolume for CoreAudioVolume {
     }
 
     fn adjustable_volume(&self, device: AudioObjectId) -> Result<f32, String> {
-        if !is_output_volume_settable(device)? {
+        if has_output_volume_control(device) {
+            return get_output_volume(device);
+        }
+        if !tap::is_supported() {
             return Err("Output volume is fixed".to_string());
         }
-        get_output_volume(device)
+        // A tap starts from the output's full volume.
+        Ok(1.0)
     }
 
     fn set_volume(&self, device: AudioObjectId, volume: f32) -> Result<(), String> {
-        set_output_volume(device, volume)
+        if has_output_volume_control(device) {
+            return set_output_volume(device, volume);
+        }
+        self.set_tap_volume(device, volume)
     }
 }
 
@@ -469,19 +532,37 @@ pub fn mute_media_for_recording() -> Result<(), String> {
     }
 
     #[cfg(target_os = "macos")]
-    {
-        let device_id = get_default_output_device()?;
-        if !get_output_muted(device_id)? {
+    mute_default_output(&mut state)?;
+
+    state.active = true;
+    Ok(())
+}
+
+/// Logs its failures itself, because the frontend does not wait for them.
+#[cfg(target_os = "macos")]
+fn mute_default_output(state: &mut MediaMuteState) -> Result<(), String> {
+    let device_id = get_default_output_device().inspect_err(|err| {
+        log::warn!(target: "media", "mute_failed error={err}");
+    })?;
+    if !has_output_mute_control(device_id) {
+        // Turn other apps' audio all the way down instead.
+        muffle::silence();
+        return Ok(());
+    }
+    let result = get_output_muted(device_id).and_then(|already_muted| {
+        if !already_muted {
             set_output_muted(device_id, true)?;
             state.muted_device = Some(MutedDevice {
                 id: device_id,
                 uid: get_device_uid(device_id).ok(),
             });
         }
+        Ok(())
+    });
+    if let Err(err) = &result {
+        log::warn!(target: "media", "mute_failed device_id={device_id} error={err}");
     }
-
-    state.active = true;
-    Ok(())
+    result
 }
 
 /// Turns system output down for the recording instead of muting it. Returns
