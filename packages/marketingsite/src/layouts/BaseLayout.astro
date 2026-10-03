@@ -5,11 +5,16 @@
  * global base styles every page relies on.
  *
  * Nav variants:
- *   - showNavLinks renders the Features / GitHub link group.
+ *   - showNavLinks renders the landing-section / GitHub link group.
  *   - ctaHref + ctaLabel render the bordered CTA on the right.
  *   - <slot name="nav-extra" /> renders inside <nav> after .nav-inner
  *     (used by the download page's mobile menu).
  *   - showFooter=false lets a page render its own footer (404).
+ *
+ * Scroll reveal: elements marked data-reveal fade in when they enter the
+ * viewport. The hidden state only applies under html.js, which is set
+ * only when IntersectionObserver exists, so content stays visible without
+ * JavaScript.
  */
 import Footer from "../components/Footer.astro";
 import Seo from "../components/Seo.astro";
@@ -42,6 +47,7 @@ const {
 	showFooter = true,
 } = Astro.props;
 const t = useTranslations(lang);
+const home = getLocalizedPath("/", lang);
 ---
 
 <!doctype html>
@@ -50,25 +56,32 @@ const t = useTranslations(lang);
 	<meta charset="UTF-8" />
 	<Seo title={title} description={description} lang={lang} noindex={noindex} schema={schema} />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta name="theme-color" content="#0a0a0a" />
 	<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 	<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 	<meta name="mailru-domain" content="a5ieqZ6Dkv267Psx" />
 	<title>{title}</title>
+	<script is:inline>
+		if ("IntersectionObserver" in window) document.documentElement.classList.add("js");
+	</script>
 </head>
 <body class={bodyClass}>
 	<div class="grid-overlay" aria-hidden="true"></div>
 
 	<nav class="nav">
 		<div class="nav-inner">
-			<a href={getLocalizedPath("/", lang)} class="logo">
+			<a href={home} class="logo">
 				<span class="logo-bracket">[</span>VOX<span class="logo-accent">FUSION</span><span class="logo-bracket">]</span>
 			</a>
 			{showNavLinks && (
 				<div class="nav-links">
-					<a href={getLocalizedPath("/", lang) + "#features"} class="nav-link"><span class="link-index">01</span>{t("nav.features")}</a>
-					<a href="https://github.com/voxfusion/voxfusion" target="_blank" rel="noopener noreferrer" class="nav-link"><span class="link-index">02</span>{t("nav.github")}</a>
+					<a href={`${home}#how`} class="nav-link"><span class="link-index">01</span>{t("nav.how")}</a>
+					<a href={`${home}#features`} class="nav-link"><span class="link-index">02</span>{t("nav.features")}</a>
+					<a href={`${home}#privacy`} class="nav-link"><span class="link-index">03</span>{t("nav.privacy")}</a>
+					<a href={`${home}#faq`} class="nav-link"><span class="link-index">04</span>{t("nav.faq")}</a>
+					<a href="https://github.com/voxfusion/voxfusion" target="_blank" rel="noopener noreferrer" class="nav-link"><span class="link-index">05</span>{t("nav.github")}</a>
 				</div>
 			)}
 			{ctaHref && ctaLabel && <a href={ctaHref} class="nav-cta">{ctaLabel}</a>}
@@ -80,6 +93,25 @@ const t = useTranslations(lang);
 
 	{showFooter && <Footer lang={lang} />}
 	<Umami />
+	<script is:inline>
+		if ("IntersectionObserver" in window) {
+			var revealObserver = new IntersectionObserver(
+				function (entries) {
+					entries.forEach(function (entry) {
+						if (!entry.isIntersecting) return;
+
+						entry.target.classList.add("is-visible");
+						revealObserver.unobserve(entry.target);
+					});
+				},
+				{ rootMargin: "0px 0px -8% 0px" },
+			);
+
+			document.querySelectorAll("[data-reveal]").forEach(function (el) {
+				revealObserver.observe(el);
+			});
+		}
+	</script>
 </body>
 </html>
 
@@ -100,12 +132,17 @@ const t = useTranslations(lang);
 		background: #0a0a0a;
 		color: #e0e0e0;
 		scroll-behavior: smooth;
+		scroll-padding-top: 40px;
 		font-size: 15px;
 	}
 
 	body {
 		min-height: 100vh;
 		position: relative;
+	}
+
+	h1, h2, h3 {
+		text-wrap: balance;
 	}
 
 	.grid-overlay {
@@ -165,6 +202,7 @@ const t = useTranslations(lang);
 		color: #888;
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
+		white-space: nowrap;
 		transition: color 0.2s;
 	}
 
@@ -195,10 +233,15 @@ const t = useTranslations(lang);
 
 	::selection { background: #ff4d19; color: #0a0a0a; }
 	a:focus-visible, button:focus-visible { outline: 2px solid #ff7045; outline-offset: 5px; }
-	@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+	.js [data-reveal] { opacity: 0; transform: translateY(14px); transition: opacity .5s, transform .5s; }
+	.js [data-reveal].is-visible { opacity: 1; transform: none; }
+	@media (prefers-reduced-motion: reduce) {
+		html { scroll-behavior: auto; }
+		.js [data-reveal] { opacity: 1; transform: none; transition: none; }
+	}
 	@media (max-width: 1050px) { .nav-inner { padding-inline: 28px; } .nav-links { gap: 20px; } }
 	@media (max-width: 540px) { .nav-inner { padding: 18px 20px; } .logo { font-size: 13px; } .nav-cta { font-size: 10px; padding: 10px 12px; } }
-	@media (max-width: 768px) {
+	@media (max-width: 940px) {
 		.nav-links {
 			display: none;
 		}

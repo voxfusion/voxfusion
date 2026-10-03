@@ -1,0 +1,45 @@
+---
+/**
+ * Numbered section rule ("01 FEATURES ────") with an optional headline and
+ * lead paragraph. viewEvent reports the section to Umami once it scrolls
+ * into view; it sits on the intro rather than the whole section because a
+ * tall section never reaches Umami's 30% visibility threshold on phones.
+ */
+interface Props {
+	number: string;
+	tag: string;
+	title?: string;
+	description?: string;
+	viewEvent?: string;
+}
+
+const { number, tag, title, description, viewEvent } = Astro.props;
+---
+
+<div class="section-header">
+	<span class="section-number">{number}</span>
+	<p class="section-tag">{tag}</p>
+	<div class="section-line"></div>
+</div>
+{title && (
+	<div class="section-intro" data-reveal data-umami-view={viewEvent}>
+		<h2>{title}</h2>
+		{description && <p>{description}</p>}
+	</div>
+)}
+
+<style>
+	.section-header { display: flex; gap: 16px; align-items: center; margin-bottom: 34px; }
+	.section-number { font-size: 11px; color: #ff6b3d; }
+	.section-tag { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #a3a3a3; }
+	.section-line { flex: 1; height: 1px; background: #292929; }
+	.section-intro { display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: end; margin-bottom: 48px; }
+	.section-intro h2 { font-size: clamp(30px, 3.6vw, 46px); line-height: 1.22; letter-spacing: -.05em; font-weight: 500; max-width: 580px; }
+	.section-intro p { font-size: 14px; line-height: 1.85; color: #aaa; max-width: 440px; }
+	@media (max-width: 800px) {
+		.section-intro { grid-template-columns: 1fr; gap: 20px; margin-bottom: 36px; }
+	}
+	@media (max-width: 540px) {
+		.section-intro p { font-size: 13px; }
+	}
+</style>

@@ -1,0 +1,48 @@
+---
+import { defaultLang, type languages, useTranslations } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
+const items = ([1, 2, 3, 4, 5, 6] as const).map((n) => ({
+	id: `0${n}`,
+	question: t(`faq.item${n}.question`),
+	answer: t(`faq.item${n}.answer`),
+}));
+---
+
+<div class="faq-list" data-reveal>
+	{items.map((item) => (
+		<details class="faq-item">
+			<summary data-umami-event="faq_toggle" data-umami-event-question={item.id}>
+				<span class="faq-index">{item.id}</span>
+				<h3>{item.question}</h3>
+				<span class="faq-marker" aria-hidden="true"></span>
+			</summary>
+			<p>{item.answer}</p>
+		</details>
+	))}
+</div>
+
+<style>
+	.faq-list { border-top: 1px solid #343434; }
+	.faq-item { border-bottom: 1px solid #343434; }
+	.faq-item summary { display: grid; grid-template-columns: 44px 1fr auto; align-items: baseline; gap: 12px; padding: 24px 4px; cursor: pointer; list-style: none; transition: color .2s; }
+	.faq-item summary::-webkit-details-marker { display: none; }
+	.faq-item summary:hover h3, .faq-item[open] h3 { color: #fff; }
+	.faq-item summary:focus-visible { outline: 2px solid #ff7045; outline-offset: -2px; }
+	.faq-index { font-size: 11px; color: #ff6b3d; }
+	.faq-item h3 { font-size: 17px; font-weight: 500; letter-spacing: -.03em; line-height: 1.5; color: #dcdcdc; transition: color .2s; }
+	.faq-marker { font-size: 13px; color: #ff6b3d; white-space: nowrap; }
+	.faq-marker::before { content: "[ + ]"; }
+	.faq-item[open] .faq-marker::before { content: "[ − ]"; }
+	.faq-item p { max-width: 720px; padding: 0 4px 28px 60px; color: #a8a8a8; font-size: 14px; line-height: 1.9; }
+	@media (max-width: 540px) {
+		.faq-item summary { grid-template-columns: 28px 1fr auto; gap: 10px; padding-block: 20px; }
+		.faq-item h3 { font-size: 15px; }
+		.faq-item p { padding: 0 4px 24px 42px; font-size: 13px; }
+	}
+</style>

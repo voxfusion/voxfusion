@@ -1,25 +1,24 @@
 export const features = {
 	"features.tag": "Features",
-	"features.title": "Fast, private dictation everywhere",
+	"features.title": "Built for people who write all day",
 	"features.description":
-		"No app switching. No copy and paste. No cloud. Just speak. Your audio never leaves your Mac.",
-	"features.globalHotkey.title": "Global hotkey",
-	"features.globalHotkey.description":
-		"Press Ctrl+Option anywhere on your Mac to dictate. It works in email, documents, chats, and code editors.",
-	"features.instantTranscription.title": "Local transcription",
-	"features.instantTranscription.description":
-		"Speech recognition runs entirely on your Mac using a local Whisper model. No internet required after the one-time model download.",
-	"features.customDictionary.title": "Custom dictionary",
-	"features.customDictionary.description":
-		"Add specialized terms, names, or technical words for better accuracy. Stored locally on your device.",
-	"features.history.title": "Transcription history",
+		"Emails, messages, docs, prompts for your coding agent. VoxFusion does the typing so you can stay with the thought.",
+	"features.shortcuts.title": "Two ways to start talking",
+	"features.shortcuts.description":
+		"Tap ⌃ + ⌥ to dictate hands-free, or hold Right ⌘ and release when you're done. Both shortcuts are yours to remap.",
+	"features.onDevice.title": "Transcription that never leaves home",
+	"features.onDevice.description":
+		"Whisper Large v3 Turbo or NVIDIA Parakeet runs right on your Mac. After the one-time model download, you can dictate with Wi-Fi off.",
+	"features.dictionary.title": "Teach it your words",
+	"features.dictionary.description":
+		"Add names, product terms, and jargon once and they come out spelled right. Keep separate word lists for individual apps and websites.",
+	"features.styles.title": "The right tone for every app",
+	"features.styles.description":
+		"Choose a style per app or website: Professional for email, Casual for chat, Agents for prompting Claude Code and Cursor. Styles work with the Whisper model.",
+	"features.focus.title": "Quiet while you talk",
+	"features.focus.description":
+		"VoxFusion can mute or turn down music and videos while you dictate, then restore the volume the moment you finish.",
+	"features.history.title": "Everything you've said, kept local",
 	"features.history.description":
-		"Review past transcriptions with timestamps. Everything stays on your Mac.",
-	"features.highlight.tag": "Why VoxFusion?",
-	"features.highlight.title": "Private by design. Free forever.",
-	"features.highlight.description":
-		"VoxFusion is local-first. There's no server, no account, and no subscription. Your audio is transcribed on-device and never sent anywhere.",
-	"features.highlight.list1": "100% offline transcription after the one-time model download",
-	"features.highlight.list2": "Inserts text directly at the cursor in any app",
-	"features.highlight.list3": "No account, no telemetry of your voice data",
+		"Scroll back through past dictations with timestamps and one-click copy. They're stored in a database on your Mac and nowhere else.",
 } as const;

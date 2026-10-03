@@ -1,5 +1,9 @@
 ---
+import Faq from "../components/Faq.astro";
 import FeatureGrid from "../components/FeatureGrid.astro";
+import HeroDemo from "../components/HeroDemo.astro";
+import HowItWorks from "../components/HowItWorks.astro";
+import SectionHeading from "../components/SectionHeading.astro";
 import { defaultLang, getLocalizedPath, useTranslations } from "../i18n/utils";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { softwareApplicationSchema } from "../seo";
@@ -9,6 +13,31 @@ const t = useTranslations(lang);
 const title = t("meta.title");
 const description = t("meta.description");
 const schema = softwareApplicationSchema(description);
+const downloadHref = getLocalizedPath("/download", lang);
+
+const stats = (["local", "uploads", "languages", "price"] as const).map((key) => ({
+	value: t(`hero.stat.${key}.value`),
+	label: t(`hero.stat.${key}.label`),
+}));
+const tickerApps = [
+	"Mail",
+	"Slack",
+	"Notes",
+	"Messages",
+	"Notion",
+	"Chrome",
+	"VS Code",
+	"Cursor",
+	"Terminal",
+	"Linear",
+	"Figma",
+	"Safari",
+];
+const compareRows = (["audio", "offline", "account", "price", "source"] as const).map((key) => ({
+	label: t(`why.compare.${key}.label`),
+	cloud: t(`why.compare.${key}.cloud`),
+	local: t(`why.compare.${key}.local`),
+}));
 ---
 
 <BaseLayout
@@ -17,7 +46,7 @@ const schema = softwareApplicationSchema(description);
 	lang={lang}
 	schema={schema}
 	showNavLinks
-	ctaHref={getLocalizedPath("/download", lang)}
+	ctaHref={downloadHref}
 	ctaLabel={`${t("nav.download")} →`}
 >
 	<main id="main-content">
@@ -26,15 +55,16 @@ const schema = softwareApplicationSchema(description);
 			<div class="hero-content">
 				<div class="hero-label">
 					<span class="label-line" aria-hidden="true"></span>
-					<span class="label-text">LOCAL VOICE TO TEXT / macOS</span>
+					<span class="label-text">{t("hero.label")}</span>
 				</div>
 				<h1 class="hero-title">
 					<span class="title-line">{t("hero.title.line1")}</span>
-					<span class="title-line title-accent">{t("hero.title.line2")}</span>
+					<span class="title-line">{t("hero.title.line2")}</span>
+					<span class="title-line title-accent">{t("hero.title.line3")}</span>
 				</h1>
 				<p class="hero-description">{t("hero.subtitle")}</p>
 				<div class="hero-actions">
-					<a href={getLocalizedPath("/download", lang)} class="btn-primary" data-umami-event="hero_download_click">
+					<a href={downloadHref} class="btn-primary" data-umami-event="hero_download_click">
 						<span class="btn-icon">↓</span>
 						<span>{t("hero.cta.download")}</span>
 					</a>
@@ -43,206 +73,204 @@ const schema = softwareApplicationSchema(description);
 						<span>{t("nav.github")}</span>
 					</a>
 				</div>
-				<p class="hero-note"><span aria-hidden="true">[✓]</span> Free & open source <span class="note-divider">/</span> No account needed</p>
+				<p class="hero-note"><span aria-hidden="true">[✓]</span> {t("hero.note.free")} <span class="note-divider">/</span> {t("hero.note.account")} <span class="note-divider">/</span> {t("hero.note.platform")}</p>
 			</div>
-			<div class="hero-visual" aria-label="Example of voice dictation into Messages">
-				<div class="visual-caption"><span>01 / VOICE → TEXT</span><span>WORKFLOW DEMO</span></div>
-				<div class="terminal">
-					<div class="terminal-header">
-						<span class="terminal-title"><span class="terminal-mark" aria-hidden="true">✳</span> voxfusion</span>
-						<span class="local-status"><span></span> ON DEVICE</span>
-					</div>
-					<div class="terminal-body">
-						<div class="input-label"><span>VOICE INPUT</span><span class="hotkey"><kbd>⌃</kbd> + <kbd>⌥</kbd></span></div>
-						<p class="spoken-text">“Hey team, let's schedule<br class="desktop-break" /> a quick sync for tomorrow.”</p>
-						<div class="waveform-raw" aria-hidden="true">
-							{Array.from({ length: 48 }, (_, i) => (
-								<div class="wave-bar" style={'--i: ' + i + '; --h: ' + (18 + Math.abs(Math.sin(i * 1.7) * Math.cos(i * 0.23)) * 82) + '%'}></div>
-							))}
-						</div>
-						<div class="processing-line"><span class="prompt">↳</span> Transcribed locally <span class="processing-engine">whisper.cpp</span></div>
-						<div class="text-output">
-							<div class="output-label"><span>MESSAGES.APP</span><span class="success">[INSERTED]</span></div>
-							<p>Hey team, let's schedule a quick sync for tomorrow.<span class="cursor" aria-hidden="true">▎</span></p>
-						</div>
-					</div>
-					<div class="terminal-footer"><span>Audio stays on your Mac.</span><span aria-hidden="true">↗</span></div>
-				</div>
-			</div>
+			<HeroDemo />
 		</div>
 		<div class="hero-stats">
-			<div class="stat">
-				<span class="stat-value">{t("hero.stat.words.value")}</span>
-				<span class="stat-label">{t("hero.stat.words.label")}</span>
-			</div>
-			<div class="stat">
-				<span class="stat-value">{t("hero.stat.languages.value")}</span>
-				<span class="stat-label">{t("hero.stat.languages.label")}</span>
-			</div>
-			<div class="stat">
-				<span class="stat-value">{t("hero.stat.apps.value")}</span>
-				<span class="stat-label">{t("hero.stat.apps.label")}</span>
+			{stats.map((stat) => (
+				<div class="stat">
+					<span class="stat-value">{stat.value}</span>
+					<span class="stat-label">{stat.label}</span>
+				</div>
+			))}
+		</div>
+		<div class="ticker">
+			<span class="ticker-label">{t("hero.ticker.label")}</span>
+			<div class="ticker-window">
+				<div class="ticker-track">
+					{[false, true].map((isClone) => (
+						<ul aria-hidden={isClone ? "true" : undefined}>
+							{tickerApps.map((app) => <li>{app}</li>)}
+						</ul>
+					))}
+				</div>
 			</div>
 		</div>
 	</header>
 
-	<section id="features" class="features" data-umami-view="view_features">
-		<div class="section-header">
-			<span class="section-number">01</span>
-			<h2 class="section-title">{t("features.tag")}</h2>
-			<div class="section-line"></div>
-		</div>
-		<div class="section-intro">
-			<h3>{t("features.title")}</h3>
-			<p>{t("features.description")}</p>
-		</div>
-		<FeatureGrid lang={lang} />
+	<section id="how" class="section">
+		<SectionHeading number="01" tag={t("how.tag")} title={t("how.title")} description={t("how.description")} viewEvent="view_how" />
+		<HowItWorks lang={lang} />
+	</section>
 
-		<div class="highlight-block">
-			<div class="privacy-heading">
-			<div class="highlight-label">{t("features.highlight.tag")}</div>
-			<h3 class="highlight-title">{t("features.highlight.title")}</h3>
-			<p class="highlight-desc">{t("features.highlight.description")}</p>
+	<section id="features" class="section">
+		<SectionHeading number="02" tag={t("features.tag")} title={t("features.title")} description={t("features.description")} viewEvent="view_features" />
+		<FeatureGrid lang={lang} />
+	</section>
+
+	<section id="privacy" class="section">
+		<SectionHeading number="03" tag={t("why.section")} />
+		<div class="highlight-block" data-reveal data-umami-view="view_privacy">
+			<div class="highlight-copy">
+				<p class="highlight-label">{t("why.tag")}</p>
+				<h2 class="highlight-title">{t("why.title")}</h2>
+				<p class="highlight-desc">{t("why.description")}</p>
+				<ul class="highlight-list">
+					<li><span class="check" aria-hidden="true">[✓]</span> {t("why.list1")}</li>
+					<li><span class="check" aria-hidden="true">[✓]</span> {t("why.list2")}</li>
+					<li><span class="check" aria-hidden="true">[✓]</span> {t("why.list3")}</li>
+				</ul>
 			</div>
-			<ul class="highlight-list">
-				<li><span class="check">[✓]</span> {t("features.highlight.list1")}</li>
-				<li><span class="check">[✓]</span> {t("features.highlight.list2")}</li>
-				<li><span class="check">[✓]</span> {t("features.highlight.list3")}</li>
-			</ul>
+			<table class="compare">
+				<caption>{t("why.compare.caption")}</caption>
+				<thead>
+					<tr>
+						<td></td>
+						<th scope="col">{t("why.compare.cloud")}</th>
+						<th scope="col" class="compare-local">{t("why.compare.local")}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{compareRows.map((row) => (
+						<tr>
+							<th scope="row">{row.label}</th>
+							<td>{row.cloud}</td>
+							<td class="compare-local">{row.local}</td>
+						</tr>
+					))}
+				</tbody>
+			</table>
 		</div>
 	</section>
 
+	<section id="faq" class="section">
+		<SectionHeading number="04" tag={t("faq.tag")} title={t("faq.title")} description={t("faq.description")} viewEvent="view_faq" />
+		<Faq lang={lang} />
+	</section>
+
 	<section class="cta">
-		<div class="cta-inner">
+		<div class="cta-inner" data-reveal>
 			<div class="cta-copy">
-			<span class="cta-label">YOUR VOICE. YOUR MAC.</span>
-			<h2>{t("cta.title")}</h2>
-			<p>{t("cta.description")}</p>
+				<span class="cta-label">{t("cta.label")}</span>
+				<h2>{t("cta.title")}</h2>
+				<p>{t("cta.description")}</p>
 			</div>
-			<a href={getLocalizedPath("/download", lang)} class="cta-btn" data-umami-event="bottom_cta_click">
-				<span>↓</span> {t("cta.button")}
-			</a>
+			<div class="cta-action">
+				<a href={downloadHref} class="cta-btn" data-umami-event="bottom_cta_click">
+					<span class="btn-icon">↓</span> {t("cta.button")}
+				</a>
+				<span class="cta-note">{t("cta.note")}</span>
+			</div>
 		</div>
 	</section>
 	</main>
 </BaseLayout>
 
 <style>
-	.hero, .features { max-width: 1280px; margin: 0 auto; padding-inline: 40px; }
-	.hero { padding-top: 164px; padding-bottom: 0; }
+	.hero, .section { max-width: 1280px; margin: 0 auto; padding-inline: 40px; }
+	.hero { padding-top: 156px; }
 	.hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 64px; align-items: center; }
 	.hero-label { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
 	.label-line { width: 7px; height: 7px; background: #ff3e00; box-shadow: 0 0 16px #ff3e0050; }
 	.label-text { font-size: 11px; color: #ff6b3d; letter-spacing: .12em; }
-	.hero-title { font-size: clamp(38px, 4.4vw, 60px); font-weight: 600; line-height: 1.12; letter-spacing: -.06em; margin-bottom: 26px; }
+	.hero-title { font-size: clamp(40px, 5vw, 68px); font-weight: 600; line-height: 1.08; letter-spacing: -.06em; margin-bottom: 28px; }
 	.title-line { display: block; }
 	.title-accent { color: #ff4d19; }
-	.hero-description { max-width: 520px; font-size: 14px; line-height: 1.9; color: #a1a1a1; margin-bottom: 30px; }
-	.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-	.btn-primary, .btn-secondary, .cta-btn { display: inline-flex; justify-content: center; align-items: center; gap: 12px; padding: 16px 22px; font-size: 12px; font-weight: 600; transition: background .2s, color .2s, border-color .2s; }
-	.btn-primary, .cta-btn { background: #ff4d19; border: 1px solid #ff4d19; color: #090909; }
-	.btn-primary:hover, .cta-btn:hover { background: #ff7045; border-color: #ff7045; }
+	.hero-description { max-width: 530px; font-size: 15px; line-height: 1.85; color: #a8a8a8; margin-bottom: 32px; }
+	.hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+	.btn-primary, .btn-secondary, .cta-btn { display: inline-flex; justify-content: center; align-items: center; gap: 12px; padding: 16px 22px; font-size: 12px; font-weight: 600; transition: background .2s, color .2s, border-color .2s, transform .12s, box-shadow .12s; }
+	.btn-primary, .cta-btn { background: #ff4d19; border: 1px solid #ff4d19; color: #090909; box-shadow: 4px 4px 0 #7a2409; }
+	.btn-primary:hover, .cta-btn:hover { background: #ff7045; border-color: #ff7045; transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #7a2409; }
+	.btn-primary:active, .cta-btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #7a2409; }
 	.btn-secondary { border: 1px solid #383838; color: #ccc; }
 	.btn-secondary:hover { background: #1c1c1c; border-color: #777; color: #fff; }
 	.btn-icon { font-size: 18px; }
-	.hero-note { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; color: #888; font-size: 10px; line-height: 1.8; }
+	.hero-note { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; color: #888; font-size: 10px; line-height: 1.8; }
 	.hero-note > span:first-child { color: #ff6b3d; }
 	.note-divider { color: #444; }
-	.hero-visual { min-width: 0; }
-	.visual-caption { display: flex; justify-content: space-between; gap: 12px; color: #777; font-size: 9px; letter-spacing: .08em; padding-bottom: 14px; }
-	.visual-caption span:first-child { color: #aaa; }
-	.terminal { background: #111; border: 1px solid #3b3b3b; box-shadow: 10px 10px 0 #0a0a0a, 11px 11px 0 #272727; }
-	.terminal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #303030; background: #181818; }
-	.terminal-title { font-size: 13px; color: #ccc; display: flex; align-items: center; gap: 10px; }
-	.terminal-mark { color: #ff4d19; font-size: 24px; line-height: 1; }
-	.local-status { display: flex; align-items: center; gap: 8px; color: #a9b7a9; font-size: 9px; letter-spacing: .08em; }
-	.local-status span { width: 5px; height: 5px; background: #96bd96; }
-	.terminal-body { padding: 24px; }
-	.input-label, .output-label { display: flex; justify-content: space-between; align-items: center; font-size: 9px; letter-spacing: .06em; color: #919191; }
-	.hotkey { display: flex; gap: 5px; align-items: center; }
-	.hotkey kbd { display: inline-flex; justify-content: center; align-items: center; width: 23px; height: 23px; border: 1px solid #3a3a3a; border-bottom-width: 2px; color: #ccc; font-size: 14px; }
-	.spoken-text { font-size: 17px; line-height: 1.7; margin-top: 18px; color: #ddd; letter-spacing: -.025em; }
-	.waveform-raw { display: flex; align-items: center; justify-content: space-between; gap: 4px; height: 60px; margin: 22px 0; }
-	.wave-bar { width: 4px; height: var(--h); background: #ff4d19; opacity: .8; animation: wave 2s ease-in-out infinite; animation-delay: calc(var(--i) * -.08s); }
-	@keyframes wave { 0%, 100% { transform: scaleY(.45); opacity: .55; } 50% { transform: scaleY(1); opacity: 1; } }
-	.processing-line { display: flex; gap: 8px; align-items: center; padding: 14px 0; border-top: 1px solid #292929; color: #8c8c8c; font-size: 10px; }
-	.prompt { color: #ff6b3d; }
-	.processing-engine { margin-left: auto; color: #777; }
-	.text-output { border: 1px solid #343434; padding: 16px; background: #191919; }
-	.success { color: #9ebd9e; }
-	.text-output p { color: #d5d5d5; font-size: 13px; line-height: 1.8; margin-top: 12px; }
-	.cursor { color: #ff4d19; }
-	.terminal-footer { display: flex; justify-content: space-between; padding: 13px 22px; border-top: 1px solid #303030; color: #888; font-size: 10px; }
-	.terminal-footer span:last-child { color: #ff6b3d; }
-	.hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); border-block: 1px solid #303030; margin-top: 76px; }
-	.stat { padding: 27px 32px; display: flex; align-items: center; gap: 20px; }
+	.hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-block: 1px solid #303030; margin-top: 76px; }
+	.stat { padding: 27px 28px; display: flex; align-items: center; gap: 18px; }
 	.stat:first-child { padding-left: 0; }
 	.stat + .stat { border-left: 1px solid #303030; }
 	.stat-value { font-size: 34px; letter-spacing: -.05em; line-height: 1; color: #e6e6e6; }
 	.stat-label { font-size: 10px; color: #969696; text-transform: uppercase; line-height: 1.7; max-width: 150px; letter-spacing: .05em; }
-	.features { padding-block: 104px; scroll-margin-top: 68px; }
-	.section-header { display: flex; gap: 16px; align-items: center; margin-bottom: 34px; }
-	.section-number { font-size: 11px; color: #ff6b3d; }
-	.section-title { font-size: 11px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: #a3a3a3; }
-	.section-line { flex: 1; height: 1px; background: #292929; }
-	.section-intro { display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: end; margin-bottom: 48px; }
-	.section-intro h3 { font-size: clamp(32px, 3.8vw, 48px); line-height: 1.25; letter-spacing: -.05em; font-weight: 500; max-width: 550px; }
-	.section-intro p { font-size: 14px; line-height: 1.85; color: #aaa; max-width: 440px; }
-	.highlight-block { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 64px; margin-top: 48px; padding: 42px; border: 1px solid #493026; border-left: 3px solid #ff4d19; background: #15110f; }
+	.ticker { display: flex; align-items: center; border-bottom: 1px solid #303030; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+	.ticker-label { flex-shrink: 0; padding: 16px 20px 16px 0; border-right: 1px solid #303030; color: #ff6b3d; }
+	.ticker-window { flex: 1; min-width: 0; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
+	.ticker-track { display: flex; width: max-content; animation: ticker 44s linear infinite; }
+	.ticker-track ul { display: flex; flex-shrink: 0; list-style: none; }
+	.ticker-track li { display: flex; align-items: center; color: #8f8f8f; white-space: nowrap; }
+	.ticker-track li::after { content: "/"; margin-inline: 22px; color: #4a4a4a; }
+	.ticker:hover .ticker-track { animation-play-state: paused; }
+	@keyframes ticker { to { transform: translateX(-50%); } }
+	.section { padding-top: 112px; }
+	.highlight-block { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 64px; padding: 48px; border: 1px solid #493026; border-left: 3px solid #ff4d19; background: #15110f; }
 	.highlight-label { font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: #ff6b3d; margin-bottom: 18px; }
-	.highlight-title { font-size: 25px; line-height: 1.4; font-weight: 500; letter-spacing: -.04em; margin-bottom: 14px; }
-	.highlight-desc { font-size: 12px; color: #a39893; line-height: 1.9; }
-	.highlight-list { list-style: none; display: flex; flex-direction: column; gap: 18px; }
+	.highlight-title { font-size: clamp(26px, 2.8vw, 36px); line-height: 1.25; font-weight: 500; letter-spacing: -.05em; margin-bottom: 18px; }
+	.highlight-desc { font-size: 13px; color: #a39893; line-height: 1.9; }
+	.highlight-list { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
 	.highlight-list li { display: flex; gap: 12px; font-size: 12px; color: #c4bdb8; line-height: 1.8; }
 	.check { color: #ff6b3d; flex-shrink: 0; }
-	.cta { border-top: 1px solid #303030; background: #111; }
-	.cta-inner { max-width: 1280px; margin: auto; padding: 64px 40px; display: flex; align-items: center; justify-content: space-between; gap: 56px; }
+	.compare { width: 100%; border-collapse: collapse; border: 1px solid #3c2e25; background: #100e0c; font-size: 12px; }
+	.compare caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+	.compare th, .compare td { padding: 15px 16px; text-align: left; vertical-align: top; line-height: 1.6; font-weight: 400; }
+	.compare thead th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #8d7f77; }
+	.compare tbody tr { border-top: 1px solid #2c221c; }
+	.compare tbody th { color: #8d7f77; font-size: 11px; white-space: nowrap; }
+	.compare tbody td { color: #84807d; }
+	.compare tbody .compare-local, .compare thead .compare-local { border-left: 1px solid #3c2e25; background: #1d1511; }
+	.compare tbody .compare-local { color: #f3ddd2; }
+	.compare thead .compare-local { color: #ff754c; }
+	.cta { margin-top: 112px; border-top: 1px solid #303030; background: #111; }
+	.cta-inner { max-width: 1280px; margin: auto; padding: 72px 40px; display: flex; align-items: center; justify-content: space-between; gap: 56px; }
 	.cta-label { font-size: 10px; letter-spacing: .1em; color: #ff6b3d; }
-	.cta h2 { margin: 18px 0 14px; font-size: clamp(26px, 3vw, 34px); line-height: 1.3; font-weight: 500; letter-spacing: -.05em; }
-	.cta p { font-size: 12px; color: #999; max-width: 590px; line-height: 1.8; }
-	.cta-btn { flex-shrink: 0; }
+	.cta h2 { margin: 18px 0 14px; font-size: clamp(28px, 3.4vw, 42px); line-height: 1.22; font-weight: 500; letter-spacing: -.05em; max-width: 680px; }
+	.cta p { font-size: 13px; color: #999; max-width: 590px; line-height: 1.8; }
+	.cta-action { display: flex; flex-direction: column; align-items: flex-end; gap: 18px; flex-shrink: 0; }
+	.cta-btn { padding: 18px 26px; font-size: 13px; }
+	.cta-note { font-size: 10px; color: #777; letter-spacing: .04em; }
 	@media (max-width: 1050px) {
 		.hero-grid { gap: 32px; }
-		.hero-title { font-size: 46px; }
-		.hero, .features { padding-inline: 28px; }
-		.terminal-body { padding: 20px; }
-		.spoken-text { font-size: 15px; }
-		.desktop-break { display: none; }
-		.stat { padding-inline: 24px; gap: 14px; }
-		.highlight-block { gap: 32px; padding: 32px; }
+		.hero, .section { padding-inline: 28px; }
+		.stat { padding-inline: 18px; gap: 12px; flex-direction: column; align-items: flex-start; }
+		.highlight-block { gap: 36px; padding: 32px; }
+		.cta-inner { padding-inline: 28px; }
 	}
 	@media (max-width: 800px) {
 		.hero { padding-top: 120px; }
 		.hero-grid { grid-template-columns: 1fr; gap: 48px; }
-		.hero-title { font-size: clamp(38px, 7vw, 58px); max-width: 620px; }
+		.hero-title { font-size: clamp(40px, 9vw, 64px); }
 		.hero-description { max-width: 600px; }
-		.hero-visual { max-width: 580px; width: 100%; }
-		.hero-stats { margin-top: 56px; }
-		.stat { flex-direction: column; align-items: flex-start; gap: 12px; }
-		.section-intro { grid-template-columns: 1fr; gap: 20px; }
-		.features { padding-block: 64px; }
-		.highlight-block { grid-template-columns: 1fr; gap: 28px; }
-		.cta-inner { flex-direction: column; align-items: flex-start; gap: 28px; padding: 48px 28px; }
+		.hero-stats { grid-template-columns: repeat(2, 1fr); margin-top: 56px; }
+		.stat:nth-child(odd) { padding-left: 0; border-left: 0; }
+		.stat:nth-child(n + 3) { border-top: 1px solid #303030; }
+		.section { padding-top: 72px; }
+		.highlight-block { grid-template-columns: 1fr; }
+		.cta { margin-top: 72px; }
+		.cta-inner { flex-direction: column; align-items: flex-start; gap: 32px; padding-block: 52px; }
+		.cta-action { align-items: flex-start; }
 	}
 	@media (max-width: 540px) {
-		.hero, .features { padding-inline: 20px; }
+		.hero, .section { padding-inline: 20px; }
 		.hero-label { margin-bottom: 22px; }
 		.label-text { font-size: 10px; }
 		.hero-title { font-size: clamp(32px, 9.3vw, 48px); }
-		.hero-description { font-size: 13px; }
+		.hero-description { font-size: 14px; }
 		.btn-primary, .btn-secondary { padding: 15px 18px; font-size: 11px; }
 		.hero-note { font-size: 9px; gap: 7px; }
-		.terminal-body { padding: 18px; }
-		.terminal-header { padding: 16px 18px; }
-		.waveform-raw { gap: 3px; }
-		.processing-line { font-size: 9px; gap: 6px; }
-		.processing-engine { font-size: 8px; }
-		.stat { padding: 24px 14px; }
+		.stat { padding: 22px 14px; }
 		.stat-value { font-size: 28px; }
 		.stat-label { font-size: 9px; letter-spacing: 0; }
+		.ticker-label { padding-right: 14px; }
 		.highlight-block { padding: 28px 22px; }
-		.highlight-title { font-size: 23px; }
+		.compare th, .compare td { padding: 12px 10px; }
+		.compare { font-size: 11px; }
+		.compare tbody th { white-space: normal; font-size: 10px; }
 		.cta-inner { padding-inline: 20px; }
 	}
-	@media (prefers-reduced-motion: reduce) { .wave-bar { animation: none; } }
+	@media (prefers-reduced-motion: reduce) {
+		.ticker-track { animation: none; }
+		.btn-primary, .btn-secondary, .cta-btn { transition: none; }
+	}
 </style>

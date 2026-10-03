@@ -1,10 +1,13 @@
 import { common } from "./ru/common";
 import { downloads } from "./ru/downloads";
+import { faq } from "./ru/faq";
 import { features } from "./ru/features";
 import { hero } from "./ru/hero";
+import { how } from "./ru/how";
 import { privacy } from "./ru/privacy";
 import { security } from "./ru/security";
 import { terms } from "./ru/terms";
+import { why } from "./ru/why";
 
 export const languages = {
 	en: "English",
@@ -16,7 +19,10 @@ export const translations = {
 	en: {
 		...common,
 		...hero,
+		...how,
 		...features,
+		...why,
+		...faq,
 		...downloads,
 		...privacy,
 		...terms,

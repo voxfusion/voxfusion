@@ -1,6 +1,9 @@
 export { common } from "./common";
 export { hero } from "./hero";
+export { how } from "./how";
 export { features } from "./features";
+export { why } from "./why";
+export { faq } from "./faq";
 export { downloads } from "./downloads";
 export { privacy } from "./privacy";
 export { terms } from "./terms";
