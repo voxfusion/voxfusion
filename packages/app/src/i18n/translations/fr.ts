@@ -25,7 +25,7 @@ export const fr: Translations = {
 			"Coupe temporairement l'audio système pendant l'enregistrement, puis le restaure.",
 		muffleMediaWhileRecording: "Atténuer les médias pendant l'enregistrement",
 		muffleMediaWhileRecordingDescription:
-			"Baisse l'audio système pendant l'enregistrement, sans le couper, puis le restaure.",
+			"Rend le son des autres apps étouffé pendant l'enregistrement, comme de la musique dans la pièce d'à côté, puis le restaure.",
 		recordingSounds: "Sons d'enregistrement",
 		recordingSoundsDescription:
 			"Joue des sons au début de l'enregistrement, après l'insertion du texte ou en cas d'erreur.",

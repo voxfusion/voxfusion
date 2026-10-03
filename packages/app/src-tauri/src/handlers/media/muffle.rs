@@ -1,19 +1,21 @@
-//! Muffling turns the system output down for the length of a recording
-//! instead of muting it. Outputs without a mute control are muted here too,
-//! by turning them all the way down.
+//! Muffling makes other apps' audio sound muffled for the length of a
+//! recording: a tap plays it through a low-pass filter, so music sounds like
+//! it comes from the next room. Where the filter cannot run, the output's
+//! volume is turned down instead. Outputs without a mute control are muted
+//! here too, through a tap that turns their audio all the way down.
 //!
-//! A single worker thread owns every volume change. Commands only post a
-//! message, so they return at once and never delay the start of a recording.
-//! A fade that is still running is retargeted by the next command instead of
-//! racing it: a recording that starts while the previous one is still fading
-//! back up fades down from wherever the volume is, and still restores the
-//! original level afterward.
+//! A single worker thread owns every change. Commands only post a message, so
+//! they return at once and never delay the start of a recording. A fade that
+//! is still running is retargeted by the next command instead of racing it: a
+//! recording that starts while the previous one is still fading back fades
+//! from wherever it is, and still restores the original afterward.
 
 use std::sync::OnceLock;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
-/// Share of the original volume that stays audible while muffled.
+/// Share of the original volume that stays audible when muffling turns the
+/// volume down instead of filtering.
 const MUFFLED_VOLUME_RATIO: f32 = 0.35;
 const FADE_DOWN: Duration = Duration::from_millis(150);
 const FADE_UP: Duration = Duration::from_millis(300);
@@ -22,15 +24,30 @@ const EXIT_RESTORE_TIMEOUT: Duration = Duration::from_millis(500);
 
 pub(super) type DeviceId = u32;
 
-/// The system output volume, as the macOS volume slider sees it.
-pub(super) trait OutputVolume {
+/// What a tap does to the audio it plays back.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum TapEffect {
+    /// The muffle filter.
+    Muffle,
+    /// Turns the audio down to silence.
+    Silence,
+}
+
+/// The system output, as the worker changes it.
+pub(super) trait Output {
     fn default_output_device(&self) -> Result<DeviceId, String>;
     fn device_uid(&self, device: DeviceId) -> Option<String>;
     fn find_device_by_uid(&self, uid: &str) -> Option<DeviceId>;
-    /// Volume from 0 to 1, or an error when the device has no volume the app
-    /// can change.
+    /// The output's own volume from 0 to 1, as the macOS volume slider sees
+    /// it, or an error when it has none the app can change.
     fn adjustable_volume(&self, device: DeviceId) -> Result<f32, String>;
     fn set_volume(&self, device: DeviceId, volume: f32) -> Result<(), String>;
+    /// Starts tapping other apps' audio on the device, with no effect applied
+    /// yet. Fails when the effect cannot work on this output.
+    fn start_tap(&self, device: DeviceId, effect: TapEffect) -> Result<(), String>;
+    /// How far the tap's effect is applied, from 0 to 1.
+    fn set_tap(&self, device: DeviceId, amount: f32) -> Result<(), String>;
+    fn stop_tap(&self, device: DeviceId);
 }
 
 enum Command {
@@ -45,7 +62,7 @@ enum Command {
 static COMMANDS: OnceLock<Sender<Command>> = OnceLock::new();
 
 fn send(command: Command) {
-    let commands = COMMANDS.get_or_init(|| spawn(super::CoreAudioVolume::default()));
+    let commands = COMMANDS.get_or_init(|| spawn(super::CoreAudioOutput::default()));
     let _ = commands.send(command);
 }
 
@@ -85,20 +102,20 @@ pub(super) fn devices_changed() {
     send_if_running(Command::DevicesChanged);
 }
 
-fn spawn<V: OutputVolume + Send + 'static>(volume: V) -> Sender<Command> {
+fn spawn<O: Output + Send + 'static>(output: O) -> Sender<Command> {
     let (commands, received) = mpsc::channel();
     // If the thread cannot start, the receiver is dropped with it and
     // muffling quietly does nothing.
     if let Err(err) = std::thread::Builder::new()
         .name("media-muffle".to_string())
-        .spawn(move || run(Muffler::new(volume), received))
+        .spawn(move || run(Muffler::new(output), received))
     {
         log::warn!(target: "media", "muffle_worker_spawn_failed error={err}");
     }
     commands
 }
 
-fn run<V: OutputVolume>(mut muffler: Muffler<V>, commands: Receiver<Command>) {
+fn run<O: Output>(mut muffler: Muffler<O>, commands: Receiver<Command>) {
     loop {
         let received = if muffler.is_fading() {
             commands.recv_timeout(FADE_STEP)
@@ -122,7 +139,7 @@ struct Fade {
 }
 
 impl Fade {
-    fn volume_at(&self, now: Instant) -> f32 {
+    fn value_at(&self, now: Instant) -> f32 {
         // Ends exactly on the target, so a restore puts back the original.
         if self.is_done(now) {
             return self.to;
@@ -137,7 +154,7 @@ impl Fade {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 enum Quieting {
     Muffle,
     /// Down to zero, at once, like a mute.
@@ -149,13 +166,6 @@ impl Quieting {
         match self {
             Quieting::Muffle => "muffle",
             Quieting::Silence => "mute",
-        }
-    }
-
-    fn volume(self, original: f32) -> f32 {
-        match self {
-            Quieting::Muffle => original * MUFFLED_VOLUME_RATIO,
-            Quieting::Silence => 0.0,
         }
     }
 
@@ -174,18 +184,38 @@ impl Quieting {
     }
 }
 
+/// What a session changes.
+#[derive(Clone, Copy, PartialEq)]
+enum Control {
+    /// The output's own volume. Values are volumes.
+    Volume,
+    /// A tap on other apps' audio. Values are how far its effect is applied.
+    Tap(TapEffect),
+}
+
 struct Session {
     device: DeviceId,
     uid: Option<String>,
     quieting: Quieting,
+    control: Control,
+    /// Value to restore.
     original: f32,
-    /// Volume last set on the device.
+    /// Value last set.
     current: f32,
     restoring: bool,
     fade: Option<Fade>,
 }
 
 impl Session {
+    /// The value while quieted.
+    fn target(&self) -> f32 {
+        match (self.control, self.quieting) {
+            (Control::Tap(_), _) => 1.0,
+            (Control::Volume, Quieting::Muffle) => self.original * MUFFLED_VOLUME_RATIO,
+            (Control::Volume, Quieting::Silence) => 0.0,
+        }
+    }
+
     fn fade_to(&mut self, to: f32, duration: Duration, now: Instant) {
         self.fade = Some(Fade {
             from: self.current,
@@ -196,21 +226,21 @@ impl Session {
     }
 }
 
-struct Muffler<V> {
-    volume: V,
-    /// The muffled device, from the start of the fade down to the end of the
-    /// fade back up.
+struct Muffler<O> {
+    output: O,
+    /// The quieted device, from the start of the fade down to the end of the
+    /// fade back.
     session: Option<Session>,
-    /// UIDs and original volumes of devices that were unplugged while
-    /// muffled. macOS restores a device's saved volume when it reconnects, so
+    /// UIDs and original volumes of devices that were unplugged while turned
+    /// down. macOS restores a device's saved volume when it reconnects, so
     /// they are turned back up once they are back.
     pending_restores: Vec<(String, f32)>,
 }
 
-impl<V: OutputVolume> Muffler<V> {
-    fn new(volume: V) -> Self {
+impl<O: Output> Muffler<O> {
+    fn new(output: O) -> Self {
         Self {
-            volume,
+            output,
             session: None,
             pending_restores: Vec::new(),
         }
@@ -232,31 +262,34 @@ impl<V: OutputVolume> Muffler<V> {
                 self.step(now);
                 let _ = done.send(());
             }
-            Command::DevicesChanged => self.restore_returned_devices(),
+            Command::DevicesChanged => {
+                self.restore_returned_devices();
+                self.follow_default_output(now);
+            }
         }
     }
 
     fn quiet(&mut self, quieting: Quieting, now: Instant) {
         self.restore_returned_devices();
-        let default_device = self.volume.default_output_device();
+        let default_device = self.output.default_output_device();
 
         if let Some(session) = self.session.as_mut() {
             if !session.restoring {
                 return;
             }
-            // The previous recording is still fading back up.
-            if default_device
-                .as_ref()
-                .is_ok_and(|device| *device == session.device)
+            // The previous recording is still fading back.
+            if session.quieting == quieting
+                && default_device
+                    .as_ref()
+                    .is_ok_and(|device| *device == session.device)
             {
-                session.quieting = quieting;
                 session.restoring = false;
-                session.fade_to(quieting.volume(session.original), quieting.fade_down(), now);
+                session.fade_to(session.target(), quieting.fade_down(), now);
                 return;
             }
         }
         if self.session.is_some() {
-            // The output moved to another device; finish restoring the old one.
+            // The output or the setting changed; finish restoring first.
             self.restore(true, now);
             self.step(now);
         }
@@ -269,8 +302,8 @@ impl<V: OutputVolume> Muffler<V> {
                 return;
             }
         };
-        let original = match self.volume.adjustable_volume(device) {
-            Ok(volume) => volume,
+        let (control, original) = match self.choose_control(quieting, device) {
+            Ok(choice) => choice,
             Err(err) => {
                 log::warn!(target: "media", "{name}_unsupported device_id={device} error={err}");
                 return;
@@ -278,15 +311,43 @@ impl<V: OutputVolume> Muffler<V> {
         };
         let mut session = Session {
             device,
-            uid: self.volume.device_uid(device),
+            uid: self.output.device_uid(device),
             quieting,
+            control,
             original,
             current: original,
             restoring: false,
             fade: None,
         };
-        session.fade_to(quieting.volume(original), quieting.fade_down(), now);
+        session.fade_to(session.target(), quieting.fade_down(), now);
         self.session = Some(session);
+    }
+
+    /// Muffles through the filter where it can and turns the volume down
+    /// otherwise. Mutes with the volume where there is one, and with a tap
+    /// otherwise.
+    fn choose_control(
+        &self,
+        quieting: Quieting,
+        device: DeviceId,
+    ) -> Result<(Control, f32), String> {
+        if quieting == Quieting::Muffle {
+            match self.output.start_tap(device, TapEffect::Muffle) {
+                Ok(()) => return Ok((Control::Tap(TapEffect::Muffle), 0.0)),
+                Err(err) => log::info!(
+                    target: "media",
+                    "muffle_filter_unavailable device_id={device} error={err}"
+                ),
+            }
+        }
+        match self.output.adjustable_volume(device) {
+            Ok(volume) => Ok((Control::Volume, volume)),
+            Err(err) if quieting == Quieting::Muffle => Err(err),
+            Err(_) => self
+                .output
+                .start_tap(device, TapEffect::Silence)
+                .map(|()| (Control::Tap(TapEffect::Silence), 0.0)),
+        }
     }
 
     fn restore(&mut self, immediately: bool, now: Instant) {
@@ -299,13 +360,17 @@ impl<V: OutputVolume> Muffler<V> {
         // A device unplugged and reconnected mid-recording can come back
         // under a new ID, so look it up by UID first.
         if let Some(uid) = &session.uid {
-            let Some(device) = self.volume.find_device_by_uid(uid) else {
+            let Some(device) = self.output.find_device_by_uid(uid) else {
                 log::info!(
                     target: "media",
                     "muffled_output_disconnected device_id={}",
                     session.device
                 );
-                self.pending_restores.push((uid.clone(), session.original));
+                match session.control {
+                    Control::Volume => self.pending_restores.push((uid.clone(), session.original)),
+                    // Its audio no longer goes through the tap.
+                    Control::Tap(_) => self.output.stop_tap(session.device),
+                }
                 self.session = None;
                 return;
             };
@@ -320,6 +385,42 @@ impl<V: OutputVolume> Muffler<V> {
         session.fade_to(session.original, duration, now);
     }
 
+    /// Moves a tap to the new default output when the output changes during a
+    /// recording, such as when headphones are plugged in. Audio on the old
+    /// output plays normally again once its tap stops.
+    fn follow_default_output(&mut self, now: Instant) {
+        let Some(session) = self.session.as_mut() else {
+            return;
+        };
+        let Control::Tap(effect) = session.control else {
+            return;
+        };
+        if session.restoring {
+            return;
+        }
+        let Ok(device) = self.output.default_output_device() else {
+            return;
+        };
+        if device == session.device {
+            return;
+        }
+        self.output.stop_tap(session.device);
+        if let Err(err) = self.output.start_tap(device, effect) {
+            log::info!(
+                target: "media",
+                "{}_follow_failed device_id={device} error={err}",
+                session.quieting.name()
+            );
+            self.session = None;
+            return;
+        }
+        session.device = device;
+        session.uid = self.output.device_uid(device);
+        // The new tap starts with no effect.
+        session.current = session.original;
+        session.fade_to(session.target(), session.quieting.fade_down(), now);
+    }
+
     fn step(&mut self, now: Instant) {
         let Some(session) = self.session.as_mut() else {
             return;
@@ -327,44 +428,61 @@ impl<V: OutputVolume> Muffler<V> {
         let Some(fade) = &session.fade else {
             return;
         };
-        let volume = fade.volume_at(now);
+        let value = fade.value_at(now);
         let done = fade.is_done(now);
 
-        if let Err(err) = self.volume.set_volume(session.device, volume) {
+        let result = match session.control {
+            Control::Volume => self.output.set_volume(session.device, value),
+            Control::Tap(_) => self.output.set_tap(session.device, value),
+        };
+        if let Err(err) = result {
             log::warn!(
                 target: "media",
                 "{}_volume_failed device_id={} error={err}",
                 session.quieting.name(),
                 session.device
             );
-            // Most likely unplugged. A failed fade down is restored with the
-            // recording; a failed fade up is retried when the device is back.
             session.fade = None;
-            if session.restoring {
-                if let Some(uid) = session.uid.take() {
-                    self.pending_restores.push((uid, session.original));
+            match session.control {
+                // Most likely unplugged. A failed fade down is restored with
+                // the recording; a failed fade up is retried when the device
+                // is back.
+                Control::Volume => {
+                    if session.restoring {
+                        if let Some(uid) = session.uid.take() {
+                            self.pending_restores.push((uid, session.original));
+                        }
+                        self.session = None;
+                    }
                 }
-                self.session = None;
+                // Audio plays normally again once the tap stops.
+                Control::Tap(_) => {
+                    self.output.stop_tap(session.device);
+                    self.session = None;
+                }
             }
             return;
         }
 
-        session.current = volume;
+        session.current = value;
         if done {
             session.fade = None;
             if session.restoring {
+                if let Control::Tap(_) = session.control {
+                    self.output.stop_tap(session.device);
+                }
                 self.session = None;
             }
         }
     }
 
     fn restore_returned_devices(&mut self) {
-        let volume = &self.volume;
+        let output = &self.output;
         self.pending_restores.retain(|(uid, original)| {
-            let Some(device) = volume.find_device_by_uid(uid) else {
+            let Some(device) = output.find_device_by_uid(uid) else {
                 return true;
             };
-            match volume.set_volume(device, *original) {
+            match output.set_volume(device, *original) {
                 Ok(()) => {
                     log::info!(target: "media", "returned_output_unmuffled device_id={device}");
                     false
@@ -390,7 +508,11 @@ mod tests {
     struct FakeDevice {
         uid: String,
         volume: f32,
+        has_volume: bool,
         connected: bool,
+        taps_work: bool,
+        /// Effect and amount of the running tap.
+        tap: Option<(TapEffect, f32)>,
     }
 
     #[derive(Default)]
@@ -413,7 +535,10 @@ mod tests {
                 FakeDevice {
                     uid: format!("uid-{device}"),
                     volume,
+                    has_volume: true,
                     connected: true,
+                    taps_work: false,
+                    tap: None,
                 },
             );
         }
@@ -434,9 +559,31 @@ mod tests {
                 .unwrap()
                 .connected = connected;
         }
+
+        fn allow_taps(&self, device: DeviceId) {
+            self.devices
+                .lock()
+                .unwrap()
+                .get_mut(&device)
+                .unwrap()
+                .taps_work = true;
+        }
+
+        fn remove_volume_control(&self, device: DeviceId) {
+            self.devices
+                .lock()
+                .unwrap()
+                .get_mut(&device)
+                .unwrap()
+                .has_volume = false;
+        }
+
+        fn tap(&self, device: DeviceId) -> Option<(TapEffect, f32)> {
+            self.devices.lock().unwrap()[&device].tap
+        }
     }
 
-    impl OutputVolume for Arc<FakeOutput> {
+    impl Output for Arc<FakeOutput> {
         fn default_output_device(&self) -> Result<DeviceId, String> {
             Ok(*self.default.lock().unwrap())
         }
@@ -459,7 +606,12 @@ mod tests {
         }
 
         fn adjustable_volume(&self, device: DeviceId) -> Result<f32, String> {
-            Ok(self.devices.lock().unwrap()[&device].volume)
+            let devices = self.devices.lock().unwrap();
+            let device = &devices[&device];
+            if !device.has_volume {
+                return Err("fixed".to_string());
+            }
+            Ok(device.volume)
         }
 
         fn set_volume(&self, device: DeviceId, volume: f32) -> Result<(), String> {
@@ -470,6 +622,32 @@ mod tests {
             }
             device.volume = volume;
             Ok(())
+        }
+
+        fn start_tap(&self, device: DeviceId, effect: TapEffect) -> Result<(), String> {
+            let mut devices = self.devices.lock().unwrap();
+            let device = devices.get_mut(&device).unwrap();
+            if !device.connected || !device.taps_work {
+                return Err("no tap".to_string());
+            }
+            device.tap = Some((effect, 0.0));
+            Ok(())
+        }
+
+        fn set_tap(&self, device: DeviceId, amount: f32) -> Result<(), String> {
+            let mut devices = self.devices.lock().unwrap();
+            let device = devices.get_mut(&device).unwrap();
+            match (&mut device.tap, device.connected) {
+                (Some((_, current)), true) => {
+                    *current = amount;
+                    Ok(())
+                }
+                _ => Err("no tap".to_string()),
+            }
+        }
+
+        fn stop_tap(&self, device: DeviceId) {
+            self.devices.lock().unwrap().get_mut(&device).unwrap().tap = None;
         }
     }
 
@@ -677,6 +855,110 @@ mod tests {
         muffler.step(ms(start, 900));
         assert_eq!(output.volume(1), 0.5);
         assert!(muffler.session.is_none());
+    }
+
+    #[test]
+    fn muffles_through_the_filter_and_leaves_the_volume_alone() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.allow_taps(1);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 75));
+        let (effect, amount) = output.tap(1).unwrap();
+        assert_eq!(effect, TapEffect::Muffle);
+        assert!(amount > 0.0 && amount < 1.0);
+        muffler.step(ms(start, 150));
+        assert_eq!(output.tap(1), Some((TapEffect::Muffle, 1.0)));
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1150));
+        assert!(output.tap(1).is_some_and(|(_, amount)| amount < 1.0));
+        muffler.step(ms(start, 1300));
+        assert_eq!(output.tap(1), None);
+        assert!(muffler.session.is_none());
+        assert_eq!(output.volume(1), 0.8);
+    }
+
+    #[test]
+    fn muffle_turns_the_volume_down_where_the_filter_cannot_run() {
+        let output = FakeOutput::with_device(1, 0.8);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        assert_eq!(output.tap(1), None);
+        assert_volume(output.volume(1), 0.8 * MUFFLED_VOLUME_RATIO);
+    }
+
+    #[test]
+    fn muffle_does_nothing_without_a_filter_or_a_volume() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.remove_volume_control(1);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+
+        muffler.handle(Command::Muffle, Instant::now());
+        assert!(muffler.session.is_none());
+    }
+
+    #[test]
+    fn silence_taps_an_output_without_a_volume() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.remove_volume_control(1);
+        output.allow_taps(1);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Silence, start);
+        muffler.step(start);
+        assert_eq!(output.tap(1), Some((TapEffect::Silence, 1.0)));
+
+        muffler.handle(Command::Restore, ms(start, 500));
+        muffler.step(ms(start, 500));
+        assert_eq!(output.tap(1), None);
+        assert!(muffler.session.is_none());
+    }
+
+    #[test]
+    fn the_filter_follows_the_default_output() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.connect(2, 0.6);
+        output.allow_taps(1);
+        output.allow_taps(2);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        output.set_default(2);
+        muffler.handle(Command::DevicesChanged, ms(start, 500));
+        assert_eq!(output.tap(1), None);
+        muffler.step(ms(start, 650));
+        assert_eq!(output.tap(2), Some((TapEffect::Muffle, 1.0)));
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1300));
+        assert_eq!(output.tap(2), None);
+        assert_eq!(output.volume(1), 0.8);
+        assert_eq!(output.volume(2), 0.6);
+    }
+
+    #[test]
+    fn a_filter_on_an_unplugged_output_is_dropped() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.allow_taps(1);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        output.set_connected(1, false);
+        muffler.handle(Command::Restore, ms(start, 500));
+        assert!(muffler.session.is_none());
+        assert_eq!(output.tap(1), None);
+        assert!(muffler.pending_restores.is_empty());
     }
 
     #[test]

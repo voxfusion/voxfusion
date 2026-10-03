@@ -20,8 +20,9 @@ export const zh: Translations = {
 		microphoneDescription: "选择用于语音录制的麦克风。",
 		muteMediaWhileRecording: "录音时静音媒体",
 		muteMediaWhileRecordingDescription: "录音期间临时静音系统音频，并在结束后恢复。",
-		muffleMediaWhileRecording: "录音时降低媒体音量",
-		muffleMediaWhileRecordingDescription: "录音期间临时调低系统音量（不静音），并在结束后恢复。",
+		muffleMediaWhileRecording: "录音时让媒体声音变闷",
+		muffleMediaWhileRecordingDescription:
+			"录音期间让其他应用的声音变得低沉，像隔壁房间传来的音乐，结束后恢复。",
 		recordingSounds: "录音提示音",
 		recordingSoundsDescription: "在录音开始、文本插入完成或出错时播放提示音。",
 		analytics: "匿名使用统计",

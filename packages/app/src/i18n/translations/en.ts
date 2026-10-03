@@ -214,7 +214,7 @@ export const en: Translations = {
 			"Temporarily mute system audio while recording and restore it afterward.",
 		muffleMediaWhileRecording: "Muffle Media During Recording",
 		muffleMediaWhileRecordingDescription:
-			"Turn system audio down while recording, without muting it, and restore it afterward.",
+			"Make other apps sound muffled while recording, like music from the next room, and restore them afterward.",
 		recordingSounds: "Recording Sounds",
 		recordingSoundsDescription:
 			"Play sounds when recording starts, text is inserted, or an error occurs.",

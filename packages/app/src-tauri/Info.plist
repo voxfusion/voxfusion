@@ -9,7 +9,7 @@
 	<key>NSAccessibilityUsageDescription</key>
 	<string>VoxFusion needs accessibility access to type transcribed text into other applications.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>VoxFusion turns down or mutes other apps' audio while you dictate on outputs without a volume control, such as USB audio interfaces and displays. The audio is not recorded or saved.</string>
+	<string>VoxFusion muffles or mutes other apps' audio while you dictate. The audio is not recorded or saved.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>VoxFusion uses Apple Events to read the active tab URL from your browser so it can apply per-site dictionaries during transcription.</string>
 </dict>

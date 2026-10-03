@@ -1,6 +1,8 @@
 use std::sync::{LazyLock, Mutex};
 
 #[cfg(target_os = "macos")]
+mod filter;
+#[cfg(target_os = "macos")]
 mod muffle;
 #[cfg(target_os = "macos")]
 mod tap;
@@ -75,6 +77,14 @@ unsafe extern "C" {
         out_data: *mut std::ffi::c_void,
     ) -> OsStatus;
 
+    fn AudioObjectGetPropertyDataSize(
+        in_object_id: AudioObjectId,
+        in_address: *const AudioObjectPropertyAddress,
+        in_qualifier_data_size: u32,
+        in_qualifier_data: *const std::ffi::c_void,
+        out_data_size: *mut u32,
+    ) -> OsStatus;
+
     fn AudioObjectIsPropertySettable(
         in_object_id: AudioObjectId,
         in_address: *const AudioObjectPropertyAddress,
@@ -121,6 +131,23 @@ const AUDIO_DEVICE_PROPERTY_DEVICE_UID: AudioObjectPropertySelector = u32::from_
 #[cfg(target_os = "macos")]
 const AUDIO_DEVICE_PROPERTY_MUTE: AudioObjectPropertySelector = u32::from_be_bytes(*b"mute");
 
+#[cfg(target_os = "macos")]
+const AUDIO_DEVICE_PROPERTY_STREAMS: AudioObjectPropertySelector = u32::from_be_bytes(*b"stm#");
+
+#[cfg(target_os = "macos")]
+const AUDIO_DEVICE_PROPERTY_TRANSPORT_TYPE: AudioObjectPropertySelector =
+    u32::from_be_bytes(*b"tran");
+
+#[cfg(target_os = "macos")]
+const AUDIO_DEVICE_PROPERTY_DEVICE_IS_RUNNING_SOMEWHERE: AudioObjectPropertySelector =
+    u32::from_be_bytes(*b"gone");
+
+#[cfg(target_os = "macos")]
+const AUDIO_DEVICE_TRANSPORT_TYPE_BLUETOOTH: u32 = u32::from_be_bytes(*b"blue");
+
+#[cfg(target_os = "macos")]
+const AUDIO_DEVICE_TRANSPORT_TYPE_BLUETOOTH_LE: u32 = u32::from_be_bytes(*b"blea");
+
 /// The volume behind the system volume slider, from 0 to 1. Unlike a device's
 /// per-channel volumes it exists on any output with adjustable volume, but not
 /// on outputs whose volume is fixed, such as many USB audio interfaces.
@@ -133,6 +160,9 @@ const AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL: AudioObjectPropertyScope = u32::from_b
 
 #[cfg(target_os = "macos")]
 const AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT: AudioObjectPropertyScope = u32::from_be_bytes(*b"outp");
+
+#[cfg(target_os = "macos")]
+const AUDIO_DEVICE_PROPERTY_SCOPE_INPUT: AudioObjectPropertyScope = u32::from_be_bytes(*b"inpt");
 
 #[cfg(target_os = "macos")]
 const AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN: AudioObjectPropertyElement = 0;
@@ -377,51 +407,159 @@ fn has_output_volume_control(device_id: AudioObjectId) -> bool {
     is_output_volume_settable(device_id).unwrap_or(false)
 }
 
-/// Changes the output's own volume where it has one, and otherwise turns
-/// other apps' audio down with a tap.
 #[cfg(target_os = "macos")]
-#[derive(Default)]
-struct CoreAudioVolume {
-    /// Taps by device UID, with the ID the device last had.
-    taps: std::cell::RefCell<std::collections::HashMap<String, (AudioObjectId, tap::OutputTap)>>,
+fn get_u32_property(
+    device_id: AudioObjectId,
+    selector: AudioObjectPropertySelector,
+    scope: AudioObjectPropertyScope,
+) -> Option<u32> {
+    let address = AudioObjectPropertyAddress {
+        selector,
+        scope,
+        element: AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
+    };
+    let mut value: u32 = 0;
+    let mut data_size = size_of_val_u32(&value).ok()?;
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            device_id,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut data_size,
+            (&mut value as *mut u32).cast(),
+        )
+    };
+    (status == 0).then_some(value)
 }
 
 #[cfg(target_os = "macos")]
-impl CoreAudioVolume {
-    fn set_tap_volume(&self, device: AudioObjectId, volume: f32) -> Result<(), String> {
-        let mut taps = self.taps.borrow_mut();
-        let uid = match get_device_uid(device) {
-            Ok(uid) => uid,
-            Err(err) => {
-                // Most likely unplugged; its tap stopped with it.
-                taps.retain(|_, (tapped, _)| *tapped != device);
-                return Err(err);
-            }
-        };
-        // A tap at full volume only adds latency.
-        if volume >= 1.0 {
-            if taps.remove(&uid).is_some() {
-                log::info!(target: "media", "output_tap_stopped device_id={device}");
-            }
-            return Ok(());
+fn property_data_size(
+    object_id: AudioObjectId,
+    selector: AudioObjectPropertySelector,
+    scope: AudioObjectPropertyScope,
+) -> u32 {
+    let address = AudioObjectPropertyAddress {
+        selector,
+        scope,
+        element: AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
+    };
+    let mut data_size: u32 = 0;
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(object_id, &address, 0, std::ptr::null(), &mut data_size)
+    };
+    if status == 0 { data_size } else { 0 }
+}
+
+#[cfg(target_os = "macos")]
+fn get_devices() -> Vec<AudioObjectId> {
+    let count = property_data_size(
+        AUDIO_OBJECT_SYSTEM_OBJECT,
+        AUDIO_HARDWARE_PROPERTY_DEVICES,
+        AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
+    ) as usize
+        / std::mem::size_of::<AudioObjectId>();
+    let mut devices = vec![AUDIO_OBJECT_UNKNOWN; count];
+    let address = global_address(AUDIO_HARDWARE_PROPERTY_DEVICES);
+    let Ok(mut data_size) = u32::try_from(std::mem::size_of_val(devices.as_slice())) else {
+        return Vec::new();
+    };
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            AUDIO_OBJECT_SYSTEM_OBJECT,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut data_size,
+            devices.as_mut_ptr().cast(),
+        )
+    };
+    if status != 0 {
+        return Vec::new();
+    }
+    devices.truncate(data_size as usize / std::mem::size_of::<AudioObjectId>());
+    devices
+}
+
+#[cfg(target_os = "macos")]
+fn is_bluetooth(device_id: AudioObjectId) -> bool {
+    get_u32_property(
+        device_id,
+        AUDIO_DEVICE_PROPERTY_TRANSPORT_TYPE,
+        AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
+    )
+    .is_some_and(|transport| {
+        transport == AUDIO_DEVICE_TRANSPORT_TYPE_BLUETOOTH
+            || transport == AUDIO_DEVICE_TRANSPORT_TYPE_BLUETOOTH_LE
+    })
+}
+
+/// Whether the output is a Bluetooth headset whose microphone is recording.
+/// It then plays in its call profile and switches back when the recording
+/// ends, while a tap would still be fading out.
+#[cfg(target_os = "macos")]
+fn is_bluetooth_headset_recording(device_id: AudioObjectId) -> bool {
+    if !is_bluetooth(device_id) {
+        return false;
+    }
+    let Ok(uid) = get_device_uid(device_id) else {
+        return false;
+    };
+    // The microphone is a separate device whose UID starts with the same
+    // Bluetooth address.
+    let address = uid.split(':').next().unwrap_or(&uid).to_string();
+    get_devices().into_iter().any(|other| {
+        other != device_id
+            && is_bluetooth(other)
+            && property_data_size(
+                other,
+                AUDIO_DEVICE_PROPERTY_STREAMS,
+                AUDIO_DEVICE_PROPERTY_SCOPE_INPUT,
+            ) > 0
+            && get_device_uid(other).is_ok_and(|other_uid| other_uid.starts_with(&address))
+            && get_u32_property(
+                other,
+                AUDIO_DEVICE_PROPERTY_DEVICE_IS_RUNNING_SOMEWHERE,
+                AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
+            )
+            .is_some_and(|running| running != 0)
+    })
+}
+
+/// Changes the output's own volume, and other apps' audio on it through taps.
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+struct CoreAudioOutput {
+    /// Taps by device UID, with the ID the device last had.
+    taps: std::cell::RefCell<
+        std::collections::HashMap<String, (AudioObjectId, muffle::TapEffect, tap::OutputTap)>,
+    >,
+}
+
+#[cfg(target_os = "macos")]
+impl CoreAudioOutput {
+    fn start_muffle_tap(device: AudioObjectId, uid: &str) -> Result<tap::OutputTap, String> {
+        let permission = tap::audio_capture_permission();
+        if permission == tap::Permission::Denied {
+            return Err("System Audio Recording permission is off".to_string());
         }
-        if let Some((tapped, output_tap)) = taps.get_mut(&uid) {
-            *tapped = device;
-            if let Err(err) = output_tap.set_volume(volume) {
-                taps.remove(&uid);
-                return Err(err);
-            }
-            return Ok(());
+        if is_bluetooth_headset_recording(device) {
+            return Err("The output is a Bluetooth headset that is recording".to_string());
         }
-        let output_tap = tap::OutputTap::start(&uid, volume)?;
-        log::info!(target: "media", "output_tap_started device_id={device}");
-        taps.insert(uid, (device, output_tap));
-        Ok(())
+        // Starting may ask for the permission. Without it the tap delivers
+        // silence, which would mute instead of muffle.
+        let output_tap = tap::OutputTap::start(uid, 1.0)?;
+        if permission != tap::Permission::Granted
+            && tap::audio_capture_permission() != tap::Permission::Granted
+        {
+            return Err("System Audio Recording permission was not granted".to_string());
+        }
+        Ok(output_tap)
     }
 }
 
 #[cfg(target_os = "macos")]
-impl muffle::OutputVolume for CoreAudioVolume {
+impl muffle::Output for CoreAudioOutput {
     fn default_output_device(&self) -> Result<AudioObjectId, String> {
         get_default_output_device()
     }
@@ -435,21 +573,58 @@ impl muffle::OutputVolume for CoreAudioVolume {
     }
 
     fn adjustable_volume(&self, device: AudioObjectId) -> Result<f32, String> {
-        if has_output_volume_control(device) {
-            return get_output_volume(device);
-        }
-        if !tap::is_supported() {
+        if !has_output_volume_control(device) {
             return Err("Output volume is fixed".to_string());
         }
-        // A tap starts from the output's full volume.
-        Ok(1.0)
+        get_output_volume(device)
     }
 
     fn set_volume(&self, device: AudioObjectId, volume: f32) -> Result<(), String> {
-        if has_output_volume_control(device) {
-            return set_output_volume(device, volume);
+        set_output_volume(device, volume)
+    }
+
+    fn start_tap(&self, device: AudioObjectId, effect: muffle::TapEffect) -> Result<(), String> {
+        if !tap::is_supported() {
+            return Err("Output taps need macOS 14.2 or later".to_string());
         }
-        self.set_tap_volume(device, volume)
+        let uid = get_device_uid(device)?;
+        let output_tap = match effect {
+            muffle::TapEffect::Muffle => Self::start_muffle_tap(device, &uid)?,
+            // Muting needs neither playback nor the permission: the tap holds
+            // the audio back either way.
+            muffle::TapEffect::Silence => tap::OutputTap::start(&uid, 0.0)?,
+        };
+        log::info!(target: "media", "output_tap_started device_id={device} effect={effect:?}");
+        self.taps
+            .borrow_mut()
+            .insert(uid, (device, effect, output_tap));
+        Ok(())
+    }
+
+    fn set_tap(&self, device: AudioObjectId, amount: f32) -> Result<(), String> {
+        let mut taps = self.taps.borrow_mut();
+        let uid = get_device_uid(device)?;
+        let Some((tapped, effect, output_tap)) = taps.get_mut(&uid) else {
+            return Err("The output has no tap".to_string());
+        };
+        *tapped = device;
+        match effect {
+            muffle::TapEffect::Muffle => output_tap.set_muffle(amount),
+            muffle::TapEffect::Silence => output_tap.set_volume(1.0 - amount),
+        }
+        Ok(())
+    }
+
+    fn stop_tap(&self, device: AudioObjectId) {
+        let uid = get_device_uid(device).ok();
+        let mut taps = self.taps.borrow_mut();
+        let before = taps.len();
+        taps.retain(|tapped_uid, (tapped, _, _)| {
+            *tapped != device && uid.as_deref() != Some(tapped_uid.as_str())
+        });
+        if taps.len() < before {
+            log::info!(target: "media", "output_tap_stopped device_id={device}");
+        }
     }
 }
 
@@ -568,9 +743,9 @@ fn mute_default_output(state: &mut MediaMuteState) -> Result<(), String> {
     result
 }
 
-/// Turns system output down for the recording instead of muting it. Returns
-/// at once; the fade runs on a background thread, so it never delays the
-/// recording.
+/// Muffles other apps' audio for the recording instead of muting it, or turns
+/// the volume down where the muffle filter cannot run. Returns at once; the
+/// fade runs on a background thread, so it never delays the recording.
 #[tauri::command]
 pub fn muffle_media_for_recording() {
     #[cfg(target_os = "macos")]
