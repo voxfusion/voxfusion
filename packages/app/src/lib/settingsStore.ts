@@ -22,6 +22,7 @@ export interface Settings {
 	selectedMicrophoneId: string | null;
 	language: Locale;
 	muteMediaWhileRecording: boolean;
+	muffleMediaWhileRecording: boolean;
 	recordingSoundsEnabled: boolean;
 	defaultStyle: AppStyle;
 	analyticsEnabled: boolean;
@@ -36,6 +37,7 @@ const DEFAULT_SETTINGS: Settings = {
 	selectedMicrophoneId: null,
 	language: "en",
 	muteMediaWhileRecording: false,
+	muffleMediaWhileRecording: false,
 	recordingSoundsEnabled: false,
 	defaultStyle: "default",
 	analyticsEnabled: true,
@@ -57,6 +59,7 @@ async function getStore() {
 				selectedMicrophoneId: DEFAULT_SETTINGS.selectedMicrophoneId,
 				language: DEFAULT_SETTINGS.language,
 				muteMediaWhileRecording: DEFAULT_SETTINGS.muteMediaWhileRecording,
+				muffleMediaWhileRecording: DEFAULT_SETTINGS.muffleMediaWhileRecording,
 				recordingSoundsEnabled: DEFAULT_SETTINGS.recordingSoundsEnabled,
 				defaultStyle: DEFAULT_SETTINGS.defaultStyle,
 				analyticsEnabled: DEFAULT_SETTINGS.analyticsEnabled,
@@ -78,6 +81,7 @@ export async function loadSettings(): Promise<Settings> {
 	const selectedMicrophoneId = await store.get<string | null>("selectedMicrophoneId");
 	const language = await store.get<Locale>("language");
 	const muteMediaWhileRecording = await store.get<boolean>("muteMediaWhileRecording");
+	const muffleMediaWhileRecording = await store.get<boolean>("muffleMediaWhileRecording");
 	const recordingSoundsEnabled = await store.get<boolean>("recordingSoundsEnabled");
 	const storedDefaultStyle = await store.get<AppStyle>("defaultStyle");
 	const defaultStyle =
@@ -108,6 +112,8 @@ export async function loadSettings(): Promise<Settings> {
 		selectedMicrophoneId: selectedMicrophoneId ?? DEFAULT_SETTINGS.selectedMicrophoneId,
 		language: language ?? DEFAULT_SETTINGS.language,
 		muteMediaWhileRecording: muteMediaWhileRecording ?? DEFAULT_SETTINGS.muteMediaWhileRecording,
+		muffleMediaWhileRecording:
+			muffleMediaWhileRecording ?? DEFAULT_SETTINGS.muffleMediaWhileRecording,
 		recordingSoundsEnabled: recordingSoundsEnabled ?? DEFAULT_SETTINGS.recordingSoundsEnabled,
 		defaultStyle,
 		analyticsEnabled: analyticsEnabled ?? DEFAULT_SETTINGS.analyticsEnabled,
@@ -145,6 +151,11 @@ export async function saveLanguage(language: Locale): Promise<void> {
 export async function saveMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	const store = await getStore();
 	await store.set("muteMediaWhileRecording", enabled);
+}
+
+export async function saveMuffleMediaWhileRecording(enabled: boolean): Promise<void> {
+	const store = await getStore();
+	await store.set("muffleMediaWhileRecording", enabled);
 }
 
 export async function saveRecordingSoundsEnabled(enabled: boolean): Promise<void> {
@@ -223,9 +234,26 @@ export async function updateLanguage(
 	setLocale(language);
 }
 
+// Muting and muffling are alternatives: turning one on turns the other off.
 export async function updateMuteMediaWhileRecording(enabled: boolean): Promise<void> {
 	await saveMuteMediaWhileRecording(enabled);
-	setSettingsInternal((prev) => ({ ...prev, muteMediaWhileRecording: enabled }));
+	if (enabled) await saveMuffleMediaWhileRecording(false);
+	setSettingsInternal((prev) => ({
+		...prev,
+		muteMediaWhileRecording: enabled,
+		muffleMediaWhileRecording: enabled ? false : prev.muffleMediaWhileRecording,
+	}));
+	await emit("settings-changed");
+}
+
+export async function updateMuffleMediaWhileRecording(enabled: boolean): Promise<void> {
+	await saveMuffleMediaWhileRecording(enabled);
+	if (enabled) await saveMuteMediaWhileRecording(false);
+	setSettingsInternal((prev) => ({
+		...prev,
+		muffleMediaWhileRecording: enabled,
+		muteMediaWhileRecording: enabled ? false : prev.muteMediaWhileRecording,
+	}));
 	await emit("settings-changed");
 }
 

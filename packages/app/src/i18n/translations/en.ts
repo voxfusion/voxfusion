@@ -38,6 +38,8 @@ export type Translations = {
 		microphoneDescription: string;
 		muteMediaWhileRecording: string;
 		muteMediaWhileRecordingDescription: string;
+		muffleMediaWhileRecording: string;
+		muffleMediaWhileRecordingDescription: string;
 		recordingSounds: string;
 		recordingSoundsDescription: string;
 		analytics: string;
@@ -276,6 +278,9 @@ export const en: Translations = {
 		muteMediaWhileRecording: "Mute Media During Recording",
 		muteMediaWhileRecordingDescription:
 			"Temporarily mute system audio while recording and restore it afterward.",
+		muffleMediaWhileRecording: "Muffle Media During Recording",
+		muffleMediaWhileRecordingDescription:
+			"Turn system audio down while recording, without muting it, and restore it afterward.",
 		recordingSounds: "Recording Sounds",
 		recordingSoundsDescription:
 			"Play sounds when recording starts, text is inserted, or an error occurs.",

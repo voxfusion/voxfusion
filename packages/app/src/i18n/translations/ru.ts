@@ -43,6 +43,9 @@ export const ru: Translations = {
 		muteMediaWhileRecording: "Отключать медиа во время записи",
 		muteMediaWhileRecordingDescription:
 			"Временно отключать системный звук во время записи и восстанавливать его после.",
+		muffleMediaWhileRecording: "Приглушать медиа во время записи",
+		muffleMediaWhileRecordingDescription:
+			"Временно уменьшать громкость системного звука во время записи, не отключая его, и восстанавливать после.",
 		recordingSounds: "Звуки записи",
 		recordingSoundsDescription:
 			"Воспроизводить звуки при начале записи, вставке текста или ошибке.",

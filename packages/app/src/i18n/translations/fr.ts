@@ -43,6 +43,9 @@ export const fr: Translations = {
 		muteMediaWhileRecording: "Couper les médias pendant l'enregistrement",
 		muteMediaWhileRecordingDescription:
 			"Coupe temporairement l'audio système pendant l'enregistrement, puis le restaure.",
+		muffleMediaWhileRecording: "Atténuer les médias pendant l'enregistrement",
+		muffleMediaWhileRecordingDescription:
+			"Baisse l'audio système pendant l'enregistrement, sans le couper, puis le restaure.",
 		recordingSounds: "Sons d'enregistrement",
 		recordingSoundsDescription:
 			"Joue des sons au début de l'enregistrement, après l'insertion du texte ou en cas d'erreur.",

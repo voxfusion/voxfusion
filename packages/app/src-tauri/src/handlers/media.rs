@@ -1,5 +1,8 @@
 use std::sync::{LazyLock, Mutex};
 
+#[cfg(target_os = "macos")]
+mod muffle;
+
 #[derive(Default)]
 struct MediaMuteState {
     active: bool,
@@ -69,6 +72,12 @@ unsafe extern "C" {
         out_data: *mut std::ffi::c_void,
     ) -> OsStatus;
 
+    fn AudioObjectIsPropertySettable(
+        in_object_id: AudioObjectId,
+        in_address: *const AudioObjectPropertyAddress,
+        out_is_settable: *mut u8,
+    ) -> OsStatus;
+
     fn AudioObjectSetPropertyData(
         in_object_id: AudioObjectId,
         in_address: *const AudioObjectPropertyAddress,
@@ -108,6 +117,12 @@ const AUDIO_DEVICE_PROPERTY_DEVICE_UID: AudioObjectPropertySelector = u32::from_
 
 #[cfg(target_os = "macos")]
 const AUDIO_DEVICE_PROPERTY_MUTE: AudioObjectPropertySelector = u32::from_be_bytes(*b"mute");
+
+/// The volume behind the system volume slider, from 0 to 1. Unlike a device's
+/// per-channel volumes it exists on any output with adjustable volume.
+#[cfg(target_os = "macos")]
+const AUDIO_HARDWARE_SERVICE_DEVICE_PROPERTY_VIRTUAL_MAIN_VOLUME: AudioObjectPropertySelector =
+    u32::from_be_bytes(*b"vmvc");
 
 #[cfg(target_os = "macos")]
 const AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL: AudioObjectPropertyScope = u32::from_be_bytes(*b"glob");
@@ -273,6 +288,105 @@ fn set_output_muted(device_id: AudioObjectId, muted: bool) -> Result<(), String>
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+fn output_volume_address() -> AudioObjectPropertyAddress {
+    AudioObjectPropertyAddress {
+        selector: AUDIO_HARDWARE_SERVICE_DEVICE_PROPERTY_VIRTUAL_MAIN_VOLUME,
+        scope: AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT,
+        element: AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn is_output_volume_settable(device_id: AudioObjectId) -> Result<bool, String> {
+    let address = output_volume_address();
+    let mut settable: u8 = 0;
+
+    let status = unsafe { AudioObjectIsPropertySettable(device_id, &address, &mut settable) };
+
+    if status != 0 {
+        return Err(core_audio_error("Checking output volume", status));
+    }
+
+    Ok(settable != 0)
+}
+
+#[cfg(target_os = "macos")]
+fn get_output_volume(device_id: AudioObjectId) -> Result<f32, String> {
+    let address = output_volume_address();
+    let mut volume: f32 = 0.0;
+    let mut data_size = size_of_val_u32(&volume)?;
+
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            device_id,
+            &address,
+            0,
+            std::ptr::null(),
+            &mut data_size,
+            (&mut volume as *mut f32).cast(),
+        )
+    };
+
+    if status != 0 {
+        return Err(core_audio_error("Getting output volume", status));
+    }
+
+    Ok(volume)
+}
+
+#[cfg(target_os = "macos")]
+fn set_output_volume(device_id: AudioObjectId, volume: f32) -> Result<(), String> {
+    let address = output_volume_address();
+    let value = volume.clamp(0.0, 1.0);
+
+    let status = unsafe {
+        AudioObjectSetPropertyData(
+            device_id,
+            &address,
+            0,
+            std::ptr::null(),
+            size_of_val_u32(&value)?,
+            (&value as *const f32).cast(),
+        )
+    };
+
+    if status != 0 {
+        return Err(core_audio_error("Setting output volume", status));
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+struct CoreAudioVolume;
+
+#[cfg(target_os = "macos")]
+impl muffle::OutputVolume for CoreAudioVolume {
+    fn default_output_device(&self) -> Result<AudioObjectId, String> {
+        get_default_output_device()
+    }
+
+    fn device_uid(&self, device: AudioObjectId) -> Option<String> {
+        get_device_uid(device).ok()
+    }
+
+    fn find_device_by_uid(&self, uid: &str) -> Option<AudioObjectId> {
+        find_device_by_uid(uid)
+    }
+
+    fn adjustable_volume(&self, device: AudioObjectId) -> Result<f32, String> {
+        if !is_output_volume_settable(device)? {
+            return Err("Output volume is fixed".to_string());
+        }
+        get_output_volume(device)
+    }
+
+    fn set_volume(&self, device: AudioObjectId, volume: f32) -> Result<(), String> {
+        set_output_volume(device, volume)
+    }
+}
+
 /// Unmutes devices that were unplugged while muted for a recording, now that
 /// they are connected again.
 #[cfg(target_os = "macos")]
@@ -309,6 +423,7 @@ unsafe extern "C" fn on_audio_devices_changed(
     // Runs on a CoreAudio notification thread; do the work elsewhere.
     std::thread::spawn(|| {
         unmute_returned_devices();
+        muffle::devices_changed();
         if let Some(handle) = APP_HANDLE.get() {
             let _ = handle.emit("audio-devices-changed", ());
         }
@@ -369,8 +484,21 @@ pub fn mute_media_for_recording() -> Result<(), String> {
     Ok(())
 }
 
+/// Turns system output down for the recording instead of muting it. Returns
+/// at once; the fade runs on a background thread, so it never delays the
+/// recording.
+#[tauri::command]
+pub fn muffle_media_for_recording() {
+    #[cfg(target_os = "macos")]
+    muffle::muffle();
+}
+
+/// Puts output back after a recording, whether it was muted or muffled.
 #[tauri::command]
 pub fn restore_media_after_recording() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    muffle::restore();
+
     let mut state = MEDIA_MUTE_STATE.lock().map_err(|err| err.to_string())?;
     if !state.active {
         return Ok(());
@@ -400,4 +528,13 @@ pub fn restore_media_after_recording() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Puts output back if the app quits mid-recording.
+pub fn restore_media_on_exit() {
+    #[cfg(target_os = "macos")]
+    muffle::restore_now();
+    if let Err(err) = restore_media_after_recording() {
+        log::warn!(target: "media", "exit_restore_failed error={err}");
+    }
 }
