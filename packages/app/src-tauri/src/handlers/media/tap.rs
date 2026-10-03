@@ -58,8 +58,9 @@ const TAP_UNMUTED: isize = 0;
 /// while the tap is read, so it comes back as soon as playback stops.
 const TAP_MUTED_WHEN_TAPPED: isize = 2;
 
-/// How long a permission request waits for an answer to the prompt.
-const PERMISSION_REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+/// How long a permission request keeps the prompt up for an answer. The
+/// prompt closes with it, and is shown again with the next muffled recording.
+const PERMISSION_REQUEST_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const PERMISSION_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// How quickly the playback gain follows a new target, so gain changes do not
