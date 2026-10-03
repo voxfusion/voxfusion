@@ -18,7 +18,7 @@
 use std::cell::UnsafeCell;
 use std::ffi::{c_char, c_void};
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 use core_foundation::array::CFArray;
@@ -190,8 +190,31 @@ type AccessPreflight = unsafe extern "C" fn(
     options: CFDictionaryRef,
 ) -> i32;
 
+/// The answer to the prompt, from the process that asked. TCC keeps
+/// answering this process from what it saw first, until the app restarts.
+static ANSWER: AtomicU8 = AtomicU8::new(ANSWER_NONE);
+const ANSWER_NONE: u8 = 0;
+const ANSWER_GRANTED: u8 = 1;
+const ANSWER_DENIED: u8 = 2;
+
+impl Permission {
+    /// Exit code of the process that asks.
+    fn exit_code(self) -> i32 {
+        match self {
+            Permission::Granted => 0,
+            Permission::Denied => 1,
+            Permission::Undetermined | Permission::Unknown => 2,
+        }
+    }
+}
+
 /// Asks TCC without prompting. There is no public API for this permission.
 pub(super) fn audio_capture_permission() -> Permission {
+    match ANSWER.load(Ordering::Acquire) {
+        ANSWER_GRANTED => return Permission::Granted,
+        ANSWER_DENIED => return Permission::Denied,
+        _ => {}
+    }
     static PREFLIGHT: OnceLock<Option<AccessPreflight>> = OnceLock::new();
     let preflight = PREFLIGHT.get_or_init(|| {
         let framework = unsafe {
@@ -248,7 +271,14 @@ pub(super) fn request_permission(device_uid: &str) {
         }
     };
     std::thread::spawn(move || {
-        let _ = child.wait();
+        let answer = match child.wait().ok().and_then(|status| status.code()) {
+            Some(code) if code == Permission::Granted.exit_code() => ANSWER_GRANTED,
+            Some(code) if code == Permission::Denied.exit_code() => ANSWER_DENIED,
+            _ => ANSWER_NONE,
+        };
+        if answer != ANSWER_NONE {
+            ANSWER.store(answer, Ordering::Release);
+        }
         log::info!(
             target: "media",
             "audio_capture_permission_requested result={:?}",
@@ -259,16 +289,17 @@ pub(super) fn request_permission(device_uid: &str) {
 }
 
 /// Runs in the process started with [`REQUEST_PERMISSION_FLAG`]: reads an
-/// unmuted tap on the output until the prompt is answered.
-pub(super) fn hold_permission_request(device_uid: &str) {
-    let Ok(probe) = OutputTap::open(device_uid, TAP_UNMUTED, false, 0.0) else {
-        return;
-    };
-    let deadline = Instant::now() + PERMISSION_REQUEST_TIMEOUT;
-    while audio_capture_permission() == Permission::Undetermined && Instant::now() < deadline {
-        std::thread::sleep(PERMISSION_POLL_INTERVAL);
+/// unmuted tap on the output until the prompt is answered, and exits with
+/// the answer for the app.
+pub(super) fn hold_permission_request(device_uid: &str) -> ! {
+    if let Ok(probe) = OutputTap::open(device_uid, TAP_UNMUTED, false, 0.0) {
+        let deadline = Instant::now() + PERMISSION_REQUEST_TIMEOUT;
+        while audio_capture_permission() == Permission::Undetermined && Instant::now() < deadline {
+            std::thread::sleep(PERMISSION_POLL_INTERVAL);
+        }
+        drop(probe);
     }
-    drop(probe);
+    std::process::exit(audio_capture_permission().exit_code())
 }
 
 fn own_process_object() -> Result<AudioObjectId, String> {
