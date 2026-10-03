@@ -407,7 +407,10 @@ impl CoreAudioVolume {
         }
         if let Some((tapped, output_tap)) = taps.get_mut(&uid) {
             *tapped = device;
-            output_tap.set_volume(volume);
+            if let Err(err) = output_tap.set_volume(volume) {
+                taps.remove(&uid);
+                return Err(err);
+            }
             return Ok(());
         }
         let output_tap = tap::OutputTap::start(&uid, volume)?;

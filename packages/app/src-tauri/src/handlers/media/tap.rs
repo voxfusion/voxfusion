@@ -28,14 +28,18 @@ use objc2::rc::{Allocated, Retained, autoreleasepool};
 use objc2::runtime::{AnyClass, AnyObject, Bool};
 
 use super::{
+    AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT, AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
     AUDIO_OBJECT_SYSTEM_OBJECT, AUDIO_OBJECT_UNKNOWN, AudioObjectGetPropertyData, AudioObjectId,
-    AudioObjectPropertySelector, OsStatus, core_audio_error, global_address, size_of_val_u32,
+    AudioObjectPropertyAddress, AudioObjectPropertySelector, OsStatus, core_audio_error,
+    global_address, size_of_val_u32,
 };
 
 const AUDIO_HARDWARE_PROPERTY_TRANSLATE_PID_TO_PROCESS_OBJECT: AudioObjectPropertySelector =
     u32::from_be_bytes(*b"id2p");
 
 const AUDIO_TAP_PROPERTY_FORMAT: AudioObjectPropertySelector = u32::from_be_bytes(*b"tfmt");
+
+const AUDIO_DEVICE_PROPERTY_STREAMS: AudioObjectPropertySelector = u32::from_be_bytes(*b"stm#");
 
 const AUDIO_FORMAT_LINEAR_PCM: u32 = u32::from_be_bytes(*b"lpcm");
 
@@ -92,6 +96,14 @@ type AudioDeviceIoProc = unsafe extern "C" fn(
 
 #[link(name = "CoreAudio", kind = "framework")]
 unsafe extern "C" {
+    fn AudioObjectGetPropertyDataSize(
+        in_object_id: AudioObjectId,
+        in_address: *const AudioObjectPropertyAddress,
+        in_qualifier_data_size: u32,
+        in_qualifier_data: *const c_void,
+        out_data_size: *mut u32,
+    ) -> OsStatus;
+
     fn AudioHardwareCreateAggregateDevice(
         in_description: CFDictionaryRef,
         out_device_id: *mut AudioObjectId,
@@ -289,6 +301,30 @@ fn create_aggregate_device(device_uid: &str, tap_uid: &str) -> Result<AudioObjec
     Ok(device)
 }
 
+/// An output made of other devices, such as an Aggregate or Multi-Output
+/// Device, cannot be nested in the playback device, which then has no output
+/// to play the tap on.
+fn has_output_stream(device: AudioObjectId) -> Result<bool, String> {
+    let address = AudioObjectPropertyAddress {
+        selector: AUDIO_DEVICE_PROPERTY_STREAMS,
+        scope: AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT,
+        element: AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
+    };
+    let mut data_size: u32 = 0;
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(device, &address, 0, std::ptr::null(), &mut data_size)
+    };
+    if status != 0 {
+        return Err(core_audio_error(
+            "Getting output tap device streams",
+            status,
+        ));
+    }
+    Ok(data_size > 0)
+}
+
+const NO_PLAYBACK: &str = "The output tap device has no output to play on";
+
 /// Shared with the IO thread.
 struct Playback {
     /// Gain the IO thread moves toward.
@@ -371,6 +407,9 @@ pub(super) struct OutputTap {
     api: &'static TapApi,
     tap: AudioObjectId,
     aggregate_device: AudioObjectId,
+    /// Without playback the tapped audio is only held back, which mutes but
+    /// cannot turn it down.
+    can_play_back: bool,
     io_proc: *mut c_void,
     playback: Box<Playback>,
 }
@@ -389,6 +428,7 @@ impl OutputTap {
             api,
             tap: tap.id,
             aggregate_device: AUDIO_OBJECT_UNKNOWN,
+            can_play_back: false,
             io_proc: std::ptr::null_mut(),
             playback: Box::new(Playback {
                 // Playback starts at full volume, where the output already is.
@@ -408,9 +448,10 @@ impl OutputTap {
         }
         output_tap.playback.smoothing =
             (1.0 - (-1.0 / (GAIN_SMOOTHING_SECONDS * format.sample_rate.max(1.0))).exp()) as f32;
-        output_tap.set_volume(volume);
 
         output_tap.aggregate_device = create_aggregate_device(device_uid, &tap.uid)?;
+        output_tap.can_play_back = has_output_stream(output_tap.aggregate_device)?;
+        output_tap.set_volume(volume)?;
         let playback: *const Playback = &*output_tap.playback;
         let status = unsafe {
             AudioDeviceCreateIOProcID(
@@ -433,11 +474,15 @@ impl OutputTap {
     /// Volume on the scale of the macOS volume slider, which is close to cubic
     /// in amplitude. Muffling then turns an output down about as far as it
     /// does one with a volume control.
-    pub(super) fn set_volume(&self, volume: f32) {
+    pub(super) fn set_volume(&self, volume: f32) -> Result<(), String> {
         let gain = volume.clamp(0.0, 1.0).powi(3);
+        if gain > 0.0 && !self.can_play_back {
+            return Err(NO_PLAYBACK.to_string());
+        }
         self.playback
             .target
             .store(gain.to_bits(), Ordering::Relaxed);
+        Ok(())
     }
 }
 
