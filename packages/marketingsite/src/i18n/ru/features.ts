@@ -5,7 +5,7 @@ export const features = {
 		"Emails, messages, docs, prompts for your coding agent. VoxFusion does the typing so you can stay with the thought.",
 	"features.shortcuts.title": "Two ways to start talking",
 	"features.shortcuts.description":
-		"Tap ⌃ + ⌥ to dictate hands-free, or hold Right ⌘ and release when you're done. Both shortcuts are yours to remap.",
+		"Tap ⌃ + ⌥ to dictate hands-free, or hold Right ⌘ and release when you're done. Both shortcuts are yours to remap, and Esc cancels a recording.",
 	"features.onDevice.title": "Transcription that never leaves home",
 	"features.onDevice.description":
 		"Whisper Large v3 Turbo or NVIDIA Parakeet runs right on your Mac. After the one-time model download, you can dictate with Wi-Fi off.",
@@ -21,4 +21,11 @@ export const features = {
 	"features.history.title": "Everything you've said, kept local",
 	"features.history.description":
 		"Scroll back through past dictations with timestamps and one-click copy. They're stored in a database on your Mac and nowhere else.",
+	"features.extras.title": "And the small things",
+	"features.extras.item1": "Lives in the menu bar, not the Dock",
+	"features.extras.item2": "Switch microphones from the menu bar",
+	"features.extras.item3": "Optional sound cues for start and finish",
+	"features.extras.item4": "Light and dark themes",
+	"features.extras.item5": "Interface in 7 languages",
+	"features.extras.item6": "Updates built in",
 } as const;

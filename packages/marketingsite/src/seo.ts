@@ -1,4 +1,4 @@
-const SITE_URL = "https://voxfusion.com";
+const SITE_URL = "https://voxfusion.io";
 
 export function softwareApplicationSchema(description: string) {
 	return {
@@ -16,5 +16,25 @@ export function softwareApplicationSchema(description: string) {
 			price: "0",
 			priceCurrency: "USD",
 		},
+	};
+}
+
+export function faqPageSchema(items: { question: string; answer: string }[]) {
+	return {
+		"@context": "https://schema.org",
+		"@type": "FAQPage",
+		mainEntity: items.map((item) => ({
+			"@type": "Question",
+			name: item.question,
+			acceptedAnswer: { "@type": "Answer", text: item.answer },
+		})),
+	};
+}
+
+/** Combines several schema.org objects into one JSON-LD document. */
+export function schemaGraph(...schemas: Record<string, unknown>[]) {
+	return {
+		"@context": "https://schema.org",
+		"@graph": schemas.map(({ "@context": _context, ...schema }) => schema),
 	};
 }

@@ -4,4 +4,4 @@ Disallow:
 User-agent: *
 Allow: /
 
-Sitemap: https://voxfusion.com/sitemap-index.xml
+Sitemap: https://voxfusion.io/sitemap-index.xml

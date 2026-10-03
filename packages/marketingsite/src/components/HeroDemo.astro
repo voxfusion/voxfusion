@@ -1,103 +1,124 @@
 ---
 /**
- * Hero dictation demo. The first sample is rendered statically, so the
- * terminal reads correctly without JavaScript and for reduced-motion
- * visitors. The script then loops through the samples: listen, transcribe,
- * insert. Every sample must fit the two lines reserved for it on desktop
- * (three on phones), or the terminal changes height between samples.
+ * Hero dictation demo: a stand-in app window with VoxFusion's recording
+ * pill underneath. The first sample is rendered finished, so the demo reads
+ * correctly without JavaScript and for reduced-motion visitors. The script
+ * then loops through the samples: listen, transcribe, type.
+ *
+ * "spoken" is the raw speech, "text" is what gets typed; the difference
+ * shows punctuation and capitalization being filled in. Every sample must
+ * fit the lines reserved for it (see the min-heights below), or the window
+ * changes height between samples.
  */
 const samples = [
-	{ app: "MAIL", text: "Hi Anna, the proposal looks great. Let's review it Thursday." },
-	{ app: "SLACK", text: "Hey team, let's schedule a quick sync for tomorrow." },
-	{ app: "CURSOR", text: "Add retry logic to the upload handler and write a test." },
+	{
+		app: "Mail",
+		context: "To: Anna / Re: Proposal",
+		spoken: "hi anna the proposal looks great let's review it thursday",
+		text: "Hi Anna, the proposal looks great. Let's review it Thursday.",
+	},
+	{
+		app: "Slack",
+		context: "# product-team",
+		spoken: "hey team let's schedule a quick sync for tomorrow",
+		text: "Hey team, let's schedule a quick sync for tomorrow.",
+	},
+	{
+		app: "Cursor",
+		context: "Agent / upload.ts",
+		spoken: "add retry logic to the upload handler and write a test",
+		text: "Add retry logic to the upload handler and write a test.",
+	},
 ];
 const first = samples[0];
-const barHeights = Array.from(
-	{ length: 48 },
-	(_, i) => 18 + Math.abs(Math.sin(i * 1.7) * Math.cos(i * 0.23)) * 82
-);
+const barHeights = [38, 72, 54, 100, 64, 88, 46, 78, 58, 34];
 ---
 
 <div class="hero-visual" role="img" aria-label="Demo: a spoken sentence is transcribed on the Mac and typed into the app in use">
-	<div class="visual-caption"><span>VOICE → TEXT</span><span>WORKFLOW DEMO</span></div>
-	<div class="terminal" data-demo data-samples={JSON.stringify(samples)}>
-		<div class="terminal-header">
-			<span class="terminal-title"><span class="terminal-mark">✳</span> voxfusion</span>
-			<span class="local-status"><span></span> ON DEVICE</span>
-		</div>
-		<div class="terminal-body">
-			<div class="input-label"><span>VOICE INPUT</span><span class="hotkey"><kbd>⌃</kbd> + <kbd>⌥</kbd></span></div>
-			<p class="spoken-text" data-demo-spoken>“{first.text}”</p>
-			<div class="waveform-raw">
-				{barHeights.map((height, i) => (
-					<div class="wave-bar" style={`--i: ${i}; --h: ${height}%`}></div>
+	<div class="visual-caption"><span>LIVE DEMO</span><span class="local-status"><i></i> ON DEVICE</span></div>
+	<div class="window" data-demo data-phase="done" data-samples={JSON.stringify(samples)}>
+		<div class="window-bar">
+			<div class="tabs">
+				{samples.map((sample, i) => (
+					<span class:list={["tab", { "is-active": i === 0 }]} data-demo-tab>{sample.app}</span>
 				))}
 			</div>
-			<div class="processing-line"><span class="prompt">↳</span> <span data-demo-status>Transcribed locally</span> <span class="processing-engine">whisper.cpp</span></div>
-			<div class="text-output">
-				<div class="output-label"><span data-demo-app>{first.app}</span><span class="result" data-demo-result>[INSERTED]</span></div>
-				<p><span data-demo-output>{first.text}</span><span class="cursor">▎</span></p>
-			</div>
+			<span class="hotkey"><kbd>⌃</kbd><kbd>⌥</kbd></span>
 		</div>
-		<div class="terminal-footer"><span>Audio stays on your Mac.</span><span>0 KB UPLOADED</span></div>
+		<div class="window-body tw-caret">
+			<p class="context" data-demo-context>{first.context}</p>
+			<p class="typed"><span data-demo-output>{first.text}<span class="tw-rest"></span></span></p>
+		</div>
+		<div class="voice">
+			<div class="pill">
+				<span class="bars">
+					{barHeights.map((height, i) => <i style={`--i: ${i}; --h: ${height}%`}></i>)}
+				</span>
+				<span class="spinner">{Array.from({ length: 9 }, (_, i) => <i style={`--i: ${i}`}></i>)}</span>
+			</div>
+			<p class="heard"><span class="heard-label">YOU SAY</span><span data-demo-heard>{first.spoken}</span></p>
+		</div>
+		<div class="window-footer">
+			<span><span class="prompt">↳</span> <span data-demo-status>Typed at your cursor</span></span>
+			<span class="uploaded">0 KB UPLOADED</span>
+		</div>
 	</div>
 </div>
 
 <script>
+	import { prefersReducedMotion, renderTyped, sleep, typeText } from "../scripts/typewriter";
+
 	interface Sample {
 		app: string;
+		context: string;
+		spoken: string;
 		text: string;
 	}
 
-	const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
-
 	async function playDemo(root: HTMLElement) {
 		const samples: Sample[] = JSON.parse(root.dataset.samples ?? "[]");
-		const spoken = root.querySelector<HTMLElement>("[data-demo-spoken]");
+		const tabs = [...root.querySelectorAll<HTMLElement>("[data-demo-tab]")];
+		const context = root.querySelector<HTMLElement>("[data-demo-context]");
 		const output = root.querySelector<HTMLElement>("[data-demo-output]");
-		const app = root.querySelector<HTMLElement>("[data-demo-app]");
+		const heard = root.querySelector<HTMLElement>("[data-demo-heard]");
 		const status = root.querySelector<HTMLElement>("[data-demo-status]");
-		const result = root.querySelector<HTMLElement>("[data-demo-result]");
-		if (!spoken || !output || !app || !status || !result || samples.length < 2) return;
+		if (!context || !output || !heard || !status || samples.length < 2) return;
 
 		// The server-rendered first sample is already in its finished state.
-		root.dataset.phase = "done";
-
 		for (let index = 1; ; index = (index + 1) % samples.length) {
-			await sleep(2600);
+			await sleep(3200);
 			while (document.hidden) await sleep(500);
 
 			const sample = samples[index];
-			const words = sample.text.split(" ");
 
 			root.dataset.phase = "listening";
-			app.textContent = sample.app;
-			spoken.textContent = "“";
-			output.textContent = "";
+			tabs.forEach((tab, i) => tab.classList.toggle("is-active", i === index));
+			context.textContent = sample.context;
 			status.textContent = "Listening…";
-			result.textContent = "[WAITING]";
-			await sleep(450);
-			for (let count = 1; count <= words.length; count++) {
-				const closing = count === words.length ? "”" : "";
-				spoken.textContent = `“${words.slice(0, count).join(" ")}${closing}`;
-				await sleep(170);
+			renderTyped(output, sample.text, 0);
+			renderTyped(heard, sample.spoken, 0);
+			await sleep(500);
+			for (let end = 0; end < sample.spoken.length; ) {
+				const space = sample.spoken.indexOf(" ", end + 1);
+				end = space === -1 ? sample.spoken.length : space;
+				renderTyped(heard, sample.spoken, end);
+				await sleep(180);
 			}
 
 			root.dataset.phase = "transcribing";
 			status.textContent = "Transcribing on your Mac…";
-			await sleep(800);
+			await sleep(900);
 
-			status.textContent = "Transcribed locally";
-			for (let count = 1; count <= sample.text.length; count++) {
-				output.textContent = sample.text.slice(0, count);
-				await sleep(16);
-			}
+			root.dataset.phase = "typing";
+			status.textContent = "Typing at your cursor…";
+			await typeText(output, sample.text, 15);
+
 			root.dataset.phase = "done";
-			result.textContent = "[INSERTED]";
+			status.textContent = "Typed at your cursor";
 		}
 	}
 
-	if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+	if (!prefersReducedMotion()) {
 		for (const root of document.querySelectorAll<HTMLElement>("[data-demo]")) {
 			playDemo(root);
 		}
@@ -106,55 +127,69 @@ const barHeights = Array.from(
 
 <style>
 	.hero-visual { position: relative; isolation: isolate; min-width: 0; }
-	.hero-visual::before { content: ""; position: absolute; inset: -80px 0; z-index: -1; background: radial-gradient(closest-side, #ff4d191c, transparent); pointer-events: none; }
-	.visual-caption { display: flex; justify-content: space-between; gap: 12px; color: #777; font-size: 9px; letter-spacing: .08em; padding-bottom: 14px; }
-	.visual-caption span:first-child { color: #aaa; }
-	.terminal { background: #111; border: 1px solid #3b3b3b; box-shadow: 10px 10px 0 #0a0a0a, 11px 11px 0 #272727; }
-	.terminal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #303030; background: #181818; }
-	.terminal-title { font-size: 13px; color: #ccc; display: flex; align-items: center; gap: 10px; }
-	.terminal-mark { color: #ff4d19; font-size: 24px; line-height: 1; }
-	.local-status { display: flex; align-items: center; gap: 8px; color: #a9b7a9; font-size: 9px; letter-spacing: .08em; }
-	.local-status span { width: 5px; height: 5px; background: #96bd96; }
-	.terminal-body { padding: 24px; }
-	.input-label, .output-label { display: flex; justify-content: space-between; align-items: center; font-size: 9px; letter-spacing: .06em; color: #919191; }
-	.hotkey { display: flex; gap: 5px; align-items: center; }
-	.hotkey kbd { display: inline-flex; justify-content: center; align-items: center; width: 23px; height: 23px; border: 1px solid #3a3a3a; border-bottom-width: 2px; color: #ccc; font-family: inherit; font-size: 14px; transition: border-color .2s, color .2s, background .2s; }
-	[data-phase="listening"] .hotkey kbd { border-color: #ff4d19; color: #ff7045; background: #1d1511; }
-	.spoken-text { min-height: 3.4em; font-size: 17px; line-height: 1.7; margin-top: 18px; color: #ddd; letter-spacing: -.025em; }
-	.waveform-raw { display: flex; align-items: center; justify-content: space-between; gap: 4px; height: 60px; margin: 22px 0; transition: transform .35s, opacity .35s; }
-	[data-phase="transcribing"] .waveform-raw { transform: scaleY(.3); opacity: .5; }
-	[data-phase="done"] .waveform-raw { transform: scaleY(.45); opacity: .6; }
-	.wave-bar { width: 4px; height: var(--h); background: #ff4d19; opacity: .8; animation: wave 2s ease-in-out infinite; animation-delay: calc(var(--i) * -.08s); }
-	@keyframes wave { 0%, 100% { transform: scaleY(.45); opacity: .55; } 50% { transform: scaleY(1); opacity: 1; } }
-	.processing-line { display: flex; gap: 8px; align-items: center; padding: 14px 0; border-top: 1px solid #292929; color: #8c8c8c; font-size: 10px; }
+	.hero-visual::before { content: ""; position: absolute; inset: -90px -20px; z-index: -1; background: radial-gradient(closest-side, #ff4d1920, transparent); pointer-events: none; }
+	.visual-caption { display: flex; justify-content: space-between; gap: 12px; color: #aaa; font-size: 9px; letter-spacing: .1em; padding-bottom: 14px; }
+	.local-status { display: flex; align-items: center; gap: 8px; color: #a9b7a9; }
+	.local-status i { width: 5px; height: 5px; background: var(--ok); animation: status-pulse 2.4s ease-in-out infinite; }
+	@keyframes status-pulse { 50% { opacity: .35; } }
+
+	.window { background: #111; border: 1px solid #3b3b3b; box-shadow: 10px 10px 0 #0a0a0a, 11px 11px 0 #272727; }
+	.window-bar { display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1px solid #303030; background: #181818; }
+	.tabs { display: flex; min-width: 0; }
+	.tab { position: relative; padding: 15px 20px; margin-bottom: -1px; border-right: 1px solid #303030; border-bottom: 1px solid transparent; color: #7c7c7c; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; transition: color .3s, background .3s; }
+	.tab::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: 0 50%; transition: transform .4s var(--ease-out); }
+	.tab.is-active { color: #f0f0f0; background: #111; border-bottom-color: #111; }
+	.tab.is-active::before { transform: none; }
+	.hotkey { display: flex; gap: 5px; align-items: center; padding-right: 16px; }
+	.hotkey kbd { display: inline-flex; justify-content: center; align-items: center; width: 23px; height: 23px; border: 1px solid #3a3a3a; border-bottom-width: 2px; color: #ccc; font-family: inherit; font-size: 14px; transition: border-color .2s, color .2s, background .2s, transform .12s; }
+	[data-phase="listening"] .hotkey kbd { border-color: var(--accent); color: var(--accent-soft); background: var(--warm-2); transform: translateY(1px); }
+
+	.window-body { padding: 20px 24px 22px; }
+	.context { padding-bottom: 13px; margin-bottom: 16px; border-bottom: 1px dashed #2c2c2c; color: #808080; font-size: 10px; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.typed { min-height: 5.1em; color: #ececec; font-size: 17px; line-height: 1.7; letter-spacing: -.025em; }
+	[data-phase="listening"] .tw-rest::before, [data-phase="transcribing"] .tw-rest::before { opacity: .45; }
+
+	.voice { display: flex; align-items: center; gap: 18px; padding: 16px 24px; border-top: 1px solid #292929; background: #0d0d0d; }
+	.pill { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 108px; height: 32px; border: 1px solid #3a3a3a; border-radius: 999px; background: #0a0a0a; opacity: .65; transition: opacity .3s, border-color .3s, box-shadow .3s; }
+	[data-phase="listening"] .pill, [data-phase="transcribing"] .pill { opacity: 1; border-color: #6b3d2a; box-shadow: 0 0 0 4px #ff4d1912; }
+	.bars { display: flex; align-items: center; gap: 3px; height: 18px; }
+	.bars i { width: 3px; height: calc(var(--h) * .4); border-radius: 2px; background: var(--accent); transition: height .25s ease-out; }
+	[data-phase="transcribing"] .bars i { height: 3px; }
+	[data-phase="listening"] .bars i { height: var(--h); animation: pill-wave .9s ease-in-out infinite alternate; animation-delay: calc(var(--i) * -.17s); }
+	@keyframes pill-wave { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
+	.spinner { display: grid; grid-template-columns: repeat(3, 3px); gap: 2px; max-width: 0; overflow: hidden; opacity: 0; transition: max-width .3s ease-out, margin .3s ease-out, opacity .3s; }
+	.spinner i { width: 3px; height: 3px; background: var(--accent); animation: spinner-dot 1s steps(1) infinite; animation-delay: calc(var(--i) * .11s); }
+	@keyframes spinner-dot { 0%, 100% { opacity: .25; } 35% { opacity: 1; } }
+	[data-phase="transcribing"] .spinner { max-width: 16px; margin-left: 9px; opacity: 1; }
+	.heard { display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 5em; justify-content: center; color: #9c9c9c; font-size: 12px; line-height: 1.6; }
+	.heard-label { color: #6f6f6f; font-size: 9px; letter-spacing: .1em; transition: color .3s; }
+	[data-phase="listening"] .heard-label { color: var(--accent-soft); }
+
+	.window-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 24px; border-top: 1px solid #303030; color: #8c8c8c; font-size: 10px; }
 	.prompt { color: #ff6b3d; }
-	.processing-engine { margin-left: auto; color: #777; }
-	.text-output { border: 1px solid #343434; padding: 16px; background: #191919; }
-	.result { color: #9ebd9e; }
-	[data-phase="listening"] .result, [data-phase="transcribing"] .result { color: #6f6f6f; }
-	.text-output p { min-height: 3.6em; color: #d5d5d5; font-size: 13px; line-height: 1.8; margin-top: 12px; }
-	.cursor { color: #ff4d19; animation: blink 1.1s steps(1) infinite; }
-	@keyframes blink { 50% { opacity: 0; } }
-	.terminal-footer { display: flex; justify-content: space-between; gap: 12px; padding: 13px 22px; border-top: 1px solid #303030; color: #888; font-size: 10px; }
-	.terminal-footer span:last-child { color: #ff6b3d; font-size: 9px; letter-spacing: .08em; }
+	.uploaded { flex-shrink: 0; color: #ff6b3d; font-size: 9px; letter-spacing: .08em; }
+
 	@media (max-width: 1050px) {
-		.terminal-body { padding: 20px; }
-		.spoken-text { min-height: 5.1em; font-size: 15px; }
+		.window-body { padding-inline: 20px; }
+		.voice, .window-footer { padding-inline: 20px; }
+		.typed { font-size: 15px; }
+		.heard { min-height: 6.6em; }
+		.tab { padding-inline: 14px; }
 	}
 	@media (max-width: 800px) {
 		.hero-visual { max-width: 580px; width: 100%; }
-		.spoken-text { min-height: 3.4em; }
+		.heard { min-height: 5em; }
 	}
 	@media (max-width: 540px) {
-		.terminal-body { padding: 18px; }
-		.terminal-header { padding: 16px 18px; }
-		.spoken-text { min-height: 5.1em; }
-		.text-output p { min-height: 5.4em; }
-		.waveform-raw { gap: 3px; }
-		.processing-line { font-size: 9px; gap: 6px; }
-		.processing-engine { font-size: 8px; }
+		.window-body, .voice, .window-footer { padding-inline: 18px; }
+		.voice { flex-direction: column; align-items: flex-start; gap: 12px; }
+		.heard { min-height: 5.2em; justify-content: flex-start; font-size: 11px; }
+		.tab { padding: 14px 13px; }
+		.hotkey { padding-right: 12px; }
+		.window-footer { font-size: 9px; }
+		.uploaded { font-size: 8px; }
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.wave-bar, .cursor { animation: none; }
+		.local-status i, .bars i, .spinner i { animation: none; }
 	}
 </style>

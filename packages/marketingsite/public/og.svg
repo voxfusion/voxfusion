@@ -1,25 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
 	<title id="title">VoxFusion</title>
-	<desc id="desc">Local-first voice to text for Mac.</desc>
+	<desc id="desc">You talk. It types. In any Mac app. Free, open-source dictation that runs on your Mac.</desc>
 	<defs>
 		<pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-			<path d="M48 0H0v48" fill="none" stroke="#242424" stroke-width="2"/>
+			<path d="M48 0H0v48" fill="none" stroke="#1b1b1b" stroke-width="2"/>
 		</pattern>
-		<linearGradient id="accent" x1="0" x2="1" y1="0" y2="1">
-			<stop offset="0" stop-color="#ff3e00"/>
-			<stop offset="1" stop-color="#ff8a00"/>
-		</linearGradient>
+		<radialGradient id="glow" cx="0.8" cy="0.48" r="0.42">
+			<stop offset="0" stop-color="#ff4d19" stop-opacity="0.16"/>
+			<stop offset="1" stop-color="#ff4d19" stop-opacity="0"/>
+		</radialGradient>
 	</defs>
 	<rect width="1200" height="630" fill="#0a0a0a"/>
-	<rect width="1200" height="630" fill="url(#grid)" opacity="0.75"/>
-	<rect x="72" y="72" width="1056" height="486" fill="none" stroke="#2f2f2f" stroke-width="2"/>
-	<text x="104" y="128" fill="#ff3e00" font-family="JetBrains Mono, Space Mono, monospace" font-size="28" font-weight="700">[VOXFUSION]</text>
-	<text x="104" y="276" fill="#f2f2f2" font-family="JetBrains Mono, Space Mono, monospace" font-size="78" font-weight="800">Local voice</text>
-	<text x="104" y="366" fill="#f2f2f2" font-family="JetBrains Mono, Space Mono, monospace" font-size="78" font-weight="800">to text for Mac</text>
-	<text x="108" y="444" fill="#a0a0a0" font-family="JetBrains Mono, Space Mono, monospace" font-size="30">Press a hotkey. Speak. Text appears.</text>
-	<g transform="translate(780 176)" fill="none" stroke-linecap="square">
-		<path d="M0 142h48m24 0h48m24 0h48m24 0h48" stroke="#3a3a3a" stroke-width="8"/>
-		<path d="M24 96v92M96 42v200M168 78v128M240 18v248" stroke="url(#accent)" stroke-width="20"/>
-		<rect x="-36" y="-36" width="356" height="356" stroke="#2f2f2f" stroke-width="2"/>
+	<rect width="1200" height="630" fill="url(#grid)"/>
+	<rect width="1200" height="630" fill="url(#glow)"/>
+	<rect x="56" y="56" width="1088" height="518" fill="none" stroke="#2f2f2f" stroke-width="2"/>
+	<g font-family="JetBrains Mono, monospace">
+		<text x="104" y="132" font-size="26" font-weight="700" letter-spacing="2.6"><tspan fill="#ff3e00">[</tspan><tspan fill="#e6e6e6">VOX</tspan><tspan fill="#6f6f6f">FUSION</tspan><tspan fill="#ff3e00">]</tspan></text>
+		<text x="1096" y="132" fill="#7a7a7a" font-size="20" text-anchor="end" letter-spacing="1">voxfusion.io</text>
+		<g font-size="76" font-weight="600" letter-spacing="-3.8">
+			<text x="100" y="262" fill="#f2f2f2">You talk.</text>
+			<text x="100" y="346" fill="#f2f2f2">It types.</text>
+			<text x="100" y="430" fill="#ff4d19">In any Mac app.</text>
+		</g>
+		<text x="104" y="508" fill="#a0a0a0" font-size="25">Free, open-source dictation that runs on your Mac.</text>
 	</g>
+	<path d="M824 276v56M848 238v132M872 260v88M896 197v214M920 242v124M944 166v276M968 220v168M992 186v236M1016 250v108M1040 211v186M1064 265v78M1088 240v128" fill="none" stroke="#ff4d19" stroke-width="12"/>
 </svg>

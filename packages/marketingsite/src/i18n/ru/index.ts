@@ -1,5 +1,6 @@
 export { common } from "./common";
 export { hero } from "./hero";
+export { speed } from "./speed";
 export { how } from "./how";
 export { features } from "./features";
 export { why } from "./why";
