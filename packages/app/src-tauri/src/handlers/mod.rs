@@ -22,7 +22,8 @@ pub use db::{
 };
 pub use hotkeys::start_system_key_watcher;
 pub use media::{
-    muffle_media_for_recording, mute_media_for_recording, restore_media_after_recording,
+    muffle_media_for_recording, mute_media_for_recording, request_muffle_permission,
+    restore_media_after_recording,
 };
 pub use models::{cancel_model_download, download_model, list_models, set_active_model};
 pub use sites::{

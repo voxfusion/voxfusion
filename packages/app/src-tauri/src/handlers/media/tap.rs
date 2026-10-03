@@ -1,10 +1,12 @@
-//! Turns other apps' audio down on outputs that have no volume or mute
-//! control, such as USB audio interfaces and displays (macOS 14.2+).
+//! Changes other apps' audio on an output (macOS 14.2+): muffles it with a
+//! filter, or mutes outputs that have no mute control, such as USB audio
+//! interfaces and displays.
 //!
 //! A process tap on the output collects the audio every other process sends
 //! to it and keeps that audio off the output while the tap is being read. A
 //! private aggregate device reads the tap and plays it back on the same output
-//! at a lower volume; at zero volume the output is muted.
+//! through the muffle filter and at a set volume; at zero volume the output is
+//! muted.
 //!
 //! Reading a tap needs the System Audio Recording permission. Without it the
 //! tap delivers silence but still holds the audio back, so the output is muted
@@ -13,9 +15,11 @@
 //! The tap and the aggregate device belong to this process: if the app quits
 //! or crashes, the audio goes straight to the output again.
 
+use std::cell::UnsafeCell;
 use std::ffi::{c_char, c_void};
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
+use std::time::{Duration, Instant};
 
 use core_foundation::array::CFArray;
 use core_foundation::base::{CFType, TCFType};
@@ -27,9 +31,11 @@ use objc2::msg_send;
 use objc2::rc::{Allocated, Retained, autoreleasepool};
 use objc2::runtime::{AnyClass, AnyObject, Bool};
 
+use super::filter::MuffleFilter;
 use super::{
-    AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT, AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN,
-    AUDIO_OBJECT_SYSTEM_OBJECT, AUDIO_OBJECT_UNKNOWN, AudioObjectGetPropertyData, AudioObjectId,
+    AUDIO_DEVICE_PROPERTY_SCOPE_OUTPUT, AUDIO_DEVICE_PROPERTY_STREAMS,
+    AUDIO_OBJECT_PROPERTY_ELEMENT_MAIN, AUDIO_OBJECT_SYSTEM_OBJECT, AUDIO_OBJECT_UNKNOWN,
+    AudioObjectGetPropertyData, AudioObjectGetPropertyDataSize, AudioObjectId,
     AudioObjectPropertyAddress, AudioObjectPropertySelector, OsStatus, core_audio_error,
     global_address, size_of_val_u32,
 };
@@ -39,7 +45,12 @@ const AUDIO_HARDWARE_PROPERTY_TRANSLATE_PID_TO_PROCESS_OBJECT: AudioObjectProper
 
 const AUDIO_TAP_PROPERTY_FORMAT: AudioObjectPropertySelector = u32::from_be_bytes(*b"tfmt");
 
-const AUDIO_DEVICE_PROPERTY_STREAMS: AudioObjectPropertySelector = u32::from_be_bytes(*b"stm#");
+const AUDIO_DEVICE_PROPERTY_DEVICE_IS_ALIVE: AudioObjectPropertySelector =
+    u32::from_be_bytes(*b"livn");
+
+/// How long a new aggregate device may take to come up.
+const AGGREGATE_DEVICE_READY_TIMEOUT: Duration = Duration::from_secs(1);
+const AGGREGATE_DEVICE_READY_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 const AUDIO_FORMAT_LINEAR_PCM: u32 = u32::from_be_bytes(*b"lpcm");
 
@@ -47,9 +58,20 @@ const AUDIO_FORMAT_FLAG_IS_FLOAT: u32 = 1;
 
 const AUDIO_FORMAT_FLAG_IS_NON_INTERLEAVED: u32 = 1 << 5;
 
+/// `CATapUnmuted`: the tapped audio still reaches the output.
+const TAP_UNMUTED: isize = 0;
+
 /// `CATapMutedWhenTapped`: the tapped audio is held back from the output only
 /// while the tap is read, so it comes back as soon as playback stops.
 const TAP_MUTED_WHEN_TAPPED: isize = 2;
+
+/// How long a permission request keeps the prompt up for an answer. The
+/// prompt closes with it, and is shown again with the next muffled recording.
+const PERMISSION_REQUEST_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+const PERMISSION_POLL_INTERVAL: Duration = Duration::from_millis(250);
+
+/// How often a recording may check the permission again.
+const PERMISSION_REFRESH_INTERVAL: Duration = Duration::from_secs(60);
 
 /// How quickly the playback gain follows a new target, so gain changes do not
 /// click.
@@ -96,14 +118,6 @@ type AudioDeviceIoProc = unsafe extern "C" fn(
 
 #[link(name = "CoreAudio", kind = "framework")]
 unsafe extern "C" {
-    fn AudioObjectGetPropertyDataSize(
-        in_object_id: AudioObjectId,
-        in_address: *const AudioObjectPropertyAddress,
-        in_qualifier_data_size: u32,
-        in_qualifier_data: *const c_void,
-        out_data_size: *mut u32,
-    ) -> OsStatus;
-
     fn AudioHardwareCreateAggregateDevice(
         in_description: CFDictionaryRef,
         out_device_id: *mut AudioObjectId,
@@ -127,8 +141,11 @@ unsafe extern "C" {
 }
 
 unsafe extern "C" {
+    fn dlopen(path: *const c_char, mode: i32) -> *mut c_void;
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
 }
+
+const RTLD_LAZY: i32 = 1;
 
 type CreateProcessTap = unsafe extern "C" fn(
     in_description: *mut AnyObject,
@@ -165,6 +182,182 @@ fn tap_api() -> Option<&'static TapApi> {
 
 pub(super) fn is_supported() -> bool {
     tap_api().is_some()
+}
+
+/// The System Audio Recording permission, which reading a tap needs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Permission {
+    Granted,
+    Denied,
+    /// Not asked yet.
+    Undetermined,
+    /// The private API to check it is gone.
+    Unknown,
+}
+
+type AccessPreflight = unsafe extern "C" fn(
+    service: core_foundation::string::CFStringRef,
+    options: CFDictionaryRef,
+) -> i32;
+
+/// The permission as a separate process last saw it. TCC keeps answering
+/// this process from what it saw first, until the app restarts, so the app
+/// asks and checks in processes of its own.
+static ANSWER: AtomicU8 = AtomicU8::new(ANSWER_NONE);
+const ANSWER_NONE: u8 = 0;
+const ANSWER_GRANTED: u8 = 1;
+const ANSWER_DENIED: u8 = 2;
+const ANSWER_UNDETERMINED: u8 = 3;
+
+impl Permission {
+    /// Exit code of a process that asks or checks.
+    fn exit_code(self) -> i32 {
+        match self {
+            Permission::Granted => 0,
+            Permission::Denied => 1,
+            Permission::Undetermined => 2,
+            Permission::Unknown => 3,
+        }
+    }
+
+    fn answer_from_exit_code(code: i32) -> u8 {
+        match code {
+            0 => ANSWER_GRANTED,
+            1 => ANSWER_DENIED,
+            2 => ANSWER_UNDETERMINED,
+            _ => ANSWER_NONE,
+        }
+    }
+}
+
+/// Asks TCC without prompting. There is no public API for this permission.
+pub(super) fn audio_capture_permission() -> Permission {
+    match ANSWER.load(Ordering::Acquire) {
+        ANSWER_GRANTED => return Permission::Granted,
+        ANSWER_DENIED => return Permission::Denied,
+        ANSWER_UNDETERMINED => return Permission::Undetermined,
+        _ => {}
+    }
+    static PREFLIGHT: OnceLock<Option<AccessPreflight>> = OnceLock::new();
+    let preflight = PREFLIGHT.get_or_init(|| {
+        let framework = unsafe {
+            dlopen(
+                c"/System/Library/PrivateFrameworks/TCC.framework/Versions/A/TCC".as_ptr(),
+                RTLD_LAZY,
+            )
+        };
+        if framework.is_null() {
+            return None;
+        }
+        let symbol = unsafe { dlsym(framework, c"TCCAccessPreflight".as_ptr()) };
+        (!symbol.is_null())
+            .then(|| unsafe { std::mem::transmute::<*mut c_void, AccessPreflight>(symbol) })
+    });
+    let Some(preflight) = preflight else {
+        return Permission::Unknown;
+    };
+    let service = CFString::from_static_string("kTCCServiceAudioCapture");
+    match unsafe { preflight(service.as_concrete_TypeRef(), std::ptr::null()) } {
+        0 => Permission::Granted,
+        1 => Permission::Denied,
+        2 => Permission::Undetermined,
+        _ => Permission::Unknown,
+    }
+}
+
+/// Command-line flag that starts the app only to ask for the System Audio
+/// Recording permission.
+pub(super) const REQUEST_PERMISSION_FLAG: &str = "--request-audio-capture-permission";
+
+/// Command-line flag that starts the app only to check the permission.
+pub(super) const CHECK_PERMISSION_FLAG: &str = "--check-audio-capture-permission";
+
+/// Runs the app executable with `args` in the background and keeps the
+/// permission it exits with. Does nothing while the last one still runs.
+fn run_permission_process(args: &[&str], running: &'static AtomicBool, event: &'static str) {
+    if running.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let child = std::env::current_exe()
+        .and_then(|executable| std::process::Command::new(executable).args(args).spawn());
+    let mut child = match child {
+        Ok(child) => child,
+        Err(err) => {
+            log::warn!(target: "media", "audio_capture_permission_{event}_failed error={err}");
+            running.store(false, Ordering::Release);
+            return;
+        }
+    };
+    std::thread::spawn(move || {
+        let answer = child
+            .wait()
+            .ok()
+            .and_then(|status| status.code())
+            .map_or(ANSWER_NONE, Permission::answer_from_exit_code);
+        let previous = ANSWER.swap(answer, Ordering::AcqRel);
+        if answer != previous {
+            log::info!(
+                target: "media",
+                "audio_capture_permission_{event} result={:?}",
+                audio_capture_permission()
+            );
+        }
+        running.store(false, Ordering::Release);
+    });
+}
+
+/// Shows the System Audio Recording prompt without changing any audio. macOS
+/// only asks once a tap has been read for a moment. Reading one in the app
+/// process does not bring the prompt up, while reading it in a separate
+/// process does, so the app runs itself again just for that; the permission
+/// still belongs to the app.
+pub(super) fn request_permission(device_uid: &str) {
+    static REQUESTING: AtomicBool = AtomicBool::new(false);
+    run_permission_process(
+        &[REQUEST_PERMISSION_FLAG, device_uid],
+        &REQUESTING,
+        "requested",
+    );
+}
+
+/// Checks the permission again in a separate process, at most once a minute,
+/// so a change in System Settings takes effect without restarting the app.
+pub(super) fn refresh_permission() {
+    static CHECKING: AtomicBool = AtomicBool::new(false);
+    static LAST_CHECK: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+    {
+        let Ok(mut last_check) = LAST_CHECK.lock() else {
+            return;
+        };
+        if last_check.is_some_and(|checked| checked.elapsed() < PERMISSION_REFRESH_INTERVAL) {
+            return;
+        }
+        *last_check = Some(Instant::now());
+    }
+    run_permission_process(&[CHECK_PERMISSION_FLAG], &CHECKING, "changed");
+}
+
+/// Runs in the process started with [`CHECK_PERMISSION_FLAG`].
+pub(super) fn exit_with_permission() -> ! {
+    std::process::exit(audio_capture_permission().exit_code())
+}
+
+/// Runs in the process started with [`REQUEST_PERMISSION_FLAG`]: reads an
+/// unmuted tap on the output until the prompt is answered, and exits with
+/// the answer for the app. Quits with the app, which closes the prompt.
+pub(super) fn hold_permission_request(device_uid: &str) -> ! {
+    if let Ok(probe) = OutputTap::open(device_uid, TAP_UNMUTED, false, 0.0) {
+        let deadline = Instant::now() + PERMISSION_REQUEST_TIMEOUT;
+        while audio_capture_permission() == Permission::Undetermined
+            && Instant::now() < deadline
+            // Once the app is gone, launchd adopts this process.
+            && std::os::unix::process::parent_id() != 1
+        {
+            std::thread::sleep(PERMISSION_POLL_INTERVAL);
+        }
+        drop(probe);
+    }
+    exit_with_permission()
 }
 
 fn own_process_object() -> Result<AudioObjectId, String> {
@@ -206,7 +399,7 @@ struct Tap {
 
 /// Taps the audio every other process sends to the first stream of the output.
 /// The app's own process is left out, because it plays the tapped audio back.
-fn create_tap(api: &TapApi, device_uid: &str) -> Result<Tap, String> {
+fn create_tap(api: &TapApi, device_uid: &str, mute_behavior: isize) -> Result<Tap, String> {
     let own_process = own_process_object()?;
     let excluded = CFArray::from_CFTypes(&[CFNumber::from(i64::from(own_process))]);
     let device_uid = CFString::new(device_uid);
@@ -224,7 +417,7 @@ fn create_tap(api: &TapApi, device_uid: &str) -> Result<Tap, String> {
         let description = description.ok_or("Describing the output tap failed")?;
         let uid: Retained<AnyObject> = unsafe {
             let _: () = msg_send![&*description, setPrivate: Bool::YES];
-            let _: () = msg_send![&*description, setMuteBehavior: TAP_MUTED_WHEN_TAPPED];
+            let _: () = msg_send![&*description, setMuteBehavior: mute_behavior];
             let uuid: Retained<AnyObject> = msg_send![&*description, UUID];
             msg_send![&*uuid, UUIDString]
         };
@@ -301,6 +494,34 @@ fn create_aggregate_device(device_uid: &str, tap_uid: &str) -> Result<AudioObjec
     Ok(device)
 }
 
+/// A new aggregate device comes up asynchronously. Started before then, it can
+/// deliver silence, which would mute instead of muffle.
+fn wait_until_alive(device: AudioObjectId) -> Result<(), String> {
+    let address = global_address(AUDIO_DEVICE_PROPERTY_DEVICE_IS_ALIVE);
+    let deadline = Instant::now() + AGGREGATE_DEVICE_READY_TIMEOUT;
+    loop {
+        let mut alive: u32 = 0;
+        let mut data_size = size_of_val_u32(&alive)?;
+        let status = unsafe {
+            AudioObjectGetPropertyData(
+                device,
+                &address,
+                0,
+                std::ptr::null(),
+                &mut data_size,
+                (&mut alive as *mut u32).cast(),
+            )
+        };
+        if status == 0 && alive != 0 {
+            return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err("The output tap device did not come up".to_string());
+        }
+        std::thread::sleep(AGGREGATE_DEVICE_READY_POLL_INTERVAL);
+    }
+}
+
 /// An output made of other devices, such as an Aggregate or Multi-Output
 /// Device, cannot be nested in the playback device, which then has no output
 /// to play the tap on.
@@ -327,13 +548,26 @@ const NO_PLAYBACK: &str = "The output tap device has no output to play on";
 
 /// Shared with the IO thread.
 struct Playback {
+    /// Whether to play the tapped audio at all.
+    play: bool,
     /// Gain the IO thread moves toward.
-    target: AtomicU32,
-    /// Gain of the last sample played. Only the IO thread changes it.
-    current: AtomicU32,
-    /// Share of the remaining distance to the target covered per sample.
-    smoothing: f32,
+    gain: AtomicU32,
+    /// Muffle filter amount the IO thread moves toward, from 0 to 1.
+    muffle: AtomicU32,
+    /// Share of the remaining distance to the target gain covered per sample.
+    gain_smoothing: f32,
+    io: UnsafeCell<IoState>,
 }
+
+/// Only the IO thread uses it, one callback at a time.
+struct IoState {
+    /// Gain of the last sample played.
+    gain: f32,
+    filter: MuffleFilter,
+}
+
+// The atomics are shared; `io` belongs to the IO thread.
+unsafe impl Sync for Playback {}
 
 /// Plays the tap, the last input stream after the output device's own, on the
 /// output's first stream, and silence on the others.
@@ -369,6 +603,9 @@ unsafe extern "C" fn play_tap(
             std::ptr::write_bytes(output.data.cast::<u8>(), 0, output.data_byte_size as usize)
         };
     }
+    if !playback.play {
+        return 0;
+    }
     let (Some(tap), Some(output)) = (inputs.last(), outputs.first_mut()) else {
         return 0;
     };
@@ -386,30 +623,28 @@ unsafe extern "C" fn play_tap(
         std::slice::from_raw_parts_mut(output.data.cast::<f32>(), frames * output_channels)
     };
 
-    let target = f32::from_bits(playback.target.load(Ordering::Relaxed));
-    let mut gain = f32::from_bits(playback.current.load(Ordering::Relaxed));
+    let io = unsafe { &mut *playback.io.get() };
+    let target_gain = f32::from_bits(playback.gain.load(Ordering::Relaxed));
     for (tap_frame, output_frame) in tap_samples
         .chunks_exact(tap_channels)
         .zip(output_samples.chunks_exact_mut(output_channels))
     {
-        gain += (target - gain) * playback.smoothing;
+        io.gain += (target_gain - io.gain) * playback.gain_smoothing;
         for (sample, tapped) in output_frame.iter_mut().zip(tap_frame) {
-            *sample = tapped * gain;
+            *sample = tapped * io.gain;
         }
     }
-    playback.current.store(gain.to_bits(), Ordering::Relaxed);
+    let muffle = f32::from_bits(playback.muffle.load(Ordering::Relaxed));
+    io.filter.process(output_samples, output_channels, muffle);
     0
 }
 
-/// Plays other apps' audio on an output at a volume from 0 to 1, for as long
-/// as it exists.
+/// Plays other apps' audio on an output, muffled and at a volume as set, for
+/// as long as it exists.
 pub(super) struct OutputTap {
     api: &'static TapApi,
     tap: AudioObjectId,
     aggregate_device: AudioObjectId,
-    /// Without playback the tapped audio is only held back, which mutes but
-    /// cannot turn it down.
-    can_play_back: bool,
     io_proc: *mut c_void,
     playback: Box<Playback>,
 }
@@ -418,27 +653,50 @@ pub(super) struct OutputTap {
 unsafe impl Send for OutputTap {}
 
 impl OutputTap {
-    /// Blocks until playback runs. The first time, that includes the System
-    /// Audio Recording permission prompt.
+    /// Holds other apps' audio back and plays it unmuffled at `volume`.
     pub(super) fn start(device_uid: &str, volume: f32) -> Result<Self, String> {
+        Self::open(device_uid, TAP_MUTED_WHEN_TAPPED, true, volume)
+    }
+
+    fn open(
+        device_uid: &str,
+        mute_behavior: isize,
+        play: bool,
+        volume: f32,
+    ) -> Result<Self, String> {
         let api = tap_api().ok_or("Output taps need macOS 14.2 or later")?;
-        let tap = create_tap(api, device_uid)?;
+        let tap = create_tap(api, device_uid, mute_behavior)?;
+        let format = match tap_format(tap.id) {
+            Ok(format) => format,
+            Err(err) => {
+                unsafe { (api.destroy)(tap.id) };
+                return Err(err);
+            }
+        };
+        let sample_rate = format.sample_rate.max(1.0);
         // From here on, Drop releases whatever was created.
         let mut output_tap = OutputTap {
             api,
             tap: tap.id,
             aggregate_device: AUDIO_OBJECT_UNKNOWN,
-            can_play_back: false,
             io_proc: std::ptr::null_mut(),
             playback: Box::new(Playback {
+                play,
                 // Playback starts at full volume, where the output already is.
-                target: AtomicU32::new(1.0f32.to_bits()),
-                current: AtomicU32::new(1.0f32.to_bits()),
-                smoothing: 0.0,
+                gain: AtomicU32::new(1.0f32.to_bits()),
+                muffle: AtomicU32::new(0.0f32.to_bits()),
+                gain_smoothing: (1.0 - (-1.0 / (GAIN_SMOOTHING_SECONDS * sample_rate)).exp())
+                    as f32,
+                io: UnsafeCell::new(IoState {
+                    gain: 1.0,
+                    filter: MuffleFilter::new(
+                        sample_rate as f32,
+                        format.channels_per_frame as usize,
+                    ),
+                }),
             }),
         };
 
-        let format = tap_format(tap.id)?;
         if format.format_id != AUDIO_FORMAT_LINEAR_PCM
             || format.format_flags & AUDIO_FORMAT_FLAG_IS_FLOAT == 0
             || format.format_flags & AUDIO_FORMAT_FLAG_IS_NON_INTERLEAVED != 0
@@ -446,12 +704,15 @@ impl OutputTap {
         {
             return Err("The output tap delivers an unsupported format".to_string());
         }
-        output_tap.playback.smoothing =
-            (1.0 - (-1.0 / (GAIN_SMOOTHING_SECONDS * format.sample_rate.max(1.0))).exp()) as f32;
 
         output_tap.aggregate_device = create_aggregate_device(device_uid, &tap.uid)?;
-        output_tap.can_play_back = has_output_stream(output_tap.aggregate_device)?;
-        output_tap.set_volume(volume)?;
+        wait_until_alive(output_tap.aggregate_device)?;
+        // Without playback the tapped audio is only held back, which mutes
+        // but cannot play anything.
+        if play && volume > 0.0 && !has_output_stream(output_tap.aggregate_device)? {
+            return Err(NO_PLAYBACK.to_string());
+        }
+        output_tap.set_volume(volume);
         let playback: *const Playback = &*output_tap.playback;
         let status = unsafe {
             AudioDeviceCreateIOProcID(
@@ -472,17 +733,18 @@ impl OutputTap {
     }
 
     /// Volume on the scale of the macOS volume slider, which is close to cubic
-    /// in amplitude. Muffling then turns an output down about as far as it
-    /// does one with a volume control.
-    pub(super) fn set_volume(&self, volume: f32) -> Result<(), String> {
+    /// in amplitude.
+    pub(super) fn set_volume(&self, volume: f32) {
         let gain = volume.clamp(0.0, 1.0).powi(3);
-        if gain > 0.0 && !self.can_play_back {
-            return Err(NO_PLAYBACK.to_string());
-        }
+        self.playback.gain.store(gain.to_bits(), Ordering::Relaxed);
+    }
+
+    /// How far the muffle filter is applied, from 0 (not at all) to 1.
+    pub(super) fn set_muffle(&self, amount: f32) {
+        let amount = amount.clamp(0.0, 1.0);
         self.playback
-            .target
-            .store(gain.to_bits(), Ordering::Relaxed);
-        Ok(())
+            .muffle
+            .store(amount.to_bits(), Ordering::Relaxed);
     }
 }
 

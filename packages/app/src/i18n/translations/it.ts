@@ -25,7 +25,7 @@ export const it: Translations = {
 			"Disattiva temporaneamente l'audio di sistema durante la registrazione e lo ripristina dopo.",
 		muffleMediaWhileRecording: "Attenua i media durante la registrazione",
 		muffleMediaWhileRecordingDescription:
-			"Abbassa l'audio di sistema durante la registrazione, senza disattivarlo, e lo ripristina dopo.",
+			"Rende ovattato l'audio delle altre app durante la registrazione, come musica dalla stanza accanto, e lo ripristina dopo.",
 		recordingSounds: "Suoni di registrazione",
 		recordingSoundsDescription:
 			"Riproduce suoni all'avvio della registrazione, dopo l'inserimento del testo o in caso di errore.",

@@ -25,7 +25,7 @@ export const de: Translations = {
 			"Schaltet Systemaudio während der Aufnahme vorübergehend stumm und stellt es danach wieder her.",
 		muffleMediaWhileRecording: "Medien bei Aufnahme dämpfen",
 		muffleMediaWhileRecordingDescription:
-			"Senkt die Systemlautstärke während der Aufnahme, ohne sie stummzuschalten, und stellt sie danach wieder her.",
+			"Lässt andere Apps während der Aufnahme gedämpft klingen, wie Musik aus dem Nebenraum, und stellt sie danach wieder her.",
 		recordingSounds: "Aufnahmetöne",
 		recordingSoundsDescription:
 			"Spielt Töne beim Aufnahmestart, nach dem Einfügen des Textes oder bei einem Fehler ab.",

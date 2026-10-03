@@ -25,7 +25,7 @@ export const es: Translations = {
 			"Silencia temporalmente el audio del sistema mientras grabas y lo restaura después.",
 		muffleMediaWhileRecording: "Atenuar medios durante la grabación",
 		muffleMediaWhileRecordingDescription:
-			"Baja el audio del sistema mientras grabas, sin silenciarlo, y lo restaura después.",
+			"Hace que el audio de otras apps suene amortiguado mientras grabas, como música en la habitación de al lado, y lo restaura después.",
 		recordingSounds: "Sonidos de grabación",
 		recordingSoundsDescription:
 			"Reproduce sonidos al iniciar la grabación, insertar el texto o producirse un error.",

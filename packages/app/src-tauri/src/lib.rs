@@ -14,10 +14,11 @@ use handlers::{
     download_whisper_model, get_frontmost_app, list_app_dictionaries, list_app_instructions,
     list_audio_devices, list_dictionary_words, list_installed_apps, list_models,
     list_site_dictionaries, list_site_styles, list_transcriptions, muffle_media_for_recording,
-    mute_media_for_recording, restore_media_after_recording, save_transcription, set_active_model,
-    set_app_instruction, set_site_style, start_recording_with_device, start_system_key_watcher,
-    stop_recording_with_device, transcribe_audio, type_text, update_app_dictionary_word,
-    update_dictionary_word, update_site_dictionary_word,
+    mute_media_for_recording, request_muffle_permission, restore_media_after_recording,
+    save_transcription, set_active_model, set_app_instruction, set_site_style,
+    start_recording_with_device, start_system_key_watcher, stop_recording_with_device,
+    transcribe_audio, type_text, update_app_dictionary_word, update_dictionary_word,
+    update_site_dictionary_word,
 };
 
 fn install_panic_hook() {
@@ -50,6 +51,9 @@ fn install_panic_hook() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if handlers::media::run_permission_request_if_asked() {
+        return;
+    }
     install_panic_hook();
 
     #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
@@ -62,6 +66,7 @@ pub fn run() {
             mute_media_for_recording,
             muffle_media_for_recording,
             restore_media_after_recording,
+            request_muffle_permission,
             start_recording_with_device,
             stop_recording_with_device,
             save_transcription,
