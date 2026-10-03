@@ -70,6 +70,9 @@ const TAP_MUTED_WHEN_TAPPED: isize = 2;
 const PERMISSION_REQUEST_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 const PERMISSION_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
+/// How often a recording may check the permission again.
+const PERMISSION_REFRESH_INTERVAL: Duration = Duration::from_secs(60);
+
 /// How quickly the playback gain follows a new target, so gain changes do not
 /// click.
 const GAIN_SMOOTHING_SECONDS: f64 = 0.01;
@@ -197,20 +200,32 @@ type AccessPreflight = unsafe extern "C" fn(
     options: CFDictionaryRef,
 ) -> i32;
 
-/// The answer to the prompt, from the process that asked. TCC keeps
-/// answering this process from what it saw first, until the app restarts.
+/// The permission as a separate process last saw it. TCC keeps answering
+/// this process from what it saw first, until the app restarts, so the app
+/// asks and checks in processes of its own.
 static ANSWER: AtomicU8 = AtomicU8::new(ANSWER_NONE);
 const ANSWER_NONE: u8 = 0;
 const ANSWER_GRANTED: u8 = 1;
 const ANSWER_DENIED: u8 = 2;
+const ANSWER_UNDETERMINED: u8 = 3;
 
 impl Permission {
-    /// Exit code of the process that asks.
+    /// Exit code of a process that asks or checks.
     fn exit_code(self) -> i32 {
         match self {
             Permission::Granted => 0,
             Permission::Denied => 1,
-            Permission::Undetermined | Permission::Unknown => 2,
+            Permission::Undetermined => 2,
+            Permission::Unknown => 3,
+        }
+    }
+
+    fn answer_from_exit_code(code: i32) -> u8 {
+        match code {
+            0 => ANSWER_GRANTED,
+            1 => ANSWER_DENIED,
+            2 => ANSWER_UNDETERMINED,
+            _ => ANSWER_NONE,
         }
     }
 }
@@ -220,6 +235,7 @@ pub(super) fn audio_capture_permission() -> Permission {
     match ANSWER.load(Ordering::Acquire) {
         ANSWER_GRANTED => return Permission::Granted,
         ANSWER_DENIED => return Permission::Denied,
+        ANSWER_UNDETERMINED => return Permission::Undetermined,
         _ => {}
     }
     static PREFLIGHT: OnceLock<Option<AccessPreflight>> = OnceLock::new();
@@ -253,6 +269,43 @@ pub(super) fn audio_capture_permission() -> Permission {
 /// Recording permission.
 pub(super) const REQUEST_PERMISSION_FLAG: &str = "--request-audio-capture-permission";
 
+/// Command-line flag that starts the app only to check the permission.
+pub(super) const CHECK_PERMISSION_FLAG: &str = "--check-audio-capture-permission";
+
+/// Runs the app executable with `args` in the background and keeps the
+/// permission it exits with. Does nothing while the last one still runs.
+fn run_permission_process(args: &[&str], running: &'static AtomicBool, event: &'static str) {
+    if running.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let child = std::env::current_exe()
+        .and_then(|executable| std::process::Command::new(executable).args(args).spawn());
+    let mut child = match child {
+        Ok(child) => child,
+        Err(err) => {
+            log::warn!(target: "media", "audio_capture_permission_{event}_failed error={err}");
+            running.store(false, Ordering::Release);
+            return;
+        }
+    };
+    std::thread::spawn(move || {
+        let answer = child
+            .wait()
+            .ok()
+            .and_then(|status| status.code())
+            .map_or(ANSWER_NONE, Permission::answer_from_exit_code);
+        let previous = ANSWER.swap(answer, Ordering::AcqRel);
+        if answer != previous {
+            log::info!(
+                target: "media",
+                "audio_capture_permission_{event} result={:?}",
+                audio_capture_permission()
+            );
+        }
+        running.store(false, Ordering::Release);
+    });
+}
+
 /// Shows the System Audio Recording prompt without changing any audio. macOS
 /// only asks once a tap has been read for a moment. Reading one in the app
 /// process does not bring the prompt up, while reading it in a separate
@@ -260,53 +313,51 @@ pub(super) const REQUEST_PERMISSION_FLAG: &str = "--request-audio-capture-permis
 /// still belongs to the app.
 pub(super) fn request_permission(device_uid: &str) {
     static REQUESTING: AtomicBool = AtomicBool::new(false);
-    if REQUESTING.swap(true, Ordering::AcqRel) {
-        return;
-    }
-    let child = std::env::current_exe().and_then(|executable| {
-        std::process::Command::new(executable)
-            .arg(REQUEST_PERMISSION_FLAG)
-            .arg(device_uid)
-            .spawn()
-    });
-    let mut child = match child {
-        Ok(child) => child,
-        Err(err) => {
-            log::warn!(target: "media", "audio_capture_permission_request_failed error={err}");
-            REQUESTING.store(false, Ordering::Release);
+    run_permission_process(
+        &[REQUEST_PERMISSION_FLAG, device_uid],
+        &REQUESTING,
+        "requested",
+    );
+}
+
+/// Checks the permission again in a separate process, at most once a minute,
+/// so a change in System Settings takes effect without restarting the app.
+pub(super) fn refresh_permission() {
+    static CHECKING: AtomicBool = AtomicBool::new(false);
+    static LAST_CHECK: std::sync::Mutex<Option<Instant>> = std::sync::Mutex::new(None);
+    {
+        let Ok(mut last_check) = LAST_CHECK.lock() else {
+            return;
+        };
+        if last_check.is_some_and(|checked| checked.elapsed() < PERMISSION_REFRESH_INTERVAL) {
             return;
         }
-    };
-    std::thread::spawn(move || {
-        let answer = match child.wait().ok().and_then(|status| status.code()) {
-            Some(code) if code == Permission::Granted.exit_code() => ANSWER_GRANTED,
-            Some(code) if code == Permission::Denied.exit_code() => ANSWER_DENIED,
-            _ => ANSWER_NONE,
-        };
-        if answer != ANSWER_NONE {
-            ANSWER.store(answer, Ordering::Release);
-        }
-        log::info!(
-            target: "media",
-            "audio_capture_permission_requested result={:?}",
-            audio_capture_permission()
-        );
-        REQUESTING.store(false, Ordering::Release);
-    });
+        *last_check = Some(Instant::now());
+    }
+    run_permission_process(&[CHECK_PERMISSION_FLAG], &CHECKING, "changed");
+}
+
+/// Runs in the process started with [`CHECK_PERMISSION_FLAG`].
+pub(super) fn exit_with_permission() -> ! {
+    std::process::exit(audio_capture_permission().exit_code())
 }
 
 /// Runs in the process started with [`REQUEST_PERMISSION_FLAG`]: reads an
 /// unmuted tap on the output until the prompt is answered, and exits with
-/// the answer for the app.
+/// the answer for the app. Quits with the app, which closes the prompt.
 pub(super) fn hold_permission_request(device_uid: &str) -> ! {
     if let Ok(probe) = OutputTap::open(device_uid, TAP_UNMUTED, false, 0.0) {
         let deadline = Instant::now() + PERMISSION_REQUEST_TIMEOUT;
-        while audio_capture_permission() == Permission::Undetermined && Instant::now() < deadline {
+        while audio_capture_permission() == Permission::Undetermined
+            && Instant::now() < deadline
+            // Once the app is gone, launchd adopts this process.
+            && std::os::unix::process::parent_id() != 1
+        {
             std::thread::sleep(PERMISSION_POLL_INTERVAL);
         }
         drop(probe);
     }
-    std::process::exit(audio_capture_permission().exit_code())
+    exit_with_permission()
 }
 
 fn own_process_object() -> Result<AudioObjectId, String> {

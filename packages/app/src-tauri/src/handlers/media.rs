@@ -541,6 +541,8 @@ impl CoreAudioOutput {
     /// Without the System Audio Recording permission the tap delivers silence,
     /// which would mute instead of muffle.
     fn start_muffle_tap(device: AudioObjectId, uid: &str) -> Result<tap::OutputTap, String> {
+        // For the next recording, in case it changed in System Settings.
+        tap::refresh_permission();
         match tap::audio_capture_permission() {
             tap::Permission::Granted => {}
             tap::Permission::Denied => {
@@ -762,11 +764,15 @@ pub fn run_permission_request_if_asked() -> bool {
     #[cfg(target_os = "macos")]
     {
         let mut args = std::env::args().skip(1);
-        if args.next().as_deref() == Some(tap::REQUEST_PERMISSION_FLAG) {
-            if let Some(device_uid) = args.next() {
-                tap::hold_permission_request(&device_uid);
+        match args.next().as_deref() {
+            Some(tap::REQUEST_PERMISSION_FLAG) => {
+                if let Some(device_uid) = args.next() {
+                    tap::hold_permission_request(&device_uid);
+                }
+                return true;
             }
-            return true;
+            Some(tap::CHECK_PERMISSION_FLAG) => tap::exit_with_permission(),
+            _ => {}
         }
     }
     false
