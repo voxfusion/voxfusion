@@ -18,7 +18,8 @@
 use std::cell::UnsafeCell;
 use std::ffi::{c_char, c_void};
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::time::{Duration, Instant};
 
 use core_foundation::array::CFArray;
 use core_foundation::base::{CFType, TCFType};
@@ -50,9 +51,16 @@ const AUDIO_FORMAT_FLAG_IS_FLOAT: u32 = 1;
 
 const AUDIO_FORMAT_FLAG_IS_NON_INTERLEAVED: u32 = 1 << 5;
 
+/// `CATapUnmuted`: the tapped audio still reaches the output.
+const TAP_UNMUTED: isize = 0;
+
 /// `CATapMutedWhenTapped`: the tapped audio is held back from the output only
 /// while the tap is read, so it comes back as soon as playback stops.
 const TAP_MUTED_WHEN_TAPPED: isize = 2;
+
+/// How long a permission request waits for an answer to the prompt.
+const PERMISSION_REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
+const PERMISSION_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// How quickly the playback gain follows a new target, so gain changes do not
 /// click.
@@ -170,8 +178,10 @@ pub(super) fn is_supported() -> bool {
 pub(super) enum Permission {
     Granted,
     Denied,
-    /// Not asked yet, or unknown.
+    /// Not asked yet.
     Undetermined,
+    /// The private API to check it is gone.
+    Unknown,
 }
 
 type AccessPreflight = unsafe extern "C" fn(
@@ -179,8 +189,7 @@ type AccessPreflight = unsafe extern "C" fn(
     options: CFDictionaryRef,
 ) -> i32;
 
-/// Asks TCC without prompting. There is no public API for this permission;
-/// without the private one, it counts as undetermined.
+/// Asks TCC without prompting. There is no public API for this permission.
 pub(super) fn audio_capture_permission() -> Permission {
     static PREFLIGHT: OnceLock<Option<AccessPreflight>> = OnceLock::new();
     let preflight = PREFLIGHT.get_or_init(|| {
@@ -198,13 +207,55 @@ pub(super) fn audio_capture_permission() -> Permission {
             .then(|| unsafe { std::mem::transmute::<*mut c_void, AccessPreflight>(symbol) })
     });
     let Some(preflight) = preflight else {
-        return Permission::Undetermined;
+        return Permission::Unknown;
     };
     let service = CFString::from_static_string("kTCCServiceAudioCapture");
     match unsafe { preflight(service.as_concrete_TypeRef(), std::ptr::null()) } {
         0 => Permission::Granted,
         1 => Permission::Denied,
-        _ => Permission::Undetermined,
+        2 => Permission::Undetermined,
+        _ => Permission::Unknown,
+    }
+}
+
+/// Shows the System Audio Recording prompt without changing any audio, by
+/// reading an unmuted tap on the output until the prompt is answered. macOS
+/// only asks once a tap is read for a moment, so a tap that must not hold the
+/// audio back cannot wait for the answer itself.
+pub(super) fn request_permission(device_uid: &str) {
+    static REQUESTING: AtomicBool = AtomicBool::new(false);
+    if REQUESTING.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let device_uid = device_uid.to_string();
+    let spawned = std::thread::Builder::new()
+        .name("media-permission".to_string())
+        .spawn(move || {
+            match OutputTap::open(&device_uid, TAP_UNMUTED, false, 0.0) {
+                Ok(probe) => {
+                    let deadline = Instant::now() + PERMISSION_REQUEST_TIMEOUT;
+                    while audio_capture_permission() == Permission::Undetermined
+                        && Instant::now() < deadline
+                    {
+                        std::thread::sleep(PERMISSION_POLL_INTERVAL);
+                    }
+                    drop(probe);
+                    log::info!(
+                        target: "media",
+                        "audio_capture_permission_requested result={:?}",
+                        audio_capture_permission()
+                    );
+                }
+                Err(err) => log::warn!(
+                    target: "media",
+                    "audio_capture_permission_request_failed error={err}"
+                ),
+            }
+            REQUESTING.store(false, Ordering::Release);
+        });
+    if let Err(err) = spawned {
+        log::warn!(target: "media", "audio_capture_permission_request_failed error={err}");
+        REQUESTING.store(false, Ordering::Release);
     }
 }
 
@@ -247,7 +298,7 @@ struct Tap {
 
 /// Taps the audio every other process sends to the first stream of the output.
 /// The app's own process is left out, because it plays the tapped audio back.
-fn create_tap(api: &TapApi, device_uid: &str) -> Result<Tap, String> {
+fn create_tap(api: &TapApi, device_uid: &str, mute_behavior: isize) -> Result<Tap, String> {
     let own_process = own_process_object()?;
     let excluded = CFArray::from_CFTypes(&[CFNumber::from(i64::from(own_process))]);
     let device_uid = CFString::new(device_uid);
@@ -265,7 +316,7 @@ fn create_tap(api: &TapApi, device_uid: &str) -> Result<Tap, String> {
         let description = description.ok_or("Describing the output tap failed")?;
         let uid: Retained<AnyObject> = unsafe {
             let _: () = msg_send![&*description, setPrivate: Bool::YES];
-            let _: () = msg_send![&*description, setMuteBehavior: TAP_MUTED_WHEN_TAPPED];
+            let _: () = msg_send![&*description, setMuteBehavior: mute_behavior];
             let uuid: Retained<AnyObject> = msg_send![&*description, UUID];
             msg_send![&*uuid, UUIDString]
         };
@@ -368,6 +419,8 @@ const NO_PLAYBACK: &str = "The output tap device has no output to play on";
 
 /// Shared with the IO thread.
 struct Playback {
+    /// Whether to play the tapped audio at all.
+    play: bool,
     /// Gain the IO thread moves toward.
     gain: AtomicU32,
     /// Muffle filter amount the IO thread moves toward, from 0 to 1.
@@ -421,6 +474,9 @@ unsafe extern "C" fn play_tap(
             std::ptr::write_bytes(output.data.cast::<u8>(), 0, output.data_byte_size as usize)
         };
     }
+    if !playback.play {
+        return 0;
+    }
     let (Some(tap), Some(output)) = (inputs.last(), outputs.first_mut()) else {
         return 0;
     };
@@ -468,11 +524,19 @@ pub(super) struct OutputTap {
 unsafe impl Send for OutputTap {}
 
 impl OutputTap {
-    /// Starts unmuffled at `volume`. Blocks until playback runs; the first
-    /// time, that includes the System Audio Recording permission prompt.
+    /// Holds other apps' audio back and plays it unmuffled at `volume`.
     pub(super) fn start(device_uid: &str, volume: f32) -> Result<Self, String> {
+        Self::open(device_uid, TAP_MUTED_WHEN_TAPPED, true, volume)
+    }
+
+    fn open(
+        device_uid: &str,
+        mute_behavior: isize,
+        play: bool,
+        volume: f32,
+    ) -> Result<Self, String> {
         let api = tap_api().ok_or("Output taps need macOS 14.2 or later")?;
-        let tap = create_tap(api, device_uid)?;
+        let tap = create_tap(api, device_uid, mute_behavior)?;
         let format = match tap_format(tap.id) {
             Ok(format) => format,
             Err(err) => {
@@ -488,6 +552,7 @@ impl OutputTap {
             aggregate_device: AUDIO_OBJECT_UNKNOWN,
             io_proc: std::ptr::null_mut(),
             playback: Box::new(Playback {
+                play,
                 // Playback starts at full volume, where the output already is.
                 gain: AtomicU32::new(1.0f32.to_bits()),
                 muffle: AtomicU32::new(0.0f32.to_bits()),
@@ -514,7 +579,7 @@ impl OutputTap {
         output_tap.aggregate_device = create_aggregate_device(device_uid, &tap.uid)?;
         // Without playback the tapped audio is only held back, which mutes
         // but cannot play anything.
-        if volume > 0.0 && !has_output_stream(output_tap.aggregate_device)? {
+        if play && volume > 0.0 && !has_output_stream(output_tap.aggregate_device)? {
             return Err(NO_PLAYBACK.to_string());
         }
         output_tap.set_volume(volume);

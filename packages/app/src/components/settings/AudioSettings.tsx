@@ -1,6 +1,7 @@
 import { RefreshCw } from "lucide-solid";
 import { type Accessor, createSignal, onCleanup } from "solid-js";
 import type { I18nContextType } from "../../i18n";
+import { requestMufflePermission } from "../../lib/commands/media";
 import { capture } from "../../lib/posthog";
 import type { AudioDevice, Settings } from "../../lib/settingsStore";
 import {
@@ -106,6 +107,8 @@ export default function AudioSettings(props: AudioSettingsProps) {
 				onChange={(enabled) => {
 					capture("settings_muffle_media_while_recording_changed", { enabled });
 					updateMuffleMediaWhileRecording(enabled);
+					// macOS asks for System Audio Recording, which the muffle filter needs.
+					if (enabled) void requestMufflePermission();
 				}}
 			/>
 

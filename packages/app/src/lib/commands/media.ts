@@ -9,6 +9,10 @@ export async function muffleMediaForRecording(): Promise<CommandResult<void>> {
 	return invokeResult<void>("muffle_media_for_recording");
 }
 
+export async function requestMufflePermission(): Promise<CommandResult<void>> {
+	return invokeResult<void>("request_muffle_permission");
+}
+
 export async function restoreMediaAfterRecording(): Promise<CommandResult<void>> {
 	return invokeResult<void>("restore_media_after_recording");
 }

@@ -538,23 +538,24 @@ struct CoreAudioOutput {
 
 #[cfg(target_os = "macos")]
 impl CoreAudioOutput {
+    /// Without the System Audio Recording permission the tap delivers silence,
+    /// which would mute instead of muffle.
     fn start_muffle_tap(device: AudioObjectId, uid: &str) -> Result<tap::OutputTap, String> {
-        let permission = tap::audio_capture_permission();
-        if permission == tap::Permission::Denied {
-            return Err("System Audio Recording permission is off".to_string());
+        match tap::audio_capture_permission() {
+            tap::Permission::Granted | tap::Permission::Unknown => {}
+            tap::Permission::Denied => {
+                return Err("System Audio Recording permission is off".to_string());
+            }
+            tap::Permission::Undetermined => {
+                // Ask now; the filter works from the next recording on.
+                tap::request_permission(uid);
+                return Err("System Audio Recording permission was not asked yet".to_string());
+            }
         }
         if is_bluetooth_headset_recording(device) {
             return Err("The output is a Bluetooth headset that is recording".to_string());
         }
-        // Starting may ask for the permission. Without it the tap delivers
-        // silence, which would mute instead of muffle.
-        let output_tap = tap::OutputTap::start(uid, 1.0)?;
-        if permission != tap::Permission::Granted
-            && tap::audio_capture_permission() != tap::Permission::Granted
-        {
-            return Err("System Audio Recording permission was not granted".to_string());
-        }
-        Ok(output_tap)
+        tap::OutputTap::start(uid, 1.0)
     }
 }
 
@@ -750,6 +751,21 @@ fn mute_default_output(state: &mut MediaMuteState) -> Result<(), String> {
 pub fn muffle_media_for_recording() {
     #[cfg(target_os = "macos")]
     muffle::muffle();
+}
+
+/// Asks for the System Audio Recording permission that the muffle filter
+/// needs, if it was not asked yet. Returns at once.
+#[tauri::command]
+pub fn request_muffle_permission() {
+    #[cfg(target_os = "macos")]
+    if tap::is_supported() && tap::audio_capture_permission() == tap::Permission::Undetermined {
+        match get_default_output_device().and_then(get_device_uid) {
+            Ok(uid) => tap::request_permission(&uid),
+            Err(err) => {
+                log::warn!(target: "media", "audio_capture_permission_request_failed error={err}")
+            }
+        }
+    }
 }
 
 /// Puts output back after a recording, whether it was muted or muffled.
