@@ -169,6 +169,7 @@ impl VoiceController {
             AppEvent::LearningStepActive(active) => {
                 self.learning_active = *active;
                 self.plan_hotkeys(*active || self.onboarding_complete, false, cx);
+                self.cancel_unstoppable_recording(cx);
             }
             AppEvent::KeyboardKeyPressed { key_code } => {
                 if *key_code == ESCAPE_KEY_CODE || !self.hotkeys_live() {
@@ -408,9 +409,19 @@ impl VoiceController {
                     this.target.bundle_id.is_some(),
                     this.target.domain.is_some(),
                 );
+                this.cancel_unstoppable_recording(cx);
             })
         })
         .detach();
+    }
+
+    /// Cancels a trial dictation whose onboarding step went away (the user
+    /// moved on, or closed the window): its hotkeys went with the step, so
+    /// they could no longer stop it.
+    fn cancel_unstoppable_recording(&mut self, cx: &mut Context<Self>) {
+        if !self.hotkeys_live() {
+            self.cancel_recording(cx);
+        }
     }
 
     pub fn stop_recording(&mut self, cx: &mut Context<Self>) {
