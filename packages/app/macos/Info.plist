@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>VoxFusion</string>
+	<key>CFBundleExecutable</key>
+	<string>voxfusion-app</string>
+	<key>CFBundleIconFile</key>
+	<string>icon.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>io.voxfusion.app</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>VoxFusion</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>__VERSION__</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>VoxFusion needs microphone access to record and transcribe your voice.</string>
+	<key>NSAccessibilityUsageDescription</key>
+	<string>VoxFusion needs accessibility access to type transcribed text into other applications.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>VoxFusion muffles or mutes other apps' audio while you dictate. The audio is not recorded or saved.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>VoxFusion uses Apple Events to read the active tab URL from your browser so it can apply per-site dictionaries during transcription.</string>
+</dict>
+</plist>

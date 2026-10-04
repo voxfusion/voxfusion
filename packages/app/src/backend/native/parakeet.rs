@@ -1,0 +1,132 @@
+//! On-device Parakeet (TDT transducer) transcription.
+//!
+//! whisper-rs cannot run Parakeet, so we drive the GGUF through the `crispasr`
+//! engine (CrispStrobe/CrispASR — a ggml/Metal C++ runtime, the same engine the
+//! `cstr/parakeet-tdt-0.6b-v3-GGUF` files target). We invoke its CLI as a
+//! subprocess: `crispasr -m <model.gguf> -f <audio.wav> -nt -np`, which prints
+//! the transcription (no timestamps) to stdout. The model backend is
+//! auto-detected from the GGUF metadata.
+
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+const BIN_NAME: &str = "crispasr";
+
+/// Resolves the `crispasr` engine binary. Search order:
+/// 1. `VOXFUSION_PARAKEET_BIN` env override (absolute path)
+/// 2. bundled resource: `<resources>/bin/crispasr` (release builds)
+/// 3. app data: `<app_data>/bin/crispasr` (dev — build-parakeet-engine.sh)
+fn resolve_binary() -> Option<PathBuf> {
+    if let Ok(path) = std::env::var("VOXFUSION_PARAKEET_BIN") {
+        let pb = PathBuf::from(path);
+        if pb.exists() {
+            return Some(pb);
+        }
+    }
+    if let Some(resources) = crate::paths::resource_dir() {
+        let pb = resources.join("bin").join(BIN_NAME);
+        if pb.exists() {
+            return Some(pb);
+        }
+    }
+    let pb = crate::paths::data_dir().join("bin").join(BIN_NAME);
+    if pb.exists() {
+        return Some(pb);
+    }
+    None
+}
+
+/// Whether the engine binary exists at any known location. Checked before a
+/// Parakeet model can be made active — see [`super::models`].
+pub fn engine_available() -> bool {
+    resolve_binary().is_some()
+}
+
+/// Error for a missing engine, shown to the user when transcription or model
+/// selection is attempted without it.
+fn missing_engine_error() -> String {
+    "The crispasr engine that runs Parakeet models is missing from this build. \
+     Reinstall VoxFusion, or run packages/app/scripts/build-parakeet-engine.sh in development."
+        .to_string()
+}
+
+/// Writes mono 16 kHz f32 samples as a 16-bit PCM WAV the engine can read,
+/// alongside the source file. Returns the temp path (caller deletes it).
+fn write_temp_wav_16k(audio_path: &Path, samples: &[f32]) -> Result<PathBuf, String> {
+    let temp_path = audio_path.with_extension("parakeet16k.wav");
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: 16000,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut writer = hound::WavWriter::create(&temp_path, spec)
+        .map_err(|e| format!("Failed to create temp WAV: {}", e))?;
+    for &sample in samples {
+        let scaled = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
+        writer
+            .write_sample(scaled)
+            .map_err(|e| format!("Failed to write WAV sample: {}", e))?;
+    }
+    writer
+        .finalize()
+        .map_err(|e| format!("Failed to finalize temp WAV: {}", e))?;
+    Ok(temp_path)
+}
+
+/// Transcribes the given 16 kHz mono samples with the Parakeet GGUF at
+/// `model_path` via the `crispasr` engine. Returns the trimmed transcript.
+pub fn transcribe(
+    model_path: &Path,
+    audio_path: &Path,
+    samples: &[f32],
+    dictionary: Option<&str>,
+) -> Result<String, String> {
+    let binary = resolve_binary().ok_or_else(missing_engine_error)?;
+    let wav_path = write_temp_wav_16k(audio_path, samples)?;
+
+    let thread_count = std::thread::available_parallelism()
+        .map(|count| count.get().saturating_sub(1).max(1))
+        .unwrap_or(4)
+        .to_string();
+
+    let mut command = Command::new(&binary);
+    command
+        .arg("-m")
+        .arg(model_path)
+        .arg("-f")
+        .arg(&wav_path)
+        .arg("-t")
+        .arg(&thread_count)
+        .arg("-nt") // no timestamps
+        .arg("-np"); // print only the transcription
+    if let Some(words) = dictionary.filter(|words| !words.trim().is_empty()) {
+        // Parakeet uses contextual vocabulary biasing, not Whisper prompts.
+        // Pass one literal argument so spaces and shell characters stay data.
+        command.arg("--hotwords").arg(words);
+    }
+    let result = command.output();
+
+    let _ = std::fs::remove_file(&wav_path);
+
+    let output = result.map_err(|e| {
+        format!(
+            "Failed to launch Parakeet engine ({}): {}. The 'crispasr' engine binary is required to run Parakeet models.",
+            binary.display(),
+            e
+        )
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let tail: String = stderr.lines().rev().take(5).collect::<Vec<_>>().join(" | ");
+        return Err(format!("Parakeet engine failed: {}", tail.trim()));
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if text.is_empty() {
+        return Err("Parakeet engine produced no transcription.".to_string());
+    }
+
+    Ok(text)
+}

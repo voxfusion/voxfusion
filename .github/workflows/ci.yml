@@ -36,15 +36,8 @@ jobs:
       - name: Lint (Biome)
         run: bun run lint
 
-      - name: Typecheck app
-        run: bun run --filter @voxfusion/app typecheck
-
       - name: Typecheck marketing site (astro check)
         run: bun run --filter @voxfusion/marketingsite typecheck
-
-      - name: Build app frontend (Vite)
-        working-directory: packages/app
-        run: bunx vite build
 
       - name: Build marketing site
         run: bun run --filter @voxfusion/marketingsite build
@@ -61,15 +54,120 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './packages/app/src-tauri -> target'
+          workspaces: './packages/app -> target'
 
       - name: Ensure cmake is available
         run: command -v cmake || brew install cmake
 
       - name: Cargo check
-        working-directory: packages/app/src-tauri
-        run: cargo check
+        working-directory: packages/app
+        run: cargo check --all-targets
+
+      # The fixture feature runs the interface against canned data; keep it building.
+      - name: Cargo check (fixture)
+        working-directory: packages/app
+        run: cargo check --features fixture
 
       - name: Cargo test
-        working-directory: packages/app/src-tauri
+        working-directory: packages/app
         run: cargo test
+
+  # Builds the app bundle the way a release does (minus the Developer ID) and
+  # checks what only a bundle on a real macOS can show: that macOS will ask
+  # for the microphone, that the app starts, and that it stays out of the Dock.
+  bundle:
+    runs-on: macos-15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app -> target'
+          shared-key: 'bundle'
+
+      - name: Ensure cmake is available
+        run: command -v cmake || brew install cmake
+
+      - name: Build the bundle
+        env:
+          HARDENED_RUNTIME: "1"
+          BUNDLE_ID: io.voxfusion.ci
+          APP_NAME: VoxFusion CI
+        run: |
+          bash packages/app/scripts/bundle-macos.sh --debug
+          echo "APP=$(find packages/app/dist -maxdepth 2 -name '*.app' | head -1)" >> "$GITHUB_ENV"
+
+      - name: Check the signature, entitlements and Info.plist
+        run: |
+          codesign --verify --strict --verbose=2 "$APP"
+          codesign -d --entitlements - "$APP" | tee entitlements.txt
+          grep -q "com.apple.security.device.audio-input" entitlements.txt
+          grep -q "com.apple.security.automation.apple-events" entitlements.txt
+          for key in NSMicrophoneUsageDescription NSAudioCaptureUsageDescription NSAppleEventsUsageDescription LSUIElement; do
+            /usr/libexec/PlistBuddy -c "Print :$key" "$APP/Contents/Info.plist"
+          done
+          # The same usage strings are embedded in the executable, for runs outside a bundle.
+          otool -s __TEXT __info_plist "$APP/Contents/MacOS/voxfusion-app" | grep -q "Contents of"
+
+      # Launched with `open`, not from the shell: macOS holds a program started
+      # from a terminal to the terminal's permissions.
+      - name: Report permissions before asking
+        run: |
+          open -W "$APP" --args --permissions-report "$RUNNER_TEMP/before.json"
+          cat "$RUNNER_TEMP/before.json"
+          test "$(jq -r .microphone "$RUNNER_TEMP/before.json")" = "prompt"
+
+      # Asking must bring up the system prompt. Without the usage string the
+      # app would be killed; without the entitlement, under the hardened
+      # runtime, macOS would deny without showing anything.
+      - name: Ask for the microphone and expect the system prompt
+        run: |
+          open "$APP" --args --permissions-report "$RUNNER_TEMP/asked.json" --request-microphone
+          prompt_shown() {
+            osascript -l JavaScript -e '
+              ObjC.import("CoreGraphics");
+              const windows = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, 0));
+              windows.some((w) => w.kCGWindowOwnerName === "UserNotificationCenter") ? "yes" : "no";'
+          }
+          for attempt in $(seq 1 30); do
+            if [ "$(prompt_shown)" = "yes" ]; then break; fi
+            sleep 1
+          done
+          screencapture -x "$RUNNER_TEMP/microphone-prompt.png" || true
+          test "$(prompt_shown)" = "yes"
+          pkill -f "voxfusion-app" || true
+
+      # `--env` gives the app its own data and log directories.
+      - name: Start the app
+        run: |
+          open "$APP" --env VOXFUSION_APP_ID=io.voxfusion.ci
+          LOG="$HOME/Library/Logs/io.voxfusion.ci/voxfusion.log"
+          for attempt in $(seq 1 60); do
+            if grep -q "setup_completed" "$LOG" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          sleep 5
+          screencapture -x "$RUNNER_TEMP/app.png" || true
+          cat "$LOG"
+          grep -q "setup_completed" "$LOG"
+          ! grep -q "rust_panic" "$LOG"
+          pgrep -f "voxfusion-app" > /dev/null
+          # A menu bar app: no Dock icon.
+          lsappinfo info -only ApplicationType "$(lsappinfo find bundleid=io.voxfusion.ci)" | tee "$RUNNER_TEMP/app-type.txt"
+          grep -q "UIElement" "$RUNNER_TEMP/app-type.txt"
+          pkill -f "voxfusion-app" || true
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-check
+          path: |
+            ${{ runner.temp }}/*.png
+            ${{ runner.temp }}/*.json
+          if-no-files-found: ignore

@@ -1,0 +1,80 @@
+[package]
+name = "voxfusion"
+version = "0.3.0"
+description = "VoxFusion Desktop Application"
+authors = ["you"]
+edition = "2024"
+license = "MIT"
+
+# The executable keeps the name the Tauri builds gave it: an installed copy
+# that updates itself relaunches the executable it was started from.
+[[bin]]
+name = "voxfusion-app"
+path = "src/main.rs"
+
+[features]
+# Runs the interface against canned data and scripted input, for screenshots
+# and interface checks on machines without the native backend.
+fixture = []
+
+[dependencies]
+gpui-kit = { version = "=0.7.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+enigo = "0.2"
+cpal = "0.17"
+hound = "3.5"
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+rusqlite = { version = "0.31", features = ["bundled"] }
+reqwest = { version = "0.12", features = ["stream"] }
+sha2 = "0.10"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+futures-util = "0.3"
+plist = "1"
+base64 = "0.22"
+icns = "0.3"
+unicode-linebreak = "0.1"
+unicode-segmentation = "1"
+global-hotkey = "0.7"
+minisign-verify = "0.2"
+semver = "1"
+tar = "0.4"
+flate2 = "1"
+async-channel = "2"
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16", features = ["metal"] }
+tray-icon = { version = "0.21", default-features = false }
+png = "0.17"
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+objc2 = "0.6"
+block2 = "0.6"
+dispatch2 = "0.3"
+objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSEnumerator", "NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSWorkspace", "NSResponder", "NSRunningApplication", "NSEvent", "NSWindow", "NSPanel", "NSView", "NSScreen", "objc2-core-foundation", "block2"] }
+objc2-av-foundation = { version = "0.3", default-features = false, features = ["std", "AVCaptureDevice", "AVMediaFormat", "block2"] }
+objc2-core-graphics = { version = "0.3", features = ["CGEventSource", "CGEventTypes", "CGRemoteOperation"] }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = { version = "0.16" }
+
+# Dependencies get line tables only, so backtraces still show file and line
+# without making every debug build several GB.
+[profile.dev.package."*"]
+debug = "line-tables-only"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = "s"
+panic = "abort"
+overflow-checks = false
+
+[dev-dependencies]
+minisign = "0.7"
+tempfile = "3"

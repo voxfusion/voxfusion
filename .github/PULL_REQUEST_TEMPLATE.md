@@ -9,7 +9,7 @@
 - [ ] `bun run check`
 - [ ] `bun run typecheck`
 - [ ] `bun run build`
-- [ ] `cargo check` in `packages/app/src-tauri`
+- [ ] `cargo check` and `cargo test` in `packages/app`
 
 ## Screenshots or recordings
 
