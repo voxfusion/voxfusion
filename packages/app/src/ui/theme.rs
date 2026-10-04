@@ -171,11 +171,12 @@ pub fn follow(window: &mut Window, cx: &mut App) {
         .observe_window_appearance(|window, cx| apply(window.appearance(), cx))
         .detach();
 
-    let handle = window.window_handle();
-    cx.observe(&SettingsStore::entity(cx), move |_, cx| {
-        let _ = handle.update(cx, |_, window, cx| apply(window.appearance(), cx));
-    })
-    .detach();
+    // Ends with the window.
+    window
+        .observe(&SettingsStore::entity(cx), cx, |_, window, cx| {
+            apply(window.appearance(), cx)
+        })
+        .detach();
 }
 
 /// GPUI Kit's text inputs take their colors and fonts from the Kit theme.

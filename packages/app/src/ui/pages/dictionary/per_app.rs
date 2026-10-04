@@ -4,13 +4,10 @@ use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, ParentElement as _, Render, Styled as _,
     Subscription, Window, div, px, size,
 };
-use std::rc::Rc;
 
 use crate::analytics;
-use crate::backend::InstalledApp;
-use crate::ui::apps_cache;
+use crate::ui::apps_cache::{self, InstalledApps};
 use crate::ui::pages::section::{empty_state, list_header};
-use crate::ui::widgets::app_icon::AppIcons;
 use crate::ui::widgets::app_search::{AppSearch, AppSelected, SKELETON_ROWS, app_row_skeleton};
 use crate::ui::{t, t_with};
 
@@ -62,15 +59,15 @@ impl AppDictionaries {
 
         page.search
             .update(cx, |search, cx| search.set_loading(page.loading, cx));
-        if let Some(apps) = cached_apps {
-            page.set_installed_apps(apps, cx);
+        if let Some(installed) = cached_apps {
+            page.set_installed_apps(installed, cx);
         }
         page.load(cx);
         page
     }
 
-    fn set_installed_apps(&mut self, apps: Vec<InstalledApp>, cx: &mut Context<Self>) {
-        let icons = Rc::new(AppIcons::decode(&apps));
+    fn set_installed_apps(&mut self, installed: InstalledApps, cx: &mut Context<Self>) {
+        let InstalledApps { apps, icons } = installed;
 
         self.groups
             .update(cx, |groups, cx| groups.set_icons(icons.clone(), cx));
@@ -84,8 +81,8 @@ impl AppDictionaries {
 
         cx.spawn(async move |this, cx| {
             match apps.await {
-                Ok(apps) => {
-                    this.update(cx, |this, cx| this.set_installed_apps(apps, cx))
+                Ok(installed) => {
+                    this.update(cx, |this, cx| this.set_installed_apps(installed, cx))
                         .ok();
                 }
                 Err(error) => {
