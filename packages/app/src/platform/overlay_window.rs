@@ -24,6 +24,7 @@ mod macos {
 
     use super::ScreenRect;
 
+    #[derive(Clone)]
     pub struct OverlayWindow {
         window: Retained<NSWindow>,
     }
@@ -57,12 +58,6 @@ mod macos {
             let view = unsafe { Retained::retain(handle.ns_view.as_ptr().cast::<NSView>()) }?;
             let window = view.window()?;
 
-            // GPUI gives a window without a title bar a titled frame with the
-            // content drawn over it. macOS outlines a titled window with a
-            // hairline and rounds its corners, which shows as a faint box
-            // around the pill. A borderless window has neither.
-            let panel_behavior = window.styleMask() & NSWindowStyleMask::NonactivatingPanel;
-            window.setStyleMask(NSWindowStyleMask::Borderless | panel_behavior);
             // Above other apps' windows, below the Dock and the menu bar.
             window.setLevel(NSFloatingWindowLevel);
             // No shadow around whatever the window draws.
@@ -74,6 +69,20 @@ mod macos {
             }
 
             Some(Self { window })
+        }
+
+        /// Makes the window borderless. GPUI gives a window without a title
+        /// bar a titled frame with the content drawn over it; macOS outlines
+        /// a titled window with a hairline and rounds its corners, which
+        /// shows as a faint box around the pill.
+        ///
+        /// AppKit reports the change to GPUI before this returns, and GPUI
+        /// cannot take that while it is updating the app: call this from a
+        /// task, not from inside an update.
+        pub fn remove_frame(&self) {
+            let panel_behavior = self.window.styleMask() & NSWindowStyleMask::NonactivatingPanel;
+            self.window
+                .setStyleMask(NSWindowStyleMask::Borderless | panel_behavior);
         }
 
         /// Shows the window without activating the app or taking key focus.
@@ -136,11 +145,16 @@ mod fallback {
 
     use super::ScreenRect;
 
+    #[derive(Clone)]
     pub enum OverlayWindow {}
 
     impl OverlayWindow {
         pub fn new(_handle: &impl HasWindowHandle) -> Option<Self> {
             None
+        }
+
+        pub fn remove_frame(&self) {
+            match *self {}
         }
 
         pub fn show(&self) {

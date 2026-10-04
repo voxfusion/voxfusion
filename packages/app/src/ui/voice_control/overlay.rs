@@ -484,8 +484,19 @@ pub fn open(
         window.set_rem_size(px(16.));
         theme::follow(window, cx);
 
+        let native = OverlayWindow::new(&*window);
+
+        // In a task, which runs once the window is open: see `remove_frame`.
+        if let Some(native) = native.clone() {
+            cx.spawn(async move |_| {
+                native.remove_frame();
+                log::info!(target: "runtime", "voice_control_frame_removed");
+            })
+            .detach();
+        }
+
         let placement = fixed_size.is_none().then(|| Placement {
-            native: OverlayWindow::new(&*window),
+            native,
             applied: WindowRequest {
                 visible: show,
                 width: WINDOW_WIDTH_COMPACT,

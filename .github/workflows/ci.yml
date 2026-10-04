@@ -218,6 +218,10 @@ jobs:
           cat "$LOG"
           grep -q "setup_completed" "$LOG"
           ! grep -q "rust_panic" "$LOG"
+          # The dictation overlay lost its window frame, and AppKit's answer
+          # to that reached GPUI.
+          grep -q "voice_control_frame_removed" "$LOG"
+          ! grep -q "already borrowed" "$LOG"
           pgrep -f "voxfusion-app" > /dev/null
           # A menu bar app: no Dock icon.
           lsappinfo info -only ApplicationType "$(lsappinfo find bundleid=io.voxfusion.ci)" | tee "$RUNNER_TEMP/bundle-check/app-type.txt"
