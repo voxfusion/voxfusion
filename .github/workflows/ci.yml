@@ -118,28 +118,33 @@ jobs:
       # from a terminal to the terminal's permissions.
       - name: Report permissions before asking
         run: |
-          open -W "$APP" --args --permissions-report "$RUNNER_TEMP/before.json"
-          cat "$RUNNER_TEMP/before.json"
-          test "$(jq -r .microphone "$RUNNER_TEMP/before.json")" = "prompt"
+          mkdir -p "$RUNNER_TEMP/bundle-check"
+          open -W "$APP" --args --permissions-report "$RUNNER_TEMP/bundle-check/before.json"
+          cat "$RUNNER_TEMP/bundle-check/before.json"
+          test "$(jq -r .microphone "$RUNNER_TEMP/bundle-check/before.json")" = "prompt"
 
       # Asking must bring up the system prompt. Without the usage string the
       # app would be killed; without the entitlement, under the hardened
       # runtime, macOS would deny without showing anything.
       - name: Ask for the microphone and expect the system prompt
         run: |
-          open "$APP" --args --permissions-report "$RUNNER_TEMP/asked.json" --request-microphone
-          prompt_shown() {
-            osascript -l JavaScript -e '
-              ObjC.import("CoreGraphics");
-              const windows = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, 0));
-              windows.some((w) => w.kCGWindowOwnerName === "UserNotificationCenter") ? "yes" : "no";'
-          }
+          cat > "$RUNNER_TEMP/prompt-shown.swift" <<'SWIFT'
+          import CoreGraphics
+
+          // Permission prompts are windows of UserNotificationCenter.
+          let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+          let shown = windows.contains { ($0[kCGWindowOwnerName as String] as? String) == "UserNotificationCenter" }
+          print(shown ? "yes" : "no")
+          SWIFT
+          swiftc -O "$RUNNER_TEMP/prompt-shown.swift" -o "$RUNNER_TEMP/prompt-shown"
+
+          open "$APP" --args --permissions-report "$RUNNER_TEMP/bundle-check/asked.json" --request-microphone
           for attempt in $(seq 1 30); do
-            if [ "$(prompt_shown)" = "yes" ]; then break; fi
+            if [ "$("$RUNNER_TEMP/prompt-shown")" = "yes" ]; then break; fi
             sleep 1
           done
-          screencapture -x "$RUNNER_TEMP/microphone-prompt.png" || true
-          test "$(prompt_shown)" = "yes"
+          screencapture -x "$RUNNER_TEMP/bundle-check/microphone-prompt.png" || true
+          test "$("$RUNNER_TEMP/prompt-shown")" = "yes"
           pkill -f "voxfusion-app" || true
 
       # `--env` gives the app its own data and log directories.
@@ -152,14 +157,15 @@ jobs:
             sleep 1
           done
           sleep 5
-          screencapture -x "$RUNNER_TEMP/app.png" || true
+          screencapture -x "$RUNNER_TEMP/bundle-check/app.png" || true
+          cp "$LOG" "$RUNNER_TEMP/bundle-check/voxfusion.log" || true
           cat "$LOG"
           grep -q "setup_completed" "$LOG"
           ! grep -q "rust_panic" "$LOG"
           pgrep -f "voxfusion-app" > /dev/null
           # A menu bar app: no Dock icon.
-          lsappinfo info -only ApplicationType "$(lsappinfo find bundleid=io.voxfusion.ci)" | tee "$RUNNER_TEMP/app-type.txt"
-          grep -q "UIElement" "$RUNNER_TEMP/app-type.txt"
+          lsappinfo info -only ApplicationType "$(lsappinfo find bundleid=io.voxfusion.ci)" | tee "$RUNNER_TEMP/bundle-check/app-type.txt"
+          grep -q "UIElement" "$RUNNER_TEMP/bundle-check/app-type.txt"
           pkill -f "voxfusion-app" || true
 
       - name: Upload screenshots
@@ -167,7 +173,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bundle-check
-          path: |
-            ${{ runner.temp }}/*.png
-            ${{ runner.temp }}/*.json
+          path: ${{ runner.temp }}/bundle-check
           if-no-files-found: ignore
