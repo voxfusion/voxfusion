@@ -156,6 +156,20 @@ jobs:
           SH
           chmod +x "$RUNNER_TEMP/wait-for-prompt"
 
+          # A prompt outlives the process that asked, and the next one waits
+          # behind it. Closes whatever is on screen.
+          cat > "$RUNNER_TEMP/close-prompts" <<'SH'
+          #!/bin/bash
+          pkill -f "voxfusion-app" || true
+          killall UserNotificationCenter 2> /dev/null || true
+          for attempt in $(seq 1 15); do
+            if [ -z "$("$RUNNER_TEMP/prompts")" ]; then exit 0; fi
+            sleep 1
+          done
+          echo "prompts still on screen: $("$RUNNER_TEMP/prompts")"
+          SH
+          chmod +x "$RUNNER_TEMP/close-prompts"
+
       # The muffle filter needs System Audio Recording. The request is the one
       # the Audio settings make: the app starts a copy of itself that reads a
       # tap on the output until the prompt is answered.
@@ -167,7 +181,7 @@ jobs:
           SHOWN="$("$RUNNER_TEMP/wait-for-prompt" "$BEFORE")"
           screencapture -x "$OUT/audio-capture-prompt.png" || true
           cat "$OUT/audio-capture.json"
-          pkill -f "voxfusion-app" || true
+          "$RUNNER_TEMP/close-prompts"
 
           if [ "$(jq -r 'has("audio_capture_error")' "$OUT/audio-capture.json")" = "true" ]; then
             echo "::notice::System Audio Recording cannot be asked for on this runner: $(jq -r .audio_capture_error "$OUT/audio-capture.json")"
@@ -182,18 +196,11 @@ jobs:
       - name: Ask for the microphone and expect the system prompt
         run: |
           OUT="$RUNNER_TEMP/bundle-check"
-          # The last prompt closes with the process that asked.
-          for attempt in $(seq 1 15); do
-            if [ -z "$("$RUNNER_TEMP/prompts")" ]; then break; fi
-            sleep 1
-          done
           BEFORE="$("$RUNNER_TEMP/prompts")"
-          echo "prompts left on screen: '$BEFORE'"
-
           open "$APP" --args --permissions-report "$OUT/asked.json" --request-microphone
           SHOWN="$("$RUNNER_TEMP/wait-for-prompt" "$BEFORE")"
           screencapture -x "$OUT/microphone-prompt.png" || true
-          pkill -f "voxfusion-app" || true
+          "$RUNNER_TEMP/close-prompts"
           test "$SHOWN" = "yes"
 
       # `--env` gives the app its own data and log directories.
