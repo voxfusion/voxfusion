@@ -1,8 +1,9 @@
 # Contributing to VoxFusion
 
 Thanks for helping improve VoxFusion. This project is a local-first desktop
-transcription app built with Tauri, SolidJS, TypeScript, Rust, SQLite, and
-Whisper.
+transcription app: a native Rust app built on GPUI (through GPUI Kit), with
+Whisper and Parakeet for transcription and SQLite for storage. The marketing
+site is a separate Astro project in the same repository.
 
 ## Project Priorities
 
@@ -16,60 +17,65 @@ Whisper.
 
 Install the required tools:
 
-- [Bun](https://bun.sh/) 1.3.3 or newer
-- [Rust](https://rustup.rs/)
-- macOS for full desktop and permission-flow development
+- [Rust](https://rustup.rs/) 1.85 or newer
+- [CMake](https://cmake.org/) (whisper.cpp is compiled from source; on macOS:
+  `brew install cmake`)
+- [Bun](https://bun.sh/) 1.3.3 or newer (for the marketing site and the
+  repository scripts)
+- macOS for the full app. The interface also builds and runs on Linux for
+  development, without the macOS-only services.
 
-Install dependencies:
-
-```sh
-bun install
-```
-
-Run the full desktop app:
+Run the desktop app:
 
 ```sh
 cd packages/app
 bun run dev
 ```
 
-Run the root development task:
+On macOS this builds the debug build into `VoxFusion Dev.app`, signs it, and
+starts it the way the installed app is started. macOS grants permissions
+(microphone, accessibility, system audio) to an app bundle; a bare `cargo run`
+binary is held to the permissions of the terminal it was started from, and
+never gets the System Audio Recording prompt. The script signs with your
+"Apple Development" identity when you have one, so macOS remembers what you
+allowed across rebuilds; see `scripts/dev.sh` for the options.
+
+Run the marketing site:
 
 ```sh
-bun run dev
+bun install
+bun run --filter @voxfusion/marketingsite dev
 ```
 
 ## Useful Commands
 
+Desktop app, from `packages/app`:
+
+```sh
+cargo check --all-targets
+cargo test
+cargo run --features fixture   # with VOXFUSION_FIXTURE=<scenario.json>: canned data, no backend
+```
+
+Marketing site and repository-wide checks, from the repository root:
+
 ```sh
 bun run check
-bun run typecheck
-bun run build
-```
-
-Package-specific checks can be run from the repository root:
-
-```sh
-bun run --filter @voxfusion/app typecheck
-bun run --filter @voxfusion/app lint
 bun run --filter @voxfusion/marketingsite typecheck
-bun run --filter @voxfusion/marketingsite lint
-```
-
-Rust checks for the Tauri backend:
-
-```sh
-cd packages/app/src-tauri
-cargo check
-cargo test
+bun run --filter @voxfusion/marketingsite build
 ```
 
 ## Repository Layout
 
-- `packages/app/src`: SolidJS frontend for the desktop app.
-- `packages/app/src-tauri/src`: Rust handlers, listeners, and Tauri setup.
+- `packages/app/src`: the desktop app. `ui/` holds the windows, `backend/` the
+  services behind them (recording, transcription, models, storage), and
+  `platform/` the macOS integrations.
+- `packages/app/assets`: icons, fonts, images and translations compiled into
+  the app.
+- `packages/app/macos`: Info.plist, entitlements and the app icon.
+- `packages/app/scripts`: bundling and the Parakeet engine build.
 - `packages/marketingsite/src`: Astro marketing site.
-- `.github/workflows`: release automation.
+- `.github/workflows`: checks and release automation.
 
 ## Pull Request Guidelines
 

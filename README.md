@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packages/app/src-tauri/icons/icon.png" width="128" alt="VoxFusion icon">
+  <img src="packages/app/assets/images/app-icon.png" width="128" alt="VoxFusion icon">
 </p>
 
 <h1 align="center">VoxFusion</h1>

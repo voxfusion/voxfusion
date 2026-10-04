@@ -32,28 +32,27 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './packages/app/src-tauri -> target'
+          workspaces: './packages/app -> target'
           shared-key: 'release-build'
           save-if: ${{ github.ref_type == 'tag' }}
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
+      # The version compiled into the app (shown in Settings and compared by
+      # the updater) is the package version, so it follows the tag.
       - name: Sync version from git tag
+        working-directory: packages/app
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "Setting version to $VERSION"
-          cd packages/app/src-tauri
-          jq --arg v "$VERSION" '.version = $v' tauri.conf.json > tmp.json && mv tmp.json tauri.conf.json
-          echo "Updated tauri.conf.json:"
-          grep '"version"' tauri.conf.json
+          sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+          grep '^version' Cargo.toml
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       # The engine is a ~2h cold compile (two arches, every CrispASR backend),
       # but its inputs are fully pinned: the build script embeds the engine
       # commit, arch list, and deployment target. Cache the installed staging
       # dir keyed on the script hash so releases that don't bump the engine
-      # skip the compile entirely. (The signing step later re-signs the cached
-      # binaries with --force, so restoring already-signed files is fine.)
+      # skip the compile entirely. (Bundling re-signs the engine binaries with
+      # --force, so restoring already-signed files is fine.)
       - name: Cache Parakeet engine
         id: engine-cache
         uses: actions/cache@v4
@@ -73,7 +72,7 @@ jobs:
             echo "restored=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Build the crispasr engine that runs Parakeet models (handlers::parakeet)
+      # Build the crispasr engine that runs Parakeet models
       # for both architectures. Done before the certificate import so the large
       # compile does not eat into the keychain's unlock window.
       - name: Build Parakeet engine (crispasr)
@@ -108,16 +107,6 @@ jobs:
           echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
           echo "Certificate imported: $CERT_ID"
 
-      # The engine binaries are bundled into Contents/Resources/bin, which the
-      # Tauri bundler does not sign for us. Notarization requires every Mach-O
-      # to be signed with hardened runtime, so sign them before staging.
-      - name: Sign Parakeet engine binaries
-        run: |
-          for f in engine-staging/*/*; do
-            codesign --force --options runtime --timestamp --sign "$CERT_ID" "$f"
-            codesign --verify --verbose=2 "$f"
-          done
-
       - name: Verify Apple notarization secrets
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -131,42 +120,32 @@ jobs:
             fi
           done
 
-      - name: Build Tauri app
+      # Builds, signs and notarizes the app for each architecture, with the
+      # matching engine build in Contents/Resources/bin, then packs the DMG
+      # and the archive installed copies update from.
+      - name: Build app bundles
         working-directory: packages/app
         env:
-          VITE_API_URL: https://voxfusion-production.up.railway.app
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
+          SIGN_IDENTITY: ${{ env.CERT_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MACOSX_DEPLOYMENT_TARGET: "11.0"
+          NOTARIZE: "1"
         run: |
-          # Stage the matching engine build into src-tauri/engine, which
-          # tauri.release.conf.json bundles into Contents/Resources/bin.
-          # (The resources entry lives in a release-only config overlay
-          # because Tauri's build script fails on an empty resources glob,
-          # which would break plain cargo check / tauri dev without the
-          # engine staged.)
-          stage_engine() {
-            rm -rf src-tauri/engine
-            mkdir -p src-tauri/engine
-            cp "$GITHUB_WORKSPACE/engine-staging/$1/"* src-tauri/engine/
-          }
-          stage_engine aarch64-apple-darwin
-          bun run tauri build --config src-tauri/tauri.release.conf.json --target aarch64-apple-darwin
-          stage_engine x86_64-apple-darwin
-          bun run tauri build --config src-tauri/tauri.release.conf.json --target x86_64-apple-darwin
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            bash scripts/bundle-macos.sh --target "$target" \
+              --engine-dir "$GITHUB_WORKSPACE/engine-staging/$target" --dmg --updater
+          done
 
       # Belt and braces: assert the engine made it into both app bundles.
       - name: Verify bundled Parakeet engine
         run: |
           verify_engine() {
             local target="$1" arch="$2" app_path engine
-            app_path=$(find "packages/app/src-tauri/target/$target/release/bundle/macos" -maxdepth 1 -name "*.app" -type d | head -1)
+            app_path=$(find "packages/app/dist/$target" -maxdepth 1 -name "*.app" -type d | head -1)
             engine="$app_path/Contents/Resources/bin/crispasr"
             if [ ! -f "$engine" ]; then
               echo "::error::crispasr engine missing from $app_path"
@@ -184,37 +163,37 @@ jobs:
         run: |
           echo "Searching for artifacts..."
 
-          ARM_DMG_PATH=$(find packages/app/src-tauri/target/aarch64-apple-darwin -name "*.dmg" -type f | head -1)
+          ARM_DMG_PATH=$(find packages/app/dist/aarch64-apple-darwin -name "*.dmg" -type f | head -1)
           if [ -z "$ARM_DMG_PATH" ]; then
             echo "Error: No Apple Silicon DMG file found"
-            find packages/app/src-tauri/target/aarch64-apple-darwin -type f -name "*.dmg" || true
+            find packages/app/dist/aarch64-apple-darwin -type f -name "*.dmg" || true
             exit 1
           fi
           echo "Found Apple Silicon DMG: $ARM_DMG_PATH"
           echo "ARM_DMG_PATH=$ARM_DMG_PATH" >> $GITHUB_OUTPUT
 
-          INTEL_DMG_PATH=$(find packages/app/src-tauri/target/x86_64-apple-darwin -name "*.dmg" -type f | head -1)
+          INTEL_DMG_PATH=$(find packages/app/dist/x86_64-apple-darwin -name "*.dmg" -type f | head -1)
           if [ -z "$INTEL_DMG_PATH" ]; then
             echo "Error: No Intel DMG file found"
-            find packages/app/src-tauri/target/x86_64-apple-darwin -type f -name "*.dmg" || true
+            find packages/app/dist/x86_64-apple-darwin -type f -name "*.dmg" || true
             exit 1
           fi
           echo "Found Intel DMG: $INTEL_DMG_PATH"
           echo "INTEL_DMG_PATH=$INTEL_DMG_PATH" >> $GITHUB_OUTPUT
 
-          ARM_TARBALL_PATH=$(find packages/app/src-tauri/target/aarch64-apple-darwin -name "*.app.tar.gz" -type f | head -1)
+          ARM_TARBALL_PATH=$(find packages/app/dist/aarch64-apple-darwin -name "*.app.tar.gz" -type f | head -1)
           if [ -z "$ARM_TARBALL_PATH" ]; then
             echo "Error: No Apple Silicon .app.tar.gz file found"
-            find packages/app/src-tauri/target/aarch64-apple-darwin -type f -name "*.tar.gz" || true
+            find packages/app/dist/aarch64-apple-darwin -type f -name "*.tar.gz" || true
             exit 1
           fi
           echo "Found Apple Silicon tarball: $ARM_TARBALL_PATH"
           echo "ARM_TARBALL_PATH=$ARM_TARBALL_PATH" >> $GITHUB_OUTPUT
 
-          INTEL_TARBALL_PATH=$(find packages/app/src-tauri/target/x86_64-apple-darwin -name "*.app.tar.gz" -type f | head -1)
+          INTEL_TARBALL_PATH=$(find packages/app/dist/x86_64-apple-darwin -name "*.app.tar.gz" -type f | head -1)
           if [ -z "$INTEL_TARBALL_PATH" ]; then
             echo "Error: No Intel .app.tar.gz file found"
-            find packages/app/src-tauri/target/x86_64-apple-darwin -type f -name "*.tar.gz" || true
+            find packages/app/dist/x86_64-apple-darwin -type f -name "*.tar.gz" || true
             exit 1
           fi
           echo "Found Intel tarball: $INTEL_TARBALL_PATH"
@@ -226,7 +205,7 @@ jobs:
             cat "$ARM_SIG_FILE"
           else
             echo "Error: No Apple Silicon signature file found at $ARM_SIG_FILE"
-            find packages/app/src-tauri/target/aarch64-apple-darwin -name "*.sig" -type f || true
+            find packages/app/dist/aarch64-apple-darwin -name "*.sig" -type f || true
             exit 1
           fi
           echo "ARM_SIG_FILE=$ARM_SIG_FILE" >> $GITHUB_OUTPUT
@@ -237,7 +216,7 @@ jobs:
             cat "$INTEL_SIG_FILE"
           else
             echo "Error: No Intel signature file found at $INTEL_SIG_FILE"
-            find packages/app/src-tauri/target/x86_64-apple-darwin -name "*.sig" -type f || true
+            find packages/app/dist/x86_64-apple-darwin -name "*.sig" -type f || true
             exit 1
           fi
           echo "INTEL_SIG_FILE=$INTEL_SIG_FILE" >> $GITHUB_OUTPUT
@@ -309,6 +288,51 @@ jobs:
           verify_dmg "${{ steps.artifacts.outputs.INTEL_DMG_PATH }}"
           verify_app_tarball "${{ steps.artifacts.outputs.ARM_TARBALL_PATH }}"
           verify_app_tarball "${{ steps.artifacts.outputs.INTEL_TARBALL_PATH }}"
+
+      # The update reaches every installed copy, so the build has to start as
+      # it ships: optimized, signed with the release identity and notarized.
+      - name: Start the Apple Silicon app
+        run: |
+          APP=$(find packages/app/dist/aarch64-apple-darwin -maxdepth 1 -name "*.app" -type d | head -1)
+          LOG="$HOME/Library/Logs/io.voxfusion.release-check/voxfusion.log"
+          open "$APP" --env VOXFUSION_APP_ID=io.voxfusion.release-check
+          for attempt in $(seq 1 60); do
+            if grep -q "setup_completed" "$LOG" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          sleep 5
+          cat "$LOG"
+          grep -q "setup_completed" "$LOG"
+          grep -q "cargo_package_version=$VERSION" "$LOG"
+          ! grep -q "rust_panic" "$LOG"
+          ! grep -q "already borrowed" "$LOG"
+          pgrep -f "voxfusion-app" > /dev/null
+          lsappinfo info -only ApplicationType "$(lsappinfo find bundleid=io.voxfusion.app)" | grep -q "UIElement"
+          pkill -f "voxfusion-app" || true
+
+      # The Intel build runs here only through Rosetta, so this one warns
+      # instead of stopping the release.
+      - name: Start the Intel app
+        continue-on-error: true
+        run: |
+          if ! arch -x86_64 /usr/bin/true 2> /dev/null; then
+            echo "::warning::Rosetta is not installed on this runner; the Intel build was not started."
+            exit 0
+          fi
+          APP=$(find packages/app/dist/x86_64-apple-darwin -maxdepth 1 -name "*.app" -type d | head -1)
+          LOG="$HOME/Library/Logs/io.voxfusion.release-check-intel/voxfusion.log"
+          open "$APP" --env VOXFUSION_APP_ID=io.voxfusion.release-check-intel
+          for attempt in $(seq 1 90); do
+            if grep -q "setup_completed" "$LOG" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          sleep 5
+          cat "$LOG" || true
+          pkill -f "voxfusion-app" || true
+          if ! grep -q "setup_completed" "$LOG" || grep -q "rust_panic" "$LOG"; then
+            echo "::warning::The Intel build did not start under Rosetta on this runner."
+            exit 1
+          fi
 
       - name: Prepare artifacts for upload
         run: |
