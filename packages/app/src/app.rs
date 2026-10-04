@@ -168,16 +168,17 @@ fn handle_actions(cx: &mut App) {
     cx.on_action(|_: &Quit, cx| cx.quit());
 
     cx.on_action(|_: &CloseWindow, cx| {
-        let Some(window) = cx.try_global::<MainWindow>().map(|main| main.window) else {
-            return;
-        };
-        log::info!(target: "runtime", "window_close_requested");
-
-        // The shortcut arrives while the window handles the key, and a
-        // window cannot be updated again from inside its own update.
-        cx.defer(move |cx| {
-            let _ = window.update(cx, |_, window, _| window.remove_window());
-        });
+        if let Some(window) = cx.active_window() {
+            log::info!(target: "runtime", "window_close_requested");
+            // The shortcut and the menu dispatch the action while GPUI is
+            // updating the window, which cannot be updated again from inside
+            // that: close it once the update is over.
+            cx.defer(move |cx| {
+                if let Err(error) = window.update(cx, |_, window, _| window.remove_window()) {
+                    log::warn!(target: "runtime", "window_close_failed error={error}");
+                }
+            });
+        }
     });
 
     cx.on_action(|_: &CheckForUpdates, cx| check_for_updates(cx));
