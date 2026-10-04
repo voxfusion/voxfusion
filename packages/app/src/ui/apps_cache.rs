@@ -45,14 +45,16 @@ pub fn load(cx: &mut App) -> Task<CommandResult<InstalledApps>> {
             icons: Rc::new(AppIcons::decode(&apps)),
             apps,
         };
-        cx.update(|cx| {
+        // Two loads may overlap; all callers get the apps the first one
+        // brought, so that `clear` knows every icon handed out.
+        Ok(cx.update(|cx| {
             let cache = cx.default_global::<AppsCache>();
             if cache.generation == generation {
-                cache.installed = Some(installed.clone());
+                cache.installed.get_or_insert(installed).clone()
+            } else {
+                installed
             }
-        });
-
-        Ok(installed)
+        }))
     })
 }
 
