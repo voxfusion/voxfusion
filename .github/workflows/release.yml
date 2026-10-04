@@ -289,6 +289,51 @@ jobs:
           verify_app_tarball "${{ steps.artifacts.outputs.ARM_TARBALL_PATH }}"
           verify_app_tarball "${{ steps.artifacts.outputs.INTEL_TARBALL_PATH }}"
 
+      # The update reaches every installed copy, so the build has to start as
+      # it ships: optimized, signed with the release identity and notarized.
+      - name: Start the Apple Silicon app
+        run: |
+          APP=$(find packages/app/dist/aarch64-apple-darwin -maxdepth 1 -name "*.app" -type d | head -1)
+          LOG="$HOME/Library/Logs/io.voxfusion.release-check/voxfusion.log"
+          open "$APP" --env VOXFUSION_APP_ID=io.voxfusion.release-check
+          for attempt in $(seq 1 60); do
+            if grep -q "setup_completed" "$LOG" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          sleep 5
+          cat "$LOG"
+          grep -q "setup_completed" "$LOG"
+          grep -q "cargo_package_version=$VERSION" "$LOG"
+          ! grep -q "rust_panic" "$LOG"
+          ! grep -q "already borrowed" "$LOG"
+          pgrep -f "voxfusion-app" > /dev/null
+          lsappinfo info -only ApplicationType "$(lsappinfo find bundleid=io.voxfusion.app)" | grep -q "UIElement"
+          pkill -f "voxfusion-app" || true
+
+      # The Intel build runs here only through Rosetta, so this one warns
+      # instead of stopping the release.
+      - name: Start the Intel app
+        continue-on-error: true
+        run: |
+          if ! arch -x86_64 /usr/bin/true 2> /dev/null; then
+            echo "::warning::Rosetta is not installed on this runner; the Intel build was not started."
+            exit 0
+          fi
+          APP=$(find packages/app/dist/x86_64-apple-darwin -maxdepth 1 -name "*.app" -type d | head -1)
+          LOG="$HOME/Library/Logs/io.voxfusion.release-check-intel/voxfusion.log"
+          open "$APP" --env VOXFUSION_APP_ID=io.voxfusion.release-check-intel
+          for attempt in $(seq 1 90); do
+            if grep -q "setup_completed" "$LOG" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          sleep 5
+          cat "$LOG" || true
+          pkill -f "voxfusion-app" || true
+          if ! grep -q "setup_completed" "$LOG" || grep -q "rust_panic" "$LOG"; then
+            echo "::warning::The Intel build did not start under Rosetta on this runner."
+            exit 1
+          fi
+
       - name: Prepare artifacts for upload
         run: |
           mkdir -p release-artifacts
