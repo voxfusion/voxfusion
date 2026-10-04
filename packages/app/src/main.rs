@@ -9,6 +9,7 @@ mod events;
 mod fixture;
 mod i18n;
 mod logging;
+mod memory;
 mod paths;
 mod platform;
 mod settings;
