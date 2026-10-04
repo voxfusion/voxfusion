@@ -152,7 +152,14 @@ fn handle_actions(cx: &mut App) {
     cx.on_action(|_: &CloseWindow, cx| {
         if let Some(window) = cx.active_window() {
             log::info!(target: "runtime", "window_close_requested");
-            let _ = window.update(cx, |_, window, _| window.remove_window());
+            // The shortcut and the menu dispatch the action while GPUI is
+            // updating the window, which cannot be updated again from inside
+            // that: close it once the update is over.
+            cx.defer(move |cx| {
+                if let Err(error) = window.update(cx, |_, window, _| window.remove_window()) {
+                    log::warn!(target: "runtime", "window_close_failed error={error}");
+                }
+            });
         }
     });
 
