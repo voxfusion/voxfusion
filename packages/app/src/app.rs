@@ -85,6 +85,7 @@ pub fn run() {
 
         handle_actions(cx);
         handle_events(cx);
+        forget_main_window_when_closed(cx);
 
         menu_bar_item::setup(sender.clone(), cx);
 
@@ -111,12 +112,29 @@ fn init_interface(cx: &mut App) {
     actions::bind_keys(cx);
 }
 
+/// The main window while it is open. It is dropped when the window closes,
+/// so that the view and everything it holds go with the window.
 struct MainWindow {
     window: AnyWindowHandle,
     view: Entity<MainView>,
 }
 
 impl Global for MainWindow {}
+
+/// Forgets the main window once it has closed.
+fn forget_main_window_when_closed(cx: &mut App) {
+    cx.on_window_closed(|cx, closed| {
+        let main = cx
+            .try_global::<MainWindow>()
+            .map(|main| main.window.window_id());
+        if main == Some(closed) {
+            cx.remove_global::<MainWindow>();
+            ui::apps_cache::clear(cx);
+            log::info!(target: "runtime", "main_window_closed");
+        }
+    })
+    .detach();
+}
 
 /// Brings the main window to the front, opening it if it was closed. Closing
 /// the window only closes the window: the app keeps running in the menu bar.

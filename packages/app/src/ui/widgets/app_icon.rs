@@ -45,6 +45,10 @@ impl AppIcons {
     pub fn get(&self, bundle_id: &str) -> Option<Arc<Image>> {
         self.by_bundle_id.get(bundle_id).cloned()
     }
+
+    pub fn images(&self) -> impl Iterator<Item = Arc<Image>> + '_ {
+        self.by_bundle_id.values().cloned()
+    }
 }
 
 /// An app's icon, or the first letter of its name when it has none.

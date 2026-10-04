@@ -138,14 +138,17 @@ impl Backend for NativeBackend {
         domain: Option<String>,
         fallback_style: String,
     ) -> CommandResult<TranscriptionResult> {
-        whisper::transcribe_audio(
+        let result = whisper::transcribe_audio(
             &self.db,
             &self.active_model,
             &audio_path,
             bundle_id.as_deref(),
             domain.as_deref(),
             &fallback_style,
-        )
+        );
+
+        crate::memory::release_free_pages();
+        result
     }
 
     fn save_transcription(&self, result: &TranscriptionResult) -> CommandResult<Transcription> {
