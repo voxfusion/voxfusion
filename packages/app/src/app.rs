@@ -150,10 +150,16 @@ fn handle_actions(cx: &mut App) {
     cx.on_action(|_: &Quit, cx| cx.quit());
 
     cx.on_action(|_: &CloseWindow, cx| {
-        if let Some(window) = cx.active_window() {
-            log::info!(target: "runtime", "window_close_requested");
+        let Some(window) = cx.try_global::<MainWindow>().map(|main| main.window) else {
+            return;
+        };
+        log::info!(target: "runtime", "window_close_requested");
+
+        // The shortcut arrives while the window handles the key, and a
+        // window cannot be updated again from inside its own update.
+        cx.defer(move |cx| {
             let _ = window.update(cx, |_, window, _| window.remove_window());
-        }
+        });
     });
 
     cx.on_action(|_: &CheckForUpdates, cx| check_for_updates(cx));
