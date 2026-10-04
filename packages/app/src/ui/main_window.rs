@@ -274,6 +274,8 @@ impl MainView {
             .flex_col()
             .items_center()
             .justify_center()
+            // GPUI rasterizes the file at twice the size it declares, 64px,
+            // and keeps the result for the rest of the run.
             .child(img("images/app-icon.svg").size_16().mb_8())
             .child(div().w_48().h_1().bg(p.border).overflow_hidden().child(bar))
     }
