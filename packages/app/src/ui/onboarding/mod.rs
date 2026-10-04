@@ -33,6 +33,7 @@ use self::step_indicator::{format_step, step_indicator};
 use self::transition::Tween;
 use crate::analytics;
 use crate::settings::{self, MODEL_DOWNLOAD_STEP, ONBOARDING_STEP_COUNT, SettingsStore};
+use crate::ui::motion::Transitions as _;
 use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -235,6 +236,7 @@ impl OnboardingWizard {
         let back = (self.current_step > 1).then(|| {
             div()
                 .id("back")
+                .transition_colors()
                 .px_6()
                 .py_3()
                 .type_sm()

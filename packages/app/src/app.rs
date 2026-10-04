@@ -32,6 +32,19 @@ pub fn run() {
         env!("CARGO_PKG_VERSION")
     );
 
+    // macOS gives permissions to an app bundle. A bare executable started
+    // from a terminal is held to the terminal's permissions: the prompts name
+    // the terminal, and the one for System Audio Recording never appears.
+    // `scripts/dev.sh` runs a debug build as a bundle.
+    #[cfg(target_os = "macos")]
+    if !std::env::current_exe().is_ok_and(|executable| {
+        executable
+            .to_string_lossy()
+            .contains(".app/Contents/MacOS/")
+    }) {
+        log::warn!(target: "runtime", "started_outside_bundle");
+    }
+
     let (sender, receiver) = events::channel();
 
     if !single_instance::acquire(sender.clone()) {
@@ -282,7 +295,12 @@ fn run_fixture(scenario: crate::fixture::Scenario) {
             init_interface(cx);
             events::init(sender.clone(), receiver, cx);
 
-            ui::widgets::freeze_animations();
+            // Screenshots need everything at rest. `VOXFUSION_FIXTURE_MOTION`
+            // leaves the animations running, to watch a transition play.
+            if std::env::var_os("VOXFUSION_FIXTURE_MOTION").is_none() {
+                ui::widgets::freeze_animations();
+                cx.set_reduce_motion(true);
+            }
             if let Some(theme) = scenario.theme.as_deref() {
                 ui::theme::override_system_appearance(theme == "dark");
             }

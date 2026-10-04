@@ -2,11 +2,12 @@
 
 use gpui_kit::{
     App, ClipboardItem, Context, Div, Global, InteractiveElement as _, ParentElement as _,
-    SharedString, Stateful, StatefulInteractiveElement as _, Styled as _, div, prelude::*, px,
+    SharedString, StatefulInteractiveElement as _, Styled as _, div, prelude::*, px,
 };
 use std::time::Duration;
 
 use super::{Section, SettingsModal};
+use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::icon;
@@ -78,12 +79,13 @@ impl SettingsModal {
         .detach();
     }
 
-    fn render_section_item(&self, section: Section, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn render_section_item(&self, section: Section, cx: &mut Context<Self>) -> Faded {
         let p = palette(cx);
         let active = self.section == section;
 
         div()
             .id(section.number())
+            .transition_colors()
             .flex()
             .items_center()
             .gap_3()
@@ -129,6 +131,7 @@ impl SettingsModal {
                     div()
                         .id("copy-version")
                         .group("copy-version")
+                        .transition_all()
                         .flex()
                         .items_center()
                         .gap_1p5()
@@ -141,6 +144,8 @@ impl SettingsModal {
                             icon("check").size_3().text_color(p.ac).into_any_element()
                         } else {
                             div()
+                                .id("copy-icon")
+                                .transition_opacity()
                                 .opacity(0.)
                                 .group_hover("copy-version", |icon| icon.opacity(1.))
                                 .child(icon("copy").size_3())

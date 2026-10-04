@@ -8,6 +8,7 @@ use gpui_kit::{
 use std::time::Duration;
 
 use super::animations_frozen;
+use crate::ui::motion::{Glided, gliding};
 
 /// A Lucide icon. Like an inline SVG with `stroke="currentColor"`, it takes
 /// the surrounding text color unless it is given its own, which GPUI's `svg`
@@ -33,11 +34,14 @@ impl Icon {
         self.rotation = turns;
         self
     }
+}
 
-    /// `rotate-180`, for a chevron that points up while its menu is open.
-    pub fn flipped(self, flipped: bool) -> Self {
-        self.rotate(if flipped { 0.5 } else { 0. })
-    }
+/// A chevron that points up while its menu is open: `rotate-180`, reached by
+/// turning over as `transition-transform` does.
+pub fn turning(open: bool, icon: Icon) -> Glided {
+    gliding("chevron", if open { 0.5 } else { 0. }, move |turns| {
+        icon.rotate(turns)
+    })
 }
 
 impl Styled for Icon {

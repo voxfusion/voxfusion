@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 use crate::backend::{self, AppEvent, UpdateDownloadEvent, UpdateInfo};
 use crate::events;
 use crate::ui::download_format::format_mb;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::icon;
@@ -289,6 +290,7 @@ impl Render for UpdateNotification {
         let ignore = (!self.downloading).then(|| {
             div()
                 .id("ignore-update")
+                .transition_colors()
                 .type_px(10.)
                 .text_color(p.txt_muted)
                 .hover(|button| button.text_color(p.txt_primary))
@@ -324,6 +326,7 @@ impl Render for UpdateNotification {
         } else {
             div()
                 .id("install-update")
+                .transition_colors()
                 .w_full()
                 .flex()
                 .items_center()

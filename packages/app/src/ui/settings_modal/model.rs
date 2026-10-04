@@ -16,6 +16,7 @@ use crate::backend::{
 };
 use crate::events;
 use crate::ui::download_format::{format_eta, format_mb};
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::progress_bar::{Progress, progress_bar};
@@ -349,6 +350,7 @@ impl ModelSettings {
             return Some(
                 status
                     .id("download")
+                    .transition_colors()
                     .px_3()
                     .py_1p5()
                     .bg(p.ac)
@@ -378,6 +380,7 @@ impl ModelSettings {
         Some(
             div()
                 .id("use")
+                .transition_colors()
                 .px_3()
                 .py_1p5()
                 .border_1()
@@ -467,6 +470,7 @@ impl ModelSettings {
                     .child(
                         div()
                             .id("cancel")
+                            .transition_colors()
                             .px_2()
                             .py_1()
                             .border_1()

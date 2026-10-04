@@ -123,29 +123,78 @@ jobs:
           cat "$RUNNER_TEMP/bundle-check/before.json"
           test "$(jq -r .microphone "$RUNNER_TEMP/bundle-check/before.json")" = "prompt"
 
+      - name: Build the prompt detector
+        run: |
+          cat > "$RUNNER_TEMP/prompts.swift" <<'SWIFT'
+          import CoreGraphics
+
+          // Permission prompts are windows of UserNotificationCenter. Prints
+          // the numbers of the ones on screen.
+          let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+          let prompts = windows
+              .filter { ($0[kCGWindowOwnerName as String] as? String) == "UserNotificationCenter" }
+              .compactMap { $0[kCGWindowNumber as String] as? Int }
+              .sorted()
+          print(prompts.map(String.init).joined(separator: " "))
+          SWIFT
+          swiftc -O "$RUNNER_TEMP/prompts.swift" -o "$RUNNER_TEMP/prompts"
+
+          # Says whether a prompt comes up that is not among the ones given.
+          cat > "$RUNNER_TEMP/wait-for-prompt" <<'SH'
+          #!/bin/bash
+          before=" $1 "
+          for attempt in $(seq 1 30); do
+            for window in $("$RUNNER_TEMP/prompts"); do
+              case "$before" in
+                *" $window "*) ;;
+                *) echo yes; exit 0 ;;
+              esac
+            done
+            sleep 1
+          done
+          echo no
+          SH
+          chmod +x "$RUNNER_TEMP/wait-for-prompt"
+
+      # The muffle filter needs System Audio Recording. The request is the one
+      # the Audio settings make: the app starts a copy of itself that reads a
+      # tap on the output until the prompt is answered.
+      - name: Ask for System Audio Recording and expect the system prompt
+        run: |
+          OUT="$RUNNER_TEMP/bundle-check"
+          BEFORE="$("$RUNNER_TEMP/prompts")"
+          open "$APP" --args --permissions-report "$OUT/audio-capture.json" --request-audio-capture
+          SHOWN="$("$RUNNER_TEMP/wait-for-prompt" "$BEFORE")"
+          screencapture -x "$OUT/audio-capture-prompt.png" || true
+          cat "$OUT/audio-capture.json"
+          pkill -f "voxfusion-app" || true
+
+          if [ "$(jq -r 'has("audio_capture_error")' "$OUT/audio-capture.json")" = "true" ]; then
+            echo "::notice::System Audio Recording cannot be asked for on this runner: $(jq -r .audio_capture_error "$OUT/audio-capture.json")"
+            exit 0
+          fi
+          test "$(jq -r .audio_capture "$OUT/audio-capture.json")" = "prompt"
+          test "$SHOWN" = "yes"
+
       # Asking must bring up the system prompt. Without the usage string the
       # app would be killed; without the entitlement, under the hardened
       # runtime, macOS would deny without showing anything.
       - name: Ask for the microphone and expect the system prompt
         run: |
-          cat > "$RUNNER_TEMP/prompt-shown.swift" <<'SWIFT'
-          import CoreGraphics
-
-          // Permission prompts are windows of UserNotificationCenter.
-          let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
-          let shown = windows.contains { ($0[kCGWindowOwnerName as String] as? String) == "UserNotificationCenter" }
-          print(shown ? "yes" : "no")
-          SWIFT
-          swiftc -O "$RUNNER_TEMP/prompt-shown.swift" -o "$RUNNER_TEMP/prompt-shown"
-
-          open "$APP" --args --permissions-report "$RUNNER_TEMP/bundle-check/asked.json" --request-microphone
-          for attempt in $(seq 1 30); do
-            if [ "$("$RUNNER_TEMP/prompt-shown")" = "yes" ]; then break; fi
+          OUT="$RUNNER_TEMP/bundle-check"
+          # The last prompt closes with the process that asked.
+          for attempt in $(seq 1 15); do
+            if [ -z "$("$RUNNER_TEMP/prompts")" ]; then break; fi
             sleep 1
           done
-          screencapture -x "$RUNNER_TEMP/bundle-check/microphone-prompt.png" || true
-          test "$("$RUNNER_TEMP/prompt-shown")" = "yes"
+          BEFORE="$("$RUNNER_TEMP/prompts")"
+          echo "prompts left on screen: '$BEFORE'"
+
+          open "$APP" --args --permissions-report "$OUT/asked.json" --request-microphone
+          SHOWN="$("$RUNNER_TEMP/wait-for-prompt" "$BEFORE")"
+          screencapture -x "$OUT/microphone-prompt.png" || true
           pkill -f "voxfusion-app" || true
+          test "$SHOWN" = "yes"
 
       # `--env` gives the app its own data and log directories.
       - name: Start the app
@@ -167,6 +216,33 @@ jobs:
           lsappinfo info -only ApplicationType "$(lsappinfo find bundleid=io.voxfusion.ci)" | tee "$RUNNER_TEMP/bundle-check/app-type.txt"
           grep -q "UIElement" "$RUNNER_TEMP/bundle-check/app-type.txt"
           pkill -f "voxfusion-app" || true
+
+      # `bun run dev` on a Mac: the debug build as a bundle of its own, started
+      # by LaunchServices so that macOS holds it to its own permissions.
+      - name: Run the dev launcher
+        env:
+          SIGN_IDENTITY: "-"
+          BUNDLE_ID: io.voxfusion.ci.dev
+          APP_NAME: VoxFusion CI Dev
+          VOXFUSION_APP_ID: io.voxfusion.ci.dev
+        run: |
+          LOG="$RUNNER_TEMP/bundle-check/dev.log"
+          bash packages/app/scripts/dev.sh > "$LOG" 2>&1 &
+          DEV=$!
+          for attempt in $(seq 1 180); do
+            if grep -q "setup_completed" "$LOG"; then break; fi
+            sleep 1
+          done
+          cat "$LOG"
+          grep -q "setup_completed" "$LOG"
+          ! grep -q "started_outside_bundle" "$LOG"
+          lsappinfo find bundleid=io.voxfusion.ci.dev | grep -q ASN
+
+          # Stopping the launcher quits the app.
+          kill -TERM "$DEV"
+          wait "$DEV" || true
+          sleep 2
+          ! pgrep -f "VoxFusion CI Dev.app/Contents/MacOS" > /dev/null
 
       - name: Upload screenshots
         if: always()

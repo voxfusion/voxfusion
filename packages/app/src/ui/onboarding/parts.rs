@@ -2,10 +2,11 @@
 
 use gpui_kit::{
     App, Div, ElementId, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Rgba, SharedString, Stateful, Styled as _, div, px,
+    ParentElement as _, Rgba, SharedString, Styled as _, div, px,
 };
 
 use crate::ui::grid::above_grid;
+use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::upper;
@@ -111,12 +112,7 @@ pub fn side_note(label: SharedString, cx: &App) -> Div {
 /// The filled button of the wizard, without its horizontal padding and
 /// label. A disabled one is drawn at 30% over `backdrop` and still shows its
 /// hover color, as the original's does.
-pub fn accent_button(
-    id: impl Into<ElementId>,
-    enabled: bool,
-    backdrop: Hsla,
-    cx: &App,
-) -> Stateful<Div> {
+pub fn accent_button(id: impl Into<ElementId>, enabled: bool, backdrop: Hsla, cx: &App) -> Faded {
     let p = palette(cx);
     let shade = move |color: Hsla| {
         if enabled {
@@ -128,6 +124,7 @@ pub fn accent_button(
 
     div()
         .id(id)
+        .transition_colors()
         .flex()
         .items_center()
         .py_3()

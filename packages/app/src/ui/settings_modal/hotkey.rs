@@ -9,6 +9,7 @@ use super::SettingsModal;
 use crate::settings::SettingsStore;
 use crate::ui::hotkey_recorder::HotkeyRecorder;
 use crate::ui::hotkeys::hotkey_display_name;
+use crate::ui::motion::Transitions as _;
 use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -87,6 +88,7 @@ fn render_hotkey(
     let recorder = recorder.clone();
     let button = div()
         .id(label)
+        .transition_colors()
         .px_4()
         .py_3()
         .type_xs()

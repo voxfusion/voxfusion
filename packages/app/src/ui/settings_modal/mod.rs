@@ -23,6 +23,7 @@ use crate::ui::hotkey_recorder::{HotkeyKind, HotkeyRecorder, route_keys};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 
+use crate::ui::motion::Transitions as _;
 use audio::AudioState;
 use model::ModelSettings;
 
@@ -163,6 +164,7 @@ impl Render for SettingsModal {
             .child(
                 div()
                     .id("close")
+                    .transition_colors()
                     .text_color(p.txt_muted)
                     .hover(|button| button.text_color(p.ac))
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(DismissEvent)))

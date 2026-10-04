@@ -14,6 +14,7 @@ use crate::backend::AppEvent;
 use crate::events;
 use crate::settings::SettingsStore;
 use crate::ui::grid::above_grid;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::icon;
@@ -308,6 +309,7 @@ impl Render for LearningStep {
 
         let send = div()
             .id("send")
+            .transition_colors()
             .size_9()
             .flex_shrink_0()
             .rounded_full()

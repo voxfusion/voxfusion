@@ -3,34 +3,8 @@
 use gpui_kit::{Animation, ElementId};
 use std::time::{Duration, Instant};
 
+use crate::ui::motion::ease;
 use crate::ui::widgets::animations_frozen;
-
-/// The design's default timing function, `cubic-bezier(0.4, 0, 0.2, 1)`.
-pub fn ease(progress: f32) -> f32 {
-    cubic_bezier(0.4, 0., 0.2, 1., progress)
-}
-
-/// The height of the unit cubic Bézier curve with control points `(x1, y1)`
-/// and `(x2, y2)` where it passes `x`.
-fn cubic_bezier(x1: f32, y1: f32, x2: f32, y2: f32, x: f32) -> f32 {
-    let coordinate = |first: f32, second: f32, t: f32| {
-        let rest = 1. - t;
-        3. * rest * rest * t * first + 3. * rest * t * t * second + t * t * t
-    };
-
-    // The curve's x grows with t, so the t for `x` is found by bisection.
-    let (mut low, mut high) = (0., 1.);
-    for _ in 0..24 {
-        let middle = (low + high) / 2.;
-        if coordinate(x1, x2, middle) < x {
-            low = middle;
-        } else {
-            high = middle;
-        }
-    }
-
-    coordinate(y1, y2, (low + high) / 2.)
-}
 
 /// A value on its way to a target. As with a CSS transition, a new target is
 /// approached from wherever the value is at that moment.
@@ -105,17 +79,6 @@ impl Tween {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_timing_function_starts_fast_and_settles_slowly() {
-        assert!(ease(0.).abs() < 1e-4);
-        assert!((ease(1.) - 1.).abs() < 1e-4);
-
-        // Values of cubic-bezier(0.4, 0, 0.2, 1) as browsers compute it.
-        assert!((ease(0.25) - 0.2366).abs() < 1e-3);
-        assert!((ease(0.5) - 0.7756).abs() < 1e-3);
-        assert!((ease(0.75) - 0.9594).abs() < 1e-3);
-    }
 
     #[test]
     fn a_value_moves_from_where_it_rests_to_its_target() {

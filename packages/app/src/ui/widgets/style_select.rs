@@ -10,9 +10,10 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use crate::settings::STYLE_LIST;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
-use crate::ui::widgets::icon;
+use crate::ui::widgets::{icon, turning};
 use crate::ui::{t, upper};
 
 /// The name of a style in the interface language.
@@ -112,6 +113,7 @@ impl StyleSelect {
 
             div()
                 .id(index)
+                .transition_colors()
                 .w_full()
                 .px_3()
                 .py_1p5()
@@ -180,6 +182,7 @@ impl Render for StyleSelect {
             .child(
                 div()
                     .id("button")
+                    .transition_colors()
                     .track_focus(&self.focus_handle)
                     .on_key_down(cx.listener(Self::handle_key_down))
                     .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
@@ -214,13 +217,10 @@ impl Render for StyleSelect {
                             .tracking_wider()
                             .truncate(),
                     )
-                    .child(
-                        icon("chevron-down")
-                            .size_3()
-                            .ml_2()
-                            .text_color(p.txt_muted)
-                            .flipped(self.open),
-                    ),
+                    .child(turning(
+                        self.open,
+                        icon("chevron-down").size_3().ml_2().text_color(p.txt_muted),
+                    )),
             )
             .when(self.open, |select| {
                 select.child(deferred(self.render_list(cx)))

@@ -11,8 +11,10 @@ use std::rc::Rc;
 use super::parts::{card, description, icon_box, step_column, title};
 use crate::backend::{self, AudioDevice};
 use crate::settings::SettingsStore;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::turning;
 use crate::ui::widgets::{icon, spinning};
 use crate::ui::{t, t_upper};
 
@@ -115,6 +117,7 @@ impl MicrophoneStep {
 
         let button = div()
             .id("refresh-devices")
+            .transition_colors()
             .flex()
             .items_center()
             .gap_2()
@@ -165,6 +168,7 @@ impl MicrophoneStep {
             rows = rows.child(
                 div()
                     .id(("microphone-option", index))
+                    .transition_colors()
                     .flex()
                     .items_center()
                     .justify_between()
@@ -229,6 +233,7 @@ impl MicrophoneStep {
 
         let trigger = div()
             .id("microphone-select")
+            .transition_colors()
             .track_focus(&self.trigger_focus)
             .flex()
             .items_center()
@@ -248,13 +253,10 @@ impl MicrophoneStep {
                 cx.notify();
             }))
             .child(div().min_w_0().child(text(selected_label).truncate()))
-            .child(
-                icon("chevron-down")
-                    .size_5()
-                    .ml_2()
-                    .text_color(p.txt_muted)
-                    .flipped(self.list_open),
-            );
+            .child(turning(
+                self.list_open,
+                icon("chevron-down").size_5().ml_2().text_color(p.txt_muted),
+            ));
 
         div()
             .relative()

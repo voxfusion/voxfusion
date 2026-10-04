@@ -1,12 +1,13 @@
 //! The Appearance section: the light, dark or system theme.
 
 use gpui_kit::{
-    App, Div, InteractiveElement as _, ParentElement as _, Stateful,
-    StatefulInteractiveElement as _, Styled as _, div, prelude::*, px, rgb,
+    App, Div, InteractiveElement as _, ParentElement as _, StatefulInteractiveElement as _,
+    Styled as _, div, prelude::*, px, rgb,
 };
 
 use crate::analytics;
 use crate::settings::{SettingsStore, ThemeMode};
+use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 
@@ -43,7 +44,7 @@ fn preview(dark: bool, bar_width: f32) -> Div {
         .child(div().w(px(bar_width)).h_1p5().bg(bar))
 }
 
-fn theme_option(theme: ThemeMode, label: &'static str, cx: &App) -> Stateful<Div> {
+fn theme_option(theme: ThemeMode, label: &'static str, cx: &App) -> Faded {
     let p = palette(cx);
     let selected = SettingsStore::get(cx).theme == theme;
 
@@ -71,6 +72,7 @@ fn theme_option(theme: ThemeMode, label: &'static str, cx: &App) -> Stateful<Div
 
     div()
         .id(label)
+        .transition_all()
         .relative()
         .p_4()
         .border_1()

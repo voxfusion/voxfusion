@@ -4,19 +4,20 @@
 use gpui_kit::{
     App, AppContext as _, ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle,
     Focusable as _, Image, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    SharedString, Stateful, StatefulInteractiveElement as _, Styled as _, Subscription, Window,
-    div, prelude::*, px,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, Window, div,
+    prelude::*, px,
 };
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::backend::DictionaryWord;
+use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::app_icon::{app_icon, site_icon};
-use crate::ui::widgets::icon;
 use crate::ui::widgets::text_field::{TextField, TextFieldEvent, field_box};
+use crate::ui::widgets::{icon, turning};
 use crate::ui::{t, t_with, upper};
 
 /// Where a form or a row is shown: on the page itself, or inside a group of
@@ -40,11 +41,12 @@ pub fn add_button(
     disabled: bool,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     cx: &App,
-) -> Stateful<Div> {
+) -> Faded {
     let p = palette(cx);
 
     let button = div()
         .id("add")
+        .transition_colors()
         .flex()
         .items_center()
         .text_right()
@@ -95,6 +97,8 @@ pub fn add_word_form(
         })
         .child(
             field_box(field, cx)
+                .id("new-word")
+                .transition_colors()
                 .flex_1()
                 .map(|input| match variant {
                     Variant::Page => input.px_4().py_2(),
@@ -132,7 +136,7 @@ pub fn word_row(
     on_action: impl Fn(&WordAction, &mut Window, &mut App) + 'static,
     window: &Window,
     cx: &App,
-) -> Stateful<Div> {
+) -> Faded {
     let p = palette(cx);
     let on_action = Rc::new(on_action);
 
@@ -148,6 +152,7 @@ pub fn word_row(
     // Shown only while the pointer is over the row.
     let hover_button = |label: &'static str, action: WordAction| {
         button(label, action)
+            .transition_all()
             .text_color(p.txt_muted)
             .opacity(0.)
             .group_hover("word", |button| button.opacity(1.))
@@ -159,6 +164,8 @@ pub fn word_row(
             let focused = field.focus_handle(cx).is_focused(window);
 
             field_box(field, cx)
+                .id("edit-field")
+                .transition_colors()
                 .flex_1()
                 .px_2()
                 .py_1()
@@ -169,6 +176,7 @@ pub fn word_row(
                 .border_1()
                 .border_color(if focused { p.ac } else { p.border_strong })
                 .text_color(p.txt_primary)
+                .into_any_element()
         }
         None => match variant {
             Variant::Page => div()
@@ -180,7 +188,8 @@ pub fn word_row(
                 .type_sm()
                 .text_color(p.txt_primary)
                 .child(text(word.word.clone()).truncate()),
-        },
+        }
+        .into_any_element(),
     };
 
     let actions = div()
@@ -217,12 +226,13 @@ pub fn word_row(
         .child(actions)
 }
 
-fn word_row_frame(variant: Variant, word_id: &str, cx: &App) -> Stateful<Div> {
+fn word_row_frame(variant: Variant, word_id: &str, cx: &App) -> Faded {
     let p = palette(cx);
 
     let row = div()
         .id(SharedString::from(format!("word-{word_id}")))
         .group("word")
+        .transition_colors()
         .flex()
         .items_center()
         .justify_between()
@@ -528,16 +538,15 @@ impl WordListEditor {
                             .text_color(p.txt_muted)
                             .child(text(upper(&word_count)).tracking_wider()),
                     )
-                    .child(
-                        icon("chevron-down")
-                            .size_4()
-                            .text_color(p.txt_muted)
-                            .flipped(open),
-                    ),
+                    .child(turning(
+                        open,
+                        icon("chevron-down").size_4().text_color(p.txt_muted),
+                    )),
             )
             .child(
                 div()
                     .id("remove")
+                    .transition_all()
                     .px_3()
                     .flex()
                     .items_center()
@@ -638,6 +647,7 @@ impl Render for WordListEditor {
                 div()
                     .id(group.key.clone())
                     .group("word-group")
+                    .transition_colors()
                     .bg(p.surface)
                     .border_1()
                     .border_color(p.border)

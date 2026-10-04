@@ -8,6 +8,7 @@ use gpui_kit::{
 };
 use std::time::{Duration, Instant};
 
+use crate::ui::motion::ease;
 use crate::ui::theme::palette;
 use crate::ui::widgets::animations_frozen;
 
@@ -56,36 +57,6 @@ impl Progress {
     }
 }
 
-/// Tailwind's transition timing, `cubic-bezier(0.4, 0, 0.2, 1)`: the eased
-/// value for a share of the duration.
-fn ease(time: f32) -> f32 {
-    const X1: f32 = 0.4;
-    const Y1: f32 = 0.;
-    const X2: f32 = 0.2;
-    const Y2: f32 = 1.;
-
-    let curve = |parameter: f32, first: f32, second: f32| {
-        let rest = 1. - parameter;
-        3. * rest * rest * parameter * first
-            + 3. * rest * parameter * parameter * second
-            + parameter * parameter * parameter
-    };
-
-    // The curve gives time and value for a parameter; find the parameter for
-    // this time. Time grows with the parameter, so bisecting converges.
-    let (mut low, mut high) = (0., 1.);
-    for _ in 0..24 {
-        let middle = (low + high) / 2.;
-        if curve(middle, X1, X2) < time {
-            low = middle;
-        } else {
-            high = middle;
-        }
-    }
-
-    curve((low + high) / 2., Y1, Y2)
-}
-
 /// A track `height` tall with its fill. `name` must be unique among the
 /// siblings of the bar.
 pub fn progress_bar(name: &'static str, progress: &Progress, height: Pixels, cx: &App) -> Div {
@@ -118,15 +89,6 @@ mod tests {
 
     fn close(a: f32, b: f32) -> bool {
         (a - b).abs() < 0.001
-    }
-
-    #[test]
-    fn easing_follows_the_css_curve() {
-        assert!(close(ease(0.), 0.));
-        assert!(close(ease(0.25), 0.2366));
-        assert!(close(ease(0.5), 0.7756));
-        assert!(close(ease(0.75), 0.9594));
-        assert!(close(ease(1.), 1.));
     }
 
     #[test]

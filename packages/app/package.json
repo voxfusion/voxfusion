@@ -4,7 +4,7 @@
 	"version": "0.1.0",
 	"license": "MIT",
 	"scripts": {
-		"dev": "cargo run",
+		"dev": "bash scripts/dev.sh",
 		"build": "cargo build --release",
 		"bundle": "bash scripts/bundle-macos.sh"
 	}

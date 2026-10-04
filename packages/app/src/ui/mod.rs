@@ -7,6 +7,7 @@ pub mod grid;
 pub mod hotkey_recorder;
 pub mod hotkeys;
 pub mod main_window;
+pub mod motion;
 pub mod onboarding;
 pub mod pages;
 pub mod settings_modal;

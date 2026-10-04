@@ -6,9 +6,10 @@ use gpui_kit::{
 };
 use std::rc::Rc;
 
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
-use crate::ui::widgets::icon;
+use crate::ui::widgets::{icon, turning};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectOption {
@@ -57,6 +58,7 @@ pub fn select(
 
     let button = div()
         .id("button")
+        .transition_colors()
         .flex()
         .items_center()
         .justify_between()
@@ -100,13 +102,10 @@ pub fn select(
         .when(!selected_label.is_empty(), |button| {
             button.child(text(selected_label).truncate())
         })
-        .child(
-            icon("chevron-down")
-                .size_4()
-                .ml_2()
-                .text_color(p.txt_muted)
-                .flipped(open),
-        );
+        .child(turning(
+            open,
+            icon("chevron-down").size_4().ml_2().text_color(p.txt_muted),
+        ));
 
     let menu = open.then(|| {
         let items = options.into_iter().enumerate().map(|(index, option)| {
@@ -116,6 +115,7 @@ pub fn select(
 
             div()
                 .id(("option", index))
+                .transition_colors()
                 .flex()
                 .items_center()
                 .justify_between()

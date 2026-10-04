@@ -1,8 +1,12 @@
 //! The row of step numbers across the top of the wizard.
 
-use gpui_kit::{App, FontWeight, IntoElement, ParentElement as _, Styled as _, div, prelude::*};
+use gpui_kit::{
+    App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _, div,
+    prelude::*,
+};
 
 use crate::settings::ONBOARDING_STEP_COUNT;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 
@@ -20,6 +24,8 @@ pub fn step_indicator(current_step: u32, cx: &App) -> impl IntoElement + use<> {
         .gap_4()
         .children((1..=ONBOARDING_STEP_COUNT).map(|step| {
             let number = div()
+                .id("number")
+                .transition_all()
                 .type_sm()
                 .text_color(if step <= current_step {
                     p.ac
@@ -32,15 +38,24 @@ pub fn step_indicator(current_step: u32, cx: &App) -> impl IntoElement + use<> {
                 .child(text(format_step(step)).tracking_wider());
 
             div()
+                .id(step as usize)
                 .flex()
                 .items_center()
                 .child(number)
                 .when(step < ONBOARDING_STEP_COUNT, |item| {
-                    item.child(div().w_8().h_px().mx_3().bg(if step < current_step {
-                        p.ac
-                    } else {
-                        p.border_strong
-                    }))
+                    item.child(
+                        div()
+                            .id("connector")
+                            .transition_colors()
+                            .w_8()
+                            .h_px()
+                            .mx_3()
+                            .bg(if step < current_step {
+                                p.ac
+                            } else {
+                                p.border_strong
+                            }),
+                    )
                 })
         }))
 }

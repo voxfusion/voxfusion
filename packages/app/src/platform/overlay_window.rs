@@ -16,7 +16,9 @@ pub struct ScreenRect {
 mod macos {
     use objc2::MainThreadMarker;
     use objc2::rc::Retained;
-    use objc2_app_kit::{NSEvent, NSFloatingWindowLevel, NSPanel, NSScreen, NSView, NSWindow};
+    use objc2_app_kit::{
+        NSEvent, NSFloatingWindowLevel, NSPanel, NSScreen, NSView, NSWindow, NSWindowStyleMask,
+    };
     use objc2_foundation::{NSPoint, NSRect, NSSize};
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
@@ -55,9 +57,15 @@ mod macos {
             let view = unsafe { Retained::retain(handle.ns_view.as_ptr().cast::<NSView>()) }?;
             let window = view.window()?;
 
+            // GPUI gives a window without a title bar a titled frame with the
+            // content drawn over it. macOS outlines a titled window with a
+            // hairline and rounds its corners, which shows as a faint box
+            // around the pill. A borderless window has neither.
+            let panel_behavior = window.styleMask() & NSWindowStyleMask::NonactivatingPanel;
+            window.setStyleMask(NSWindowStyleMask::Borderless | panel_behavior);
             // Above other apps' windows, below the Dock and the menu bar.
             window.setLevel(NSFloatingWindowLevel);
-            // A titled window casts a shadow around whatever it draws.
+            // No shadow around whatever the window draws.
             window.setHasShadow(false);
             // Clicking the overlay's buttons must not take the keyboard from
             // the app being dictated into.

@@ -12,6 +12,7 @@ use super::SettingsModal;
 use crate::analytics;
 use crate::backend::{self, AudioDevice};
 use crate::settings::{self, SettingsStore};
+use crate::ui::motion::Transitions as _;
 use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -145,6 +146,7 @@ impl SettingsModal {
                     .child(
                         div()
                             .id("refresh-devices")
+                            .transition_colors()
                             .p_1p5()
                             .text_color(p.txt_muted)
                             .hover(|button| button.text_color(p.ac))

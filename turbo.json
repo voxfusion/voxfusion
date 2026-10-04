@@ -8,7 +8,18 @@
 		},
 		"dev": {
 			"cache": false,
-			"persistent": true
+			"persistent": true,
+			"passThroughEnv": [
+				"VOXFUSION_*",
+				"SIGN_IDENTITY",
+				"BUNDLE_ID",
+				"APP_NAME",
+				"RUST_BACKTRACE",
+				"CARGO_*",
+				"RUSTUP_*",
+				"WAYLAND_DISPLAY",
+				"XDG_RUNTIME_DIR"
+			]
 		},
 		"lint": {
 			"dependsOn": ["^lint"]

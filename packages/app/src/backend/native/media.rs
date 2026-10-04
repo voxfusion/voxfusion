@@ -777,15 +777,36 @@ pub fn run_permission_request_if_asked() -> bool {
 /// Asks for the System Audio Recording permission that the muffle filter
 /// needs, if it was not asked yet. Returns at once.
 pub fn request_muffle_permission() {
+    if let Err(err) = try_request_muffle_permission() {
+        log::warn!(target: "media", "audio_capture_permission_request_failed error={err}");
+    }
+}
+
+/// [`request_muffle_permission`], telling why nothing could be asked.
+pub fn try_request_muffle_permission() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     if tap::is_supported() && tap::audio_capture_permission() == tap::Permission::Undetermined {
-        match get_default_output_device().and_then(get_device_uid) {
-            Ok(uid) => tap::request_permission(&uid),
-            Err(err) => {
-                log::warn!(target: "media", "audio_capture_permission_request_failed error={err}")
-            }
-        }
+        let uid = get_default_output_device().and_then(get_device_uid)?;
+        tap::request_permission(&uid);
     }
+    Ok(())
+}
+
+/// What macOS says about System Audio Recording, or `None` where the muffle
+/// filter cannot run or macOS does not tell.
+pub fn muffle_permission() -> Option<crate::backend::PermissionState> {
+    #[cfg(target_os = "macos")]
+    if tap::is_supported() {
+        use crate::backend::PermissionState;
+
+        return match tap::audio_capture_permission() {
+            tap::Permission::Granted => Some(PermissionState::Granted),
+            tap::Permission::Denied => Some(PermissionState::Denied),
+            tap::Permission::Undetermined => Some(PermissionState::Prompt),
+            tap::Permission::Unknown => None,
+        };
+    }
+    None
 }
 
 /// Puts output back after a recording, whether it was muted or muffled.

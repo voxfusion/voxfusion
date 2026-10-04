@@ -11,7 +11,7 @@ pub mod text_field;
 pub mod toggle;
 pub mod word_list;
 
-pub use icon::{Icon, icon, spinning};
+pub use icon::{Icon, icon, spinning, turning};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 

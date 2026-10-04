@@ -24,6 +24,7 @@ use super::error_pill::{self, ErrorPillLayout, error_pill_layout};
 use super::position::{WINDOW_HEIGHT, display_for_cursor, frame_correction, overlay_frame};
 use super::spinner::dot_matrix_spinner;
 use super::transition::{Transition, ease_out};
+use crate::ui::motion::{Faded, Transitions as _};
 
 /// How often the window's place on screen is checked: the cursor may have
 /// moved to another display, or the displays may have changed.
@@ -190,10 +191,11 @@ impl Overlay {
     }
 
     /// A button in the neutral colors: it cancels or dismisses.
-    fn quiet_button(id: &'static str, cx: &App) -> gpui_kit::Stateful<gpui_kit::Div> {
+    fn quiet_button(id: &'static str, cx: &App) -> Faded {
         let p = palette(cx);
 
         Self::round_button(id, "x")
+            .transition_colors()
             .bg(p.elevated)
             .text_color(p.txt_secondary)
             .hover(|button| button.bg(p.hover).text_color(p.txt_primary))
@@ -269,6 +271,7 @@ impl Overlay {
         let retry = retry_label.zip(retry_width).map(|(label, width)| {
             div()
                 .id("retry")
+                .transition_colors()
                 .flex_none()
                 .w(px(width))
                 .px(px(error_pill::RETRY_PADDING))
@@ -371,6 +374,7 @@ impl Render for Overlay {
 
         let confirm = pill.buttons.then(|| {
             Self::round_button("confirm", "check")
+                .transition_colors()
                 .self_center()
                 .ml_1()
                 .bg(p.ac)

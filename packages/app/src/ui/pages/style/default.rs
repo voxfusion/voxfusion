@@ -7,6 +7,7 @@ use gpui_kit::{
 
 use crate::analytics;
 use crate::settings::{STYLE_LIST, SettingsStore};
+use crate::ui::motion::Transitions as _;
 use crate::ui::pages::section::list_header;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -49,6 +50,7 @@ impl Render for DefaultStyle {
         let tabs = STYLE_LIST.map(|style| {
             div()
                 .id(style)
+                .transition_colors()
                 .flex_1()
                 .px_4()
                 .py_2p5()

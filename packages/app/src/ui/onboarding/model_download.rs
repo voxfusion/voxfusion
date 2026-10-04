@@ -17,6 +17,7 @@ use crate::backend::{
 };
 use crate::events;
 use crate::ui::download_format::{format_eta, format_mb};
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::{icon, spinning};
@@ -264,6 +265,7 @@ impl ModelDownloadStep {
 
         let cancel = div()
             .id("cancel-download")
+            .transition_colors()
             .px_4()
             .py_2()
             .type_xs()
@@ -347,6 +349,7 @@ impl ModelDownloadStep {
 
         let retry = div()
             .id("retry-download")
+            .transition_colors()
             .px_4()
             .py_2()
             .type_xs()

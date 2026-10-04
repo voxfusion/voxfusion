@@ -11,6 +11,7 @@ use std::rc::Rc;
 
 use crate::analytics;
 use crate::backend::{self, AppInstruction, Backend, CommandResult, SiteStyle};
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::app_icon::{AppIcons, app_icon, site_icon};
@@ -325,6 +326,7 @@ impl StyleRules {
             div()
                 .id(rule.id.clone())
                 .group("style-rule")
+                .transition_colors()
                 .px_4()
                 .py_3()
                 .flex()
@@ -358,6 +360,7 @@ impl StyleRules {
                 .child(
                     div()
                         .id("remove")
+                        .transition_all()
                         .type_xs()
                         .text_right()
                         .text_color(p.txt_muted)

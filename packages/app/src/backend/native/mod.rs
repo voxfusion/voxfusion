@@ -24,7 +24,10 @@ use crate::backend::{
 };
 
 pub use hotkeys::resynchronize_system_keys;
-pub use media::{restore_media_on_exit, run_permission_request_if_asked};
+pub use media::{
+    muffle_permission, restore_media_on_exit, run_permission_request_if_asked,
+    try_request_muffle_permission,
+};
 
 pub struct NativeBackend {
     events: EventSender,

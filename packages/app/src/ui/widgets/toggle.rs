@@ -1,11 +1,12 @@
 //! A setting that is either on or off: its name and description beside a
-//! switch.
+//! switch, which slides and changes color over 150ms.
 
 use gpui_kit::{
     App, Div, ElementId, InteractiveElement as _, ParentElement as _, SharedString,
     StatefulInteractiveElement as _, Styled as _, Window, div, px,
 };
 
+use crate::ui::motion::{Transitions as _, gliding};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::upper;
@@ -20,10 +21,13 @@ pub fn toggle_option(
 ) -> Div {
     let p = palette(cx);
 
-    let knob = div()
-        .size_4()
-        .ml(px(if enabled { 24. } else { 4. }))
-        .bg(if enabled { p.ac_on } else { p.txt_muted });
+    // `transition-transform` slides the knob; its color changes at once.
+    let knob = gliding("knob", if enabled { 24. } else { 4. }, move |offset| {
+        div()
+            .size_4()
+            .ml(px(offset))
+            .bg(if enabled { p.ac_on } else { p.txt_muted })
+    });
 
     div()
         .flex()
@@ -46,6 +50,7 @@ pub fn toggle_option(
         .child(
             div()
                 .id(id)
+                .transition_colors()
                 .flex()
                 .items_center()
                 .h_6()

@@ -14,6 +14,7 @@ use std::time::Duration;
 
 use crate::backend::InstalledApp;
 use crate::ui::grid::above_grid;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::app_icon::{AppIcons, app_icon};
@@ -214,6 +215,7 @@ impl AppSearch {
 
                 div()
                     .id(position)
+                    .transition_colors()
                     .w_full()
                     .px_4()
                     .py_2p5()

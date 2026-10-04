@@ -7,6 +7,7 @@ use gpui_kit::{
 };
 
 use crate::ui::main_window::{SectionTab, navigate};
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::{t, t_upper, upper};
@@ -81,6 +82,7 @@ pub fn section_frame(
 
         div()
             .id(path)
+            .transition_colors()
             .py_2()
             .type_xs()
             .map(|item| {

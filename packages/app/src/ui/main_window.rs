@@ -16,6 +16,7 @@ use crate::events;
 use crate::settings::{self, MODEL_DOWNLOAD_STEP, SettingsStore};
 use crate::ui::apps_cache;
 use crate::ui::grid::{grid_overlay, grid_reset};
+use crate::ui::motion::Transitions as _;
 use crate::ui::onboarding::OnboardingWizard;
 use crate::ui::pages::{AboutPage, DictionaryPage, HomePage, StylePage};
 use crate::ui::settings_modal::SettingsModal;
@@ -290,6 +291,7 @@ impl MainView {
 
         div()
             .id(path)
+            .transition_colors()
             .flex()
             .items_center()
             .gap_3()
@@ -365,6 +367,7 @@ impl MainView {
                 div().p_3().border_t_1().border_color(p.border).child(
                     div()
                         .id("open-settings")
+                        .transition_colors()
                         .flex()
                         .items_center()
                         .gap_3()
@@ -429,6 +432,8 @@ impl Render for MainView {
 
         div()
             .id("main-window")
+            // The window changes theme over 150ms, as the original's root does.
+            .transition_colors()
             .key_context("MainWindow")
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(|this, _: &OpenSettings, window, cx| {

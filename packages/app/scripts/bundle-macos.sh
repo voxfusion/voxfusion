@@ -5,7 +5,8 @@
 # Usage: packages/app/scripts/bundle-macos.sh [--target <rust target>] [--debug]
 #                                             [--engine-dir <dir>] [--dmg] [--updater]
 #
-#   --target      aarch64-apple-darwin | x86_64-apple-darwin (default: host)
+#   --target      aarch64-apple-darwin | x86_64-apple-darwin (default: the
+#                 host, built in the same directory `cargo build` uses)
 #   --debug       bundle the debug build instead of the release build
 #   --engine-dir  directory with the Parakeet engine files to put in
 #                 Contents/Resources/bin (see build-parakeet-engine.sh)
@@ -14,7 +15,9 @@
 #                 format installed copies download and verify
 #
 # Env:
-#   SIGN_IDENTITY   codesign identity (default "-": ad-hoc, no hardened runtime)
+#   SIGN_IDENTITY   codesign identity (default "-": ad-hoc, no hardened runtime).
+#                   A release build signed with a real identity gets the
+#                   hardened runtime and a timestamp, as notarization requires.
 #   HARDENED_RUNTIME=1  sign with the hardened runtime even ad-hoc, to test
 #                   that the entitlements cover what the app does
 #   VERSION         version written to Info.plist (default: Cargo.toml's)
@@ -50,12 +53,24 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -z "$TARGET" ]; then
+BUILD_DIR="${CARGO_TARGET_DIR:-target}"
+BUILD_FLAGS=()
+
+if [ -n "$TARGET" ]; then
+  BUILD_DIR="$BUILD_DIR/$TARGET"
+  BUILD_FLAGS+=(--target "$TARGET")
+else
+  # Names the output directory only: the host build shares its artifacts
+  # with `cargo build`, `cargo check` and `cargo test`.
   case "$(uname -m)" in
     arm64) TARGET="aarch64-apple-darwin" ;;
     x86_64) TARGET="x86_64-apple-darwin" ;;
     *) echo "Unsupported host architecture: $(uname -m)" >&2; exit 1 ;;
   esac
+fi
+
+if [ "$PROFILE" = "release" ]; then
+  BUILD_FLAGS+=(--release)
 fi
 
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
@@ -70,16 +85,14 @@ cd "$APP_DIR"
 
 # The version compiled into the binary (shown in Settings, compared by the
 # updater) comes from Cargo.toml, so a release sets it there before building.
-if [ "$PROFILE" = "release" ]; then
-  cargo build --release --target "$TARGET"
-else
-  cargo build --target "$TARGET"
-fi
+# (The expansion is spelled this way for the bash 3.2 that ships with macOS,
+# which takes an empty array for an unset variable.)
+cargo build ${BUILD_FLAGS[@]+"${BUILD_FLAGS[@]}"}
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-cp "target/$TARGET/$PROFILE/voxfusion-app" "$APP/Contents/MacOS/voxfusion-app"
+cp "$BUILD_DIR/$PROFILE/voxfusion-app" "$APP/Contents/MacOS/voxfusion-app"
 chmod 755 "$APP/Contents/MacOS/voxfusion-app"
 cp macos/icon.icns "$APP/Contents/Resources/icon.icns"
 
@@ -90,7 +103,7 @@ sed "s/__VERSION__/$VERSION/g" macos/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist"
 
 SIGN_FLAGS=(--force --sign "$SIGN_IDENTITY")
-if [ "$SIGN_IDENTITY" != "-" ]; then
+if [ "$SIGN_IDENTITY" != "-" ] && [ "$PROFILE" = "release" ]; then
   # Notarization requires the hardened runtime and a secure timestamp.
   SIGN_FLAGS+=(--options runtime --timestamp)
 elif [ "${HARDENED_RUNTIME:-0}" = "1" ]; then

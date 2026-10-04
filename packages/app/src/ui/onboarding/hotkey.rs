@@ -10,6 +10,7 @@ use super::parts::{button_label, card, description, faded, icon_box, step_column
 use crate::settings::SettingsStore;
 use crate::ui::hotkey_recorder::{HotkeyKind, HotkeyRecorder, route_keys};
 use crate::ui::hotkeys::hotkey_display_name;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::icon;
@@ -84,6 +85,7 @@ impl HotkeyStep {
 
         let button = div()
             .id(id)
+            .transition_colors()
             .px_6()
             .py_3()
             .type_sm()

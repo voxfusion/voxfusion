@@ -29,16 +29,16 @@ Run the desktop app:
 
 ```sh
 cd packages/app
-cargo run
+bun run dev
 ```
 
-macOS grants permissions (microphone, accessibility, system audio) to an app
-bundle, so test permission flows with a bundle rather than `cargo run`:
-
-```sh
-packages/app/scripts/bundle-macos.sh --debug
-open packages/app/dist/*/VoxFusion.app
-```
+On macOS this builds the debug build into `VoxFusion Dev.app`, signs it, and
+starts it the way the installed app is started. macOS grants permissions
+(microphone, accessibility, system audio) to an app bundle; a bare `cargo run`
+binary is held to the permissions of the terminal it was started from, and
+never gets the System Audio Recording prompt. The script signs with your
+"Apple Development" identity when you have one, so macOS remembers what you
+allowed across rebuilds; see `scripts/dev.sh` for the options.
 
 Run the marketing site:
 

@@ -14,6 +14,7 @@ use crate::settings::SettingsStore;
 use crate::ui::datetime::{self, format_long_date, format_time, same_day};
 use crate::ui::grid::above_grid;
 use crate::ui::hotkeys::hotkey_display_name;
+use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::{icon, spinning};
@@ -249,6 +250,7 @@ impl HomePage {
                         .bg(p.base)
                         .border_1()
                         .border_color(p.border_strong)
+                        .transition_colors()
                         .hover(|button| button.border_color(p.ac))
                         .text_color(p.txt_secondary)
                         .on_click(cx.listener(move |this, _, _, cx| {
