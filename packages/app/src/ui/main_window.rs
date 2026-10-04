@@ -506,6 +506,7 @@ pub fn open_main_window(
     gpui_kit::open_window(options, cx, move |window, cx| {
         window.set_rem_size(px(16.));
         theme::follow(window, cx);
+        crate::platform::drawables::keep_two(&*window);
 
         let view = cx.new(|cx| MainView::new(route, window, cx));
         let focus_handle = view.focus_handle(cx);

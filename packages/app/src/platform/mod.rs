@@ -2,6 +2,7 @@
 pub mod accessibility_watcher;
 
 pub mod activation;
+pub mod drawables;
 pub mod main_thread;
 pub mod overlay_window;
 
