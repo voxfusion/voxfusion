@@ -11,13 +11,6 @@
  *     (used by the download page's mobile menu).
  *   - showFooter=false lets a page render its own footer (404).
  *
- * Scroll reveal: elements marked data-reveal fade in when they enter the
- * viewport. The hidden state only applies under html.js, which is set
- * only when IntersectionObserver exists, so content stays visible without
- * JavaScript. The reveal is an animation rather than a transition, so it
- * cannot collide with a component's own transitions; --reveal-delay
- * staggers siblings. Descendants can key their own effects off .is-visible.
- *
  * The font is self-hosted: the site makes no third-party font requests.
  */
 import "@fontsource-variable/jetbrains-mono/wght.css";
@@ -67,9 +60,6 @@ const home = getLocalizedPath("/", lang);
 	<link rel="preload" href={fontUrl} as="font" type="font/woff2" crossorigin />
 	<meta name="mailru-domain" content="a5ieqZ6Dkv267Psx" />
 	<title>{title}</title>
-	<script is:inline>
-		if ("IntersectionObserver" in window) document.documentElement.classList.add("js");
-	</script>
 </head>
 <body class={bodyClass}>
 	<div class="grid-overlay" aria-hidden="true"></div>
@@ -81,16 +71,14 @@ const home = getLocalizedPath("/", lang);
 			</a>
 			{showNavLinks && (
 				<div class="nav-links">
-					<a href={`${home}#how`} class="nav-link"><span class="link-index">01</span>{t("nav.how")}</a>
-					<a href={`${home}#features`} class="nav-link"><span class="link-index">02</span>{t("nav.features")}</a>
-					<a href={`${home}#privacy`} class="nav-link"><span class="link-index">03</span>{t("nav.privacy")}</a>
-					<a href={`${home}#faq`} class="nav-link"><span class="link-index">04</span>{t("nav.faq")}</a>
-					<a href="https://github.com/voxfusion/voxfusion" target="_blank" rel="noopener noreferrer" class="nav-link"><span class="link-index">05</span>{t("nav.github")}</a>
+					<a href={`${home}#features`} class="nav-link"><span class="link-index">01</span>{t("nav.features")}</a>
+					<a href={`${home}#privacy`} class="nav-link"><span class="link-index">02</span>{t("nav.privacy")}</a>
+					<a href={`${home}#faq`} class="nav-link"><span class="link-index">03</span>{t("nav.faq")}</a>
+					<a href="https://github.com/voxfusion/voxfusion" target="_blank" rel="noopener noreferrer" class="nav-link"><span class="link-index">04</span>{t("nav.github")}</a>
 				</div>
 			)}
 			{ctaHref && ctaLabel && <a href={ctaHref} class="nav-cta">{ctaLabel}</a>}
 		</div>
-		<span class="nav-progress" aria-hidden="true"></span>
 		<slot name="nav-extra" />
 	</nav>
 
@@ -100,22 +88,6 @@ const home = getLocalizedPath("/", lang);
 	<Umami />
 	<script is:inline>
 		if ("IntersectionObserver" in window) {
-			var revealObserver = new IntersectionObserver(
-				function (entries) {
-					entries.forEach(function (entry) {
-						if (!entry.isIntersecting) return;
-
-						entry.target.classList.add("is-visible");
-						revealObserver.unobserve(entry.target);
-					});
-				},
-				{ rootMargin: "0px 0px -8% 0px" },
-			);
-
-			document.querySelectorAll("[data-reveal]").forEach(function (el) {
-				revealObserver.observe(el);
-			});
-
 			// Highlight the nav link of the section crossing the middle of the viewport.
 			var navLinks = {};
 			document.querySelectorAll(".nav-link[href*='#']").forEach(function (link) {
@@ -224,29 +196,6 @@ const home = getLocalizedPath("/", lang);
 		justify-content: space-between;
 	}
 
-	/* Reading progress: drawn along the nav's bottom edge as the page scrolls. */
-	.nav-progress {
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: -1px;
-		height: 1px;
-		background: var(--accent);
-		transform: scaleX(0);
-		transform-origin: 0 50%;
-	}
-
-	@supports (animation-timeline: scroll()) {
-		.nav-progress {
-			animation: nav-progress linear both;
-			animation-timeline: scroll(root);
-		}
-	}
-
-	@keyframes nav-progress {
-		to { transform: scaleX(1); }
-	}
-
 	.logo {
 		font-size: 16px;
 		font-weight: 700;
@@ -328,19 +277,12 @@ const home = getLocalizedPath("/", lang);
 	::selection { background: #ff4d19; color: #0a0a0a; }
 	a:focus-visible, button:focus-visible { outline: 2px solid #ff7045; outline-offset: 5px; }
 
-	.js [data-reveal] { opacity: 0; }
-	.js [data-reveal].is-visible { opacity: 1; animation: reveal .7s var(--ease-out) var(--reveal-delay, 0s) backwards; }
-	@keyframes reveal { from { opacity: 0; transform: translateY(16px); } }
-
 	/* Typewriter (scripts/typewriter.ts): the untyped remainder holds its space, and carries the caret. */
 	.tw-rest { visibility: hidden; }
-	.tw-caret .tw-rest::before { content: ""; position: absolute; width: 2px; height: 1.15em; margin: .22em 0 0 2px; background: var(--accent); visibility: visible; animation: caret-blink 1.1s steps(1) infinite; }
-	@keyframes caret-blink { 50% { opacity: 0; } }
+	.tw-caret .tw-rest::before { content: ""; position: absolute; width: 2px; height: 1.15em; margin: .22em 0 0 2px; background: var(--accent); visibility: visible; }
 
 	@media (prefers-reduced-motion: reduce) {
 		html { scroll-behavior: auto; }
-		.js [data-reveal], .js [data-reveal].is-visible { opacity: 1; animation: none; }
-		.tw-caret .tw-rest::before { animation: none; }
 		.logo-bracket { transition: none; }
 	}
 	@media (max-width: 1050px) { .nav-inner { padding-inline: 28px; } .nav-links { gap: 20px; } }

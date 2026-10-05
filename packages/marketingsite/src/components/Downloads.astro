@@ -39,10 +39,6 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 						<h3 class="card-title">{t("downloads.macos.latest")}</h3>
 						<p class="card-description">{t("downloads.macos.latest.description")}</p>
 					</div>
-					<div class="card-terminal">
-						<span class="terminal-prompt">$</span>
-						<span class="terminal-command">download --arch=arm64</span>
-					</div>
 					<a href={`${baseUrl}/VoxFusion-latest.dmg`} class="download-btn" aria-label="Download VoxFusion for Apple Silicon, DMG" data-umami-event="download_dmg" data-umami-event-variant="apple_silicon">
 						<span class="btn-icon">↓</span>
 						<span>.dmg</span>
@@ -54,10 +50,6 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 					<div class="card-content">
 						<h3 class="card-title">{t("downloads.macos.intel")}</h3>
 						<p class="card-description">{t("downloads.macos.intel.description")}</p>
-					</div>
-					<div class="card-terminal">
-						<span class="terminal-prompt">$</span>
-						<span class="terminal-command">download --arch=x86_64</span>
 					</div>
 					<a href={`${baseUrl}/VoxFusion-latest-intel.dmg`} class="download-btn secondary" aria-label="Download VoxFusion for Intel, DMG" data-umami-event="download_dmg" data-umami-event-variant="intel">
 						<span class="btn-icon">↓</span>
@@ -165,11 +157,6 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 		background: transparent;
 	}
 
-	.download-grid.single {
-		grid-template-columns: 1fr;
-		max-width: 450px;
-	}
-
 	.downloads-hint {
 		display: flex;
 		gap: 12px;
@@ -191,11 +178,6 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
-		transition: background 0.3s;
-	}
-
-	.download-card:hover {
-		background: #111;
 	}
 
 	.card-index {
@@ -221,25 +203,6 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 		color: #999;
 		line-height: 1.7;
 		font-family: var(--font-mono);
-	}
-
-	.card-terminal {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 12px 16px;
-		background: #111;
-		border: 1px solid #333;
-		font-size: 12px;
-		font-family: var(--font-mono);
-	}
-
-	.terminal-prompt {
-		color: #ff3e00;
-	}
-
-	.terminal-command {
-		color: #999;
 	}
 
 	.download-btn {
@@ -280,25 +243,6 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 		font-size: 16px;
 	}
 
-	.warning-banner {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 14px 20px;
-		background: rgba(251, 191, 36, 0.05);
-		border: 1px solid rgba(251, 191, 36, 0.3);
-		font-size: 13px;
-		color: #fbbf24;
-		margin-bottom: 24px;
-		line-height: 1.5;
-		font-family: var(--font-mono);
-	}
-
-	.warning-icon {
-		color: #fbbf24;
-		font-weight: 700;
-	}
-
 	@media (max-width: 768px) {
 		.downloads {
 			padding: 120px 24px 80px;
@@ -330,9 +274,5 @@ const baseUrl = "https://github.com/voxfusion/voxfusion/releases/latest/download
 			padding: 24px;
 		}
 
-		.card-terminal {
-			padding: 10px 12px;
-			font-size: 11px;
-		}
 	}
 </style>

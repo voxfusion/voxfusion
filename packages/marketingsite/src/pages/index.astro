@@ -5,7 +5,6 @@ import HeroDemo from "../components/HeroDemo.astro";
 import HowItWorks from "../components/HowItWorks.astro";
 import PrivacyFlow from "../components/PrivacyFlow.astro";
 import SectionHeading from "../components/SectionHeading.astro";
-import SpeedRace from "../components/SpeedRace.astro";
 import { faqItems } from "../data/faq";
 import { defaultLang, getLocalizedPath, useTranslations } from "../i18n/utils";
 import BaseLayout from "../layouts/BaseLayout.astro";
@@ -18,34 +17,6 @@ const description = t("meta.description");
 const schema = schemaGraph(softwareApplicationSchema(description), faqPageSchema(faqItems(t)));
 const downloadHref = getLocalizedPath("/download", lang);
 const githubHref = "https://github.com/voxfusion/voxfusion";
-
-const stats = (["local", "uploads", "languages", "price"] as const).map((key) => ({
-	value: t(`hero.stat.${key}.value`),
-	label: t(`hero.stat.${key}.label`),
-}));
-const tickerApps = [
-	"Mail",
-	"Slack",
-	"Notes",
-	"Messages",
-	"Notion",
-	"Chrome",
-	"VS Code",
-	"Cursor",
-	"Terminal",
-	"Linear",
-	"Figma",
-	"Safari",
-];
-const compareRows = (["audio", "offline", "account", "price", "source"] as const).map((key) => ({
-	label: t(`why.compare.${key}.label`),
-	cloud: t(`why.compare.${key}.cloud`),
-	local: t(`why.compare.${key}.local`),
-}));
-const ctaBars = Array.from(
-	{ length: 120 },
-	(_, i) => 14 + Math.abs(Math.sin(i * 0.9) * Math.cos(i * 0.21)) * 86
-);
 ---
 
 <BaseLayout
@@ -59,62 +30,28 @@ const ctaBars = Array.from(
 >
 	<main id="main-content">
 	<header class="hero">
-		<div class="hero-grid">
-			<div class="hero-content">
-				<div class="hero-label enter">
-					<span class="label-line" aria-hidden="true"></span>
-					<span class="label-text">{t("hero.label")}</span>
-				</div>
-				<h1 class="hero-title">
-					<span class="title-line"><span style="--d: .08s">{t("hero.title.line1")}</span></span>
-					<span class="title-line"><span style="--d: .18s">{t("hero.title.line2")}</span></span>
-					<span class="title-line title-accent"><span style="--d: .28s">{t("hero.title.line3")}</span></span>
-				</h1>
-				<p class="hero-description enter" style="--d: .42s">{t("hero.subtitle")}</p>
-				<div class="hero-actions enter" style="--d: .52s">
-					<a href={downloadHref} class="btn-primary" data-umami-event="hero_download_click">
-						<span class="btn-icon" aria-hidden="true">↓</span>
-						<span>{t("hero.cta.download")}</span>
-					</a>
-					<a href={githubHref} target="_blank" rel="noopener noreferrer" class="btn-secondary" data-umami-event="hero_github_click">
-						<svg class="btn-icon" viewBox="0 0 1024 1024" width="16" height="16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M512 0C229.12 0 0 229.12 0 512c0 226.56 146.56 417.92 350.08 485.76 25.6 4.48 35.2-10.88 35.2-24.32 0-12.16-.64-52.48-.64-95.36-128.64 23.68-161.92-31.36-172.16-60.16-5.76-14.72-30.72-60.16-52.48-72.32-17.92-9.6-43.52-33.28-.64-33.92 40.32-.64 69.12 37.12 78.72 52.48 46.08 77.44 119.68 55.68 149.12 42.24 4.48-33.28 17.92-55.68 32.64-68.48-113.92-12.8-232.96-56.96-232.96-252.8 0-55.68 19.84-101.76 52.48-137.6-5.12-12.8-23.04-65.28 5.12-135.68 0 0 42.88-13.44 140.8 52.48 40.96-11.52 84.48-17.28 128-17.28s87.04 5.76 128 17.28c97.92-66.56 140.8-52.48 140.8-52.48 28.16 70.4 10.24 122.88 5.12 135.68 32.64 35.84 52.48 81.28 52.48 137.6 0 196.48-119.68 240-233.6 252.8 18.56 16 34.56 46.72 34.56 94.72 0 68.48-.64 123.52-.64 140.8 0 13.44 9.6 29.44 35.2 24.32C877.44 929.92 1024 737.92 1024 512 1024 229.12 794.88 0 512 0" clip-rule="evenodd"/></svg>
-						<span>{t("hero.cta.github")}</span>
-					</a>
-				</div>
-				<p class="hero-note enter" style="--d: .6s"><span aria-hidden="true">[✓]</span> {t("hero.note.free")} <span class="note-divider">/</span> {t("hero.note.account")} <span class="note-divider">/</span> {t("hero.note.platform")}</p>
+		<div class="hero-content">
+			<div class="hero-label enter">
+				<span class="label-line" aria-hidden="true"></span>
+				<span class="label-text">{t("hero.label")}</span>
 			</div>
-			<div class="hero-demo enter" style="--d: .35s"><HeroDemo /></div>
-		</div>
-		<div class="hero-stats enter" style="--d: .7s">
-			{stats.map((stat) => (
-				<div class="stat">
-					<span class="stat-value">{stat.value}</span>
-					<span class="stat-label">{stat.label}</span>
-				</div>
-			))}
-		</div>
-		<div class="ticker enter" style="--d: .78s">
-			<span class="ticker-label">{t("hero.ticker.label")}</span>
-			<div class="ticker-window">
-				<div class="ticker-track">
-					{[false, true].map((isClone) => (
-						<ul aria-hidden={isClone ? "true" : undefined}>
-							{tickerApps.map((app) => <li>{app}</li>)}
-						</ul>
-					))}
-				</div>
+			<h1 class="hero-title">
+				<span class="title-line"><span style="--d: .08s">{t("hero.title.line1")}</span></span>
+				<span class="title-line"><span style="--d: .18s">{t("hero.title.line2")}</span></span>
+				<span class="title-line title-accent"><span style="--d: .28s">{t("hero.title.line3")}</span></span>
+			</h1>
+			<p class="hero-description enter" style="--d: .42s">{t("hero.subtitle")}</p>
+			<div class="hero-actions enter" style="--d: .52s">
+				<a href={downloadHref} class="btn-primary" data-umami-event="hero_download_click">
+					<span class="btn-icon" aria-hidden="true">↓</span>
+					<span>{t("hero.cta.download")}</span>
+				</a>
+				<a href={githubHref} target="_blank" rel="noopener noreferrer" class="text-link" data-umami-event="hero_github_click">{t("hero.cta.github")} <span aria-hidden="true">→</span></a>
 			</div>
+			<p class="hero-note enter" style="--d: .6s">{t("hero.note")}</p>
 		</div>
+		<div class="hero-demo enter" style="--d: .35s"><HeroDemo lang={lang} /></div>
 	</header>
-
-	<section id="why" class="section speed">
-		<div class="speed-copy" data-reveal data-umami-view="view_speed">
-			<p class="eyebrow">{t("speed.tag")}</p>
-			<h2>{t("speed.title")}</h2>
-			<p class="speed-desc">{t("speed.description")}</p>
-		</div>
-		<SpeedRace lang={lang} />
-	</section>
 
 	<section id="how" class="section">
 		<SectionHeading number="01" tag={t("how.tag")} title={t("how.title")} description={t("how.description")} viewEvent="view_how" />
@@ -128,37 +65,14 @@ const ctaBars = Array.from(
 
 	<section id="privacy" class="section">
 		<SectionHeading number="03" tag={t("why.section")} title={t("why.title")} description={t("why.description")} viewEvent="view_privacy" />
-		<div class="privacy-block" data-reveal>
-			<PrivacyFlow lang={lang} />
-			<div class="privacy-grid">
-				<div class="privacy-points">
-					<ul class="highlight-list">
-						<li><span class="check" aria-hidden="true">[✓]</span> {t("why.list1")}</li>
-						<li><span class="check" aria-hidden="true">[✓]</span> {t("why.list2")}</li>
-						<li><span class="check" aria-hidden="true">[✓]</span> {t("why.list3")}</li>
-					</ul>
-					<a href={githubHref} target="_blank" rel="noopener noreferrer" class="source-link" data-umami-event="privacy_github_click">{t("why.source")} <span aria-hidden="true">→</span></a>
-				</div>
-				<table class="compare">
-					<caption>{t("why.compare.caption")}</caption>
-					<thead>
-						<tr>
-							<td></td>
-							<th scope="col">{t("why.compare.cloud")}</th>
-							<th scope="col" class="compare-local">{t("why.compare.local")}</th>
-						</tr>
-					</thead>
-					<tbody>
-						{compareRows.map((row) => (
-							<tr>
-								<th scope="row">{row.label}</th>
-								<td>{row.cloud}</td>
-								<td class="compare-local">{row.local}</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</div>
+		<PrivacyFlow lang={lang} />
+		<div class="privacy-points">
+			<ul>
+				<li><span aria-hidden="true">[✓]</span> {t("why.list1")}</li>
+				<li><span aria-hidden="true">[✓]</span> {t("why.list2")}</li>
+				<li><span aria-hidden="true">[✓]</span> {t("why.list3")}</li>
+			</ul>
+			<a href={githubHref} target="_blank" rel="noopener noreferrer" class="text-link" data-umami-event="privacy_github_click">{t("why.source")} <span aria-hidden="true">→</span></a>
 		</div>
 	</section>
 
@@ -167,16 +81,13 @@ const ctaBars = Array.from(
 		<Faq lang={lang} />
 	</section>
 
-	<section class="cta">
-		<div class="cta-bars" aria-hidden="true">
-			{ctaBars.map((height, i) => <i style={`--i: ${i}; --h: ${height}%`}></i>)}
-		</div>
-		<div class="cta-inner" data-reveal>
-			<span class="cta-label">{t("cta.label")}</span>
-			<h2>{t("cta.title")}</h2>
-			<p>{t("cta.description")}</p>
-			<a href={downloadHref} class="cta-btn" data-umami-event="bottom_cta_click">
-				<span class="btn-icon" aria-hidden="true">↓</span> {t("cta.button")}
+	<section class="section cta">
+		<div class="cta-rule"></div>
+		<h2>{t("cta.title")}</h2>
+		<div class="cta-actions">
+			<a href={downloadHref} class="btn-primary" data-umami-event="bottom_cta_click">
+				<span class="btn-icon" aria-hidden="true">↓</span>
+				<span>{t("cta.button")}</span>
 			</a>
 			<span class="cta-note">{t("cta.note")}</span>
 		</div>
@@ -186,138 +97,72 @@ const ctaBars = Array.from(
 
 <style>
 	.hero, .section { max-width: 1280px; margin: 0 auto; padding-inline: 40px; }
-	.hero { padding-top: 156px; }
-	.hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 64px; align-items: center; }
+	.hero { display: grid; grid-template-columns: 1.08fr 1fr; gap: 64px; align-items: center; padding-top: 188px; padding-bottom: 24px; }
 	.hero-demo { min-width: 0; }
 
 	/* Entrance: the hero settles in once, in reading order. */
-	.enter { animation: reveal .8s var(--ease-out) var(--d, 0s) backwards; }
+	.enter { animation: enter .8s var(--ease-out) var(--d, 0s) backwards; }
+	@keyframes enter { from { opacity: 0; transform: translateY(16px); } }
 	.title-line { display: block; overflow: hidden; padding-bottom: .14em; margin-bottom: -.14em; }
 	.title-line > span { display: block; animation: line-up .9s var(--ease-out) var(--d, 0s) backwards; }
 	@keyframes line-up { from { transform: translateY(110%); } }
 
-	.hero-label { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-	.label-line { width: 7px; height: 7px; background: #ff3e00; box-shadow: 0 0 16px #ff3e0050; animation: label-pulse 2.4s ease-in-out infinite; }
-	@keyframes label-pulse { 50% { box-shadow: 0 0 4px #ff3e0020; opacity: .6; } }
-	.label-text { font-size: 11px; color: #ff6b3d; letter-spacing: .12em; }
-	.hero-title { font-size: clamp(40px, 5vw, 68px); font-weight: 600; line-height: 1.08; letter-spacing: -.06em; margin-bottom: 28px; }
+	.hero-label { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+	.label-line { width: 7px; height: 7px; background: #ff3e00; }
+	.label-text { font-size: 11px; color: #a3a3a3; letter-spacing: .14em; }
+	.hero-title { font-size: clamp(40px, 5vw, 70px); font-weight: 600; line-height: 1.06; letter-spacing: -.06em; margin-bottom: 32px; white-space: nowrap; }
 	.title-accent { color: #ff4d19; }
-	.hero-description { max-width: 530px; font-size: 15px; line-height: 1.85; color: #a8a8a8; margin-bottom: 32px; }
-	.hero-actions { display: flex; gap: 16px; flex-wrap: wrap; }
-	.btn-primary, .btn-secondary, .cta-btn { display: inline-flex; justify-content: center; align-items: center; gap: 12px; padding: 16px 22px; font-size: 12px; font-weight: 600; transition: background .2s, color .2s, border-color .2s, transform .12s, box-shadow .12s; }
-	.btn-primary, .cta-btn { background: #ff4d19; border: 1px solid #ff4d19; color: #090909; box-shadow: 4px 4px 0 #7a2409; }
-	.btn-primary:hover, .cta-btn:hover { background: #ff7045; border-color: #ff7045; transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #7a2409; }
-	.btn-primary:active, .cta-btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #7a2409; }
-	.btn-secondary { border: 1px solid #383838; color: #ccc; }
-	.btn-secondary:hover { background: #1c1c1c; border-color: #777; color: #fff; }
+	.hero-description { max-width: 420px; font-size: 16px; line-height: 1.75; color: #a8a8a8; margin-bottom: 40px; }
+	.hero-actions { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+	.btn-primary { display: inline-flex; justify-content: center; align-items: center; gap: 12px; padding: 17px 24px; font-size: 13px; font-weight: 600; background: #ff4d19; border: 1px solid #ff4d19; color: #090909; box-shadow: 4px 4px 0 #7a2409; transition: background .2s, border-color .2s, transform .12s, box-shadow .12s; }
+	.btn-primary:hover { background: #ff7045; border-color: #ff7045; transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #7a2409; }
+	.btn-primary:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #7a2409; }
 	.btn-icon { font-size: 18px; transition: transform .2s var(--ease-out); }
-	.btn-primary:hover .btn-icon, .cta-btn:hover .btn-icon { transform: translateY(2px); }
-	.hero-note { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; color: #888; font-size: 10px; line-height: 1.8; }
-	.hero-note > span:first-child { color: #ff6b3d; }
-	.note-divider { color: #444; }
+	.btn-primary:hover .btn-icon { transform: translateY(2px); }
+	.text-link { padding-bottom: 3px; border-bottom: 1px solid #3a3a3a; color: #cfcfcf; font-size: 13px; transition: color .2s, border-color .2s; }
+	.text-link:hover { color: #fff; border-color: #ff6b3d; }
+	.text-link span { display: inline-block; transition: transform .2s var(--ease-out); }
+	.text-link:hover span { transform: translateX(3px); }
+	.hero-note { margin-top: 28px; color: #7a7a7a; font-size: 11px; letter-spacing: .04em; }
 
-	.hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-block: 1px solid #303030; margin-top: 76px; }
-	.stat { padding: 27px 28px; display: flex; align-items: center; gap: 18px; }
-	.stat:first-child { padding-left: 0; }
-	.stat + .stat { border-left: 1px solid #303030; }
-	.stat-value { font-size: 34px; letter-spacing: -.05em; line-height: 1; color: #e6e6e6; }
-	.stat-label { font-size: 10px; color: #969696; text-transform: uppercase; line-height: 1.7; max-width: 150px; letter-spacing: .05em; }
-	.ticker { display: flex; align-items: center; border-bottom: 1px solid #303030; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
-	.ticker-label { flex-shrink: 0; padding: 16px 20px 16px 0; border-right: 1px solid #303030; color: #ff6b3d; }
-	.ticker-window { flex: 1; min-width: 0; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 48px, #000 calc(100% - 48px), transparent); }
-	.ticker-track { display: flex; width: max-content; animation: ticker 44s linear infinite; }
-	.ticker-track ul { display: flex; flex-shrink: 0; list-style: none; }
-	.ticker-track li { display: flex; align-items: center; color: #8f8f8f; white-space: nowrap; }
-	.ticker-track li::after { content: "/"; margin-inline: 22px; color: #4a4a4a; }
-	.ticker:hover .ticker-track { animation-play-state: paused; }
-	@keyframes ticker { to { transform: translateX(-50%); } }
+	.section { padding-top: 168px; }
 
-	.section { padding-top: 112px; }
+	.privacy-points { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px; margin-top: 40px; }
+	.privacy-points ul { display: flex; flex-wrap: wrap; gap: 12px 40px; list-style: none; }
+	.privacy-points li { display: flex; gap: 12px; color: #a8a8a8; font-size: 13px; line-height: 1.7; }
+	.privacy-points li span { flex-shrink: 0; color: #ff6b3d; }
 
-	.speed { display: grid; grid-template-columns: 1fr 1.05fr; gap: 72px; align-items: center; }
-	.eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #ff6b3d; margin-bottom: 22px; }
-	.speed h2 { font-size: clamp(30px, 3.6vw, 46px); line-height: 1.22; letter-spacing: -.05em; font-weight: 500; max-width: 520px; }
-	.speed-desc { margin-top: 22px; font-size: 14px; line-height: 1.85; color: #aaa; max-width: 470px; }
-
-	.privacy-block { border: 1px solid #493026; border-left: 3px solid #ff4d19; background: #15110f; }
-	.privacy-grid { display: grid; grid-template-columns: 1fr 1.15fr; align-items: center; gap: 56px; padding: 44px 48px 48px; }
-	.highlight-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
-	.highlight-list li { display: flex; gap: 12px; font-size: 13px; color: #c4bdb8; line-height: 1.8; }
-	.check { color: #ff6b3d; flex-shrink: 0; }
-	.source-link { display: inline-block; margin-top: 28px; padding-bottom: 3px; border-bottom: 1px solid #5a3424; color: #ff754c; font-size: 12px; transition: color .2s, border-color .2s; }
-	.source-link:hover { color: #ff9470; border-color: #ff754c; }
-	.source-link span { display: inline-block; transition: transform .2s var(--ease-out); }
-	.source-link:hover span { transform: translateX(3px); }
-	.compare { width: 100%; border-collapse: collapse; border: 1px solid #3c2e25; background: #100e0c; font-size: 12px; }
-	.compare caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-	.compare th, .compare td { padding: 14px 16px; text-align: left; vertical-align: top; line-height: 1.6; font-weight: 400; }
-	.compare thead th { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #8d7f77; }
-	.compare tbody tr { border-top: 1px solid #2c221c; }
-	.compare tbody th { color: #8d7f77; font-size: 11px; white-space: nowrap; }
-	.compare tbody td { color: #84807d; }
-	.compare tbody .compare-local, .compare thead .compare-local { border-left: 1px solid #3c2e25; background: #1d1511; }
-	.compare tbody .compare-local { color: #f3ddd2; }
-	.compare thead .compare-local { color: #ff754c; }
-
-	.cta { position: relative; overflow: hidden; margin-top: 112px; border-top: 1px solid #303030; background: #111; }
-	/* Idle waveform along the bottom edge of the closing band. */
-	.cta-bars { position: absolute; inset: auto 0 0; display: flex; align-items: flex-end; justify-content: center; gap: 8px; height: 150px; opacity: .2; mask-image: linear-gradient(transparent, #000 70%); pointer-events: none; }
-	.cta-bars i { flex-shrink: 0; width: 4px; height: var(--h); background: #ff4d19; transform-origin: 50% 100%; animation: cta-wave 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * -.09s); }
-	@keyframes cta-wave { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
-	.cta-inner { position: relative; max-width: 1280px; margin: auto; padding: 96px 40px 150px; display: flex; flex-direction: column; align-items: center; text-align: center; }
-	.cta-label { font-size: 10px; letter-spacing: .14em; color: #ff6b3d; }
-	.cta h2 { margin: 20px 0 16px; font-size: clamp(30px, 4vw, 52px); line-height: 1.18; font-weight: 500; letter-spacing: -.05em; max-width: 760px; }
-	.cta p { font-size: 14px; color: #a0a0a0; max-width: 560px; line-height: 1.8; }
-	.cta-btn { margin-top: 36px; padding: 18px 28px; font-size: 13px; }
-	.cta-note { margin-top: 20px; font-size: 10px; color: #808080; letter-spacing: .04em; }
+	.cta { padding-bottom: 168px; }
+	.cta-rule { height: 1px; margin-bottom: 72px; background: #292929; }
+	.cta h2 { max-width: 860px; font-size: clamp(30px, 4.4vw, 60px); line-height: 1.12; font-weight: 500; letter-spacing: -.055em; }
+	.cta-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; margin-top: 44px; }
+	.cta-note { color: #7a7a7a; font-size: 11px; letter-spacing: .04em; }
 
 	@media (max-width: 1050px) {
-		.hero-grid { gap: 32px; }
+		.hero { gap: 40px; }
 		.hero, .section { padding-inline: 28px; }
-		.stat { padding-inline: 18px; gap: 12px; flex-direction: column; align-items: flex-start; }
-		.speed { gap: 40px; }
-		.privacy-grid { gap: 36px; padding: 32px; }
-		.cta-inner { padding-inline: 28px; }
+		.section { padding-top: 136px; }
+		.cta { padding-bottom: 136px; }
 	}
 	@media (max-width: 800px) {
-		.hero { padding-top: 120px; }
-		.hero-grid { grid-template-columns: 1fr; gap: 48px; }
-		.hero-title { font-size: clamp(40px, 9vw, 64px); }
-		.hero-description { max-width: 600px; }
-		.hero-stats { grid-template-columns: repeat(2, 1fr); margin-top: 56px; }
-		.stat:nth-child(odd) { padding-left: 0; border-left: 0; }
-		.stat:nth-child(n + 3) { border-top: 1px solid #303030; }
-		.section { padding-top: 72px; }
-		.speed { grid-template-columns: 1fr; gap: 36px; }
-		.privacy-grid { grid-template-columns: 1fr; }
-		.cta { margin-top: 72px; }
-		.cta-inner { padding-block: 64px 124px; }
-		.cta-bars { height: 110px; }
+		.hero { grid-template-columns: 1fr; gap: 56px; padding-top: 128px; }
+		.hero-title { font-size: clamp(40px, 9.6vw, 64px); }
+		.section { padding-top: 104px; }
+		.cta { padding-bottom: 104px; }
+		.cta-rule { margin-bottom: 48px; }
 	}
 	@media (max-width: 540px) {
 		.hero, .section { padding-inline: 20px; }
-		.hero-label { margin-bottom: 22px; }
-		.label-text { font-size: 10px; }
-		.hero-title { font-size: clamp(32px, 9.3vw, 48px); }
-		.hero-description { font-size: 14px; }
-		.btn-primary, .btn-secondary { padding: 15px 18px; font-size: 11px; }
-		.hero-note { font-size: 9px; gap: 7px; }
-		.stat { padding: 22px 14px; }
-		.stat-value { font-size: 28px; }
-		.stat-label { font-size: 9px; letter-spacing: 0; }
-		.ticker-label { padding-right: 14px; }
-		.speed-desc { font-size: 13px; }
-		.privacy-grid { padding: 28px 22px; }
-		.highlight-list li { font-size: 12px; }
-		.compare th, .compare td { padding: 12px 10px; }
-		.compare { font-size: 11px; }
-		.compare tbody th { white-space: normal; font-size: 10px; }
-		.cta-inner { padding-inline: 20px; }
-		.cta p { font-size: 13px; }
+		.hero { padding-top: 112px; gap: 44px; }
+		.hero-label { margin-bottom: 24px; }
+		.hero-title { font-size: clamp(30px, 9.6vw, 48px); margin-bottom: 24px; }
+		.hero-description { font-size: 15px; margin-bottom: 32px; }
+		.section { padding-top: 88px; }
+		.privacy-points ul { flex-direction: column; gap: 10px; }
+		.cta { padding-bottom: 88px; }
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.enter, .title-line > span, .label-line, .cta-bars i { animation: none; }
-		.ticker-track { animation: none; }
-		.btn-primary, .btn-secondary, .cta-btn, .btn-icon { transition: none; }
+		.enter, .title-line > span { animation: none; }
+		.btn-primary, .btn-icon, .text-link, .text-link span { transition: none; }
 	}
 </style>

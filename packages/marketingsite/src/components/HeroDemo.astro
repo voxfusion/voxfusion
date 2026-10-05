@@ -3,29 +3,36 @@
  * Hero dictation demo: a stand-in app window with VoxFusion's recording
  * pill underneath. The first sample is rendered finished, so the demo reads
  * correctly without JavaScript and for reduced-motion visitors. The script
- * then loops through the samples: listen, transcribe, type.
+ * then plays the other samples once (listen, transcribe, type), returns to
+ * the first and stops; the button beside the pill stops it or plays it
+ * again.
  *
  * "spoken" is the raw speech, "text" is what gets typed; the difference
  * shows punctuation and capitalization being filled in. Every sample must
  * fit the lines reserved for it (see the min-heights below), or the window
  * changes height between samples.
  */
+import { defaultLang, type languages, useTranslations } from "../i18n/utils";
+
+interface Props {
+	lang?: keyof typeof languages;
+}
+
+const { lang = defaultLang } = Astro.props;
+const t = useTranslations(lang);
 const samples = [
 	{
 		app: "Mail",
-		context: "To: Anna / Re: Proposal",
 		spoken: "hi anna the proposal looks great let's review it thursday",
 		text: "Hi Anna, the proposal looks great. Let's review it Thursday.",
 	},
 	{
 		app: "Slack",
-		context: "# product-team",
 		spoken: "hey team let's schedule a quick sync for tomorrow",
 		text: "Hey team, let's schedule a quick sync for tomorrow.",
 	},
 	{
 		app: "Cursor",
-		context: "Agent / upload.ts",
 		spoken: "add retry logic to the upload handler and write a test",
 		text: "Add retry logic to the upload handler and write a test.",
 	},
@@ -34,9 +41,8 @@ const first = samples[0];
 const barHeights = [38, 72, 54, 100, 64, 88, 46, 78, 58, 34];
 ---
 
-<div class="hero-visual" role="img" aria-label="Demo: a spoken sentence is transcribed on the Mac and typed into the app in use">
-	<div class="visual-caption"><span>LIVE DEMO</span><span class="local-status"><i></i> ON DEVICE</span></div>
-	<div class="window" data-demo data-phase="done" data-samples={JSON.stringify(samples)}>
+<div class="window" data-demo data-phase="done" data-samples={JSON.stringify(samples)}>
+	<div class="window-scene" role="img" aria-label={t("hero.demo.alt")}>
 		<div class="window-bar">
 			<div class="tabs">
 				{samples.map((sample, i) => (
@@ -46,22 +52,22 @@ const barHeights = [38, 72, 54, 100, 64, 88, 46, 78, 58, 34];
 			<span class="hotkey"><kbd>⌃</kbd><kbd>⌥</kbd></span>
 		</div>
 		<div class="window-body tw-caret">
-			<p class="context" data-demo-context>{first.context}</p>
 			<p class="typed"><span data-demo-output>{first.text}<span class="tw-rest"></span></span></p>
 		</div>
-		<div class="voice">
-			<div class="pill">
-				<span class="bars">
-					{barHeights.map((height, i) => <i style={`--i: ${i}; --h: ${height}%`}></i>)}
-				</span>
-				<span class="spinner">{Array.from({ length: 9 }, (_, i) => <i style={`--i: ${i}`}></i>)}</span>
-			</div>
-			<p class="heard"><span class="heard-label">YOU SAY</span><span data-demo-heard>{first.spoken}</span></p>
+	</div>
+	<div class="voice">
+		<div class="pill" aria-hidden="true">
+			<span class="bars">
+				{barHeights.map((height, i) => <i style={`--i: ${i}; --h: ${height}%`}></i>)}
+			</span>
+			<span class="spinner">{Array.from({ length: 9 }, (_, i) => <i style={`--i: ${i}`}></i>)}</span>
 		</div>
-		<div class="window-footer">
-			<span><span class="prompt">↳</span> <span data-demo-status>Typed at your cursor</span></span>
-			<span class="uploaded">0 KB UPLOADED</span>
-		</div>
+		<p class="heard" aria-hidden="true"><span class="heard-label">{t("hero.demo.say")}</span><span data-demo-heard>{first.spoken}</span></p>
+		{/* In place from the start (inert until the demo first moves), with both labels in one cell, so nothing shifts. */}
+		<button type="button" class="demo-toggle" data-demo-toggle inert>
+			<span>[ {t("hero.demo.stop")} ]</span>
+			<span>[ {t("hero.demo.replay")} ]</span>
+		</button>
 	</div>
 </div>
 
@@ -70,70 +76,137 @@ const barHeights = [38, 72, 54, 100, 64, 88, 46, 78, 58, 34];
 
 	interface Sample {
 		app: string;
-		context: string;
 		spoken: string;
 		text: string;
 	}
 
-	async function playDemo(root: HTMLElement) {
+	/** How long a finished sample stays before the next one starts, in ms. */
+	const DWELL = 4000;
+	/** The first wait is longer: on arrival the visitor is still reading the title. */
+	const FIRST_DWELL = 7000;
+
+	function setupDemo(root: HTMLElement) {
 		const samples: Sample[] = JSON.parse(root.dataset.samples ?? "[]");
 		const tabs = [...root.querySelectorAll<HTMLElement>("[data-demo-tab]")];
-		const context = root.querySelector<HTMLElement>("[data-demo-context]");
 		const output = root.querySelector<HTMLElement>("[data-demo-output]");
 		const heard = root.querySelector<HTMLElement>("[data-demo-heard]");
-		const status = root.querySelector<HTMLElement>("[data-demo-status]");
-		if (!context || !output || !heard || !status || samples.length < 2) return;
+		const toggle = root.querySelector<HTMLButtonElement>("[data-demo-toggle]");
+		if (!output || !heard || !toggle || samples.length < 2) return;
 
-		// The server-rendered first sample is already in its finished state.
-		for (let index = 1; ; index = (index + 1) % samples.length) {
-			await sleep(3200);
-			while (document.hidden) await sleep(500);
+		// Each play() gets a new run number; a stopped run ends at its next step.
+		let run = 0;
+		let playing = false;
 
+		// Only play while the window is on screen in a visible tab.
+		let onScreen = false;
+		let wake = () => {};
+		const inView = (stopped: () => boolean) =>
+			new Promise<void>((resolve) => {
+				// A stopped run must not take the wake-up from the run that replaced it.
+				if (stopped()) return resolve();
+				wake = () => {
+					if (stopped() || (onScreen && !document.hidden)) resolve();
+				};
+				wake();
+			});
+		new IntersectionObserver(
+			(entries) => {
+				onScreen = entries[entries.length - 1].isIntersecting;
+				wake();
+			},
+			{ threshold: 0.5 }
+		).observe(root);
+		document.addEventListener("visibilitychange", () => wake());
+
+		const phase = (name: string) => {
+			root.dataset.phase = name;
+		};
+
+		const show = (index: number, finished: boolean) => {
 			const sample = samples[index];
-
-			root.dataset.phase = "listening";
 			tabs.forEach((tab, i) => tab.classList.toggle("is-active", i === index));
-			context.textContent = sample.context;
-			status.textContent = "Listening…";
-			renderTyped(output, sample.text, 0);
-			renderTyped(heard, sample.spoken, 0);
-			await sleep(500);
-			for (let end = 0; end < sample.spoken.length; ) {
-				const space = sample.spoken.indexOf(" ", end + 1);
-				end = space === -1 ? sample.spoken.length : space;
-				renderTyped(heard, sample.spoken, end);
-				await sleep(180);
+			renderTyped(output, sample.text, finished ? sample.text.length : 0);
+			renderTyped(heard, sample.spoken, finished ? sample.spoken.length : 0);
+			phase(finished ? "done" : "listening");
+		};
+
+		const setPlaying = (value: boolean) => {
+			playing = value;
+			root.toggleAttribute("data-playing", value);
+		};
+
+		// The server-rendered first sample is already finished: play the others, then end on it.
+		// A run started by the button begins at once; the first one waits to be seen and read.
+		const play = async (fromButton: boolean) => {
+			const current = ++run;
+			const stopped = () => current !== run;
+			if (fromButton) setPlaying(true);
+
+			for (let step = 1; step <= samples.length; step++) {
+				if (fromButton && step === 1) {
+					await sleep(300);
+				} else {
+					await inView(stopped);
+					if (stopped()) return;
+					await sleep(step === 1 ? FIRST_DWELL : DWELL);
+					await inView(stopped);
+				}
+				if (stopped()) return;
+
+				// The button appears with the first movement: until then there is nothing to stop.
+				toggle.removeAttribute("inert");
+				setPlaying(true);
+
+				const index = step % samples.length;
+				const sample = samples[index];
+				show(index, false);
+				await sleep(500);
+				for (let end = 0; end < sample.spoken.length; ) {
+					if (stopped()) return;
+					const space = sample.spoken.indexOf(" ", end + 1);
+					end = space === -1 ? sample.spoken.length : space;
+					renderTyped(heard, sample.spoken, end);
+					await sleep(260);
+				}
+				if (stopped()) return;
+
+				phase("transcribing");
+				await sleep(900);
+				if (stopped()) return;
+
+				phase("typing");
+				await typeText(output, sample.text, 15, () => !stopped());
+				if (stopped()) return;
+
+				phase("done");
+			}
+			setPlaying(false);
+		};
+
+		toggle.addEventListener("click", () => {
+			if (!playing) {
+				play(true);
+				return;
 			}
 
-			root.dataset.phase = "transcribing";
-			status.textContent = "Transcribing on your Mac…";
-			await sleep(900);
-
-			root.dataset.phase = "typing";
-			status.textContent = "Typing at your cursor…";
-			await typeText(output, sample.text, 15);
-
-			root.dataset.phase = "done";
-			status.textContent = "Typed at your cursor";
-		}
+			// Stop: settle on the finished first sample.
+			run++;
+			wake();
+			show(0, true);
+			setPlaying(false);
+		});
+		play(false);
 	}
 
-	if (!prefersReducedMotion()) {
+	if (!prefersReducedMotion() && "IntersectionObserver" in window) {
 		for (const root of document.querySelectorAll<HTMLElement>("[data-demo]")) {
-			playDemo(root);
+			setupDemo(root);
 		}
 	}
 </script>
 
 <style>
-	.hero-visual { position: relative; isolation: isolate; min-width: 0; }
-	.hero-visual::before { content: ""; position: absolute; inset: -90px -20px; z-index: -1; background: radial-gradient(closest-side, #ff4d1920, transparent); pointer-events: none; }
-	.visual-caption { display: flex; justify-content: space-between; gap: 12px; color: #aaa; font-size: 9px; letter-spacing: .1em; padding-bottom: 14px; }
-	.local-status { display: flex; align-items: center; gap: 8px; color: #a9b7a9; }
-	.local-status i { width: 5px; height: 5px; background: var(--ok); animation: status-pulse 2.4s ease-in-out infinite; }
-	@keyframes status-pulse { 50% { opacity: .35; } }
-
-	.window { background: #111; border: 1px solid #3b3b3b; box-shadow: 10px 10px 0 #0a0a0a, 11px 11px 0 #272727; }
+	.window { min-width: 0; background: #111; border: 1px solid #3b3b3b; box-shadow: 10px 10px 0 #0a0a0a, 11px 11px 0 #272727; }
 	.window-bar { display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1px solid #303030; background: #181818; }
 	.tabs { display: flex; min-width: 0; }
 	.tab { position: relative; padding: 15px 20px; margin-bottom: -1px; border-right: 1px solid #303030; border-bottom: 1px solid transparent; color: #7c7c7c; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; transition: color .3s, background .3s; }
@@ -144,12 +217,14 @@ const barHeights = [38, 72, 54, 100, 64, 88, 46, 78, 58, 34];
 	.hotkey kbd { display: inline-flex; justify-content: center; align-items: center; width: 23px; height: 23px; border: 1px solid #3a3a3a; border-bottom-width: 2px; color: #ccc; font-family: inherit; font-size: 14px; transition: border-color .2s, color .2s, background .2s, transform .12s; }
 	[data-phase="listening"] .hotkey kbd { border-color: var(--accent); color: var(--accent-soft); background: var(--warm-2); transform: translateY(1px); }
 
-	.window-body { padding: 20px 24px 22px; }
-	.context { padding-bottom: 13px; margin-bottom: 16px; border-bottom: 1px dashed #2c2c2c; color: #808080; font-size: 10px; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.typed { min-height: 5.1em; color: #ececec; font-size: 17px; line-height: 1.7; letter-spacing: -.025em; }
-	[data-phase="listening"] .tw-rest::before, [data-phase="transcribing"] .tw-rest::before { opacity: .45; }
+	.window-body { padding: 28px 28px 30px; }
+	.typed { min-height: 5.1em; color: #ececec; font-size: 18px; line-height: 1.7; letter-spacing: -.025em; }
+	/* The caret blinks only where text is about to be typed. */
+	.tw-caret :global(.tw-rest)::before { animation: caret-blink 1.1s steps(1) infinite; }
+	@keyframes caret-blink { 50% { opacity: 0; } }
+	[data-phase="listening"] :global(.tw-rest)::before, [data-phase="transcribing"] :global(.tw-rest)::before { opacity: .45; }
 
-	.voice { display: flex; align-items: center; gap: 18px; padding: 16px 24px; border-top: 1px solid #292929; background: #0d0d0d; }
+	.voice { display: flex; align-items: center; gap: 18px; padding: 16px 28px; border-top: 1px solid #292929; background: #0d0d0d; }
 	.pill { display: flex; flex-shrink: 0; align-items: center; justify-content: center; width: 108px; height: 32px; border: 1px solid #3a3a3a; border-radius: 999px; background: #0a0a0a; opacity: .65; transition: opacity .3s, border-color .3s, box-shadow .3s; }
 	[data-phase="listening"] .pill, [data-phase="transcribing"] .pill { opacity: 1; border-color: #6b3d2a; box-shadow: 0 0 0 4px #ff4d1912; }
 	.bars { display: flex; align-items: center; gap: 3px; height: 18px; }
@@ -158,38 +233,40 @@ const barHeights = [38, 72, 54, 100, 64, 88, 46, 78, 58, 34];
 	[data-phase="listening"] .bars i { height: var(--h); animation: pill-wave .9s ease-in-out infinite alternate; animation-delay: calc(var(--i) * -.17s); }
 	@keyframes pill-wave { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
 	.spinner { display: grid; grid-template-columns: repeat(3, 3px); gap: 2px; max-width: 0; overflow: hidden; opacity: 0; transition: max-width .3s ease-out, margin .3s ease-out, opacity .3s; }
-	.spinner i { width: 3px; height: 3px; background: var(--accent); animation: spinner-dot 1s steps(1) infinite; animation-delay: calc(var(--i) * .11s); }
+	.spinner i { width: 3px; height: 3px; background: var(--accent); }
+	[data-phase="transcribing"] .spinner i { animation: spinner-dot 1s steps(1) infinite; animation-delay: calc(var(--i) * .11s); }
 	@keyframes spinner-dot { 0%, 100% { opacity: .25; } 35% { opacity: 1; } }
 	[data-phase="transcribing"] .spinner { max-width: 16px; margin-left: 9px; opacity: 1; }
-	.heard { display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 5em; justify-content: center; color: #9c9c9c; font-size: 12px; line-height: 1.6; }
+	.heard { display: flex; flex: 1; flex-direction: column; gap: 5px; min-width: 0; min-height: 5em; justify-content: center; color: #9c9c9c; font-size: 12px; line-height: 1.6; }
 	.heard-label { color: #6f6f6f; font-size: 9px; letter-spacing: .1em; transition: color .3s; }
 	[data-phase="listening"] .heard-label { color: var(--accent-soft); }
 
-	.window-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 24px; border-top: 1px solid #303030; color: #8c8c8c; font-size: 10px; }
-	.prompt { color: #ff6b3d; }
-	.uploaded { flex-shrink: 0; color: #ff6b3d; font-size: 9px; letter-spacing: .08em; }
+	/* Stop and Replay share one cell, so the row never changes width. */
+	.demo-toggle { display: inline-grid; justify-items: end; flex-shrink: 0; align-self: flex-start; margin: -4px -6px; padding: 8px 6px; border: 0; background: none; color: #8a8a8a; font: inherit; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; transition: color .2s; }
+	.demo-toggle:hover { color: var(--accent-soft); }
+	.demo-toggle span { grid-area: 1 / 1; }
+	.window:not([data-playing]) .demo-toggle span:first-child, .window[data-playing] .demo-toggle span:last-child { visibility: hidden; }
+	/* Without the script (or with reduced motion) nothing plays, so there is nothing to stop. */
+	.demo-toggle[inert] { visibility: hidden; }
 
 	@media (max-width: 1050px) {
-		.window-body { padding-inline: 20px; }
-		.voice, .window-footer { padding-inline: 20px; }
-		.typed { font-size: 15px; }
-		.heard { min-height: 6.6em; }
+		.window-body { padding-inline: 22px; }
+		.voice { flex-wrap: wrap; gap: 12px; padding-inline: 22px; }
+		.heard { flex-basis: 100%; order: 3; min-height: 3.6em; justify-content: flex-start; }
+		.demo-toggle { margin-left: auto; align-self: center; }
+		.typed { font-size: 16px; }
 		.tab { padding-inline: 14px; }
 	}
 	@media (max-width: 800px) {
-		.hero-visual { max-width: 580px; width: 100%; }
-		.heard { min-height: 5em; }
+		.window { max-width: 580px; width: 100%; }
 	}
 	@media (max-width: 540px) {
-		.window-body, .voice, .window-footer { padding-inline: 18px; }
-		.voice { flex-direction: column; align-items: flex-start; gap: 12px; }
-		.heard { min-height: 5.2em; justify-content: flex-start; font-size: 11px; }
+		.window-body, .voice { padding-inline: 18px; }
+		.heard { font-size: 11px; }
 		.tab { padding: 14px 13px; }
 		.hotkey { padding-right: 12px; }
-		.window-footer { font-size: 9px; }
-		.uploaded { font-size: 8px; }
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.local-status i, .bars i, .spinner i { animation: none; }
+		.window :global(.tw-rest)::before, .bars i, .spinner i { animation: none !important; }
 	}
 </style>

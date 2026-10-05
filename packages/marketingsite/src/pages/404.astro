@@ -1,12 +1,4 @@
 ---
-/**
- * 404 PAGE: BRUTALIST / RAW INDUSTRIAL
- *
- * Design Direction: Raw, industrial, unapologetic. Exposed grid structures,
- * monospace typography, harsh contrasts, visible construction elements.
- * Think concrete architecture meets command-line interfaces.
- */
-
 import { defaultLang, getLocalizedPath, useTranslations } from "../i18n/utils";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
@@ -60,18 +52,12 @@ const description = t("notFound.description");
 					<span>{t("notFound.cta")}</span>
 				</a>
 			</div>
-
-			<div class="glitch-lines">
-				{[...Array(5)].map((_, i) => (
-					<div class="glitch-line" style={`--delay: ${i * 0.2}s; --offset: ${(i - 2) * 15}px`}></div>
-				))}
-			</div>
 		</div>
 	</main>
 
 	<footer class="footer">
 		<div class="footer-inner">
-			<span>&copy; 2025 VoxFusion</span>
+			<span>&copy; {new Date().getFullYear()} VoxFusion</span>
 		</div>
 	</footer>
 </BaseLayout>
@@ -84,23 +70,6 @@ const description = t("notFound.description");
 </style>
 
 <style>
-	@keyframes blink {
-		0%, 50% { opacity: 1; }
-		51%, 100% { opacity: 0; }
-	}
-
-	@keyframes glitch {
-		0%, 100% { transform: translateX(0); opacity: 0; }
-		10% { transform: translateX(var(--offset)); opacity: 0.5; }
-		20% { transform: translateX(calc(var(--offset) * -0.5)); opacity: 0.3; }
-		30% { transform: translateX(0); opacity: 0; }
-	}
-
-	@keyframes pulse {
-		0%, 100% { opacity: 0.5; }
-		50% { opacity: 1; }
-	}
-
 	/* Error Page */
 	.error-page {
 		flex: 1;
@@ -179,7 +148,6 @@ const description = t("notFound.description");
 
 	.status.error {
 		color: #ff3e00;
-		animation: pulse 2s ease-in-out infinite;
 	}
 
 	.timestamp {
@@ -188,7 +156,6 @@ const description = t("notFound.description");
 	}
 
 	.cursor {
-		animation: blink 1s infinite;
 		color: #ff3e00;
 	}
 
@@ -258,26 +225,6 @@ const description = t("notFound.description");
 
 	.cta-icon {
 		font-size: 18px;
-	}
-
-	/* Glitch Effect */
-	.glitch-lines {
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		overflow: hidden;
-	}
-
-	.glitch-line {
-		position: absolute;
-		top: 50%;
-		left: -10%;
-		right: -10%;
-		height: 2px;
-		background: linear-gradient(90deg, transparent, #ff3e00, transparent);
-		opacity: 0;
-		animation: glitch 4s ease-in-out infinite;
-		animation-delay: var(--delay);
 	}
 
 	/* Footer */
