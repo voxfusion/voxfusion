@@ -741,9 +741,17 @@ mod layout {
 
     use super::x11::KEYCODE_OFFSET;
 
+    /// What one key types in each group, unshifted, with the key's XKB
+    /// group info: its number of groups, and what an active group past them
+    /// makes it show.
+    struct Key {
+        group_info: u8,
+        keysyms: Vec<u32>,
+    }
+
     struct Layout {
-        /// By X key code, the keysym each group puts on the key, unshifted.
-        keys: HashMap<u32, Vec<u32>>,
+        /// The keys, by X key code.
+        keys: HashMap<u32, Key>,
         /// The active group.
         group: usize,
     }
@@ -756,7 +764,7 @@ mod layout {
         format!("{context}: {err}")
     }
 
-    fn read_keys(connection: &RustConnection) -> Result<HashMap<u32, Vec<u32>>, String> {
+    fn read_keys(connection: &RustConnection) -> Result<HashMap<u32, Key>, String> {
         let setup = connection.setup();
         let (first, last) = (setup.min_keycode, setup.max_keycode);
         let none = xkb::MapPart::from(0u16);
@@ -794,10 +802,14 @@ mod layout {
             .map(|(index, key)| {
                 let width = usize::from(key.width).max(1);
                 let groups = usize::from(key.group_info & 0x0f);
-                let firsts = (0..groups)
+                let keysyms = (0..groups)
                     .filter_map(|group| key.syms.get(group * width).copied())
                     .collect();
-                (u32::from(first) + index as u32, firsts)
+                let key = Key {
+                    group_info: key.group_info,
+                    keysyms,
+                };
+                (u32::from(first) + index as u32, key)
             })
             .collect())
     }
@@ -890,15 +902,35 @@ mod layout {
         }
     }
 
+    /// The group of its own a key shows when `group` is active: that group
+    /// if the key has it, and otherwise what the key's group info says, as
+    /// XKB has it: wrap around the key's groups, clamp to the last, or
+    /// redirect to one.
+    pub(super) fn key_group(group: usize, group_info: u8) -> Option<usize> {
+        let groups = usize::from(group_info & 0x0f);
+        if groups == 0 {
+            return None;
+        }
+        if group < groups {
+            return Some(group);
+        }
+        Some(match group_info & 0xc0 {
+            0x40 => groups - 1,
+            0x80 => Some(usize::from((group_info >> 4) & 0x03))
+                .filter(|target| *target < groups)
+                .unwrap_or(0),
+            _ => group % groups,
+        })
+    }
+
     /// The keysym on the key with this kernel code in the active layout.
     pub fn keysym(code: u32) -> Option<u32> {
         let layout = LAYOUT
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let layout = layout.as_ref()?;
-        let groups = layout.keys.get(&(code + KEYCODE_OFFSET))?;
-        // A key with fewer groups wraps the active one around them.
-        let keysym = *groups.get(layout.group % groups.len().max(1))?;
+        let key = layout.keys.get(&(code + KEYCODE_OFFSET))?;
+        let keysym = *key.keysyms.get(key_group(layout.group, key.group_info)?)?;
         (keysym != 0).then_some(keysym)
     }
 }
@@ -1409,6 +1441,23 @@ mod tests {
         assert_eq!(combination_key(KEY_Q, None), Some(Code::KeyQ));
         assert_eq!(combination_key(KEY_KP0, Some(0xff9e)), Some(Code::Numpad0));
         assert_eq!(key_for_keysym(0xffbe), None);
+    }
+
+    #[test]
+    fn a_key_shows_the_group_its_settings_give_an_active_group_it_lacks() {
+        use layout::key_group;
+
+        // Two groups, wrapped by default.
+        assert_eq!(key_group(1, 0x02), Some(1));
+        assert_eq!(key_group(3, 0x02), Some(1));
+        // Clamped to the last.
+        assert_eq!(key_group(3, 0x42), Some(1));
+        // Redirected to the first, or to the second.
+        assert_eq!(key_group(3, 0x82), Some(0));
+        assert_eq!(key_group(3, 0x92), Some(1));
+        // A redirection past the key's groups falls back to the first.
+        assert_eq!(key_group(3, 0xb2), Some(0));
+        assert_eq!(key_group(0, 0x00), None);
     }
 
     #[test]
