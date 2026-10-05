@@ -70,7 +70,7 @@ whisper-rs = { version = "0.16", features = ["vulkan"] }
 pulseaudio = "0.3"
 futures = "0.3"
 # Keys, windows and displays on X11, and keyboards on Wayland.
-x11rb = { version = "0.13", features = ["xinput", "randr"] }
+x11rb = { version = "0.13", features = ["xinput", "randr", "xkb"] }
 evdev = "0.13"
 # The panel item.
 ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }

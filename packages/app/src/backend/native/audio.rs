@@ -164,7 +164,7 @@ impl Input {
 
         let (sources, default) = super::pulse::sources()?;
         let chosen = chosen_device(device_name);
-        let source = chosen.and_then(|name| sources.iter().find(|source| source.label == name));
+        let source = chosen.and_then(|name| sources.iter().find(|source| source.answers_to(name)));
         if let (Some(name), None) = (chosen, source) {
             log::warn!(
                 target: "audio",

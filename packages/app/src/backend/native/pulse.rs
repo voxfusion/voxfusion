@@ -178,8 +178,11 @@ pub fn with_connection<T>(
 pub struct Source {
     /// The server's name for it, which recording asks for.
     pub name: CString,
-    /// What the system's sound settings call it.
+    /// What the interface lists and saves it as: what the system's sound
+    /// settings call it, made unique by `distinct_labels`.
     pub label: String,
+    /// What the system's sound settings call it.
+    description: String,
     pub channels: u8,
     pub sample_rate: u32,
 }
@@ -198,6 +201,7 @@ pub fn sources() -> Result<(Vec<Source>, Option<CString>), String> {
             .filter(|source| source.monitor_of_sink_index.is_none())
             .map(|source| Source {
                 label: label(source.description.as_deref(), &source.name),
+                description: label(source.description.as_deref(), &source.name),
                 name: source.name,
                 channels: source.sample_spec.channels,
                 sample_rate: source.sample_spec.sample_rate,
@@ -225,10 +229,22 @@ fn distinct_labels(mut sources: Vec<Source>) -> Vec<Source> {
         .collect();
     for source in &mut sources {
         if shared.contains(&source.label) {
-            source.label = format!("{} ({})", source.label, source.name.to_string_lossy());
+            source.label = source.qualified_label();
         }
     }
     sources
+}
+
+impl Source {
+    fn qualified_label(&self) -> String {
+        format!("{} ({})", self.description, self.name.to_string_lossy())
+    }
+
+    /// Whether `saved` names this microphone. A label saved while another
+    /// microphone shared its description still does once that one is gone.
+    pub fn answers_to(&self, saved: &str) -> bool {
+        self.label == saved || self.qualified_label() == saved
+    }
 }
 
 /// A running recording. Dropping it ends the stream.
@@ -398,6 +414,7 @@ mod tests {
         Source {
             name: CString::new(name).unwrap(),
             label: label.to_string(),
+            description: label.to_string(),
             channels: 1,
             sample_rate: 48_000,
         }
@@ -422,5 +439,21 @@ mod tests {
                 "USB Microphone (alsa_input.usb-Mic_2)",
             ]
         );
+    }
+
+    #[test]
+    fn a_microphone_saved_beside_its_twin_is_found_once_the_twin_is_gone() {
+        let first = "USB Microphone (alsa_input.usb-Mic_1)";
+        let pair = distinct_labels(vec![
+            source("alsa_input.usb-Mic_1", "USB Microphone"),
+            source("alsa_input.usb-Mic_2", "USB Microphone"),
+        ]);
+        assert!(pair[0].answers_to(first));
+        assert!(!pair[1].answers_to(first));
+
+        let alone = distinct_labels(vec![source("alsa_input.usb-Mic_1", "USB Microphone")]);
+        assert_eq!(alone[0].label, "USB Microphone");
+        assert!(alone[0].answers_to(first));
+        assert!(alone[0].answers_to("USB Microphone"));
     }
 }

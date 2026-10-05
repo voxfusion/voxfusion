@@ -391,14 +391,13 @@ impl<O: Output> Muffler<O> {
         session.fade_to(session.original, duration, now);
     }
 
-    /// Moves a tap to the new default output when the output changes during a
-    /// recording, such as when headphones are plugged in. Audio on the old
-    /// output plays normally again once its tap stops.
+    /// Moves the session to the new default output when the output changes
+    /// during a recording, such as when headphones are plugged in. A tap
+    /// moves over, and audio on the old output plays normally again once its
+    /// tap stops; an output that was turned down gets its volume back, and
+    /// the new one is quieted as a new recording would quiet it.
     fn follow_default_output(&mut self, now: Instant) {
         let Some(session) = self.session.as_mut() else {
-            return;
-        };
-        let Control::Tap(effect) = session.control else {
             return;
         };
         if session.restoring {
@@ -410,6 +409,13 @@ impl<O: Output> Muffler<O> {
         if device == session.device {
             return;
         }
+        let Control::Tap(effect) = session.control else {
+            let quieting = session.quieting;
+            self.restore(true, now);
+            self.step(now);
+            self.start_session(quieting, device, now);
+            return;
+        };
         self.output.stop_tap(session.device);
         if self.output.start_tap(device, effect).is_ok() {
             session.device = device;
@@ -970,6 +976,51 @@ mod tests {
         muffler.step(ms(start, 1300));
         assert_volume(output.volume(2), 0.6);
         assert_eq!(output.volume(1), 0.8);
+    }
+
+    #[test]
+    fn a_turned_down_output_hands_over_to_the_new_default() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.connect(2, 0.6);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        assert_volume(output.volume(1), 0.8 * MUFFLED_VOLUME_RATIO);
+        output.set_default(2);
+        muffler.handle(Command::DevicesChanged, ms(start, 500));
+        assert_volume(output.volume(1), 0.8);
+        muffler.step(ms(start, 650));
+        assert_volume(output.volume(2), 0.6 * MUFFLED_VOLUME_RATIO);
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1300));
+        assert_volume(output.volume(2), 0.6);
+        assert_volume(output.volume(1), 0.8);
+    }
+
+    #[test]
+    fn a_turned_down_output_unplugged_mid_recording_is_restored_once_back() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.connect(2, 0.6);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        output.set_connected(1, false);
+        output.set_default(2);
+        muffler.handle(Command::DevicesChanged, ms(start, 500));
+        muffler.step(ms(start, 650));
+        assert_volume(output.volume(2), 0.6 * MUFFLED_VOLUME_RATIO);
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1300));
+        assert_volume(output.volume(2), 0.6);
+        output.set_connected(1, true);
+        muffler.handle(Command::DevicesChanged, ms(start, 1500));
+        assert_volume(output.volume(1), 0.8);
     }
 
     #[test]

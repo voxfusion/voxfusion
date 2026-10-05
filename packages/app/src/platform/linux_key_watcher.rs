@@ -207,16 +207,15 @@ impl Keys {
         }
     }
 
-    /// Returns false when the release does not follow from the keys known
-    /// to be held: a press went unobserved.
+    /// `key` is the modifier the key is now, which matters only when its
+    /// press went unobserved: a key is released as what it was pressed as,
+    /// even if the layout changed in between. Returns false when the release
+    /// does not follow from the keys known to be held.
     fn release(&mut self, id: KeyId, key: Option<SystemKey>, events: &EventSender) -> bool {
-        let Some(key) = key else {
-            self.others.remove(&id);
-            return true;
+        let Some(key) = self.modifiers.remove(&id) else {
+            let was_held = self.others.remove(&id);
+            return was_held || key.is_none();
         };
-        if self.modifiers.remove(&id).is_none() {
-            return false;
-        }
 
         let pressed_keys = self.pressed_modifiers();
         if pressed_keys.contains(&key) {
@@ -252,16 +251,16 @@ impl Keys {
 /// The shortcuts matched against the keyboard devices.
 struct Shortcuts {
     registered: Vec<(HotKey, String)>,
-    /// The key that completed a shortcut, with the shortcut, until the key
-    /// is released.
-    held: Option<(KeyId, String)>,
+    /// The keys that completed shortcuts, with the shortcut each completed,
+    /// until they are released.
+    held: Vec<(KeyId, String)>,
 }
 
 impl Shortcuts {
     const fn new() -> Self {
         Self {
             registered: Vec::new(),
-            held: None,
+            held: Vec::new(),
         }
     }
 
@@ -283,7 +282,7 @@ impl Shortcuts {
         else {
             return;
         };
-        self.held = Some((id, name.clone()));
+        self.held.push((id, name.clone()));
         events.emit(AppEvent::GlobalShortcut {
             shortcut: name.clone(),
             state: ShortcutState::Pressed,
@@ -291,25 +290,21 @@ impl Shortcuts {
     }
 
     fn key_released(&mut self, id: KeyId, events: &EventSender) {
-        if self.held.as_ref().is_some_and(|(held, _)| *held == id) {
-            self.release(events);
-        }
+        self.release_where(|held| *held == id, events);
     }
 
-    /// Releases the held shortcut if its key is not among `held`, as when its
-    /// keyboard was unplugged without reporting the key's release.
+    /// Releases the held shortcuts whose keys are not among `held`, as when
+    /// a keyboard was unplugged without reporting their release.
     fn release_unless_held(&mut self, held: &[(KeyId, Option<SystemKey>)], events: &EventSender) {
-        if self
-            .held
-            .as_ref()
-            .is_some_and(|(id, _)| !held.iter().any(|(down, _)| down == id))
-        {
-            self.release(events);
-        }
+        self.release_where(|id| !held.iter().any(|(down, _)| down == id), events);
     }
 
-    fn release(&mut self, events: &EventSender) {
-        if let Some((_, shortcut)) = self.held.take() {
+    fn release_where(&mut self, released: impl Fn(&KeyId) -> bool, events: &EventSender) {
+        let (gone, still_held) = std::mem::take(&mut self.held)
+            .into_iter()
+            .partition(|(id, _)| released(id));
+        self.held = still_held;
+        for (_, shortcut) in gone {
             events.emit(AppEvent::GlobalShortcut {
                 shortcut,
                 state: ShortcutState::Released,
@@ -569,7 +564,7 @@ mod x11 {
     }
 
     /// The keysym the layout puts on each X key code, without Shift.
-    pub(super) fn layout_keysyms(connection: &RustConnection) -> Result<HashMap<u32, u32>, String> {
+    fn layout_keysyms(connection: &RustConnection) -> Result<HashMap<u32, u32>, String> {
         let setup = connection.setup();
         let (first, last) = (setup.min_keycode, setup.max_keycode);
         let reply = connection
@@ -732,46 +727,161 @@ mod x11 {
 }
 
 /// What the keyboard layout puts on each key, read from XWayland, which
-/// follows the compositor's keymap. Without XWayland keys are matched by
-/// their place on a US keyboard.
+/// follows the compositor's keymap, in whichever of its layouts (XKB groups)
+/// is active. Without XWayland keys are matched by their place on a US
+/// keyboard.
 mod layout {
     use std::collections::HashMap;
     use std::sync::RwLock;
 
     use x11rb::connection::Connection as _;
     use x11rb::protocol::Event;
+    use x11rb::protocol::xkb::{self, ConnectionExt as _};
+    use x11rb::rust_connection::RustConnection;
 
-    use super::x11::{KEYCODE_OFFSET, layout_keysyms};
+    use super::x11::KEYCODE_OFFSET;
 
-    /// Keysyms by X key code.
-    static KEYSYMS: RwLock<Option<HashMap<u32, u32>>> = RwLock::new(None);
-
-    fn store(keysyms: HashMap<u32, u32>) {
-        *KEYSYMS
-            .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(keysyms);
+    struct Layout {
+        /// By X key code, the keysym each group puts on the key, unshifted.
+        keys: HashMap<u32, Vec<u32>>,
+        /// The active group.
+        group: usize,
     }
 
-    /// Reads the layout, and again whenever it changes.
+    static LAYOUT: RwLock<Option<Layout>> = RwLock::new(None);
+
+    const CORE_KEYBOARD: xkb::DeviceSpec = 0x100;
+
+    fn error(context: &str, err: impl std::fmt::Display) -> String {
+        format!("{context}: {err}")
+    }
+
+    fn read_keys(connection: &RustConnection) -> Result<HashMap<u32, Vec<u32>>, String> {
+        let setup = connection.setup();
+        let (first, last) = (setup.min_keycode, setup.max_keycode);
+        let none = xkb::MapPart::from(0u16);
+        let reply = connection
+            .xkb_get_map(
+                CORE_KEYBOARD,
+                xkb::MapPart::KEY_SYMS,
+                none,
+                0,
+                0,
+                first,
+                last - first + 1,
+                0,
+                0,
+                0,
+                0,
+                xkb::VMod::from(0u16),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            )
+            .map_err(|err| error("Reading the keyboard layout", err))?
+            .reply()
+            .map_err(|err| error("Reading the keyboard layout", err))?;
+
+        Ok(reply
+            .map
+            .syms_rtrn
+            .unwrap_or_default()
+            .into_iter()
+            .enumerate()
+            .map(|(index, key)| {
+                let width = usize::from(key.width).max(1);
+                let groups = usize::from(key.group_info & 0x0f);
+                let firsts = (0..groups)
+                    .filter_map(|group| key.syms.get(group * width).copied())
+                    .collect();
+                (u32::from(first) + index as u32, firsts)
+            })
+            .collect())
+    }
+
+    fn read_group(connection: &RustConnection) -> Result<usize, String> {
+        let state = connection
+            .xkb_get_state(CORE_KEYBOARD)
+            .map_err(|err| error("Reading the keyboard state", err))?
+            .reply()
+            .map_err(|err| error("Reading the keyboard state", err))?;
+        Ok(usize::from(u8::from(state.group)))
+    }
+
+    fn read(connection: &RustConnection) {
+        match read_keys(connection).and_then(|keys| Ok((keys, read_group(connection)?))) {
+            Ok((keys, group)) => {
+                log::info!(target: "hotkey", "keyboard_layout_read keys={} group={group}", keys.len());
+                *LAYOUT
+                    .write()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) =
+                    Some(Layout { keys, group });
+            }
+            Err(err) => log::warn!(target: "hotkey", "keyboard_layout_read_failed error={err}"),
+        }
+    }
+
+    fn set_group(group: usize) {
+        if let Some(layout) = LAYOUT
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_mut()
+        {
+            layout.group = group;
+        }
+    }
+
+    /// Reads the layout, and again whenever it or the active group changes.
     pub fn follow() {
         let Ok((connection, _)) = x11rb::connect(None) else {
             log::info!(target: "hotkey", "keyboard_layout_unavailable");
             return;
         };
-        match layout_keysyms(&connection) {
-            Ok(keysyms) => store(keysyms),
-            Err(err) => log::warn!(target: "hotkey", "keyboard_layout_read_failed error={err}"),
+        let supported = connection
+            .xkb_use_extension(1, 0)
+            .ok()
+            .and_then(|cookie| cookie.reply().ok())
+            .is_some_and(|reply| reply.supported);
+        let selected = supported
+            && connection
+                .xkb_select_events(
+                    CORE_KEYBOARD,
+                    xkb::EventType::from(0u16),
+                    xkb::EventType::NEW_KEYBOARD_NOTIFY | xkb::EventType::MAP_NOTIFY,
+                    xkb::MapPart::KEY_SYMS,
+                    xkb::MapPart::KEY_SYMS,
+                    &xkb::SelectEventsAux {
+                        state_notify: Some(xkb::SelectEventsAuxStateNotify {
+                            affect_state: xkb::StatePart::GROUP_STATE,
+                            state_details: xkb::StatePart::GROUP_STATE,
+                        }),
+                        ..Default::default()
+                    },
+                )
+                .ok()
+                .and_then(|cookie| cookie.check().ok())
+                .is_some();
+        if !selected {
+            log::info!(target: "hotkey", "keyboard_layout_unavailable");
+            return;
         }
+        read(&connection);
 
         let spawned = std::thread::Builder::new()
             .name("keyboard-layout".into())
             .spawn(move || {
-                // Every client hears of a changed keymap.
                 while let Ok(event) = connection.wait_for_event() {
-                    if matches!(event, Event::MappingNotify(_))
-                        && let Ok(keysyms) = layout_keysyms(&connection)
-                    {
-                        store(keysyms);
+                    match event {
+                        Event::XkbStateNotify(state) => {
+                            set_group(usize::from(u8::from(state.group)))
+                        }
+                        Event::XkbMapNotify(_)
+                        | Event::XkbNewKeyboardNotify(_)
+                        | Event::MappingNotify(_) => read(&connection),
+                        _ => {}
                     }
                 }
             });
@@ -780,14 +890,16 @@ mod layout {
         }
     }
 
-    /// The keysym on the key with this kernel code.
+    /// The keysym on the key with this kernel code in the active layout.
     pub fn keysym(code: u32) -> Option<u32> {
-        KEYSYMS
+        let layout = LAYOUT
             .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .as_ref()?
-            .get(&(code + KEYCODE_OFFSET))
-            .copied()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let layout = layout.as_ref()?;
+        let groups = layout.keys.get(&(code + KEYCODE_OFFSET))?;
+        // A key with fewer groups wraps the active one around them.
+        let keysym = *groups.get(layout.group % groups.len().max(1))?;
+        (keysym != 0).then_some(keysym)
     }
 }
 
@@ -1215,6 +1327,51 @@ mod tests {
         // Nothing more to release, even when the key comes up after all.
         shortcuts.key_released(external_k, &events);
         assert!(drain(&received).is_empty());
+    }
+
+    #[test]
+    fn a_key_is_released_as_the_modifier_it_was_pressed_as() {
+        let (events, received) = sender();
+        let mut keys = Keys::new();
+        keys.press(LEFT_CONTROL, Some(SystemKey::LeftControl), &events);
+        drain(&received);
+
+        // A remapper turned the key into a letter while it was down.
+        assert!(keys.release(LEFT_CONTROL, None, &events));
+        assert_eq!(
+            drain(&received),
+            vec![
+                AppEvent::SystemKeyReleased {
+                    key: SystemKey::LeftControl,
+                    pressed_keys: vec![],
+                },
+                AppEvent::SystemKeysReleased,
+            ]
+        );
+    }
+
+    #[test]
+    fn combinations_held_together_are_released_one_by_one() {
+        let (events, received) = sender();
+        let mut shortcuts = registered("Control+K");
+        shortcuts
+            .registered
+            .push(("Control+J".parse().unwrap(), "Control+J".to_string()));
+        let j = (0, 36);
+        shortcuts.key_pressed(K, Some(Code::KeyK), Modifiers::CONTROL, &events);
+        shortcuts.key_pressed(j, Some(Code::KeyJ), Modifiers::CONTROL, &events);
+        shortcuts.key_released(j, &events);
+        shortcuts.key_released(K, &events);
+
+        assert_eq!(
+            drain(&received),
+            vec![
+                shortcut("Control+K", ShortcutState::Pressed),
+                shortcut("Control+J", ShortcutState::Pressed),
+                shortcut("Control+J", ShortcutState::Released),
+                shortcut("Control+K", ShortcutState::Released),
+            ]
+        );
     }
 
     #[test]
