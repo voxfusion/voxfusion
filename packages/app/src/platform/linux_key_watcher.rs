@@ -1,52 +1,103 @@
-//! Watches the keyboard for modifier-only hotkeys on Linux, wherever the
-//! focus is: through XInput 2 raw key events on X11.
+//! Watches the keyboard on Linux, wherever the focus is: for modifier-only
+//! hotkeys, and on Wayland for every hotkey.
+//!
+//! On X11 it follows XInput 2 raw key events, and recognizes modifiers by
+//! what the keyboard layout makes of a key, so a key remapped to Control
+//! counts as Control. A Wayland compositor shows an app only the keys typed
+//! into its own windows, so there it reads the keyboard devices, which takes
+//! being in the `input` group, and modifiers are the physical keys.
 //!
 //! Key codes are the kernel's (evdev) codes, which X11 key codes are offset
-//! from by 8. Modifiers are recognized by what the keyboard layout makes of
-//! the key, so a key remapped to Control counts as Control.
+//! from by 8.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Mutex, OnceLock};
 
-use crate::backend::{AppEvent, EventSender, SystemKey};
+use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+
+use crate::backend::{AppEvent, EventSender, ShortcutState, SystemKey};
 
 /// The kernel's code for Escape.
 pub const ESCAPE_KEY_CODE: i64 = 1;
 
+/// Why hotkeys cannot work on Wayland without access to the keyboards.
+const NO_KEYBOARD_ACCESS: &str = "The keyboard cannot be read. On Wayland, VoxFusion reads \
+     its hotkeys from the keyboard devices, which takes being in the input group: run \
+     `sudo usermod -aG input $USER`, then log out and back in.";
+
 static EVENTS: OnceLock<EventSender> = OnceLock::new();
 static KEYS: Mutex<Keys> = Mutex::new(Keys::new());
-/// Set once a watcher runs; holds what it failed with otherwise.
-static STARTED: OnceLock<Result<Backend, String>> = OnceLock::new();
+static SHORTCUTS: Mutex<Shortcuts> = Mutex::new(Shortcuts::new());
+/// The watcher, once one runs.
+static WATCHER: Mutex<Option<Backend>> = Mutex::new(None);
 
-/// Starts watching, once. Later calls report how the first one went.
+/// Starts watching, unless a watcher runs already. A watcher that could not
+/// start is tried again on the next call, as the keyboard may have become
+/// readable since.
 pub fn setup(events: &EventSender) -> Result<(), String> {
     EVENTS.set(events.clone()).ok();
 
-    let started = STARTED.get_or_init(|| {
-        let started = x11::start();
-        match &started {
-            Ok(_) => log::info!(target: "hotkey", "system_key_watcher_started backend=x11"),
-            Err(err) => log::warn!(target: "hotkey", "system_key_watcher_unavailable error={err}"),
+    let mut watcher = WATCHER.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if watcher.is_some() {
+        return Ok(());
+    }
+
+    let (name, started) = if super::session::is_wayland() {
+        ("devices", devices::start())
+    } else {
+        ("x11", x11::start())
+    };
+    match started {
+        Ok(started) => {
+            log::info!(target: "hotkey", "system_key_watcher_started backend={name}");
+            *watcher = Some(started);
+            Ok(())
         }
-        started
-    });
-    started.as_ref().map(|_| ()).map_err(Clone::clone)
+        Err(err) => {
+            log::warn!(target: "hotkey", "system_key_watcher_unavailable backend={name} error={err}");
+            Err(err)
+        }
+    }
+}
+
+/// Whether hotkeys can be heard in every app. On X11 they always can; on
+/// Wayland only with access to a keyboard device.
+pub fn can_watch() -> bool {
+    !super::session::is_wayland() || devices::any_keyboard_readable()
 }
 
 /// Rebuilds the pressed-key state after the app was reopened, when key
 /// transitions may have gone unobserved.
 pub fn resynchronize(reason: &str) {
-    let Some(Ok(backend)) = STARTED.get() else {
+    let watcher = WATCHER.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let Some(backend) = watcher.as_ref() else {
         return;
     };
     let current = backend.held_keys();
+    drop(watcher);
     log::info!(target: "hotkey", "system_key_state_lifecycle_resynchronized reason={reason}");
     with_keys(|keys, events| keys.reset(current, events));
+}
+
+/// Has `hotkey` reported as `name` while the keyboard devices are watched,
+/// where no global shortcut can be registered with the system.
+pub fn register_shortcut(hotkey: HotKey, name: &str) {
+    let mut shortcuts = SHORTCUTS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    shortcuts.registered.retain(|(registered, _)| registered.id() != hotkey.id());
+    shortcuts.registered.push((hotkey, name.to_string()));
+}
+
+pub fn unregister_shortcut(hotkey: &HotKey) {
+    let mut shortcuts = SHORTCUTS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    shortcuts
+        .registered
+        .retain(|(registered, _)| registered.id() != hotkey.id());
 }
 
 /// A running watcher.
 enum Backend {
     X11(x11::Watcher),
+    Devices(devices::Watcher),
 }
 
 impl Backend {
@@ -54,6 +105,7 @@ impl Backend {
     fn held_keys(&self) -> Vec<(u32, Option<SystemKey>)> {
         match self {
             Backend::X11(watcher) => watcher.held_keys(),
+            Backend::Devices(watcher) => watcher.held_keys(),
         }
     }
 }
@@ -86,6 +138,21 @@ impl Keys {
     fn pressed_modifiers(&self) -> Vec<SystemKey> {
         let held: BTreeSet<SystemKey> = self.modifiers.values().copied().collect();
         held.into_iter().collect()
+    }
+
+    /// The held modifiers as a shortcut has them, either side counting.
+    fn combination_modifiers(&self) -> Modifiers {
+        self.modifiers
+            .values()
+            .fold(Modifiers::empty(), |held, key| {
+                held | match key {
+                    SystemKey::LeftControl | SystemKey::RightControl => Modifiers::CONTROL,
+                    SystemKey::LeftOption | SystemKey::RightOption => Modifiers::ALT,
+                    SystemKey::LeftShift | SystemKey::RightShift => Modifiers::SHIFT,
+                    SystemKey::LeftCommand | SystemKey::RightCommand => Modifiers::SUPER,
+                    SystemKey::Fn => Modifiers::empty(),
+                }
+            })
     }
 
     fn press(&mut self, code: u32, key: Option<SystemKey>, events: &EventSender) {
@@ -149,6 +216,182 @@ impl Keys {
         }
         events.emit(AppEvent::SystemKeysReleased);
     }
+}
+
+/// The shortcuts matched against the keyboard devices.
+struct Shortcuts {
+    registered: Vec<(HotKey, String)>,
+    /// The key that completed a shortcut, with the shortcut, until the key
+    /// is released.
+    held: Option<(u32, String)>,
+}
+
+impl Shortcuts {
+    const fn new() -> Self {
+        Self {
+            registered: Vec::new(),
+            held: None,
+        }
+    }
+
+    fn key_pressed(&mut self, code: u32, modifiers: Modifiers, events: &EventSender) {
+        let Some(key) = combination_key(code) else {
+            return;
+        };
+        let Some((_, name)) = self
+            .registered
+            .iter()
+            .find(|(hotkey, _)| hotkey.key == key && hotkey.mods == modifiers)
+        else {
+            return;
+        };
+        self.held = Some((code, name.clone()));
+        events.emit(AppEvent::GlobalShortcut {
+            shortcut: name.clone(),
+            state: ShortcutState::Pressed,
+        });
+    }
+
+    fn key_released(&mut self, code: u32, events: &EventSender) {
+        if self.held.as_ref().is_some_and(|(held, _)| *held == code)
+            && let Some((_, shortcut)) = self.held.take()
+        {
+            events.emit(AppEvent::GlobalShortcut {
+                shortcut,
+                state: ShortcutState::Released,
+            });
+        }
+    }
+}
+
+/// The modifier a physical key is.
+fn modifier_for_code(code: u32) -> Option<SystemKey> {
+    match code {
+        29 => Some(SystemKey::LeftControl),
+        97 => Some(SystemKey::RightControl),
+        42 => Some(SystemKey::LeftShift),
+        54 => Some(SystemKey::RightShift),
+        56 => Some(SystemKey::LeftOption),
+        100 => Some(SystemKey::RightOption),
+        125 => Some(SystemKey::LeftCommand),
+        126 => Some(SystemKey::RightCommand),
+        _ => None,
+    }
+}
+
+/// The key a shortcut names for a kernel key code: every key the hotkey
+/// recorder can write.
+fn combination_key(code: u32) -> Option<Code> {
+    use evdev::KeyCode as K;
+
+    let code = K::new(u16::try_from(code).ok()?);
+    Some(match code {
+        K::KEY_A => Code::KeyA,
+        K::KEY_B => Code::KeyB,
+        K::KEY_C => Code::KeyC,
+        K::KEY_D => Code::KeyD,
+        K::KEY_E => Code::KeyE,
+        K::KEY_F => Code::KeyF,
+        K::KEY_G => Code::KeyG,
+        K::KEY_H => Code::KeyH,
+        K::KEY_I => Code::KeyI,
+        K::KEY_J => Code::KeyJ,
+        K::KEY_K => Code::KeyK,
+        K::KEY_L => Code::KeyL,
+        K::KEY_M => Code::KeyM,
+        K::KEY_N => Code::KeyN,
+        K::KEY_O => Code::KeyO,
+        K::KEY_P => Code::KeyP,
+        K::KEY_Q => Code::KeyQ,
+        K::KEY_R => Code::KeyR,
+        K::KEY_S => Code::KeyS,
+        K::KEY_T => Code::KeyT,
+        K::KEY_U => Code::KeyU,
+        K::KEY_V => Code::KeyV,
+        K::KEY_W => Code::KeyW,
+        K::KEY_X => Code::KeyX,
+        K::KEY_Y => Code::KeyY,
+        K::KEY_Z => Code::KeyZ,
+        K::KEY_0 => Code::Digit0,
+        K::KEY_1 => Code::Digit1,
+        K::KEY_2 => Code::Digit2,
+        K::KEY_3 => Code::Digit3,
+        K::KEY_4 => Code::Digit4,
+        K::KEY_5 => Code::Digit5,
+        K::KEY_6 => Code::Digit6,
+        K::KEY_7 => Code::Digit7,
+        K::KEY_8 => Code::Digit8,
+        K::KEY_9 => Code::Digit9,
+        K::KEY_GRAVE => Code::Backquote,
+        K::KEY_BACKSLASH => Code::Backslash,
+        K::KEY_LEFTBRACE => Code::BracketLeft,
+        K::KEY_RIGHTBRACE => Code::BracketRight,
+        K::KEY_COMMA => Code::Comma,
+        K::KEY_EQUAL => Code::Equal,
+        K::KEY_MINUS => Code::Minus,
+        K::KEY_DOT => Code::Period,
+        K::KEY_APOSTROPHE => Code::Quote,
+        K::KEY_SEMICOLON => Code::Semicolon,
+        K::KEY_SLASH => Code::Slash,
+        K::KEY_SPACE => Code::Space,
+        K::KEY_TAB => Code::Tab,
+        K::KEY_ENTER => Code::Enter,
+        K::KEY_ESC => Code::Escape,
+        K::KEY_BACKSPACE => Code::Backspace,
+        K::KEY_DELETE => Code::Delete,
+        K::KEY_INSERT => Code::Insert,
+        K::KEY_CAPSLOCK => Code::CapsLock,
+        K::KEY_DOWN => Code::ArrowDown,
+        K::KEY_LEFT => Code::ArrowLeft,
+        K::KEY_RIGHT => Code::ArrowRight,
+        K::KEY_UP => Code::ArrowUp,
+        K::KEY_HOME => Code::Home,
+        K::KEY_END => Code::End,
+        K::KEY_PAGEUP => Code::PageUp,
+        K::KEY_PAGEDOWN => Code::PageDown,
+        K::KEY_KP0 => Code::Numpad0,
+        K::KEY_KP1 => Code::Numpad1,
+        K::KEY_KP2 => Code::Numpad2,
+        K::KEY_KP3 => Code::Numpad3,
+        K::KEY_KP4 => Code::Numpad4,
+        K::KEY_KP5 => Code::Numpad5,
+        K::KEY_KP6 => Code::Numpad6,
+        K::KEY_KP7 => Code::Numpad7,
+        K::KEY_KP8 => Code::Numpad8,
+        K::KEY_KP9 => Code::Numpad9,
+        K::KEY_KPPLUS => Code::NumpadAdd,
+        K::KEY_KPDOT => Code::NumpadDecimal,
+        K::KEY_KPSLASH => Code::NumpadDivide,
+        K::KEY_KPENTER => Code::NumpadEnter,
+        K::KEY_KPEQUAL => Code::NumpadEqual,
+        K::KEY_KPASTERISK => Code::NumpadMultiply,
+        K::KEY_KPMINUS => Code::NumpadSubtract,
+        K::KEY_F1 => Code::F1,
+        K::KEY_F2 => Code::F2,
+        K::KEY_F3 => Code::F3,
+        K::KEY_F4 => Code::F4,
+        K::KEY_F5 => Code::F5,
+        K::KEY_F6 => Code::F6,
+        K::KEY_F7 => Code::F7,
+        K::KEY_F8 => Code::F8,
+        K::KEY_F9 => Code::F9,
+        K::KEY_F10 => Code::F10,
+        K::KEY_F11 => Code::F11,
+        K::KEY_F12 => Code::F12,
+        K::KEY_F13 => Code::F13,
+        K::KEY_F14 => Code::F14,
+        K::KEY_F15 => Code::F15,
+        K::KEY_F16 => Code::F16,
+        K::KEY_F17 => Code::F17,
+        K::KEY_F18 => Code::F18,
+        K::KEY_F19 => Code::F19,
+        K::KEY_F20 => Code::F20,
+        K::KEY_F21 => Code::F21,
+        K::KEY_F22 => Code::F22,
+        K::KEY_F23 => Code::F23,
+        K::KEY_F24 => Code::F24,
+        _ => return None,
+    })
 }
 
 /// The modifier an X keysym stands for.
@@ -337,6 +580,198 @@ mod x11 {
     }
 }
 
+/// The keyboard devices, read directly. Each is read on a thread of its own;
+/// keyboards plugged in later are found by looking again every few seconds.
+mod devices {
+    use std::collections::HashSet;
+    use std::path::{Path, PathBuf};
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    use evdev::{Device, EventSummary, KeyCode};
+
+    use super::{Backend, NO_KEYBOARD_ACCESS, SHORTCUTS, SystemKey, modifier_for_code, with_keys};
+
+    /// How often new keyboards are looked for.
+    const RESCAN_INTERVAL: Duration = Duration::from_secs(2);
+
+    #[derive(Clone, Default)]
+    pub struct Watcher {
+        /// The devices being read.
+        watched: Arc<Mutex<HashSet<PathBuf>>>,
+    }
+
+    fn event_nodes() -> Vec<PathBuf> {
+        let Ok(entries) = std::fs::read_dir("/dev/input") else {
+            return Vec::new();
+        };
+        let mut nodes: Vec<PathBuf> = entries
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.file_name()
+                    .is_some_and(|name| name.to_string_lossy().starts_with("event"))
+            })
+            .collect();
+        nodes.sort();
+        nodes
+    }
+
+    /// Keyboards have letters or modifiers; power buttons and mice do not.
+    fn is_keyboard(device: &Device) -> bool {
+        device.supported_keys().is_some_and(|keys| {
+            [
+                KeyCode::KEY_A,
+                KeyCode::KEY_LEFTCTRL,
+                KeyCode::KEY_RIGHTCTRL,
+                KeyCode::KEY_LEFTMETA,
+            ]
+            .into_iter()
+            .any(|key| keys.contains(key))
+        })
+    }
+
+    /// Whether a keyboard device can be read.
+    pub fn any_keyboard_readable() -> bool {
+        event_nodes()
+            .iter()
+            .any(|node| Device::open(node).is_ok_and(|device| is_keyboard(&device)))
+    }
+
+    impl Watcher {
+        fn lock(&self) -> std::sync::MutexGuard<'_, HashSet<PathBuf>> {
+            self.watched.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+        }
+
+        /// Starts reading the keyboards not read yet. Returns how many there
+        /// are now, and whether any device could not be opened.
+        fn watch_new(&self) -> (usize, bool) {
+            let mut refused = false;
+            for node in event_nodes() {
+                if self.lock().contains(&node) {
+                    continue;
+                }
+                let device = match Device::open(&node) {
+                    Ok(device) => device,
+                    Err(err) => {
+                        refused |= err.kind() == std::io::ErrorKind::PermissionDenied;
+                        continue;
+                    }
+                };
+                if !is_keyboard(&device) {
+                    continue;
+                }
+
+                log::info!(
+                    target: "hotkey",
+                    "keyboard_watched device={:?} name={:?}",
+                    node,
+                    device.name().unwrap_or_default()
+                );
+                self.lock().insert(node.clone());
+                let watcher = self.clone();
+                let spawned = std::thread::Builder::new()
+                    .name("keyboard-watcher".into())
+                    .spawn(move || watcher.read(&node, device));
+                if let Err(err) = spawned {
+                    log::warn!(target: "hotkey", "keyboard_watch_failed error={err}");
+                }
+            }
+            (self.lock().len(), refused)
+        }
+
+        fn read(&self, node: &Path, mut device: Device) {
+            loop {
+                let events = match device.fetch_events() {
+                    Ok(events) => events,
+                    Err(err) => {
+                        // Unplugged: its keys are no longer held.
+                        log::info!(target: "hotkey", "keyboard_gone device={node:?} error={err}");
+                        self.lock().remove(node);
+                        let held = self.held_keys();
+                        with_keys(|keys, events| keys.reset(held, events));
+                        return;
+                    }
+                };
+                for event in events {
+                    let EventSummary::Key(_, key, value) = event.destructure() else {
+                        continue;
+                    };
+                    let code = u32::from(key.code());
+                    let modifier = modifier_for_code(code);
+                    match value {
+                        1 => with_keys(|keys, events| {
+                            keys.press(code, modifier, events);
+                            if modifier.is_none() {
+                                let modifiers = keys.combination_modifiers();
+                                SHORTCUTS
+                                    .lock()
+                                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                                    .key_pressed(code, modifiers, events);
+                            }
+                        }),
+                        0 => with_keys(|keys, events| {
+                            if !keys.release(code, modifier, events) {
+                                let held = self.held_keys();
+                                keys.reset(held, events);
+                            }
+                            SHORTCUTS
+                                .lock()
+                                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                                .key_released(code, events);
+                        }),
+                        // Autorepeat.
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        /// The keys held on every keyboard read.
+        pub fn held_keys(&self) -> Vec<(u32, Option<SystemKey>)> {
+            let nodes: Vec<PathBuf> = self.lock().iter().cloned().collect();
+            let mut held = Vec::new();
+            for node in nodes {
+                let Ok(state) = Device::open(&node).and_then(|device| device.get_key_state()) else {
+                    continue;
+                };
+                for key in state.iter() {
+                    let code = u32::from(key.code());
+                    held.push((code, modifier_for_code(code)));
+                }
+            }
+            held
+        }
+    }
+
+    pub fn start() -> Result<Backend, String> {
+        let watcher = Watcher::default();
+        let (keyboards, refused) = watcher.watch_new();
+        if keyboards == 0 {
+            return Err(if refused {
+                NO_KEYBOARD_ACCESS.to_string()
+            } else {
+                "No keyboard was found".to_string()
+            });
+        }
+        let held = watcher.held_keys();
+        with_keys(|keys, events| keys.reset(held, events));
+
+        let rescanning = watcher.clone();
+        std::thread::Builder::new()
+            .name("keyboard-scan".into())
+            .spawn(move || {
+                loop {
+                    std::thread::sleep(RESCAN_INTERVAL);
+                    rescanning.watch_new();
+                }
+            })
+            .map_err(|err| format!("Starting the keyboard scan: {err}"))?;
+
+        Ok(Backend::Devices(watcher))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -461,6 +896,67 @@ mod tests {
         // The key held through the reset is not pressed again by a repeat.
         keys.press(RIGHT_META, Some(SystemKey::RightCommand), &events);
         assert!(drain(&received).is_empty());
+    }
+
+    #[test]
+    fn combinations_match_whichever_side_the_modifiers_are_on() {
+        let (events, received) = sender();
+        let hotkey: HotKey = "Control+Shift+K".parse().unwrap();
+        let mut shortcuts = Shortcuts::new();
+        shortcuts
+            .registered
+            .push((hotkey, "Control+Shift+K".to_string()));
+        let mut keys = Keys::new();
+        keys.press(97, Some(SystemKey::RightControl), &events);
+        keys.press(42, Some(SystemKey::LeftShift), &events);
+        drain(&received);
+
+        shortcuts.key_pressed(K, keys.combination_modifiers(), &events);
+        shortcuts.key_released(K, &events);
+
+        assert_eq!(
+            drain(&received),
+            vec![
+                AppEvent::GlobalShortcut {
+                    shortcut: "Control+Shift+K".into(),
+                    state: ShortcutState::Pressed,
+                },
+                AppEvent::GlobalShortcut {
+                    shortcut: "Control+Shift+K".into(),
+                    state: ShortcutState::Released,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_combination_needs_exactly_its_modifiers() {
+        let (events, received) = sender();
+        let mut shortcuts = Shortcuts::new();
+        shortcuts
+            .registered
+            .push(("Control+K".parse().unwrap(), "Control+K".to_string()));
+
+        shortcuts.key_pressed(K, Modifiers::CONTROL | Modifiers::SHIFT, &events);
+        shortcuts.key_pressed(K, Modifiers::empty(), &events);
+        shortcuts.key_released(K, &events);
+
+        assert!(drain(&received).is_empty());
+    }
+
+    #[test]
+    fn every_key_the_recorder_writes_has_a_kernel_code() {
+        let names = [
+            "A", "Z", "0", "9", "`", "\\", "[", "]", ",", "=", "-", ".", "'", ";", "/", "Space",
+            "Tab", "Enter", "Escape", "Backspace", "Delete", "CapsLock", "ArrowDown", "ArrowLeft",
+            "ArrowRight", "ArrowUp", "Home", "End", "PageUp", "PageDown", "Numpad0", "NumpadAdd",
+            "NumpadEnter", "F1", "F12", "F13", "F24",
+        ];
+        let codes: Vec<Code> = (0..256).filter_map(combination_key).collect();
+        for name in names {
+            let hotkey: HotKey = format!("Control+{name}").parse().unwrap();
+            assert!(codes.contains(&hotkey.key), "{name}");
+        }
     }
 
     #[test]

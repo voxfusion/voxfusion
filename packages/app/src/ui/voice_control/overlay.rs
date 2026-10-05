@@ -492,7 +492,7 @@ pub fn open(
                 native.remove_frame();
                 log::info!(target: "runtime", "voice_control_frame_removed");
                 // GPUI shows every window it opens on X11.
-                if !show {
+                if !show && cfg!(target_os = "linux") {
                     native.hide();
                 }
             })

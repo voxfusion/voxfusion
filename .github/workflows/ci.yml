@@ -72,6 +72,39 @@ jobs:
         working-directory: packages/app
         run: cargo test
 
+  # Linux has code of its own for the sound server, the keyboard, the
+  # overlay window and the panel item.
+  rust-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-x11-dev libxcb1-dev libwayland-dev libvulkan-dev glslc libfontconfig-dev libasound2-dev libxdo-dev libssl-dev cmake clang
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app -> target'
+
+      - name: Cargo check
+        working-directory: packages/app
+        run: cargo check --all-targets
+
+      - name: Cargo check (fixture)
+        working-directory: packages/app
+        run: cargo check --features fixture
+
+      - name: Cargo test
+        working-directory: packages/app
+        run: cargo test
+
   # Builds the app bundle the way a release does (minus the Developer ID) and
   # checks what only a bundle on a real macOS can show: that macOS will ask
   # for the microphone, that the app starts, and that it stays out of the Dock.

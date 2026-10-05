@@ -19,6 +19,42 @@ use crate::ui::widgets::icon;
 
 const PERMISSION_POLL_INTERVAL: Duration = Duration::from_millis(1000);
 
+/// What the step asks for: on macOS the Accessibility permission, on Linux
+/// access to the keyboard, which only Wayland can lack and nothing can
+/// prompt for.
+struct Wording {
+    header: &'static str,
+    title: &'static str,
+    description: &'static str,
+    granted: &'static str,
+    not_granted: &'static str,
+    instructions: &'static str,
+    /// Whether the system has a prompt that leads to the setting.
+    can_request: bool,
+}
+
+#[cfg(not(target_os = "linux"))]
+const WORDING: Wording = Wording {
+    header: "[STEP_02] > ACCESSIBILITY_PERMISSION",
+    title: "onboarding.accessibilityTitle",
+    description: "onboarding.accessibilityDescription",
+    granted: "onboarding.accessibilityGranted",
+    not_granted: "onboarding.accessibilityNotGranted",
+    instructions: "onboarding.accessibilityInstructions",
+    can_request: true,
+};
+
+#[cfg(target_os = "linux")]
+const WORDING: Wording = Wording {
+    header: "[STEP_02] > KEYBOARD_ACCESS",
+    title: "onboarding.keyboardAccessTitle",
+    description: "onboarding.keyboardAccessDescription",
+    granted: "onboarding.keyboardAccessGranted",
+    not_granted: "onboarding.keyboardAccessNotGranted",
+    instructions: "onboarding.keyboardAccessInstructions",
+    can_request: false,
+};
+
 /// How long to wait before each further probe once the system has announced
 /// a change: its permission database takes a moment to settle.
 const RETRY_DELAYS: [Duration; 3] = [
@@ -164,14 +200,10 @@ impl AccessibilityPermissionStep {
 
         match self.granted {
             None => checking_row(t(cx, "onboarding.checkingPermission"), cx),
-            Some(true) => status_row(
-                icon("check").size_5(),
-                t(cx, "onboarding.accessibilityGranted"),
-                p.success,
-            ),
+            Some(true) => status_row(icon("check").size_5(), t(cx, WORDING.granted), p.success),
             Some(false) => status_row(
                 icon("alert-circle").size_5(),
-                t(cx, "onboarding.accessibilityNotGranted"),
+                t(cx, WORDING.not_granted),
                 p.ac,
             ),
         }
@@ -200,16 +232,16 @@ impl Render for AccessibilityPermissionStep {
 
         let content = div()
             .child(icon_box(icon("shield").text_color(p.ac), cx))
-            .child(title(&t(cx, "onboarding.accessibilityTitle"), cx))
-            .child(description(t(cx, "onboarding.accessibilityDescription"), cx).mb_4())
+            .child(title(&t(cx, WORDING.title), cx))
+            .child(description(t(cx, WORDING.description), cx).mb_4())
             .when(self.granted == Some(false), |content| {
-                content.child(side_note(t(cx, "onboarding.accessibilityInstructions"), cx).mb_6())
+                content.child(side_note(t(cx, WORDING.instructions), cx).mb_6())
             })
             .child(self.render_status(cx))
-            .when(self.granted != Some(true), |content| {
+            .when(WORDING.can_request && self.granted != Some(true), |content| {
                 content.child(self.render_action(cx))
             });
 
-        step_column("[STEP_02] > ACCESSIBILITY_PERMISSION", p.ac).child(card(content, cx))
+        step_column(WORDING.header, p.ac).child(card(content, cx))
     }
 }

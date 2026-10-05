@@ -14,6 +14,9 @@ use crate::{
 };
 
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    platform::session::init();
+
     // Asking for System Audio Recording relaunches this executable with an
     // argument (see `backend::native::media`); that copy does only that.
     if native::run_permission_request_if_asked() || diagnostics::run_if_asked() {
@@ -30,6 +33,12 @@ pub fn run() {
         target: "runtime",
         "setup_started cargo_package_version={}",
         env!("CARGO_PKG_VERSION")
+    );
+    #[cfg(target_os = "linux")]
+    log::info!(
+        target: "runtime",
+        "session wayland={}",
+        platform::session::is_wayland()
     );
 
     // macOS gives permissions to an app bundle. A bare executable started

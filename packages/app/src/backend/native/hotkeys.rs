@@ -74,6 +74,9 @@ pub struct GlobalShortcuts {
     /// The thread that delivers hotkey events locks it, so it is never held
     /// across a call into the manager, which may wait for that thread.
     names: Arc<ShortcutNames>,
+    /// Where the key watcher reports the shortcuts it matches on Wayland.
+    #[cfg(target_os = "linux")]
+    events: EventSender,
 }
 
 impl GlobalShortcuts {
@@ -83,6 +86,8 @@ impl GlobalShortcuts {
         let names = Arc::new(ShortcutNames::default());
 
         let registered = names.clone();
+        #[cfg(target_os = "linux")]
+        let watcher_events = events.clone();
         GlobalHotKeyEvent::set_event_handler(Some(move |event| {
             if let Some(event) = shortcut_event(&registered, event) {
                 events.emit(event);
@@ -92,6 +97,8 @@ impl GlobalShortcuts {
         Self {
             manager: Mutex::new(None),
             names,
+            #[cfg(target_os = "linux")]
+            events: watcher_events,
         }
     }
 
@@ -104,6 +111,15 @@ impl GlobalShortcuts {
     /// its events carry.
     pub fn register(&self, shortcut: &str) -> Result<(), String> {
         let hotkey = parse_shortcut(shortcut)?;
+
+        // A Wayland compositor registers no shortcuts for an app; the key
+        // watcher matches them against the keyboard instead.
+        #[cfg(target_os = "linux")]
+        if crate::platform::session::is_wayland() {
+            crate::platform::linux_key_watcher::setup(&self.events)?;
+            crate::platform::linux_key_watcher::register_shortcut(hotkey, shortcut);
+            return Ok(());
+        }
 
         // macOS delivers hotkeys through the main thread's event loop, and
         // the handler and every hotkey must be installed from that thread.
@@ -131,6 +147,12 @@ impl GlobalShortcuts {
     /// Does nothing for a shortcut the app does not hold.
     pub fn unregister(&self, shortcut: &str) -> Result<(), String> {
         let hotkey = parse_shortcut(shortcut)?;
+
+        #[cfg(target_os = "linux")]
+        if crate::platform::session::is_wayland() {
+            crate::platform::linux_key_watcher::unregister_shortcut(&hotkey);
+            return Ok(());
+        }
 
         main_thread::run(|| {
             let manager = self.manager.lock().map_err(|err| err.to_string())?;

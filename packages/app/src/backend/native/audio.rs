@@ -386,8 +386,12 @@ fn close_stream(stream: InputStream) {
     let spawned = std::thread::Builder::new()
         .name("audio-stream-close".into())
         .spawn(move || {
-            if let InputStream::Cpal(stream) = &stream {
-                let _ = stream.0.pause();
+            match &stream {
+                InputStream::Cpal(stream) => {
+                    let _ = stream.0.pause();
+                }
+                #[cfg(target_os = "linux")]
+                InputStream::Pulse { .. } => {}
             }
             drop(stream);
         });
