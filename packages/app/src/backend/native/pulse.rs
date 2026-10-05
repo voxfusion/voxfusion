@@ -203,14 +203,56 @@ pub fn sources() -> Result<(Vec<Source>, Option<CString>), String> {
                 sample_rate: source.sample_spec.sample_rate,
             })
             .collect();
-        Ok((sources, default))
+        Ok((distinct_labels(sources), default))
     })
+}
+
+/// Labels that tell every microphone apart, since the interface lists and
+/// saves them by label. Microphones that share a description, such as two of
+/// one USB model, are told apart by the server's name for each, which stays
+/// the same when they are plugged in again.
+fn distinct_labels(mut sources: Vec<Source>) -> Vec<Source> {
+    let shared: Vec<String> = sources
+        .iter()
+        .map(|source| source.label.clone())
+        .filter(|label| {
+            sources
+                .iter()
+                .filter(|source| source.label == *label)
+                .count()
+                > 1
+        })
+        .collect();
+    for source in &mut sources {
+        if shared.contains(&source.label) {
+            source.label = format!("{} ({})", source.label, source.name.to_string_lossy());
+        }
+    }
+    sources
 }
 
 /// A running recording. Dropping it ends the stream.
 pub struct Recording {
-    _client: pulseaudio::Client,
     _stream: pulseaudio::RecordStream,
+}
+
+/// The client that recordings stream through, kept between recordings.
+static RECORDING_CLIENT: Mutex<Option<pulseaudio::Client>> = Mutex::new(None);
+
+/// The recording client, connected again if the server has dropped it.
+fn recording_client() -> Result<pulseaudio::Client, String> {
+    use futures::executor::block_on;
+
+    let mut client = RECORDING_CLIENT.lock().map_err(|err| err.to_string())?;
+    if let Some(connected) = client.as_ref()
+        && block_on(connected.server_info()).is_ok()
+    {
+        return Ok(connected.clone());
+    }
+    let connected = pulseaudio::Client::from_env(CLIENT_NAME)
+        .map_err(|err| error("Connecting to the sound server", err))?;
+    *client = Some(connected.clone());
+    Ok(connected)
 }
 
 /// Records from `source`, or from the default microphone, as mono 32-bit
@@ -225,8 +267,7 @@ pub fn record(
 ) -> Result<Recording, String> {
     use futures::executor::block_on;
 
-    let client = pulseaudio::Client::from_env(CLIENT_NAME)
-        .map_err(|err| error("Connecting to the sound server", err))?;
+    let client = recording_client()?;
 
     // About 20 ms per callback, so the level meter moves smoothly.
     let fragment = sample_rate / 50 * 4;
@@ -266,10 +307,7 @@ pub fn record(
     }))
     .map_err(|err| error("Starting the recording", err))?;
 
-    Ok(Recording {
-        _client: client,
-        _stream: stream,
-    })
+    Ok(Recording { _stream: stream })
 }
 
 /// Calls `changed` from a thread of its own whenever an output or a
@@ -349,5 +387,40 @@ fn watch_until_disconnected(
         if relevant && events.send(()).is_err() {
             return Ok(());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn source(name: &str, label: &str) -> Source {
+        Source {
+            name: CString::new(name).unwrap(),
+            label: label.to_string(),
+            channels: 1,
+            sample_rate: 48_000,
+        }
+    }
+
+    #[test]
+    fn microphones_sharing_a_description_get_their_names_added() {
+        let labels: Vec<String> = distinct_labels(vec![
+            source("alsa_input.usb-Mic_1", "USB Microphone"),
+            source("alsa_input.pci-0000", "Built-in Audio"),
+            source("alsa_input.usb-Mic_2", "USB Microphone"),
+        ])
+        .into_iter()
+        .map(|source| source.label)
+        .collect();
+
+        assert_eq!(
+            labels,
+            [
+                "USB Microphone (alsa_input.usb-Mic_1)",
+                "Built-in Audio",
+                "USB Microphone (alsa_input.usb-Mic_2)",
+            ]
+        );
     }
 }
