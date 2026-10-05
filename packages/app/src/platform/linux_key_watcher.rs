@@ -37,7 +37,9 @@ static WATCHER: Mutex<Option<Backend>> = Mutex::new(None);
 pub fn setup(events: &EventSender) -> Result<(), String> {
     EVENTS.set(events.clone()).ok();
 
-    let mut watcher = WATCHER.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut watcher = WATCHER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if watcher.is_some() {
         return Ok(());
     }
@@ -69,7 +71,9 @@ pub fn can_watch() -> bool {
 /// Rebuilds the pressed-key state after the app was reopened, when key
 /// transitions may have gone unobserved.
 pub fn resynchronize(reason: &str) {
-    let watcher = WATCHER.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let watcher = WATCHER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let Some(backend) = watcher.as_ref() else {
         return;
     };
@@ -82,13 +86,19 @@ pub fn resynchronize(reason: &str) {
 /// Has `hotkey` reported as `name` while the keyboard devices are watched,
 /// where no global shortcut can be registered with the system.
 pub fn register_shortcut(hotkey: HotKey, name: &str) {
-    let mut shortcuts = SHORTCUTS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    shortcuts.registered.retain(|(registered, _)| registered.id() != hotkey.id());
+    let mut shortcuts = SHORTCUTS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    shortcuts
+        .registered
+        .retain(|(registered, _)| registered.id() != hotkey.id());
     shortcuts.registered.push((hotkey, name.to_string()));
 }
 
 pub fn unregister_shortcut(hotkey: &HotKey) {
-    let mut shortcuts = SHORTCUTS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut shortcuts = SHORTCUTS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     shortcuts
         .registered
         .retain(|(registered, _)| registered.id() != hotkey.id());
@@ -509,7 +519,10 @@ mod x11 {
             else {
                 return Vec::new();
             };
-            let mapping = self.mapping.read().unwrap_or_else(|poisoned| poisoned.into_inner());
+            let mapping = self
+                .mapping
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
 
             (0..256u32)
                 .filter(|keycode| reply.keys[*keycode as usize / 8] & (1 << (keycode % 8)) != 0)
@@ -570,9 +583,13 @@ mod x11 {
                 }
                 Event::MappingNotify(_) => match load_mapping(connection) {
                     Ok(loaded) => {
-                        *mapping.write().unwrap_or_else(|poisoned| poisoned.into_inner()) = loaded;
+                        *mapping
+                            .write()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner()) = loaded;
                     }
-                    Err(err) => log::warn!(target: "hotkey", "keyboard_layout_reload_failed error={err}"),
+                    Err(err) => {
+                        log::warn!(target: "hotkey", "keyboard_layout_reload_failed error={err}")
+                    }
                 },
                 _ => {}
             }
@@ -640,7 +657,9 @@ mod devices {
 
     impl Watcher {
         fn lock(&self) -> std::sync::MutexGuard<'_, HashSet<PathBuf>> {
-            self.watched.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+            self.watched
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
         }
 
         /// Starts reading the keyboards not read yet. Returns how many there
@@ -732,7 +751,8 @@ mod devices {
             let nodes: Vec<PathBuf> = self.lock().iter().cloned().collect();
             let mut held = Vec::new();
             for node in nodes {
-                let Ok(state) = Device::open(&node).and_then(|device| device.get_key_state()) else {
+                let Ok(state) = Device::open(&node).and_then(|device| device.get_key_state())
+                else {
                     continue;
                 };
                 for key in state.iter() {
@@ -947,10 +967,43 @@ mod tests {
     #[test]
     fn every_key_the_recorder_writes_has_a_kernel_code() {
         let names = [
-            "A", "Z", "0", "9", "`", "\\", "[", "]", ",", "=", "-", ".", "'", ";", "/", "Space",
-            "Tab", "Enter", "Escape", "Backspace", "Delete", "CapsLock", "ArrowDown", "ArrowLeft",
-            "ArrowRight", "ArrowUp", "Home", "End", "PageUp", "PageDown", "Numpad0", "NumpadAdd",
-            "NumpadEnter", "F1", "F12", "F13", "F24",
+            "A",
+            "Z",
+            "0",
+            "9",
+            "`",
+            "\\",
+            "[",
+            "]",
+            ",",
+            "=",
+            "-",
+            ".",
+            "'",
+            ";",
+            "/",
+            "Space",
+            "Tab",
+            "Enter",
+            "Escape",
+            "Backspace",
+            "Delete",
+            "CapsLock",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "ArrowUp",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown",
+            "Numpad0",
+            "NumpadAdd",
+            "NumpadEnter",
+            "F1",
+            "F12",
+            "F13",
+            "F24",
         ];
         let codes: Vec<Code> = (0..256).filter_map(combination_key).collect();
         for name in names {

@@ -210,7 +210,10 @@ fn theme_dirs(root: &Path, index: &str) -> Vec<ThemeDir> {
     let mut groups: HashMap<&str, HashMap<&str, &str>> = HashMap::new();
     let mut current = None;
     for line in index.lines().map(str::trim) {
-        if let Some(name) = line.strip_prefix('[').and_then(|line| line.strip_suffix(']')) {
+        if let Some(name) = line
+            .strip_prefix('[')
+            .and_then(|line| line.strip_suffix(']'))
+        {
             current = Some(name);
             continue;
         }
@@ -323,7 +326,12 @@ impl IconThemes {
         if path.is_absolute() {
             return path.is_file().then(|| path.to_path_buf());
         }
-        let files = |dir: &Path| [dir.join(format!("{icon}.png")), dir.join(format!("{icon}.svg"))];
+        let files = |dir: &Path| {
+            [
+                dir.join(format!("{icon}.png")),
+                dir.join(format!("{icon}.svg")),
+            ]
+        };
 
         self.dirs
             .iter()
@@ -357,7 +365,9 @@ fn desktop_entry_value<'a>(contents: &'a str, key: &str) -> Option<&'a str> {
 /// The desktop entries, read again once they are older than a while.
 fn cached_entries() -> Vec<DesktopEntry> {
     static CACHE: Mutex<Option<(Instant, Vec<DesktopEntry>)>> = Mutex::new(None);
-    let mut cache = CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut cache = CACHE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     match cache.as_ref() {
         Some((read_at, entries)) if read_at.elapsed() < ENTRIES_LIFETIME => entries.clone(),
         _ => {
@@ -463,13 +473,21 @@ mod x11 {
         static SERVER: OnceLock<Option<Server>> = OnceLock::new();
         SERVER
             .get_or_init(|| {
-                let wayland = std::env::var_os("WAYLAND_DISPLAY").is_some_and(|name| !name.is_empty());
+                let wayland =
+                    std::env::var_os("WAYLAND_DISPLAY").is_some_and(|name| !name.is_empty());
                 if wayland {
                     return None;
                 }
                 let (connection, screen) = x11rb::connect(None).ok()?;
                 let atom = |name: &str| -> Option<xproto::Atom> {
-                    Some(connection.intern_atom(false, name.as_bytes()).ok()?.reply().ok()?.atom)
+                    Some(
+                        connection
+                            .intern_atom(false, name.as_bytes())
+                            .ok()?
+                            .reply()
+                            .ok()?
+                            .atom,
+                    )
                 };
                 Some(Server {
                     root: connection.setup().roots[screen].root,
@@ -498,13 +516,20 @@ mod x11 {
         (!reply.value.is_empty()).then_some(reply.value)
     }
 
-    fn number(server: &Server, window: xproto::Window, name: xproto::Atom, kind: AtomEnum) -> Option<u32> {
+    fn number(
+        server: &Server,
+        window: xproto::Window,
+        name: xproto::Atom,
+        kind: AtomEnum,
+    ) -> Option<u32> {
         let value = property(server, window, name, kind)?;
         Some(u32::from_ne_bytes(value.get(..4)?.try_into().ok()?))
     }
 
     fn text(value: &[u8]) -> Option<String> {
-        let text = String::from_utf8_lossy(value).trim_matches('\0').to_string();
+        let text = String::from_utf8_lossy(value)
+            .trim_matches('\0')
+            .to_string();
         (!text.is_empty()).then_some(text)
     }
 
@@ -582,40 +607,66 @@ mod tests {
 
     #[test]
     fn programs_are_named_without_their_directory_or_environment() {
-        assert_eq!(program_name("/usr/bin/code --new-window %F").as_deref(), Some("code"));
+        assert_eq!(
+            program_name("/usr/bin/code --new-window %F").as_deref(),
+            Some("code")
+        );
         assert_eq!(
             program_name("env BAMF_DESKTOP_FILE_HINT=/x.desktop /snap/bin/firefox %u").as_deref(),
             Some("firefox")
         );
-        assert_eq!(program_name("\"/opt/My App/app\" %U").as_deref(), Some("app"));
+        assert_eq!(
+            program_name("\"/opt/My App/app\" %U").as_deref(),
+            Some("app")
+        );
         assert_eq!(program_name(""), None);
     }
 
     #[test]
     fn windows_are_matched_to_their_apps() {
         let entries = [
-            entry("org.gnome.TextEditor", "Text Editor", Some("gnome-text-editor"), None),
+            entry(
+                "org.gnome.TextEditor",
+                "Text Editor",
+                Some("gnome-text-editor"),
+                None,
+            ),
             entry("code", "Visual Studio Code", Some("code"), Some("Code")),
             entry("org.gnome.Nautilus", "Files", Some("nautilus"), None),
             entry("debian-xterm", "XTerm", Some("xterm"), Some("XTerm")),
             entry("firefox_firefox", "Firefox", Some("firefox"), None),
         ];
-        let owner = |application_id: Option<&str>, class: Option<&str>, program: Option<&str>| WindowOwner {
-            application_id: application_id.map(str::to_string),
-            instance: class.map(str::to_lowercase),
-            class: class.map(str::to_string),
-            program: program.map(str::to_string),
+        let owner = |application_id: Option<&str>, class: Option<&str>, program: Option<&str>| {
+            WindowOwner {
+                application_id: application_id.map(str::to_string),
+                instance: class.map(str::to_lowercase),
+                class: class.map(str::to_string),
+                program: program.map(str::to_string),
+            }
         };
         let id = |owner: WindowOwner| entry_for(&owner, &entries).map(|entry| entry.id.as_str());
 
         assert_eq!(
-            id(owner(Some("org.gnome.TextEditor"), Some("Gnome-text-editor"), None)),
+            id(owner(
+                Some("org.gnome.TextEditor"),
+                Some("Gnome-text-editor"),
+                None
+            )),
             Some("org.gnome.TextEditor")
         );
         assert_eq!(id(owner(None, Some("Code"), Some("code"))), Some("code"));
-        assert_eq!(id(owner(None, Some("XTerm"), Some("xterm"))), Some("debian-xterm"));
-        assert_eq!(id(owner(None, Some("Nautilus"), None)), Some("org.gnome.Nautilus"));
-        assert_eq!(id(owner(None, Some("Navigator"), Some("firefox"))), Some("firefox_firefox"));
+        assert_eq!(
+            id(owner(None, Some("XTerm"), Some("xterm"))),
+            Some("debian-xterm")
+        );
+        assert_eq!(
+            id(owner(None, Some("Nautilus"), None)),
+            Some("org.gnome.Nautilus")
+        );
+        assert_eq!(
+            id(owner(None, Some("Navigator"), Some("firefox"))),
+            Some("firefox_firefox")
+        );
         assert_eq!(id(owner(None, Some("Unknown"), Some("unknown"))), None);
     }
 
@@ -628,7 +679,10 @@ mod tests {
         };
         let app = frontmost_from(owner, &[]).unwrap();
 
-        assert_eq!((app.name.as_str(), app.bundle_id.as_str()), ("Scratch", "Scratch"));
+        assert_eq!(
+            (app.name.as_str(), app.bundle_id.as_str()),
+            ("Scratch", "Scratch")
+        );
         assert!(frontmost_from(WindowOwner::default(), &[]).is_none());
     }
 
@@ -648,7 +702,12 @@ mod tests {
 
         assert_eq!(
             dirs,
-            ["/t/64x64/apps", "/t/256x256/apps", "/t/scalable/apps", "/t/16x16/apps"]
+            [
+                "/t/64x64/apps",
+                "/t/256x256/apps",
+                "/t/scalable/apps",
+                "/t/16x16/apps"
+            ]
         );
     }
 }

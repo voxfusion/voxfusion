@@ -734,7 +734,9 @@ struct PulseOutput {
 }
 
 #[cfg(target_os = "linux")]
-fn default_sink(connection: &mut pulse::Connection) -> Result<pulseaudio::protocol::SinkInfo, String> {
+fn default_sink(
+    connection: &mut pulse::Connection,
+) -> Result<pulseaudio::protocol::SinkInfo, String> {
     let name = connection
         .server_info()?
         .default_sink_name
@@ -799,7 +801,11 @@ impl muffle::Output for PulseOutput {
             Some(balance) => balance,
             None => {
                 self.adjustable_volume(device)?;
-                self.balances.borrow().get(&device).cloned().unwrap_or_default()
+                self.balances
+                    .borrow()
+                    .get(&device)
+                    .cloned()
+                    .unwrap_or_default()
             }
         };
         let mut channels = ChannelVolume::empty();
@@ -807,7 +813,7 @@ impl muffle::Output for PulseOutput {
             let raw = (volume.max(0.0) * share * Volume::NORM.as_u32() as f32).round();
             channels.push(Volume::from_u32_clamped(raw as u32));
         }
-        pulse::with_connection(|connection| connection.set_sink_volume(device, channels.clone()))
+        pulse::with_connection(|connection| connection.set_sink_volume(device, channels))
     }
 
     fn start_tap(&self, _device: u32, _effect: muffle::TapEffect) -> Result<(), String> {
@@ -1019,9 +1025,11 @@ pub fn restore_media_after_recording() -> Result<(), String> {
     // since; it keeps its name when it is unplugged and plugged back in.
     #[cfg(target_os = "linux")]
     if let Some(name) = state.muted_sink.take() {
-        let unmuted = find_sink_by_name(&name).ok_or_else(|| "The output is gone".to_string()).and_then(
-            |index| pulse::with_connection(|connection| connection.set_sink_mute(index, false)),
-        );
+        let unmuted = find_sink_by_name(&name)
+            .ok_or_else(|| "The output is gone".to_string())
+            .and_then(|index| {
+                pulse::with_connection(|connection| connection.set_sink_mute(index, false))
+            });
         if let Err(err) = unmuted {
             log::warn!(target: "media", "restore_output_mute_failed sink={name} error={err}");
             state.pending_unmute_sinks.push(name);

@@ -20,7 +20,10 @@ fn decode_image_data_url(url: &str) -> Option<Image> {
     let (format, data) = if let Some(data) = url.strip_prefix("data:image/png;base64,") {
         (ImageFormat::Png, data)
     } else {
-        (ImageFormat::Svg, url.strip_prefix("data:image/svg+xml;base64,")?)
+        (
+            ImageFormat::Svg,
+            url.strip_prefix("data:image/svg+xml;base64,")?,
+        )
     };
     Some(Image::from_bytes(format, STANDARD.decode(data).ok()?))
 }

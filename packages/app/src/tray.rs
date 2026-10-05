@@ -12,10 +12,7 @@ pub use unsupported::Tray;
 
 /// What the user chose in the menu.
 // Only the macOS and Linux menus produce these.
-#[cfg_attr(
-    not(any(target_os = "macos", target_os = "linux")),
-    allow(dead_code)
-)]
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrayCommand {
     ShowHome,
@@ -330,7 +327,10 @@ mod linux {
         let mut buffer = vec![0; reader.output_buffer_size()];
         let info = reader.next_frame(&mut buffer).map_err(|e| e.to_string())?;
         if info.color_type != png::ColorType::Rgba {
-            return Err(format!("unsupported tray icon color type {:?}", info.color_type));
+            return Err(format!(
+                "unsupported tray icon color type {:?}",
+                info.color_type
+            ));
         }
         buffer.truncate(info.buffer_size());
 

@@ -238,9 +238,10 @@ impl Render for AccessibilityPermissionStep {
                 content.child(side_note(t(cx, WORDING.instructions), cx).mb_6())
             })
             .child(self.render_status(cx))
-            .when(WORDING.can_request && self.granted != Some(true), |content| {
-                content.child(self.render_action(cx))
-            });
+            .when(
+                WORDING.can_request && self.granted != Some(true),
+                |content| content.child(self.render_action(cx)),
+            );
 
         step_column(WORDING.header, p.ac).child(card(content, cx))
     }

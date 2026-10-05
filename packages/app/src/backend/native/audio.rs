@@ -172,7 +172,11 @@ impl Input {
             );
         }
         let sample_rate = source
-            .or_else(|| sources.iter().find(|source| default.as_ref() == Some(&source.name)))
+            .or_else(|| {
+                sources
+                    .iter()
+                    .find(|source| default.as_ref() == Some(&source.name))
+            })
             .map_or(FALLBACK_SAMPLE_RATE, |source| source.sample_rate);
 
         Ok(Self::Pulse {

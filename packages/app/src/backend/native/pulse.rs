@@ -57,13 +57,12 @@ impl Connection {
             sequence: 0,
         };
 
-        let auth: protocol::AuthReply =
-            connection.reply(Command::Auth(protocol::AuthParams {
-                version: protocol::MAX_VERSION,
-                supports_shm: false,
-                supports_memfd: false,
-                cookie,
-            }))?;
+        let auth: protocol::AuthReply = connection.reply(Command::Auth(protocol::AuthParams {
+            version: protocol::MAX_VERSION,
+            supports_shm: false,
+            supports_memfd: false,
+            cookie,
+        }))?;
         connection.version = protocol::MAX_VERSION.min(auth.version);
 
         let mut props = protocol::Props::new();
@@ -75,8 +74,13 @@ impl Connection {
 
     fn send(&mut self, command: &Command) -> Result<u32, String> {
         self.sequence = self.sequence.wrapping_add(1);
-        protocol::write_command_message(self.socket.get_mut(), self.sequence, command, self.version)
-            .map_err(|err| error("Sending a command", err))?;
+        protocol::write_command_message(
+            self.socket.get_mut(),
+            self.sequence,
+            command,
+            self.version,
+        )
+        .map_err(|err| error("Sending a command", err))?;
         Ok(self.sequence)
     }
 
@@ -92,8 +96,8 @@ impl Connection {
 
     fn ack(&mut self, command: Command) -> Result<(), String> {
         let sequence = self.send(&command)?;
-        let replied =
-            protocol::read_ack_message(&mut self.socket).map_err(|err| error("Reading a reply", err))?;
+        let replied = protocol::read_ack_message(&mut self.socket)
+            .map_err(|err| error("Reading a reply", err))?;
         if replied != sequence {
             return Err("The sound server replied out of turn".to_string());
         }
@@ -143,27 +147,30 @@ impl Connection {
 /// The connection that media changes go through, opened when first needed.
 static CONTROL: Mutex<Option<Connection>> = Mutex::new(None);
 
-/// Runs `command` on the shared connection, connecting again once if the
-/// server dropped it.
+/// Runs `command` on the shared connection. When it fails because the server
+/// dropped the connection, as when PipeWire restarts, it connects again and
+/// runs `command` once more.
 pub fn with_connection<T>(
     mut command: impl FnMut(&mut Connection) -> Result<T, String>,
 ) -> Result<T, String> {
     let mut control = CONTROL.lock().map_err(|err| err.to_string())?;
-    for attempt in 0..2 {
-        if control.is_none() {
-            *control = Some(Connection::open()?);
-        }
-        let connection = control.as_mut().expect("connected above");
-        match command(connection) {
-            Ok(value) => return Ok(value),
-            Err(err) if attempt == 0 => {
-                log::info!(target: "audio", "sound_server_reconnecting error={err}");
-                *control = None;
-            }
-            Err(err) => return Err(err),
-        }
+    let connection = match control.as_mut() {
+        Some(connection) => connection,
+        None => control.insert(Connection::open()?),
+    };
+    let err = match command(connection) {
+        Ok(value) => return Ok(value),
+        Err(err) => err,
+    };
+    // A server that still answers turned the command down.
+    if connection.server_info().is_ok() {
+        return Err(err);
     }
-    unreachable!("the second attempt returns")
+
+    log::info!(target: "audio", "sound_server_reconnecting error={err}");
+    *control = None;
+    let connection = control.insert(Connection::open()?);
+    command(connection)
 }
 
 /// A microphone: a source that is not the monitor of an output.
@@ -225,7 +232,6 @@ pub fn record(
     let fragment = sample_rate / 50 * 4;
     let mut props = protocol::Props::new();
     props.set(protocol::Prop::MediaName, c"Dictation");
-    props.set(protocol::Prop::MediaRole, c"phone");
     let params = protocol::RecordStreamParams {
         sample_spec: protocol::SampleSpec {
             format: protocol::SampleFormat::Float32Le,
@@ -327,8 +333,9 @@ fn watch_until_disconnected(
     }
 
     loop {
-        let (_, command) = protocol::read_command_message(&mut connection.socket, connection.version)
-            .map_err(|err| error("Watching devices", err))?;
+        let (_, command) =
+            protocol::read_command_message(&mut connection.socket, connection.version)
+                .map_err(|err| error("Watching devices", err))?;
         let Command::SubscribeEvent(event) = command else {
             continue;
         };
