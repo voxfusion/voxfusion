@@ -8,6 +8,8 @@
  *   - Add data-umami-event-* attributes for click event properties.
  *   - Add data-umami-view="event_name" to any section to capture once when it enters view.
  *   - Optionally pass data-umami-props='{"key":"value"}' for view event properties.
+ *
+ * data-domains keeps previews, dev servers and screenshot runs out of the statistics.
  */
 const UMAMI_WEBSITE_ID =
 	import.meta.env.PUBLIC_UMAMI_WEBSITE_ID ?? "d882f732-3dfa-4adc-8382-1b62cf146a98";
@@ -15,7 +17,7 @@ const UMAMI_SCRIPT_URL =
 	import.meta.env.PUBLIC_UMAMI_SCRIPT_URL ?? "https://cloud.umami.is/script.js";
 ---
 
-<script is:inline async defer src={UMAMI_SCRIPT_URL} data-website-id={UMAMI_WEBSITE_ID}></script>
+<script is:inline async defer src={UMAMI_SCRIPT_URL} data-website-id={UMAMI_WEBSITE_ID} data-domains="voxfusion.io"></script>
 
 <script is:inline>
 	function readProps(el) {

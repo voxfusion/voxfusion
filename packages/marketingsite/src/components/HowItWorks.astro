@@ -12,102 +12,53 @@ const barHeights = Array.from({ length: 22 }, (_, i) => 24 + Math.abs(Math.sin(i
 ---
 
 <ol class="steps">
-	<li class="step" data-reveal>
+	<li class="step">
 		<div class="step-top"><span class="step-number">01</span><span class="step-tag">{t("how.step1.tag")}</span></div>
 		<div class="step-visual" aria-hidden="true">
-			<KeyCombo press="tap" keys={[{ symbol: "⌃", label: "control" }, { symbol: "⌥", label: "option" }]} />
+			<KeyCombo keys={[{ symbol: "⌃", label: "control" }, { symbol: "⌥", label: "option" }]} />
 		</div>
-		<h3>{t("how.step1.title")}</h3>
-		<p>{t("how.step1.description")}</p>
+		<p>{t("how.step1.text")}</p>
 	</li>
-	<li class="step" data-reveal style="--reveal-delay: .12s">
+	<li class="step">
 		<div class="step-top"><span class="step-number">02</span><span class="step-tag">{t("how.step2.tag")}</span></div>
 		<div class="step-visual" aria-hidden="true">
 			<div class="mini-wave">
-				{barHeights.map((height, i) => (
-					<span style={`--i: ${i}; --h: ${height}%`}></span>
+				{barHeights.map((height) => (
+					<span style={`--h: ${height}%`}></span>
 				))}
 			</div>
 		</div>
-		<h3>{t("how.step2.title")}</h3>
-		<p>{t("how.step2.description")}</p>
+		<p>{t("how.step2.text")}</p>
 	</li>
-	<li class="step" data-reveal style="--reveal-delay: .24s">
+	<li class="step">
 		<div class="step-top"><span class="step-number">03</span><span class="step-tag">{t("how.step3.tag")}</span></div>
 		<div class="step-visual" aria-hidden="true">
-			<div class="typed-field tw-caret">
-				<span class="typed-label">NOTES</span>
-				<span class="typed-text"><span data-step-typed>{t("how.step3.sample")}<span class="tw-rest"></span></span></span>
-			</div>
+			<span class="typed-text tw-caret">{t("how.step3.sample")}<span class="tw-rest"></span></span>
 		</div>
-		<h3>{t("how.step3.title")}</h3>
-		<p>{t("how.step3.description")}</p>
+		<p>{t("how.step3.text")}</p>
 	</li>
 </ol>
 
-<script>
-	import { prefersReducedMotion, renderTyped, sleep, typeText } from "../scripts/typewriter";
-
-	// Retype the sample every few seconds while its step is on screen.
-	async function loopTyping(el: HTMLElement) {
-		const text = el.textContent ?? "";
-		let visible = false;
-		new IntersectionObserver((entries) => {
-			visible = entries[entries.length - 1].isIntersecting;
-		}).observe(el);
-
-		for (;;) {
-			await sleep(4200);
-			if (!visible || document.hidden) continue;
-			renderTyped(el, text, 0);
-			await sleep(700);
-			await typeText(el, text, 42);
-		}
-	}
-
-	if (!prefersReducedMotion() && "IntersectionObserver" in window) {
-		for (const el of document.querySelectorAll<HTMLElement>("[data-step-typed]")) {
-			loopTyping(el);
-		}
-	}
-</script>
-
 <style>
-	.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; border: 1px solid #343434; background: #111; }
-	.step { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 32px; transition: background .3s; }
-	.step + .step { border-left: 1px solid #343434; }
-	.step:hover { background: #141414; }
-	/* Rule that draws across each step in turn as the row is revealed. */
-	.step::before { content: ""; position: absolute; inset: -1px -1px auto; height: 2px; background: var(--accent); transform-origin: 0 50%; }
-	:global(.js) .step::before { transform: scaleX(0); transition: transform .9s var(--ease-out) calc(var(--reveal-delay, 0s) + .25s); }
-	:global(.js) .step.is-visible::before { transform: none; }
-	.step-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-	.step-number { font-size: 34px; line-height: 1; letter-spacing: -.05em; color: #ff4d19; }
-	.step-tag { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #8a8a8a; }
-	.step-visual { display: flex; align-items: center; justify-content: center; height: 118px; margin-bottom: 26px; padding: 0 18px; border: 1px solid #2c2c2c; background: #0c0c0c; }
-	.step h3 { margin-bottom: 10px; font-size: 20px; font-weight: 500; letter-spacing: -.04em; line-height: 1.35; }
-	.step p { color: #a3a3a3; font-size: 13px; line-height: 1.85; }
+	.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 56px; list-style: none; }
+	.step { min-width: 0; padding-top: 20px; border-top: 1px solid #303030; }
+	.step-top { display: flex; gap: 14px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+	.step-number { color: #ff6b3d; }
+	.step-tag { color: #a3a3a3; }
+	.step-visual { display: flex; align-items: center; height: 132px; }
+	.step p { color: #a3a3a3; font-size: 14px; line-height: 1.7; }
 
-	.mini-wave { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 230px; height: 56px; }
-	.mini-wave span { width: 4px; height: var(--h); background: #ff4d19; animation: step-wave 1.8s ease-in-out infinite; animation-delay: calc(var(--i) * -.11s); }
-	@keyframes step-wave { 0%, 100% { transform: scaleY(.4); opacity: .55; } 50% { transform: scaleY(1); opacity: 1; } }
-
-	.typed-field { display: flex; flex-direction: column; gap: 10px; width: 100%; padding: 14px; border: 1px solid #343434; background: #191919; }
-	.typed-label { font-size: 9px; letter-spacing: .08em; color: #8a8a8a; }
-	.typed-text { color: #d5d5d5; font-size: 12px; line-height: 1.6; }
+	.mini-wave { display: flex; align-items: center; gap: 6px; height: 52px; }
+	.mini-wave span { width: 3px; height: var(--h); background: #ff4d19; }
+	.typed-text { color: #e2e2e2; font-size: 15px; line-height: 1.6; letter-spacing: -.02em; }
 
 	@media (max-width: 1050px) {
-		.step { padding: 26px 22px; }
+		.steps { gap: 36px; }
+		.mini-wave { gap: 4px; }
 	}
 	@media (max-width: 800px) {
-		.steps { grid-template-columns: 1fr; }
-		.step + .step { border-left: 0; border-top: 1px solid #343434; }
-	}
-	@media (max-width: 540px) {
-		.step { padding: 24px 20px; }
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.mini-wave span { animation: none; }
-		:global(.js) .step::before { transform: none; transition: none; }
+		.steps { grid-template-columns: 1fr; gap: 0; }
+		.step { padding-bottom: 28px; }
+		.step-visual { height: 104px; }
 	}
 </style>

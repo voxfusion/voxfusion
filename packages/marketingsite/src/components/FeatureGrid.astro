@@ -1,10 +1,12 @@
 ---
 /**
- * Feature grid: a full-width lead card (heading beside its preview), then
- * six cards in rows of three, then two, then one.
+ * Features: the app's own window (a real capture, not a drawing; its empty
+ * lower edge is cropped away on wide screens), then six lines of text, each
+ * a short claim with a quieter second sentence.
  */
+import appWindowPhone from "../assets/app-history-phone.webp";
+import appWindow from "../assets/app-history.webp";
 import { defaultLang, type languages, useTranslations } from "../i18n/utils";
-import KeyCombo from "./KeyCombo.astro";
 
 interface Props {
 	lang?: keyof typeof languages;
@@ -12,210 +14,46 @@ interface Props {
 
 const { lang = defaultLang } = Astro.props;
 const t = useTranslations(lang);
-const extras = ([1, 2, 3, 4, 5, 6] as const).map((n) => t(`features.extras.item${n}`));
+const features = (
+	["onDevice", "languages", "dictionary", "styles", "focus", "history"] as const
+).map((key, i) => ({
+	index: `0${i + 1}`,
+	label: t(`features.${key}.label`),
+	lead: t(`features.${key}.lead`),
+	rest: t(`features.${key}.rest`),
+}));
 ---
 
-<div class="features-grid">
-	<article class="feature-card is-wide accent-card" data-reveal>
-		<div class="feature-heading">
-			<span class="feature-index">01 / SHORTCUTS</span>
-			<h3>{t("features.shortcuts.title")}</h3>
-			<p>{t("features.shortcuts.description")}</p>
-		</div>
-		<div class="feature-preview shortcut-preview" aria-hidden="true">
-			<div class="shortcut-mode">
-				<span class="mode-label">HANDS-FREE</span>
-				<KeyCombo press="tap" keys={[{ symbol: "⌃", label: "control" }, { symbol: "⌥", label: "option" }]} />
-				<span class="mode-hint">Tap to start, tap to stop</span>
-			</div>
-			<div class="shortcut-mode">
-				<span class="mode-label">HOLD TO SPEAK</span>
-				<KeyCombo press="hold" keys={[{ symbol: "⌘", label: "right command", wide: true }]} />
-				<span class="mode-hint">Hold, talk, release</span>
-			</div>
-		</div>
-	</article>
+<picture class="app-window">
+	<source srcset={appWindowPhone.src} media="(max-width: 540px)" width={appWindowPhone.width / 3} height={appWindowPhone.height / 3} />
+	<img src={appWindow.src} width={appWindow.width / 3} height={appWindow.height / 3} alt={t("features.window.alt")} loading="lazy" decoding="async" />
+</picture>
 
-	<article class="feature-card" data-reveal>
-		<div class="feature-heading">
-			<span class="feature-index">02 / ON DEVICE</span>
-			<h3>{t("features.onDevice.title")}</h3>
-			<p>{t("features.onDevice.description")}</p>
-		</div>
-		<div class="feature-preview model-preview" aria-hidden="true">
-			<div class="preview-label">YOUR MAC <span class="preview-flag">[ OFFLINE ]</span></div>
-			<div class="model-row is-active">
-				<span class="model-dot"></span>
-				<span class="model-name">Whisper Large v3 Turbo<small>99 languages / ~1.5 GB</small></span>
-			</div>
-			<div class="model-row">
-				<span class="model-dot"></span>
-				<span class="model-name">Parakeet TDT 0.6B v3<small>25 European languages / ~745 MB</small></span>
-			</div>
-		</div>
-	</article>
-
-	<article class="feature-card" data-reveal style="--reveal-delay: .1s">
-		<div class="feature-heading">
-			<span class="feature-index">03 / VOCABULARY</span>
-			<h3>{t("features.dictionary.title")}</h3>
-			<p>{t("features.dictionary.description")}</p>
-		</div>
-		<div class="feature-preview dictionary-preview" aria-hidden="true">
-			<div class="preview-tabs"><span class="is-active">DEFAULT</span><span>PER-APP</span><span>PER-SITE</span></div>
-			<div class="dictionary-words"><span>VoxFusion</span><span>TypeScript</span><span>PostgreSQL</span><span>Kubernetes</span><span class="add-word">+ add</span></div>
-		</div>
-	</article>
-
-	<article class="feature-card" data-reveal style="--reveal-delay: .2s">
-		<div class="feature-heading">
-			<span class="feature-index">04 / STYLES</span>
-			<h3>{t("features.styles.title")}</h3>
-			<p>{t("features.styles.description")}</p>
-		</div>
-		<div class="feature-preview rows-preview" aria-hidden="true">
-			<div class="preview-label">STYLE PER APP <span>EXAMPLE</span></div>
-			<div class="style-row"><span>Mail</span><span class="flow-arrow">→</span><span class="style-name">Professional</span></div>
-			<div class="style-row"><span>Slack</span><span class="flow-arrow">→</span><span class="style-name">Casual</span></div>
-			<div class="style-row"><span>Cursor</span><span class="flow-arrow">→</span><span class="style-name">Agents</span></div>
-		</div>
-	</article>
-
-	<article class="feature-card" data-reveal>
-		<div class="feature-heading">
-			<span class="feature-index">05 / FOCUS</span>
-			<h3>{t("features.focus.title")}</h3>
-			<p>{t("features.focus.description")}</p>
-		</div>
-		<div class="feature-preview volume-preview" aria-hidden="true">
-			<div class="preview-label">SYSTEM AUDIO <span class="preview-flag">[ AUTO ]</span></div>
-			<div class="volume-row"><span>Before</span><div class="volume-bar"><i style="--level: 76%"></i></div></div>
-			<div class="volume-row is-recording"><span>Recording</span><div class="volume-bar"><i style="--level: 12%; --bar-delay: .15s"></i></div></div>
-			<div class="volume-row"><span>After</span><div class="volume-bar"><i style="--level: 76%; --bar-delay: .3s"></i></div></div>
-		</div>
-	</article>
-
-	<article class="feature-card" data-reveal style="--reveal-delay: .1s">
-		<div class="feature-heading">
-			<span class="feature-index">06 / HISTORY</span>
-			<h3>{t("features.history.title")}</h3>
-			<p>{t("features.history.description")}</p>
-		</div>
-		<div class="feature-preview rows-preview" aria-hidden="true">
-			<div class="preview-label">RECENT TRANSCRIPTIONS <span class="preview-flag">[ COPY ]</span></div>
-			<div class="history-row"><span class="history-time">10:42</span><span>Let's schedule a quick sync for tomorrow.</span></div>
-			<div class="history-row"><span class="history-time">09:18</span><span>The pull request is ready for review.</span></div>
-		</div>
-	</article>
-
-	<article class="feature-card extras-card" data-reveal style="--reveal-delay: .2s">
-		<span class="feature-index">07 / DETAILS</span>
-		<h3>{t("features.extras.title")}</h3>
-		<ul class="extras">
-			{extras.map((item) => <li><span aria-hidden="true">+</span>{item}</li>)}
-		</ul>
-	</article>
-</div>
+<ul class="features">
+	{features.map((feature) => (
+		<li>
+			<span class="feature-label"><b>{feature.index}</b>{feature.label}</span>
+			<p><strong>{feature.lead}</strong> {feature.rest}</p>
+		</li>
+	))}
+</ul>
 
 <style>
-	.features-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+	.app-window img { display: block; width: 100%; height: auto; aspect-ratio: 1024 / 650; object-fit: cover; object-position: top; border: 1px solid #3b3b3b; box-shadow: 10px 10px 0 #0a0a0a, 11px 11px 0 #272727; }
 
-	.feature-card { display: flex; flex-direction: column; min-width: 0; padding: 30px; border: 1px solid #343434; background: #111; transition: border-color .2s, box-shadow .2s, transform .2s; }
-	.feature-card:hover { border-color: #686058; box-shadow: 6px 6px 0 #1b1b1b; transform: translate(-2px, -2px); }
-	.accent-card { background: #15110f; border-color: #61402f; }
-	.accent-card:hover { border-color: #8a5a41; box-shadow: 6px 6px 0 #241812; }
-	.is-wide { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 56px; align-items: center; padding: 36px; }
-	.is-wide h3 { font-size: 25px; }
-	.is-wide .feature-heading p { font-size: 14px; max-width: 460px; }
-	.feature-index { display: block; margin-bottom: 22px; color: #ff754c; font-size: 11px; letter-spacing: .09em; }
-	.feature-card h3 { margin-bottom: 12px; font-size: 21px; font-weight: 500; letter-spacing: -.045em; line-height: 1.3; }
-	.feature-heading p { margin-bottom: 28px; color: #aaa; font-size: 13px; line-height: 1.85; }
-	.is-wide .feature-heading p { margin-bottom: 0; }
-	.feature-preview { min-height: 168px; margin-top: auto; border: 1px solid #333; background: #0c0c0c; }
-	.is-wide .feature-preview { margin-top: 0; }
-	.preview-label { display: flex; justify-content: space-between; gap: 12px; font-size: 10px; letter-spacing: .06em; color: #a0a0a0; }
-	.preview-label > span { color: #777; }
-	.preview-label > .preview-flag { color: #ff754c; }
-	.flow-arrow { color: #756456; }
-
-	.shortcut-preview { display: grid; grid-template-columns: 1.2fr 1fr; border-color: #3c2e25; background: #100e0c; }
-	.shortcut-mode { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; padding: 20px 12px; }
-	.shortcut-mode + .shortcut-mode { border-left: 1px solid #3c2e25; }
-	.mode-label { color: #c9a996; font-size: 10px; letter-spacing: .08em; }
-	.mode-hint { color: #a79183; font-size: 10px; text-align: center; }
-
-	.model-preview { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 18px 20px; }
-	.model-preview .preview-label { margin-bottom: 4px; }
-	.model-row { display: flex; align-items: flex-start; gap: 12px; padding: 11px 14px; border: 1px solid #2c2c2c; color: #9a9a9a; font-size: 12px; }
-	.model-row.is-active { border-color: #67422f; background: #1d1511; color: #e2d5cd; }
-	.model-dot { flex-shrink: 0; width: 7px; height: 7px; margin-top: 5px; border: 1px solid #666; }
-	.is-active .model-dot { border-color: #ff754c; background: #ff754c; animation: dot-pulse 2.4s ease-in-out infinite; }
-	@keyframes dot-pulse { 50% { box-shadow: 0 0 0 4px #ff754c26; } }
-	.model-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-	.model-name small { color: #7f7f7f; font-size: 10px; }
-	.is-active .model-name small { color: #ff8d69; }
-
-	.dictionary-preview { padding: 18px 20px; display: flex; flex-direction: column; gap: 18px; }
-	.preview-tabs { display: flex; gap: 18px; border-bottom: 1px solid #2a2a2a; font-size: 10px; letter-spacing: .06em; color: #777; }
-	.preview-tabs span { padding-bottom: 10px; margin-bottom: -1px; border-bottom: 1px solid transparent; }
-	.preview-tabs .is-active { color: #d2d2d2; border-bottom-color: #ff754c; }
-	.dictionary-words { display: flex; flex-wrap: wrap; gap: 8px; }
-	.dictionary-words span { padding: 7px 10px; color: #d2d2d2; border: 1px solid #3c3c3c; border-bottom-color: #9c593b; font-size: 12px; }
-	.dictionary-words .add-word { color: #777; border-style: dashed; border-color: #3c3c3c; }
-
-	.rows-preview { padding: 18px 20px 4px; }
-	.rows-preview .preview-label { margin-bottom: 12px; }
-	.style-row { display: grid; grid-template-columns: 64px 20px 1fr; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #2a2a2a; color: #bebebe; font-size: 12px; }
-	.style-name { justify-self: start; padding: 4px 9px; border: 1px solid #4a3528; color: #ff9470; background: #1a1310; font-size: 11px; }
-	.history-row { display: grid; grid-template-columns: 44px 1fr; gap: 14px; align-items: baseline; padding: 11px 0; border-top: 1px solid #2a2a2a; color: #bebebe; font-size: 11px; line-height: 1.8; }
-	.history-time { color: #ff754c; font-size: 10px; }
-
-	.volume-preview { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: 18px 20px 22px; }
-	.volume-row { display: grid; grid-template-columns: 76px 1fr; align-items: center; gap: 14px; color: #9a9a9a; font-size: 11px; }
-	.volume-bar { height: 10px; background: repeating-linear-gradient(90deg, #262626 0 5px, transparent 5px 8px); }
-	.volume-bar i { display: block; height: 100%; background: repeating-linear-gradient(90deg, #8c8c8c 0 5px, transparent 5px 8px); clip-path: inset(0 calc(100% - var(--level)) 0 0); }
-	.volume-row.is-recording { color: #ff754c; }
-	.is-recording .volume-bar i { background: repeating-linear-gradient(90deg, #ff4d19 0 5px, transparent 5px 8px); }
-	/* Meters fill up to their level once the card is revealed. */
-	:global(.js) .volume-bar i { clip-path: inset(0 100% 0 0); transition: clip-path .9s var(--ease-out) calc(var(--bar-delay, 0s) + .35s); }
-	:global(.js) .is-visible .volume-bar i { clip-path: inset(0 calc(100% - var(--level)) 0 0); }
-
-	.extras-card { background: transparent; border-style: dashed; }
-	.extras { display: flex; flex: 1; flex-direction: column; margin-top: 14px; list-style: none; }
-	.extras li { display: flex; flex: 1; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px dashed #2e2e2e; color: #b4b4b4; font-size: 12px; line-height: 1.6; }
-	.extras li span { color: #ff754c; }
+	.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 56px; margin-top: 88px; list-style: none; }
+	.features li { min-width: 0; padding-top: 20px; border-top: 1px solid #303030; }
+	.feature-label { display: flex; gap: 14px; margin-bottom: 16px; color: #a3a3a3; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+	.feature-label b { color: #ff6b3d; font-weight: 400; }
+	.features p { color: #8a8a8a; font-size: 15px; line-height: 1.7; letter-spacing: -.01em; }
+	.features strong { color: #e6e6e6; font-weight: 500; }
 
 	@media (max-width: 1050px) {
-		.features-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-		.feature-card { padding: 26px; }
-		.is-wide { gap: 32px; padding: 28px; }
-		.is-wide h3 { font-size: 23px; }
+		.features { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 36px; margin-top: 72px; }
 	}
-
-	@media (max-width: 800px) {
-		.features-grid { grid-template-columns: 1fr; gap: 16px; }
-		.is-wide { display: flex; gap: 0; align-items: stretch; }
-		.is-wide .feature-heading p { margin-bottom: 28px; max-width: none; }
-	}
-
 	@media (max-width: 540px) {
-		.feature-card { padding: 24px 20px; }
-		.feature-index { font-size: 10px; margin-bottom: 18px; }
-		.feature-heading p, .is-wide .feature-heading p { margin-bottom: 24px; }
-		.preview-label { font-size: 9px; }
-		.model-preview, .dictionary-preview, .rows-preview, .volume-preview { padding-inline: 14px; }
-		.shortcut-preview { grid-template-columns: 1fr; }
-		.shortcut-mode + .shortcut-mode { border-left: 0; border-top: 1px solid #3c2e25; }
-		.is-wide { padding: 24px 20px; }
-		.history-row { gap: 8px; grid-template-columns: 36px 1fr; }
-		.dictionary-words span { font-size: 11px; }
-		.preview-tabs { gap: 14px; }
-	}
-
-	@media (prefers-reduced-motion: reduce) {
-		.feature-card { transition: none; }
-		.feature-card:hover { transform: none; }
-		.is-active .model-dot { animation: none; }
-		:global(.js) .volume-bar i { clip-path: inset(0 calc(100% - var(--level)) 0 0); transition: none; }
+		.app-window img { aspect-ratio: auto; box-shadow: 6px 6px 0 #0a0a0a, 7px 7px 0 #272727; }
+		.features { grid-template-columns: 1fr; gap: 28px; margin-top: 56px; }
+		.features p { font-size: 14px; }
 	}
 </style>
