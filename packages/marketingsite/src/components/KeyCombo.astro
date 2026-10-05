@@ -1,8 +1,5 @@
 ---
-/**
- * Keycaps for a shortcut. `press` loops a press animation: "tap" for a
- * quick press-and-release, "hold" for a key that stays down a while.
- */
+/** Keycaps for a shortcut. */
 interface Key {
 	symbol: string;
 	label: string;
@@ -11,14 +8,12 @@ interface Key {
 
 interface Props {
 	keys: Key[];
-	press?: "tap" | "hold";
-	compact?: boolean;
 }
 
-const { keys, press, compact = false } = Astro.props;
+const { keys } = Astro.props;
 ---
 
-<div class:list={["keys", { "is-compact": compact }]} data-press={press}>
+<div class="keys">
 	{keys.map((key, i) => (
 		<>
 			{i > 0 && <span class="key-plus">+</span>}
@@ -33,20 +28,6 @@ const { keys, press, compact = false } = Astro.props;
 	.key b { font-size: 22px; line-height: 1; font-weight: 400; color: #ff754c; }
 	.key-wide { width: 124px; }
 	.key-plus { color: #80685b; font-size: 16px; }
-	.is-compact { gap: 7px; }
-	.is-compact .key { width: 64px; padding-inline: 9px; font-size: 9px; }
-	.is-compact .key-wide { width: 112px; }
-
-	[data-press="tap"] .key { animation: key-tap 3.6s var(--ease-out) infinite; }
-	[data-press="hold"] .key { animation: key-hold 3.6s var(--ease-out) infinite; }
-	@keyframes key-tap {
-		0%, 8%, 22%, 100% { transform: none; box-shadow: 0 4px 0 #634433; background: #211a16; border-color: #634433; }
-		12%, 18% { transform: translateY(3px); box-shadow: 0 1px 0 #ff4d19; background: #2d1d15; border-color: #ff4d19; }
-	}
-	@keyframes key-hold {
-		0%, 46%, 96%, 100% { transform: none; box-shadow: 0 4px 0 #634433; background: #211a16; border-color: #634433; }
-		52%, 90% { transform: translateY(3px); box-shadow: 0 1px 0 #ff4d19; background: #2d1d15; border-color: #ff4d19; }
-	}
 
 	@media (max-width: 1050px) {
 		.keys { gap: 7px; }
@@ -54,11 +35,8 @@ const { keys, press, compact = false } = Astro.props;
 		.key-wide { width: 112px; }
 	}
 	@media (max-width: 800px) {
-		.keys, .is-compact { gap: 10px; }
-		.key, .is-compact .key { width: 78px; padding-inline: 12px; font-size: 10px; }
-		.key-wide, .is-compact .key-wide { width: 124px; }
-	}
-	@media (prefers-reduced-motion: reduce) {
-		[data-press] .key { animation: none; }
+		.keys { gap: 10px; }
+		.key { width: 78px; padding-inline: 12px; font-size: 10px; }
+		.key-wide { width: 124px; }
 	}
 </style>

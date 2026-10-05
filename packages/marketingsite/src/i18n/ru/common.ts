@@ -3,17 +3,13 @@ export const common = {
 	"meta.description":
 		"Press a shortcut, speak, and your words are typed into any Mac app. Free, open-source dictation that runs on your Mac. Your voice never leaves it.",
 
-	"nav.how": "How it works",
 	"nav.features": "Features",
 	"nav.privacy": "Privacy",
 	"nav.faq": "FAQ",
 	"nav.download": "Download",
 	"nav.github": "GitHub",
 
-	"cta.label": "YOUR VOICE. YOUR MAC.",
 	"cta.title": "Say your next email instead of typing it.",
-	"cta.description":
-		"Download VoxFusion, grant two permissions, and start dictating. Free, private, and no account required.",
 	"cta.button": "Download for Mac",
 	"cta.note": "macOS 11+ / Apple Silicon & Intel",
 
@@ -23,9 +19,6 @@ export const common = {
 
 	"legal.backToHome": "← Back home",
 
-	"footer.tagline": "Voice to text that runs entirely on your Mac. Free and open source.",
-	"footer.product": "Product",
-	"footer.legal": "Legal",
 	"footer.privacy": "Privacy Policy",
 	"footer.terms": "Terms of Use",
 	"footer.security": "Security",

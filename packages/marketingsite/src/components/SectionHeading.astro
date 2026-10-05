@@ -1,9 +1,10 @@
 ---
 /**
- * Numbered section rule ("01 FEATURES ────") with an optional headline and
- * lead paragraph. viewEvent reports the section to Umami once it scrolls
- * into view; it sits on the intro rather than the whole section because a
- * tall section never reaches Umami's 30% visibility threshold on phones.
+ * Numbered section rule ("01 FEATURES ────") and, under it, the section's
+ * statement: a short claim with an optional quieter second sentence on the
+ * same line. viewEvent reports the section to Umami once the statement
+ * scrolls into view; it sits there rather than on the whole section because
+ * a tall section never reaches Umami's 30% visibility threshold on phones.
  */
 interface Props {
 	number: string;
@@ -16,35 +17,24 @@ interface Props {
 const { number, tag, title, description, viewEvent } = Astro.props;
 ---
 
-<div class="section-header" data-reveal>
+<div class="section-header">
 	<span class="section-number">{number}</span>
 	<p class="section-tag">{tag}</p>
 	<div class="section-line"></div>
 </div>
 {title && (
-	<div class="section-intro" data-reveal data-umami-view={viewEvent}>
-		<h2>{title}</h2>
-		{description && <p>{description}</p>}
-	</div>
+	<h2 class="statement" data-umami-view={viewEvent}>{title}{description && <span> {description}</span>}</h2>
 )}
 
 <style>
-	.section-header { display: flex; gap: 16px; align-items: center; margin-bottom: 34px; }
+	.section-header { display: flex; gap: 16px; align-items: center; margin-bottom: 40px; }
 	.section-number { font-size: 11px; color: #ff6b3d; }
 	.section-tag { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: #a3a3a3; }
-	.section-line { flex: 1; height: 1px; background: #292929; transform-origin: 0 50%; }
-	:global(.js) .section-line { transform: scaleX(0); transition: transform 1.1s var(--ease-out) .1s; }
-	:global(.js) .is-visible .section-line { transform: none; }
-	.section-intro { display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: end; margin-bottom: 48px; }
-	.section-intro h2 { font-size: clamp(30px, 3.6vw, 46px); line-height: 1.22; letter-spacing: -.05em; font-weight: 500; max-width: 580px; }
-	.section-intro p { font-size: 14px; line-height: 1.85; color: #aaa; max-width: 440px; }
+	.section-line { flex: 1; height: 1px; background: #292929; }
+	.statement { max-width: 860px; margin-bottom: 64px; font-size: clamp(26px, 2.8vw, 38px); line-height: 1.3; letter-spacing: -.05em; font-weight: 500; text-wrap: pretty; }
+	.statement span { color: #7a7a7a; }
 	@media (max-width: 800px) {
-		.section-intro { grid-template-columns: 1fr; gap: 20px; margin-bottom: 36px; }
-	}
-	@media (max-width: 540px) {
-		.section-intro p { font-size: 13px; }
-	}
-	@media (prefers-reduced-motion: reduce) {
-		:global(.js) .section-line { transform: none; transition: none; }
+		.section-header { margin-bottom: 28px; }
+		.statement { margin-bottom: 44px; }
 	}
 </style>

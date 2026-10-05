@@ -6,7 +6,6 @@ import { hero } from "./ru/hero";
 import { how } from "./ru/how";
 import { privacy } from "./ru/privacy";
 import { security } from "./ru/security";
-import { speed } from "./ru/speed";
 import { terms } from "./ru/terms";
 import { why } from "./ru/why";
 
@@ -20,7 +19,6 @@ export const translations = {
 	en: {
 		...common,
 		...hero,
-		...speed,
 		...how,
 		...features,
 		...why,
