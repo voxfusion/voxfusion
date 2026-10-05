@@ -17,7 +17,12 @@ pub fn start_system_key_watcher(events: &EventSender) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
+pub fn start_system_key_watcher(events: &EventSender) -> Result<(), String> {
+    crate::platform::linux_key_watcher::setup(events)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn start_system_key_watcher(_events: &EventSender) -> Result<(), String> {
     Ok(())
 }
@@ -30,7 +35,12 @@ pub fn resynchronize_system_keys(reason: &str) {
     crate::platform::system_key_watcher::resynchronize(reason);
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
+pub fn resynchronize_system_keys(reason: &str) {
+    crate::platform::linux_key_watcher::resynchronize(reason);
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn resynchronize_system_keys(_reason: &str) {}
 
 /// Parses a shortcut as settings store it: modifiers first, then one key,

@@ -52,6 +52,8 @@ pub(super) trait Output {
 
 enum Command {
     Muffle,
+    // Linux outputs all have a mute control.
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
     Silence,
     Restore,
     /// Restores without a fade, then acknowledges.
@@ -62,7 +64,7 @@ enum Command {
 static COMMANDS: OnceLock<Sender<Command>> = OnceLock::new();
 
 fn send(command: Command) {
-    let commands = COMMANDS.get_or_init(|| spawn(super::CoreAudioOutput::default()));
+    let commands = COMMANDS.get_or_init(|| spawn(super::SystemOutput::default()));
     let _ = commands.send(command);
 }
 
@@ -71,6 +73,7 @@ pub(super) fn muffle() {
 }
 
 /// Mutes an output that has no mute control.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 pub(super) fn silence() {
     send(Command::Silence);
 }

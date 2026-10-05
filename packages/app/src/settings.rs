@@ -9,7 +9,12 @@ use std::path::PathBuf;
 use crate::i18n::Locale;
 
 pub const DEFAULT_HOTKEY: &str = "LeftControl+LeftOption";
+#[cfg(target_os = "macos")]
 pub const DEFAULT_HOLD_TO_SPEAK_HOTKEY: &str = "RightCommand";
+/// Right Command is the right Super key on a PC keyboard, which most laptops
+/// do not have. Nearly all have a right Control.
+#[cfg(not(target_os = "macos"))]
+pub const DEFAULT_HOLD_TO_SPEAK_HOTKEY: &str = "RightControl";
 
 pub const ONBOARDING_STEP_COUNT: u32 = 8;
 pub const CURRENT_ONBOARDING_VERSION: u32 = 4;

@@ -38,26 +38,30 @@ impl EventEmitter<TranscriptionTried> for LearningStep {}
 
 /// The keys of `hotkey` as the labels of key caps.
 fn hotkey_parts(hotkey: &str) -> Vec<SharedString> {
-    hotkey
-        .split('+')
-        .map(|part| {
-            match part {
-                "Command" => "\u{2318}",
-                "Control" => "\u{2303}",
-                "Alt" => "\u{2325}",
-                "Shift" => "\u{21E7}",
-                "LeftControl" => "Left \u{2303}",
-                "RightControl" => "Right \u{2303}",
-                "LeftOption" => "Left \u{2325}",
-                "RightOption" => "Right \u{2325}",
-                "LeftCommand" => "Left \u{2318}",
-                "RightCommand" => "Right \u{2318}",
-                other => other,
-            }
-            .to_string()
-            .into()
-        })
-        .collect()
+    hotkey.split('+').map(|part| key_cap(part).into()).collect()
+}
+
+#[cfg(target_os = "macos")]
+fn key_cap(part: &str) -> String {
+    match part {
+        "Command" => "\u{2318}",
+        "Control" => "\u{2303}",
+        "Alt" => "\u{2325}",
+        "Shift" => "\u{21E7}",
+        "LeftControl" => "Left \u{2303}",
+        "RightControl" => "Right \u{2303}",
+        "LeftOption" => "Left \u{2325}",
+        "RightOption" => "Right \u{2325}",
+        "LeftCommand" => "Left \u{2318}",
+        "RightCommand" => "Right \u{2318}",
+        other => other,
+    }
+    .to_string()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn key_cap(part: &str) -> String {
+    crate::ui::hotkeys::pc_key_name(part)
 }
 
 impl LearningStep {
@@ -425,6 +429,7 @@ impl Render for LearningStep {
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn hotkeys_split_into_key_caps() {
         assert_eq!(
@@ -437,5 +442,16 @@ mod tests {
         );
         assert_eq!(hotkey_parts("RightCommand"), ["Right \u{2318}"]);
         assert_eq!(hotkey_parts("Alt+Space"), ["\u{2325}", "Space"]);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn hotkeys_split_into_pc_key_caps() {
+        assert_eq!(
+            hotkey_parts("LeftControl+LeftOption"),
+            ["Left Ctrl", "Left Alt"]
+        );
+        assert_eq!(hotkey_parts("Command+Shift+K"), ["Super", "Shift", "K"]);
+        assert_eq!(hotkey_parts("RightControl"), ["Right Ctrl"]);
     }
 }

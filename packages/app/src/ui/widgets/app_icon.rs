@@ -14,11 +14,15 @@ use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::icon;
 
-const PNG_DATA_URL_PREFIX: &str = "data:image/png;base64,";
-
-/// The PNG inside a `data:image/png;base64,` URL.
-fn decode_png_data_url(url: &str) -> Option<Vec<u8>> {
-    STANDARD.decode(url.strip_prefix(PNG_DATA_URL_PREFIX)?).ok()
+/// The picture inside a base64 `data:` URL: a PNG, or an SVG, which is
+/// all some Linux apps have for an icon.
+fn decode_image_data_url(url: &str) -> Option<Image> {
+    let (format, data) = if let Some(data) = url.strip_prefix("data:image/png;base64,") {
+        (ImageFormat::Png, data)
+    } else {
+        (ImageFormat::Svg, url.strip_prefix("data:image/svg+xml;base64,")?)
+    };
+    Some(Image::from_bytes(format, STANDARD.decode(data).ok()?))
 }
 
 /// The icons of the installed apps, by bundle id.
@@ -32,8 +36,7 @@ impl AppIcons {
         let by_bundle_id = apps
             .iter()
             .filter_map(|app| {
-                let png = decode_png_data_url(app.icon_data_url.as_deref()?)?;
-                let image = Image::from_bytes(ImageFormat::Png, png);
+                let image = decode_image_data_url(app.icon_data_url.as_deref()?)?;
 
                 Some((app.bundle_id.clone(), Arc::new(image)))
             })
@@ -115,22 +118,34 @@ pub fn site_icon(domain: Option<&str>, size: Pixels, cx: &App) -> impl IntoEleme
 mod tests {
     use super::*;
 
+    fn decoded(url: &str) -> Option<(ImageFormat, Vec<u8>)> {
+        decode_image_data_url(url).map(|image| (image.format(), image.bytes().to_vec()))
+    }
+
     #[test]
     fn a_png_data_url_decodes_to_its_bytes() {
         assert_eq!(
-            decode_png_data_url("data:image/png;base64,iVBORw0KGgo="),
-            Some(vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a])
+            decoded("data:image/png;base64,iVBORw0KGgo="),
+            Some((
+                ImageFormat::Png,
+                vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]
+            ))
+        );
+    }
+
+    #[test]
+    fn an_svg_data_url_decodes_to_its_markup() {
+        assert_eq!(
+            decoded("data:image/svg+xml;base64,PHN2Zy8+"),
+            Some((ImageFormat::Svg, b"<svg/>".to_vec()))
         );
     }
 
     #[test]
     fn anything_else_has_no_icon() {
-        assert_eq!(decode_png_data_url("data:image/jpeg;base64,AAAA"), None);
-        assert_eq!(
-            decode_png_data_url("data:image/png;base64,not base64"),
-            None
-        );
-        assert_eq!(decode_png_data_url("https://example.com/icon.png"), None);
+        assert_eq!(decoded("data:image/jpeg;base64,AAAA"), None);
+        assert_eq!(decoded("data:image/png;base64,not base64"), None);
+        assert_eq!(decoded("https://example.com/icon.png"), None);
     }
 
     #[test]

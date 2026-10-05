@@ -26,7 +26,12 @@ const WINDOW_WIDTH_HANDS_FREE: f32 = 140.;
 const WINDOW_WIDTH_ERROR: f32 = 260.;
 
 /// The key code of Escape, which has its own shortcut while recording.
+#[cfg(target_os = "macos")]
 const ESCAPE_KEY_CODE: i64 = 53;
+#[cfg(target_os = "linux")]
+const ESCAPE_KEY_CODE: i64 = crate::platform::linux_key_watcher::ESCAPE_KEY_CODE;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+const ESCAPE_KEY_CODE: i64 = -1;
 
 /// How long a transcription error, with its retry button, stays if untouched.
 const TRANSCRIPTION_ERROR_HIDE: Duration = Duration::from_millis(5000);

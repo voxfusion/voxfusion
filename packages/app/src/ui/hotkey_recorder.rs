@@ -474,7 +474,10 @@ mod tests {
         assert_eq!(capture.system_keys_released(), None);
 
         capture.system_keys_pressed(&[SystemKey::LeftOption, SystemKey::LeftControl]);
-        assert_eq!(capture.pending, "Left⌃+Left⌥");
+        assert_eq!(
+            capture.pending,
+            hotkey_display_name("LeftControl+LeftOption")
+        );
         assert_eq!(
             capture.system_keys_released().as_deref(),
             Some("LeftControl+LeftOption")
@@ -486,7 +489,7 @@ mod tests {
         let mut capture = Capture::default();
         capture.system_keys_pressed(&[SystemKey::RightCommand]);
 
-        assert_eq!(capture.pending, "Right⌘");
+        assert_eq!(capture.pending, hotkey_display_name("RightCommand"));
         assert_eq!(capture.key_released(), None);
     }
 

@@ -95,6 +95,7 @@ pub fn is_valid_hotkey(hotkey: &str) -> bool {
 }
 
 /// A hotkey with its modifier names replaced by their symbols.
+#[cfg(target_os = "macos")]
 pub fn hotkey_display_name(hotkey: &str) -> String {
     hotkey
         .replace("Command", "\u{2318}")
@@ -102,6 +103,36 @@ pub fn hotkey_display_name(hotkey: &str) -> String {
         .replace("Option", "\u{2325}")
         .replace("Alt", "\u{2325}")
         .replace("Shift", "\u{21E7}")
+}
+
+/// One key of a hotkey as PC keyboards label it: Command is the Super key
+/// there, and Option is Alt.
+#[cfg(not(target_os = "macos"))]
+pub fn pc_key_name(part: &str) -> String {
+    let modifier = |name: &str| match name {
+        "Command" | "Cmd" => Some("Super"),
+        "Control" | "Ctrl" => Some("Ctrl"),
+        "Option" | "Alt" => Some("Alt"),
+        "Shift" => Some("Shift"),
+        _ => None,
+    };
+
+    for side in ["Left", "Right"] {
+        if let Some(name) = part.strip_prefix(side).and_then(modifier) {
+            return format!("{side} {name}");
+        }
+    }
+    modifier(part).unwrap_or(part).to_string()
+}
+
+/// A hotkey with its modifiers named as PC keyboards label them.
+#[cfg(not(target_os = "macos"))]
+pub fn hotkey_display_name(hotkey: &str) -> String {
+    hotkey
+        .split('+')
+        .map(pc_key_name)
+        .collect::<Vec<_>>()
+        .join("+")
 }
 
 /// The reason `hotkey` cannot be the hands-free hotkey, if any.
@@ -146,11 +177,24 @@ mod tests {
         assert!(!is_valid_hotkey(""));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn display_names_use_modifier_symbols() {
         assert_eq!(hotkey_display_name("LeftControl+LeftOption"), "Left⌃+Left⌥");
         assert_eq!(hotkey_display_name("Command+Shift+K"), "⌘+⇧+K");
         assert_eq!(hotkey_display_name("RightCommand"), "Right⌘");
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn display_names_use_pc_key_labels() {
+        assert_eq!(
+            hotkey_display_name("LeftControl+LeftOption"),
+            "Left Ctrl+Left Alt"
+        );
+        assert_eq!(hotkey_display_name("Command+Shift+K"), "Super+Shift+K");
+        assert_eq!(hotkey_display_name("RightCommand"), "Right Super");
+        assert_eq!(hotkey_display_name("Alt+ArrowLeft"), "Alt+ArrowLeft");
     }
 
     #[test]
