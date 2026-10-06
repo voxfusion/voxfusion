@@ -8,6 +8,7 @@
 		"dev": "astro dev",
 		"build": "astro build",
 		"preview": "astro preview",
+		"deploy": "bunx wrangler@4.147.0 deploy",
 		"lint": "biome lint ./src",
 		"lint:fix": "biome lint --write ./src",
 		"typecheck": "astro check"

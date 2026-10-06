@@ -1,0 +1,15 @@
+// The site is a Cloudflare Worker that only serves the static build. Workers
+// Builds (Cloudflare's Git integration) builds it from this directory and runs
+// `bun run deploy` on every push to main that touches it.
+{
+	"name": "voxfusion-io",
+	"account_id": "4ad082d81c88bee352bb2b2d4c115245",
+	"compatibility_date": "2026-10-01",
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "404-page"
+	},
+	"routes": [{ "pattern": "voxfusion.io", "custom_domain": true }],
+	"workers_dev": false,
+	"preview_urls": false
+}

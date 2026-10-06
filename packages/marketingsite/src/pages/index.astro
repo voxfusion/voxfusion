@@ -15,7 +15,7 @@ const t = useTranslations(lang);
 const title = t("meta.title");
 const description = t("meta.description");
 const schema = schemaGraph(softwareApplicationSchema(description), faqPageSchema(faqItems(t)));
-const downloadHref = getLocalizedPath("/download", lang);
+const downloadHref = getLocalizedPath("/download/", lang);
 const githubHref = "https://github.com/voxfusion/voxfusion";
 ---
 
