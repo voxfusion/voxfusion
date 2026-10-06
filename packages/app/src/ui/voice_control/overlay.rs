@@ -452,9 +452,9 @@ pub fn open(
     fixed_size: Option<(f32, f32)>,
     cx: &mut App,
 ) -> Result<()> {
-    // Only macOS can show the window later, so elsewhere it stays up and
-    // draws nothing between dictations.
-    let show = fixed_size.is_some() || !cfg!(target_os = "macos");
+    // Where the window cannot be shown later, it stays up and draws nothing
+    // between dictations.
+    let show = fixed_size.is_some() || !overlay_window::can_hide();
 
     let bounds = match fixed_size {
         Some((width, height)) => Bounds::new(point(px(0.), px(0.)), size(px(width), px(height))),
@@ -484,13 +484,17 @@ pub fn open(
         window.set_rem_size(px(16.));
         theme::follow(window, cx);
 
-        let native = OverlayWindow::new(&*window);
+        let native = OverlayWindow::new(&*window, f64::from(window.scale_factor()));
 
         // In a task, which runs once the window is open: see `remove_frame`.
         if let Some(native) = native.clone() {
             cx.spawn(async move |_| {
                 native.remove_frame();
                 log::info!(target: "runtime", "voice_control_frame_removed");
+                // GPUI shows every window it opens on X11.
+                if !show && cfg!(target_os = "linux") {
+                    native.hide();
+                }
             })
             .detach();
         }

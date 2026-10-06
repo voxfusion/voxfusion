@@ -52,6 +52,8 @@ pub(super) trait Output {
 
 enum Command {
     Muffle,
+    // Linux outputs all have a mute control.
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
     Silence,
     Restore,
     /// Restores without a fade, then acknowledges.
@@ -62,7 +64,7 @@ enum Command {
 static COMMANDS: OnceLock<Sender<Command>> = OnceLock::new();
 
 fn send(command: Command) {
-    let commands = COMMANDS.get_or_init(|| spawn(super::CoreAudioOutput::default()));
+    let commands = COMMANDS.get_or_init(|| spawn(super::SystemOutput::default()));
     let _ = commands.send(command);
 }
 
@@ -71,6 +73,7 @@ pub(super) fn muffle() {
 }
 
 /// Mutes an output that has no mute control.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
 pub(super) fn silence() {
     send(Command::Silence);
 }
@@ -235,6 +238,11 @@ struct Muffler<O> {
     /// down. macOS restores a device's saved volume when it reconnects, so
     /// they are turned back up once they are back.
     pending_restores: Vec<(String, f32)>,
+    /// Devices turned back up while handling the current command, with the
+    /// volume they were given. The system may report a write only later, so
+    /// a session started on one of them takes this volume as the original
+    /// rather than reading it back.
+    just_restored: Vec<(DeviceId, f32)>,
 }
 
 impl<O: Output> Muffler<O> {
@@ -243,6 +251,7 @@ impl<O: Output> Muffler<O> {
             output,
             session: None,
             pending_restores: Vec::new(),
+            just_restored: Vec::new(),
         }
     }
 
@@ -267,6 +276,7 @@ impl<O: Output> Muffler<O> {
                 self.follow_default_output(now);
             }
         }
+        self.just_restored.clear();
     }
 
     fn quiet(&mut self, quieting: Quieting, now: Instant) {
@@ -301,7 +311,7 @@ impl<O: Output> Muffler<O> {
     }
 
     fn start_session(&mut self, quieting: Quieting, device: DeviceId, now: Instant) {
-        let (control, original) = match self.choose_control(quieting, device) {
+        let (control, mut original) = match self.choose_control(quieting, device) {
             Ok(choice) => choice,
             Err(err) => {
                 log::warn!(
@@ -312,6 +322,11 @@ impl<O: Output> Muffler<O> {
                 return;
             }
         };
+        if control == Control::Volume
+            && let Some((_, restored)) = self.just_restored.iter().find(|(id, _)| *id == device)
+        {
+            original = *restored;
+        }
         let mut session = Session {
             device,
             uid: self.output.device_uid(device),
@@ -388,14 +403,13 @@ impl<O: Output> Muffler<O> {
         session.fade_to(session.original, duration, now);
     }
 
-    /// Moves a tap to the new default output when the output changes during a
-    /// recording, such as when headphones are plugged in. Audio on the old
-    /// output plays normally again once its tap stops.
+    /// Moves the session to the new default output when the output changes
+    /// during a recording, such as when headphones are plugged in. A tap
+    /// moves over, and audio on the old output plays normally again once its
+    /// tap stops; an output that was turned down gets its volume back, and
+    /// the new one is quieted as a new recording would quiet it.
     fn follow_default_output(&mut self, now: Instant) {
         let Some(session) = self.session.as_mut() else {
-            return;
-        };
-        let Control::Tap(effect) = session.control else {
             return;
         };
         if session.restoring {
@@ -407,6 +421,13 @@ impl<O: Output> Muffler<O> {
         if device == session.device {
             return;
         }
+        let Control::Tap(effect) = session.control else {
+            let quieting = session.quieting;
+            self.restore(true, now);
+            self.step(now);
+            self.start_session(quieting, device, now);
+            return;
+        };
         self.output.stop_tap(session.device);
         if self.output.start_tap(device, effect).is_ok() {
             session.device = device;
@@ -480,6 +501,7 @@ impl<O: Output> Muffler<O> {
 
     fn restore_returned_devices(&mut self) {
         let output = &self.output;
+        let just_restored = &mut self.just_restored;
         self.pending_restores.retain(|(uid, original)| {
             let Some(device) = output.find_device_by_uid(uid) else {
                 return true;
@@ -487,6 +509,7 @@ impl<O: Output> Muffler<O> {
             match output.set_volume(device, *original) {
                 Ok(()) => {
                     log::info!(target: "media", "returned_output_unmuffled device_id={device}");
+                    just_restored.push((device, *original));
                     false
                 }
                 Err(err) => {
@@ -515,6 +538,10 @@ mod tests {
         taps_work: bool,
         /// Effect and amount of the running tap.
         tap: Option<(TapEffect, f32)>,
+        /// What reads report instead of `volume` until the next write after
+        /// this one has landed, like CoreAudio applying a write later.
+        reported: Option<f32>,
+        stale_writes: u32,
     }
 
     #[derive(Default)]
@@ -541,8 +568,20 @@ mod tests {
                     connected: true,
                     taps_work: false,
                     tap: None,
+                    reported: None,
+                    stale_writes: 0,
                 },
             );
+        }
+
+        /// Reads go on reporting the old volume after the next write.
+        fn lag_next_write(&self, device: DeviceId) {
+            self.devices
+                .lock()
+                .unwrap()
+                .get_mut(&device)
+                .unwrap()
+                .stale_writes = 1;
         }
 
         fn set_default(&self, device: DeviceId) {
@@ -613,7 +652,7 @@ mod tests {
             if !device.has_volume {
                 return Err("fixed".to_string());
             }
-            Ok(device.volume)
+            Ok(device.reported.unwrap_or(device.volume))
         }
 
         fn set_volume(&self, device: DeviceId, volume: f32) -> Result<(), String> {
@@ -622,6 +661,8 @@ mod tests {
             if !device.connected {
                 return Err("disconnected".to_string());
             }
+            device.reported = (device.stale_writes > 0).then_some(device.volume);
+            device.stale_writes = device.stale_writes.saturating_sub(1);
             device.volume = volume;
             Ok(())
         }
@@ -967,6 +1008,79 @@ mod tests {
         muffler.step(ms(start, 1300));
         assert_volume(output.volume(2), 0.6);
         assert_eq!(output.volume(1), 0.8);
+    }
+
+    #[test]
+    fn a_turned_down_output_hands_over_to_the_new_default() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.connect(2, 0.6);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        assert_volume(output.volume(1), 0.8 * MUFFLED_VOLUME_RATIO);
+        output.set_default(2);
+        muffler.handle(Command::DevicesChanged, ms(start, 500));
+        assert_volume(output.volume(1), 0.8);
+        muffler.step(ms(start, 650));
+        assert_volume(output.volume(2), 0.6 * MUFFLED_VOLUME_RATIO);
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1300));
+        assert_volume(output.volume(2), 0.6);
+        assert_volume(output.volume(1), 0.8);
+    }
+
+    #[test]
+    fn a_turned_down_output_unplugged_mid_recording_is_restored_once_back() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.connect(2, 0.6);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        output.set_connected(1, false);
+        output.set_default(2);
+        muffler.handle(Command::DevicesChanged, ms(start, 500));
+        muffler.step(ms(start, 650));
+        assert_volume(output.volume(2), 0.6 * MUFFLED_VOLUME_RATIO);
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1300));
+        assert_volume(output.volume(2), 0.6);
+        output.set_connected(1, true);
+        muffler.handle(Command::DevicesChanged, ms(start, 1500));
+        assert_volume(output.volume(1), 0.8);
+    }
+
+    #[test]
+    fn a_returned_output_keeps_its_volume_though_the_system_reports_it_late() {
+        let output = FakeOutput::with_device(1, 0.8);
+        output.connect(2, 0.6);
+        let mut muffler = Muffler::new(Arc::clone(&output));
+        let start = Instant::now();
+
+        muffler.handle(Command::Muffle, start);
+        muffler.step(ms(start, 150));
+        output.set_connected(1, false);
+        output.set_default(2);
+        muffler.handle(Command::DevicesChanged, ms(start, 500));
+        muffler.step(ms(start, 650));
+
+        // Plugged back in as the default output, still turned down.
+        output.set_connected(1, true);
+        output.set_default(1);
+        output.lag_next_write(1);
+        muffler.handle(Command::DevicesChanged, ms(start, 800));
+        muffler.step(ms(start, 950));
+        assert_volume(output.volume(1), 0.8 * MUFFLED_VOLUME_RATIO);
+        assert_volume(output.volume(2), 0.6);
+
+        muffler.handle(Command::Restore, ms(start, 1000));
+        muffler.step(ms(start, 1300));
+        assert_volume(output.volume(1), 0.8);
     }
 
     #[test]

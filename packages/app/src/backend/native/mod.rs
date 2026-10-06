@@ -5,11 +5,15 @@ mod apps;
 mod audio;
 mod browser;
 mod db;
+#[cfg(target_os = "linux")]
+mod desktop_apps;
 mod hotkeys;
 mod media;
 mod models;
 mod parakeet;
 pub mod permissions;
+#[cfg(target_os = "linux")]
+mod pulse;
 mod sites;
 mod text;
 mod whisper;
@@ -65,6 +69,8 @@ impl NativeBackend {
             media::watch_audio_devices(&events);
             log::info!(target: "runtime", "macos_listeners_setup");
         }
+        #[cfg(target_os = "linux")]
+        media::watch_audio_devices(&events);
 
         let shortcuts = hotkeys::GlobalShortcuts::new(events.clone());
 

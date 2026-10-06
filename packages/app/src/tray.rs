@@ -1,19 +1,24 @@
 //! The menu bar item. VoxFusion has no Dock icon and so no menu bar of its
 //! own; this menu is where the main window, the microphone choice, an update
-//! check and Quit are reached.
+//! check and Quit are reached. On Linux it is a status notifier item in the
+//! panel, which also gets the main window back once it is closed.
 
+#[cfg(target_os = "linux")]
+pub use linux::Tray;
 #[cfg(target_os = "macos")]
 pub use macos::Tray;
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub use unsupported::Tray;
 
 /// What the user chose in the menu.
-// Only the macOS menu produces these.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+// Only the macOS and Linux menus produce these.
+#[cfg_attr(not(any(target_os = "macos", target_os = "linux")), allow(dead_code))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrayCommand {
     ShowHome,
     SelectMicrophone(String),
+    // Only macOS builds are published to update to.
+    #[cfg_attr(target_os = "linux", allow(dead_code))]
     CheckForUpdates,
     Quit,
 }
@@ -192,8 +197,170 @@ mod macos {
     }
 }
 
+/// A StatusNotifierItem, which KDE shows in its panel and GNOME through the
+/// AppIndicator extension that Ubuntu and most distributions ship.
+#[cfg(target_os = "linux")]
+mod linux {
+    use ksni::blocking::{Handle, TrayMethods as _};
+    use ksni::menu::{CheckmarkItem, StandardItem, SubMenu};
+
+    use super::TrayCommand;
+
+    type OnCommand = Box<dyn Fn(TrayCommand) + Send + Sync>;
+
+    struct Item {
+        on_command: OnCommand,
+        icon: Vec<ksni::Icon>,
+        /// Name and whether it is the system default.
+        microphones: Vec<(String, bool)>,
+        selected: Option<String>,
+    }
+
+    impl Item {
+        fn command(&self, label: &str, command: TrayCommand) -> ksni::MenuItem<Self> {
+            StandardItem {
+                label: label.into(),
+                activate: Box::new(move |item: &mut Self| (item.on_command)(command.clone())),
+                ..Default::default()
+            }
+            .into()
+        }
+    }
+
+    impl ksni::Tray for Item {
+        // The menu is the item's only purpose, as in the macOS menu bar.
+        const MENU_ON_ACTIVATE: bool = true;
+
+        fn id(&self) -> String {
+            "voxfusion".into()
+        }
+
+        fn title(&self) -> String {
+            "VoxFusion".into()
+        }
+
+        fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+            self.icon.clone()
+        }
+
+        fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
+            let microphones = self
+                .microphones
+                .iter()
+                .map(|(name, is_default)| {
+                    let label = if *is_default {
+                        format!("{name} (Default)")
+                    } else {
+                        name.clone()
+                    };
+                    let chosen = name.clone();
+                    CheckmarkItem {
+                        label,
+                        checked: self.selected.as_deref() == Some(name.as_str()),
+                        activate: Box::new(move |item: &mut Self| {
+                            (item.on_command)(TrayCommand::SelectMicrophone(chosen.clone()));
+                        }),
+                        ..Default::default()
+                    }
+                    .into()
+                })
+                .collect();
+
+            // No update check: only macOS builds are published.
+            vec![
+                self.command("Home", TrayCommand::ShowHome),
+                SubMenu {
+                    label: "Microphone".into(),
+                    submenu: microphones,
+                    ..Default::default()
+                }
+                .into(),
+                self.command("Quit", TrayCommand::Quit),
+            ]
+        }
+    }
+
+    /// The panel item. Its D-Bus service runs on a thread of its own.
+    pub struct Tray {
+        handle: Handle<Item>,
+    }
+
+    impl Tray {
+        /// Adds the item to the panel. `on_command` runs on the item's thread
+        /// when a menu item is chosen.
+        pub fn new(
+            on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
+        ) -> Result<Tray, String> {
+            let item = Item {
+                on_command: Box::new(on_command),
+                icon: vec![icon(include_bytes!("../assets/images/tray-icon.png"))?],
+                microphones: Vec::new(),
+                selected: None,
+            };
+            // Without a panel to show it, the item waits for one to appear.
+            let handle = item
+                .assume_sni_available(true)
+                .spawn()
+                .map_err(|error| error.to_string())?;
+
+            Ok(Tray { handle })
+        }
+
+        /// Lists `devices` (name, whether it is the system default) in the
+        /// Microphone submenu, with a check mark on the selected one.
+        pub fn set_microphones(&self, devices: &[(String, bool)], selected: Option<&str>) {
+            let devices = devices.to_vec();
+            let selected = selected.map(str::to_string);
+            self.handle.update(move |item| {
+                item.microphones = devices;
+                item.selected = selected;
+            });
+        }
+    }
+
+    /// A PNG as the ARGB pixels, in network byte order, that the
+    /// specification asks for.
+    fn icon(png_bytes: &[u8]) -> Result<ksni::Icon, String> {
+        let mut decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
+        decoder.set_transformations(png::Transformations::normalize_to_color8());
+        let mut reader = decoder.read_info().map_err(|e| e.to_string())?;
+        let mut buffer = vec![0; reader.output_buffer_size()];
+        let info = reader.next_frame(&mut buffer).map_err(|e| e.to_string())?;
+        if info.color_type != png::ColorType::Rgba {
+            return Err(format!(
+                "unsupported tray icon color type {:?}",
+                info.color_type
+            ));
+        }
+        buffer.truncate(info.buffer_size());
+
+        Ok(ksni::Icon {
+            width: info.width as i32,
+            height: info.height as i32,
+            data: buffer
+                .chunks_exact(4)
+                .flat_map(|rgba| [rgba[3], rgba[0], rgba[1], rgba[2]])
+                .collect(),
+        })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn the_tray_icon_becomes_argb() {
+            let icon = icon(include_bytes!("../assets/images/tray-icon.png")).unwrap();
+
+            assert_eq!(icon.data.len(), (icon.width * icon.height * 4) as usize);
+            // Transparent corners stay transparent.
+            assert_eq!(icon.data[0], 0);
+        }
+    }
+}
+
 /// Other platforms run the app for development only, without a menu bar item.
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 mod unsupported {
     use super::TrayCommand;
 

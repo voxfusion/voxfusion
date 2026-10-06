@@ -59,8 +59,22 @@ objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSWorkspace", "
 objc2-av-foundation = { version = "0.3", default-features = false, features = ["std", "AVCaptureDevice", "AVMediaFormat", "block2"] }
 objc2-core-graphics = { version = "0.3", features = ["CGEventSource", "CGEventTypes", "CGRemoteOperation"] }
 
-[target.'cfg(not(target_os = "macos"))'.dependencies]
+[target.'cfg(not(any(target_os = "macos", target_os = "linux")))'.dependencies]
 whisper-rs = { version = "0.16" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Whisper on the GPU through Vulkan, which GPUI already needs on Linux; it
+# runs on the CPU, several times slower, where there is no Vulkan device.
+whisper-rs = { version = "0.16", features = ["vulkan"] }
+# The sound server (PulseAudio, or PipeWire through its PulseAudio protocol).
+pulseaudio = "0.3"
+futures = "0.3"
+# Keys, windows and displays on X11, and keyboards on Wayland.
+x11rb = { version = "0.13", features = ["xinput", "randr", "xkb"] }
+evdev = "0.13"
+# The panel item.
+ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
+png = "0.17"
 
 # Dependencies get line tables only, so backtraces still show file and line
 # without making every debug build several GB.

@@ -18,12 +18,21 @@ struct SafeStream(Stream);
 unsafe impl Send for SafeStream {}
 unsafe impl Sync for SafeStream {}
 
+/// Where a recording's samples come from. Dropping it stops them.
+enum InputStream {
+    Cpal(SafeStream),
+    #[cfg(target_os = "linux")]
+    Pulse {
+        _recording: super::pulse::Recording,
+    },
+}
+
 /// The dictation currently being captured. Stream callbacks and the input
 /// watchdog carry the recording `id`, so late events from an earlier stream
 /// cannot touch a newer recording.
 struct Recording {
     id: u64,
-    stream: SafeStream,
+    stream: InputStream,
     writer: WavWriterHandle,
     save_path: PathBuf,
 }
@@ -53,6 +62,20 @@ fn read_device_name(device: &cpal::Device) -> Option<String> {
 }
 
 pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
+    // ALSA lists its plugins rather than the microphones the sound server
+    // has, so ask the server where there is one.
+    #[cfg(target_os = "linux")]
+    if super::pulse::is_available() {
+        let (sources, default) = super::pulse::sources()?;
+        return Ok(sources
+            .into_iter()
+            .map(|source| AudioDevice {
+                is_default: default.as_ref() == Some(&source.name),
+                name: source.label,
+            })
+            .collect());
+    }
+
     let host = cpal::default_host();
 
     let default_device_name = host
@@ -79,8 +102,13 @@ pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
     Ok(devices)
 }
 
+/// A saved device name, or `None` for the system default.
+fn chosen_device(device_name: Option<&str>) -> Option<&str> {
+    device_name.filter(|name| *name != "default" && !name.is_empty())
+}
+
 fn input_device(host: &cpal::Host, device_name: Option<&str>) -> Result<cpal::Device, String> {
-    if let Some(name) = device_name.filter(|name| *name != "default" && !name.is_empty()) {
+    if let Some(name) = chosen_device(device_name) {
         let found = host
             .input_devices()
             .map_err(|err| err.to_string())?
@@ -100,6 +128,139 @@ fn input_device(host: &cpal::Host, device_name: Option<&str>) -> Result<cpal::De
         .ok_or_else(|| "No input device available".to_string())
 }
 
+/// The microphone a recording opens, in the format it will deliver.
+enum Input {
+    Cpal {
+        device: cpal::Device,
+        config: cpal::StreamConfig,
+    },
+    /// A sound server source; `None` records from the default one.
+    #[cfg(target_os = "linux")]
+    Pulse {
+        source: Option<super::pulse::Source>,
+        sample_rate: u32,
+    },
+}
+
+impl Input {
+    fn find(device_name: Option<&str>) -> Result<Self, String> {
+        #[cfg(target_os = "linux")]
+        if super::pulse::is_available() {
+            return Self::find_source(device_name);
+        }
+
+        let host = cpal::default_host();
+        let device = input_device(&host, device_name)?;
+        let config = device
+            .default_input_config()
+            .map_err(|err| err.to_string())?
+            .config();
+        Ok(Self::Cpal { device, config })
+    }
+
+    #[cfg(target_os = "linux")]
+    fn find_source(device_name: Option<&str>) -> Result<Self, String> {
+        const FALLBACK_SAMPLE_RATE: u32 = 48_000;
+
+        let (sources, default) = super::pulse::sources()?;
+        let chosen = chosen_device(device_name);
+        let source = chosen.and_then(|name| sources.iter().find(|source| source.answers_to(name)));
+        if let (Some(name), None) = (chosen, source) {
+            log::warn!(
+                target: "audio",
+                "input device not found, falling back to default device_name={name:?}"
+            );
+        }
+        let sample_rate = source
+            .or_else(|| {
+                sources
+                    .iter()
+                    .find(|source| default.as_ref() == Some(&source.name))
+            })
+            .map_or(FALLBACK_SAMPLE_RATE, |source| source.sample_rate);
+
+        Ok(Self::Pulse {
+            source: source.cloned(),
+            sample_rate,
+        })
+    }
+
+    fn channels(&self) -> u16 {
+        match self {
+            Self::Cpal { config, .. } => config.channels,
+            // The server mixes the source down for us.
+            #[cfg(target_os = "linux")]
+            Self::Pulse { .. } => 1,
+        }
+    }
+
+    fn sample_rate(&self) -> u32 {
+        match self {
+            Self::Cpal { config, .. } => config.sample_rate,
+            #[cfg(target_os = "linux")]
+            Self::Pulse { sample_rate, .. } => *sample_rate,
+        }
+    }
+
+    fn name(&self) -> String {
+        match self {
+            Self::Cpal { device, .. } => read_device_name(device).unwrap_or_default(),
+            #[cfg(target_os = "linux")]
+            Self::Pulse { source, .. } => source
+                .as_ref()
+                .map_or_else(|| "default".to_string(), |source| source.label.clone()),
+        }
+    }
+
+    /// Starts delivering samples to `on_samples`. `on_error` hears of a
+    /// failed input, on whatever thread noticed.
+    fn open(
+        self,
+        id: u64,
+        on_samples: impl FnMut(&[f32]) + Send + 'static,
+        on_error: impl Fn(String) + Send + 'static,
+    ) -> Result<InputStream, String> {
+        match self {
+            Self::Cpal { device, config } => {
+                let mut on_samples = on_samples;
+                let stream = device
+                    .build_input_stream(
+                        &config,
+                        move |data: &[f32], _: &cpal::InputCallbackInfo| on_samples(data),
+                        move |err: StreamError| {
+                            if matches!(err, StreamError::BufferUnderrun) {
+                                log::warn!(target: "audio", "recording stream overrun id={id}");
+                                return;
+                            }
+                            on_error(err.to_string());
+                        },
+                        None,
+                    )
+                    .map_err(|err| err.to_string())?;
+                stream.play().map_err(|err| err.to_string())?;
+                Ok(InputStream::Cpal(SafeStream(stream)))
+            }
+            // The stream stops delivering when its source goes away, which
+            // the input watchdog notices.
+            #[cfg(target_os = "linux")]
+            Self::Pulse {
+                source,
+                sample_rate,
+            } => {
+                let _ = on_error;
+                super::pulse::record(
+                    source.as_ref().map(|source| source.name.as_c_str()),
+                    sample_rate,
+                    on_samples,
+                )
+                .map(|recording| InputStream::Pulse {
+                    _recording: recording,
+                })
+            }
+        }
+    }
+}
+
 pub fn start_recording_with_device(
     events: &EventSender,
     device_name: Option<String>,
@@ -109,18 +270,13 @@ pub fn start_recording_with_device(
         return Err("Recording is already in progress.".to_string());
     }
 
-    let host = cpal::default_host();
-    let device = input_device(&host, device_name.as_deref())?;
-    let config: cpal::StreamConfig = device
-        .default_input_config()
-        .map_err(|err| err.to_string())?
-        .config();
+    let input = Input::find(device_name.as_deref())?;
 
-    // Capture as f32 whatever the hardware format is; CoreAudio converts, and
-    // the WAV spec stays independent of the device.
+    // Capture as f32 whatever the hardware format is; the system converts,
+    // and the WAV spec stays independent of the device.
     let spec = WavSpec {
-        channels: config.channels,
-        sample_rate: config.sample_rate,
+        channels: input.channels(),
+        sample_rate: input.sample_rate(),
         bits_per_sample: 32,
         sample_format: SampleFormat::Float,
     };
@@ -135,42 +291,22 @@ pub fn start_recording_with_device(
     let data_events = events.clone();
     let data_last_input_ms = last_input_ms.clone();
     let mut last_level_emit_ms = 0;
+    let on_samples = move |data: &[f32]| {
+        data_last_input_ms.store(elapsed_ms(), Ordering::Relaxed);
+        write_input_data_with_levels(data, &data_writer, &data_events, &mut last_level_emit_ms);
+    };
 
     // Surface stream errors (e.g. mic unplugged mid-recording) to the interface
     // and release the recorder so the next hotkey press can start fresh.
     let err_events = events.clone();
-    let err_fn = move |err: StreamError| {
-        if matches!(err, StreamError::BufferUnderrun) {
-            log::warn!(target: "audio", "recording stream overrun id={id}");
-            return;
-        }
+    let on_error = move |message: String| {
         // Errors can arrive on CoreAudio's realtime thread; tear down elsewhere.
         let events = err_events.clone();
-        let message = err.to_string();
         std::thread::spawn(move || fail_recording(id, &events, message));
     };
 
-    let stream = device
-        .build_input_stream(
-            &config,
-            move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                data_last_input_ms.store(elapsed_ms(), Ordering::Relaxed);
-                write_input_data_with_levels(
-                    data,
-                    &data_writer,
-                    &data_events,
-                    &mut last_level_emit_ms,
-                );
-            },
-            err_fn,
-            None,
-        )
-        .map_err(|err| err.to_string())
-        .and_then(|stream| {
-            stream.play().map_err(|err| err.to_string())?;
-            Ok(stream)
-        });
-    let stream = match stream {
+    let device_label = input.name();
+    let stream = match input.open(id, on_samples, on_error) {
         Ok(stream) => stream,
         Err(err) => {
             discard_recording_file(&writer, &save_path);
@@ -182,7 +318,7 @@ pub fn start_recording_with_device(
     // leaves the recorder ready for a retry.
     *active = Some(Recording {
         id,
-        stream: SafeStream(stream),
+        stream,
         writer,
         save_path,
     });
@@ -190,10 +326,9 @@ pub fn start_recording_with_device(
 
     log::info!(
         target: "audio",
-        "recording_started id={id} device={:?} sample_rate={} channels={}",
-        read_device_name(&device).unwrap_or_default(),
-        config.sample_rate,
-        config.channels
+        "recording_started id={id} device={device_label:?} sample_rate={} channels={}",
+        spec.sample_rate,
+        spec.channels
     );
 
     let watchdog_events = events.clone();
@@ -251,11 +386,17 @@ fn fail_recording(id: u64, events: &EventSender, message: String) {
 /// Pauses and drops a capture stream on a detached thread. CoreAudio teardown
 /// can block on a device that has just disappeared, and that must not wedge
 /// the recorder or the command that stopped it.
-fn close_stream(stream: SafeStream) {
+fn close_stream(stream: InputStream) {
     let spawned = std::thread::Builder::new()
         .name("audio-stream-close".into())
         .spawn(move || {
-            let _ = stream.0.pause();
+            match &stream {
+                InputStream::Cpal(stream) => {
+                    let _ = stream.0.pause();
+                }
+                #[cfg(target_os = "linux")]
+                InputStream::Pulse { .. } => {}
+            }
             drop(stream);
         });
     if let Err(err) = spawned {

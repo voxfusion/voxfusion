@@ -1,5 +1,7 @@
 //! The microphone and Accessibility permissions, as macOS holds them for the
-//! app. Other platforms ask for neither.
+//! app. Other platforms ask for neither; on Linux, the Accessibility
+//! permission stands for being able to read the keyboard, which hotkeys on
+//! Wayland need.
 
 use crate::backend::PermissionState;
 
@@ -100,12 +102,16 @@ pub fn request_microphone_permission() -> bool {
     true
 }
 
-/// Whether the app may type into other apps.
+/// Whether the app may type into other apps, and on Linux whether it can
+/// hear its hotkeys in them.
 pub fn check_accessibility() -> bool {
     #[cfg(target_os = "macos")]
     return macos::check_accessibility();
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    return crate::platform::linux_key_watcher::can_watch();
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     true
 }
 

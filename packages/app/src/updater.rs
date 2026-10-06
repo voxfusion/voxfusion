@@ -51,6 +51,11 @@ impl AppUpdater {
 
 impl Updater for AppUpdater {
     fn check(&self) -> CommandResult<Option<UpdateInfo>> {
+        // Only macOS builds are published, and only they can be installed.
+        if !cfg!(target_os = "macos") {
+            return Ok(None);
+        }
+
         let manifest = block_on(fetch_manifest())??;
         let current =
             Version::parse(env!("CARGO_PKG_VERSION")).map_err(|error| error.to_string())?;

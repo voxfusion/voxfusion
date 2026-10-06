@@ -1,10 +1,19 @@
-use base64::Engine;
 use chrono::Utc;
 use rusqlite::params;
+
+// What reading macOS app bundles needs. Linux apps have desktop entries
+// instead; see `desktop_apps`.
+#[cfg(not(target_os = "linux"))]
+use base64::Engine;
+#[cfg(not(target_os = "linux"))]
 use std::collections::HashSet;
+#[cfg(not(target_os = "linux"))]
 use std::fs;
+#[cfg(not(target_os = "linux"))]
 use std::io::BufReader;
+#[cfg(not(target_os = "linux"))]
 use std::panic;
+#[cfg(not(target_os = "linux"))]
 use std::path::{Path, PathBuf};
 
 use super::db::DbState;
@@ -232,6 +241,7 @@ pub fn fetch_app_dictionary_words(conn: &rusqlite::Connection, bundle_id: &str) 
     }
 }
 
+#[cfg(not(target_os = "linux"))]
 fn read_bundle_id(plist: &plist::Dictionary) -> Option<String> {
     plist
         .get("CFBundleIdentifier")?
@@ -239,6 +249,7 @@ fn read_bundle_id(plist: &plist::Dictionary) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+#[cfg(not(target_os = "linux"))]
 fn read_display_name(plist: &plist::Dictionary, fallback: &str) -> String {
     if let Some(name) = plist.get("CFBundleDisplayName").and_then(|v| v.as_string()) {
         return name.to_string();
@@ -249,12 +260,14 @@ fn read_display_name(plist: &plist::Dictionary, fallback: &str) -> String {
     fallback.trim_end_matches(".app").to_string()
 }
 
+#[cfg(not(target_os = "linux"))]
 fn read_info_plist(app_path: &Path) -> Option<plist::Dictionary> {
     let plist_path = app_path.join("Contents").join("Info.plist");
     let result = panic::catch_unwind(|| plist::Value::from_file(&plist_path).ok()).ok()??;
     result.into_dictionary()
 }
 
+#[cfg(not(target_os = "linux"))]
 fn icns_path_from_plist(app_path: &Path, plist: &plist::Dictionary) -> Option<PathBuf> {
     let icon_file = plist.get("CFBundleIconFile")?.as_string()?;
     let file_name = if icon_file.ends_with(".icns") {
@@ -266,6 +279,7 @@ fn icns_path_from_plist(app_path: &Path, plist: &plist::Dictionary) -> Option<Pa
     if path.exists() { Some(path) } else { None }
 }
 
+#[cfg(not(target_os = "linux"))]
 fn pick_icon_type(family: &icns::IconFamily) -> Option<icns::IconType> {
     let available = family.available_icons();
     available
@@ -281,6 +295,7 @@ fn pick_icon_type(family: &icns::IconFamily) -> Option<icns::IconType> {
         .copied()
 }
 
+#[cfg(not(target_os = "linux"))]
 fn extract_icon_data_url(app_path: &Path, plist: &plist::Dictionary) -> Option<String> {
     let icns_path = icns_path_from_plist(app_path, plist)?;
     let result = panic::catch_unwind(|| -> Option<Vec<u8>> {
@@ -297,6 +312,7 @@ fn extract_icon_data_url(app_path: &Path, plist: &plist::Dictionary) -> Option<S
     Some(format!("data:image/png;base64,{}", b64))
 }
 
+#[cfg(not(target_os = "linux"))]
 fn scan_apps_dir(dir: &Path, results: &mut Vec<InstalledApp>, seen: &mut HashSet<String>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -330,6 +346,12 @@ fn scan_apps_dir(dir: &Path, results: &mut Vec<InstalledApp>, seen: &mut HashSet
     }
 }
 
+#[cfg(target_os = "linux")]
+pub fn list_installed_apps() -> Vec<InstalledApp> {
+    super::desktop_apps::list_installed_apps()
+}
+
+#[cfg(not(target_os = "linux"))]
 pub fn list_installed_apps() -> Vec<InstalledApp> {
     let mut results: Vec<InstalledApp> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();
@@ -384,7 +406,12 @@ pub fn get_frontmost_app() -> Option<FrontmostApp> {
     .unwrap_or(None)
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "linux")]
+pub fn get_frontmost_app() -> Option<FrontmostApp> {
+    super::desktop_apps::frontmost_app()
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 pub fn get_frontmost_app() -> Option<FrontmostApp> {
     None
 }

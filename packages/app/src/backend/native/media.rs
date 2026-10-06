@@ -2,10 +2,13 @@ use std::sync::{LazyLock, Mutex};
 
 #[cfg(target_os = "macos")]
 mod filter;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 mod muffle;
 #[cfg(target_os = "macos")]
 mod tap;
+
+#[cfg(target_os = "linux")]
+use super::pulse;
 
 #[derive(Default)]
 struct MediaMuteState {
@@ -20,6 +23,14 @@ struct MediaMuteState {
     /// they are back.
     #[cfg(target_os = "macos")]
     pending_unmute_uids: Vec<String>,
+    /// Name of the sink muted for the current recording, `None` when it was
+    /// already muted.
+    #[cfg(target_os = "linux")]
+    muted_sink: Option<String>,
+    /// Names of sinks that were unplugged while muted. The sound server
+    /// remembers a device's mute, so they are unmuted once they are back.
+    #[cfg(target_os = "linux")]
+    pending_unmute_sinks: Vec<String>,
 }
 
 #[cfg(target_os = "macos")]
@@ -33,6 +44,12 @@ static MEDIA_MUTE_STATE: LazyLock<Mutex<MediaMuteState>> =
 
 #[cfg(target_os = "macos")]
 static EVENTS: std::sync::OnceLock<crate::backend::EventSender> = std::sync::OnceLock::new();
+
+/// The output the muffle worker changes.
+#[cfg(target_os = "macos")]
+type SystemOutput = CoreAudioOutput;
+#[cfg(target_os = "linux")]
+type SystemOutput = PulseOutput;
 
 #[cfg(target_os = "macos")]
 type AudioObjectId = u32;
@@ -706,17 +723,179 @@ pub fn watch_audio_devices(events: &crate::backend::EventSender) {
     }
 }
 
+/// Changes a sink's volume through the sound server. Sinks have no taps:
+/// muffling turns the volume down instead of filtering.
+#[cfg(target_os = "linux")]
+#[derive(Default)]
+struct PulseOutput {
+    /// Each sink's channel volumes relative to its loudest channel, as they
+    /// were before the worker changed them, so a fade keeps the balance.
+    balances: std::cell::RefCell<std::collections::HashMap<u32, Vec<f32>>>,
+}
+
+#[cfg(target_os = "linux")]
+fn default_sink(
+    connection: &mut pulse::Connection,
+) -> Result<pulseaudio::protocol::SinkInfo, String> {
+    let name = connection
+        .server_info()?
+        .default_sink_name
+        .ok_or("There is no default output")?;
+    connection
+        .sinks()?
+        .into_iter()
+        .find(|sink| sink.name == name)
+        .ok_or_else(|| "The default output is gone".to_string())
+}
+
+#[cfg(target_os = "linux")]
+fn find_sink_by_name(name: &str) -> Option<u32> {
+    pulse::with_connection(|connection| connection.sinks())
+        .ok()?
+        .into_iter()
+        .find(|sink| sink.name.to_bytes() == name.as_bytes())
+        .map(|sink| sink.index)
+}
+
+#[cfg(target_os = "linux")]
+impl muffle::Output for PulseOutput {
+    fn default_output_device(&self) -> Result<u32, String> {
+        pulse::with_connection(|connection| default_sink(connection).map(|sink| sink.index))
+    }
+
+    fn device_uid(&self, device: u32) -> Option<String> {
+        pulse::with_connection(|connection| connection.sink(device))
+            .ok()
+            .map(|sink| sink.name.to_string_lossy().into_owned())
+    }
+
+    fn find_device_by_uid(&self, uid: &str) -> Option<u32> {
+        find_sink_by_name(uid)
+    }
+
+    fn adjustable_volume(&self, device: u32) -> Result<f32, String> {
+        use pulseaudio::protocol::Volume;
+
+        let sink = pulse::with_connection(|connection| connection.sink(device))?;
+        let channels: Vec<f32> = sink
+            .cvolume
+            .channels()
+            .iter()
+            .map(|volume| volume.as_u32() as f32 / Volume::NORM.as_u32() as f32)
+            .collect();
+        let loudest = channels.iter().copied().fold(0.0, f32::max);
+        let balance = if loudest > 0.0 {
+            channels.iter().map(|volume| volume / loudest).collect()
+        } else {
+            vec![1.0; channels.len()]
+        };
+        self.balances.borrow_mut().insert(device, balance);
+        Ok(loudest)
+    }
+
+    fn set_volume(&self, device: u32, volume: f32) -> Result<(), String> {
+        use pulseaudio::protocol::{ChannelVolume, Volume};
+
+        let balance = self.balances.borrow().get(&device).cloned();
+        let balance = match balance {
+            Some(balance) => balance,
+            None => {
+                self.adjustable_volume(device)?;
+                self.balances
+                    .borrow()
+                    .get(&device)
+                    .cloned()
+                    .unwrap_or_default()
+            }
+        };
+        let mut channels = ChannelVolume::empty();
+        for share in &balance {
+            let raw = (volume.max(0.0) * share * Volume::NORM.as_u32() as f32).round();
+            channels.push(Volume::from_u32_clamped(raw as u32));
+        }
+        pulse::with_connection(|connection| connection.set_sink_volume(device, channels))
+    }
+
+    fn start_tap(&self, _device: u32, _effect: muffle::TapEffect) -> Result<(), String> {
+        Err("Outputs cannot be tapped on Linux".to_string())
+    }
+
+    fn set_tap(&self, _device: u32, _amount: f32) -> Result<(), String> {
+        Err("Outputs cannot be tapped on Linux".to_string())
+    }
+
+    fn stop_tap(&self, _device: u32) {}
+}
+
+/// Unmutes sinks that were unplugged while muted for a recording, now that
+/// they are connected again.
+#[cfg(target_os = "linux")]
+fn unmute_returned_devices() {
+    let Ok(mut state) = MEDIA_MUTE_STATE.lock() else {
+        return;
+    };
+    state.pending_unmute_sinks.retain(|name| {
+        let Some(index) = find_sink_by_name(name) else {
+            return true;
+        };
+        match pulse::with_connection(|connection| connection.set_sink_mute(index, false)) {
+            Ok(()) => {
+                log::info!(target: "media", "returned_output_unmuted device_id={index}");
+                false
+            }
+            Err(err) => {
+                log::warn!(target: "media", "returned_output_unmute_failed device_id={index} error={err}");
+                true
+            }
+        }
+    });
+}
+
+/// Watches for outputs and microphones being connected or disconnected and
+/// for changes of the default ones. Emits `audio-devices-changed` so the
+/// interface can list the devices again and reopen audio output.
+#[cfg(target_os = "linux")]
+pub fn watch_audio_devices(events: &crate::backend::EventSender) {
+    if !pulse::is_available() {
+        log::warn!(target: "media", "sound_server_unavailable");
+        return;
+    }
+    let events = events.clone();
+    pulse::watch_devices(move || {
+        unmute_returned_devices();
+        muffle::devices_changed();
+        events.emit(crate::backend::AppEvent::AudioDevicesChanged);
+    });
+}
+
 pub fn mute_media_for_recording() -> Result<(), String> {
     let mut state = MEDIA_MUTE_STATE.lock().map_err(|err| err.to_string())?;
     if state.active {
         return Ok(());
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     mute_default_output(&mut state)?;
 
     state.active = true;
     Ok(())
+}
+
+/// Logs its failures itself, because the interface does not wait for them.
+#[cfg(target_os = "linux")]
+fn mute_default_output(state: &mut MediaMuteState) -> Result<(), String> {
+    let result = pulse::with_connection(|connection| {
+        let sink = default_sink(connection)?;
+        if !sink.muted {
+            connection.set_sink_mute(sink.index, true)?;
+            state.muted_sink = Some(sink.name.to_string_lossy().into_owned());
+        }
+        Ok(())
+    });
+    if let Err(err) = &result {
+        log::warn!(target: "media", "mute_failed error={err}");
+    }
+    result
 }
 
 /// Logs its failures itself, because the interface does not wait for them.
@@ -750,7 +929,7 @@ fn mute_default_output(state: &mut MediaMuteState) -> Result<(), String> {
 /// the volume down where the muffle filter cannot run. Returns at once; the
 /// fade runs on a background thread, so it never delays the recording.
 pub fn muffle_media_for_recording() {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     muffle::muffle();
 }
 
@@ -811,7 +990,7 @@ pub fn muffle_permission() -> Option<crate::backend::PermissionState> {
 
 /// Puts output back after a recording, whether it was muted or muffled.
 pub fn restore_media_after_recording() -> Result<(), String> {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     muffle::restore();
 
     let mut state = MEDIA_MUTE_STATE.lock().map_err(|err| err.to_string())?;
@@ -842,12 +1021,27 @@ pub fn restore_media_after_recording() -> Result<(), String> {
         }
     }
 
+    // Unmute the sink that was muted, even if the default output has moved
+    // since; it keeps its name when it is unplugged and plugged back in.
+    #[cfg(target_os = "linux")]
+    if let Some(name) = state.muted_sink.take() {
+        let unmuted = find_sink_by_name(&name)
+            .ok_or_else(|| "The output is gone".to_string())
+            .and_then(|index| {
+                pulse::with_connection(|connection| connection.set_sink_mute(index, false))
+            });
+        if let Err(err) = unmuted {
+            log::warn!(target: "media", "restore_output_mute_failed sink={name} error={err}");
+            state.pending_unmute_sinks.push(name);
+        }
+    }
+
     Ok(())
 }
 
 /// Puts output back if the app quits mid-recording.
 pub fn restore_media_on_exit() {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     muffle::restore_now();
     if let Err(err) = restore_media_after_recording() {
         log::warn!(target: "media", "exit_restore_failed error={err}");

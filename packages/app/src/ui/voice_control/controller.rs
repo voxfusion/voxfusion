@@ -3,7 +3,7 @@
 //! belongs to the app, not to a window; the overlay only shows its state.
 
 use gpui_kit::{
-    App, AppContext as _, AsyncApp, Context, Entity, Result, Subscription, Task, WeakEntity,
+    App, AppContext as _, AsyncApp, Context, Entity, Global, Result, Subscription, Task, WeakEntity,
 };
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -26,7 +26,12 @@ const WINDOW_WIDTH_HANDS_FREE: f32 = 140.;
 const WINDOW_WIDTH_ERROR: f32 = 260.;
 
 /// The key code of Escape, which has its own shortcut while recording.
+#[cfg(target_os = "macos")]
 const ESCAPE_KEY_CODE: i64 = 53;
+#[cfg(target_os = "linux")]
+const ESCAPE_KEY_CODE: i64 = crate::platform::linux_key_watcher::ESCAPE_KEY_CODE;
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+const ESCAPE_KEY_CODE: i64 = -1;
 
 /// How long a transcription error, with its retry button, stays if untouched.
 const TRANSCRIPTION_ERROR_HIDE: Duration = Duration::from_millis(5000);
@@ -41,6 +46,57 @@ const TRANSCRIPTION_CREATED_DELAY: Duration = Duration::from_millis(1000);
 const RECORDING_FAILED: &str = "voiceControl.recordingFailed";
 const TRANSCRIPTION_FAILED: &str = "voiceControl.transcriptionFailed";
 const TYPING_FAILED: &str = "voiceControl.typingFailed";
+
+/// A change to other apps' audio.
+enum MediaChange {
+    Mute,
+    Muffle,
+    /// Tells `done` once the audio is back.
+    Restore {
+        done: async_channel::Sender<()>,
+    },
+}
+
+/// Changes to other apps' audio, made one after another in the order they
+/// were asked for. Each backend call runs on a thread of its own, so a
+/// restore asked for right after a mute could otherwise run first and leave
+/// the output muted after the recording.
+struct MediaChanges(std::sync::mpsc::Sender<MediaChange>);
+
+impl Global for MediaChanges {}
+
+impl MediaChanges {
+    fn start(backend: crate::backend::SharedBackend) -> Self {
+        let (changes, received) = std::sync::mpsc::channel();
+        let spawned = std::thread::Builder::new()
+            .name("media-changes".into())
+            .spawn(move || {
+                for change in received {
+                    match change {
+                        // Both log their own failures.
+                        MediaChange::Mute => {
+                            let _ = backend.mute_media_for_recording();
+                        }
+                        MediaChange::Muffle => backend.muffle_media_for_recording(),
+                        MediaChange::Restore { done } => {
+                            if let Err(error) = backend.restore_media_after_recording() {
+                                log::error!(target: "voice", "restore_media_failed error={error}");
+                            }
+                            let _ = done.try_send(());
+                        }
+                    }
+                }
+            });
+        if let Err(error) = spawned {
+            log::error!(target: "voice", "media_changes_not_started error={error}");
+        }
+        Self(changes)
+    }
+
+    fn send(cx: &App, change: MediaChange) {
+        let _ = cx.global::<Self>().0.send(change);
+    }
+}
 
 /// The window the overlay needs for the current state.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -85,6 +141,9 @@ impl VoiceController {
                 settings.hold_to_speak_hotkey = hold;
             }
         });
+
+        let media_changes = MediaChanges::start(backend::backend(cx));
+        cx.set_global(media_changes);
 
         let onboarding_complete = SettingsStore::get(cx).onboarding_complete;
         let hotkeys = cx.new(Hotkeys::new);
@@ -316,19 +375,18 @@ impl VoiceController {
         let settings = SettingsStore::get(cx);
 
         if settings.mute_media_while_recording {
-            backend::call(cx, |backend| backend.mute_media_for_recording()).detach();
+            MediaChanges::send(cx, MediaChange::Mute);
         } else if settings.muffle_media_while_recording {
-            backend::call(cx, |backend| backend.muffle_media_for_recording()).detach();
+            MediaChanges::send(cx, MediaChange::Muffle);
         }
     }
 
     fn restore_media(cx: &App) -> Task<()> {
-        let restore = backend::call(cx, |backend| backend.restore_media_after_recording());
+        let (done, restored) = async_channel::bounded(1);
+        MediaChanges::send(cx, MediaChange::Restore { done });
 
         cx.background_spawn(async move {
-            if let Err(error) = restore.await {
-                log::error!(target: "voice", "restore_media_failed error={error}");
-            }
+            let _ = restored.recv().await;
         })
     }
 
