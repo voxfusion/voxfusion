@@ -41,8 +41,9 @@ jobs:
       - name: Find what to release
         id: next
         run: |
-          if [ "$(gh run list --workflow release.yml --limit 20 --json status \
-            --jq '[.[] | select(.status != "completed")] | length')" != "0" ]; then
+          RUNNING=$(gh run list --workflow release.yml --limit 20 --json status \
+            --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$RUNNING" != "0" ]; then
             echo "::notice::A release is already running; nothing to start."
             exit 0
           fi
