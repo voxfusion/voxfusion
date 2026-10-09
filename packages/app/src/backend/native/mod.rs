@@ -7,6 +7,7 @@ mod browser;
 mod db;
 mod hotkeys;
 mod media;
+mod microphones;
 mod models;
 mod parakeet;
 pub mod permissions;
@@ -28,6 +29,7 @@ pub use media::{
     muffle_permission, restore_media_on_exit, run_permission_request_if_asked,
     try_request_muffle_permission,
 };
+pub use microphones::report as microphones_report;
 
 pub struct NativeBackend {
     events: EventSender,
@@ -65,6 +67,13 @@ impl NativeBackend {
             media::watch_audio_devices(&events);
             log::info!(target: "runtime", "macos_listeners_setup");
         }
+
+        microphones::watch_lid(audio::lid_changed);
+        log::info!(
+            target: "runtime",
+            "lid_state closed={:?}",
+            microphones::lid_state()
+        );
 
         let shortcuts = hotkeys::GlobalShortcuts::new(events.clone());
 

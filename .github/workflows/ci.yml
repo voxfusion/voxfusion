@@ -114,6 +114,17 @@ jobs:
           # The same usage strings are embedded in the executable, for runs outside a bundle.
           otool -s __TEXT __info_plist "$APP/Contents/MacOS/voxfusion-app" | grep -q "Contents of"
 
+      # The lid state comes from IOKit and how each microphone is connected
+      # from CoreAudio. Listing them needs no permission; a runner has no lid
+      # to close.
+      - name: Report the lid and the microphones
+        run: |
+          mkdir -p "$RUNNER_TEMP/bundle-check"
+          OUT="$RUNNER_TEMP/bundle-check/microphones.json"
+          "$APP/Contents/MacOS/voxfusion-app" --microphones-report "$OUT"
+          cat "$OUT"
+          jq -e '.lidClosed != true and (.microphones | type == "array")' "$OUT"
+
       # Launched with `open`, not from the shell: macOS holds a program started
       # from a terminal to the terminal's permissions.
       - name: Report permissions before asking
@@ -221,6 +232,8 @@ jobs:
           # The dictation overlay lost its window frame, and AppKit's answer
           # to that reached GPUI.
           grep -q "voice_control_frame_removed" "$LOG"
+          grep -q "lid_state" "$LOG"
+          ! grep -q "lid_watch_failed" "$LOG"
           ! grep -q "already borrowed" "$LOG"
           pgrep -f "voxfusion-app" > /dev/null
           # A menu bar app: no Dock icon.

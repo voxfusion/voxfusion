@@ -5,13 +5,15 @@ use hound::{SampleFormat, WavSpec, WavWriter};
 use std::fs::{File, create_dir_all};
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
+use super::microphones::{self, InputKind};
 use crate::backend::{AppEvent, AudioDevice, EventSender};
 
-type WavWriterHandle = Arc<Mutex<Option<WavWriter<BufWriter<File>>>>>;
+type Wav = WavWriter<BufWriter<File>>;
+type WavWriterHandle = Arc<Mutex<Option<Wav>>>;
 
 struct SafeStream(Stream);
 
@@ -22,10 +24,39 @@ unsafe impl Sync for SafeStream {}
 /// watchdog carry the recording `id`, so late events from an earlier stream
 /// cannot touch a newer recording.
 struct Recording {
-    id: u64,
-    stream: SafeStream,
-    writer: WavWriterHandle,
+    sink: Sink,
+    input: Input,
+    /// Set while another microphone is being opened to take over from the
+    /// built-in one, which the lid has disconnected; the watchdog waits.
+    switching_input: bool,
     save_path: PathBuf,
+}
+
+/// Where a recording's samples go, whichever microphone they come from.
+#[derive(Clone)]
+struct Sink {
+    id: u64,
+    writer: WavWriterHandle,
+    /// The file's format, which a microphone that takes over is converted to.
+    spec: WavSpec,
+    events: EventSender,
+}
+
+/// A microphone feeding a recording.
+struct Input {
+    stream: SafeStream,
+    kind: InputKind,
+    clock: Arc<InputClock>,
+    /// Cleared when another microphone takes over the recording. A callback
+    /// of this stream still in flight then writes nothing, and its errors no
+    /// longer end the recording.
+    current: Arc<AtomicBool>,
+}
+
+/// When an input was opened and when it last delivered samples.
+struct InputClock {
+    opened_ms: u64,
+    last_input_ms: AtomicU64,
 }
 
 static RECORDING: Mutex<Option<Recording>> = Mutex::new(None);
@@ -79,7 +110,39 @@ pub fn list_audio_devices() -> Result<Vec<AudioDevice>, String> {
     Ok(devices)
 }
 
-fn input_device(host: &cpal::Host, device_name: Option<&str>) -> Result<cpal::Device, String> {
+/// The microphone a recording uses: the one chosen in the settings, or the
+/// system default, unless that is the built-in microphone and the lid is
+/// closed.
+pub(super) fn input_device(
+    host: &cpal::Host,
+    device_name: Option<&str>,
+) -> Result<(cpal::Device, InputKind), String> {
+    let device = chosen_input_device(host, device_name)?;
+    let kind = microphones::kind(&device);
+    if kind != InputKind::BuiltIn || !microphones::lid_closed() {
+        return Ok((device, kind));
+    }
+
+    match microphones::replacement(host) {
+        Some((replacement, replacement_kind)) => {
+            log::info!(
+                target: "audio",
+                "built_in_microphone_skipped reason=lid_closed device={:?} kind={replacement_kind:?}",
+                read_device_name(&replacement).unwrap_or_default()
+            );
+            Ok((replacement, replacement_kind))
+        }
+        None => {
+            log::warn!(target: "audio", "built_in_microphone_lid_closed no_other_microphone");
+            Ok((device, kind))
+        }
+    }
+}
+
+fn chosen_input_device(
+    host: &cpal::Host,
+    device_name: Option<&str>,
+) -> Result<cpal::Device, String> {
     if let Some(name) = device_name.filter(|name| *name != "default" && !name.is_empty()) {
         let found = host
             .input_devices()
@@ -110,7 +173,7 @@ pub fn start_recording_with_device(
     }
 
     let host = cpal::default_host();
-    let device = input_device(&host, device_name.as_deref())?;
+    let (device, kind) = input_device(&host, device_name.as_deref())?;
     let config: cpal::StreamConfig = device
         .default_input_config()
         .map_err(|err| err.to_string())?
@@ -129,19 +192,90 @@ pub fn start_recording_with_device(
     let writer: WavWriterHandle = Arc::new(Mutex::new(Some(writer)));
 
     let id = NEXT_RECORDING_ID.fetch_add(1, Ordering::Relaxed);
-    let last_input_ms = Arc::new(AtomicU64::new(NO_INPUT_YET));
+    let sink = Sink {
+        id,
+        writer,
+        spec,
+        events: events.clone(),
+    };
+    let input = match open_input(&sink, &device, kind, &config, true) {
+        Ok(input) => input,
+        Err(err) => {
+            discard_recording_file(&sink.writer, &save_path);
+            return Err(err);
+        }
+    };
 
-    let data_writer = writer.clone();
-    let data_events = events.clone();
-    let data_last_input_ms = last_input_ms.clone();
+    // Only publish the recording once the stream is running — any error above
+    // leaves the recorder ready for a retry.
+    *active = Some(Recording {
+        sink,
+        input,
+        switching_input: false,
+        save_path,
+    });
+    drop(active);
+
+    log::info!(
+        target: "audio",
+        "recording_started id={id} device={:?} kind={kind:?} sample_rate={} channels={}",
+        read_device_name(&device).unwrap_or_default(),
+        config.sample_rate,
+        config.channels
+    );
+
+    let watchdog_events = events.clone();
+    let spawned = std::thread::Builder::new()
+        .name("audio-input-watchdog".into())
+        .spawn(move || watch_input(id, watchdog_events));
+    if let Err(err) = spawned {
+        log::warn!(target: "audio", "input watchdog not started id={id} error={err}");
+    }
+
+    Ok(())
+}
+
+/// Opens `device` to write into `sink`, converted to its format when the
+/// device's differs. Unless it is `current`, the stream writes nothing until
+/// it is made so.
+fn open_input(
+    sink: &Sink,
+    device: &cpal::Device,
+    kind: InputKind,
+    config: &cpal::StreamConfig,
+    current: bool,
+) -> Result<Input, String> {
+    let id = sink.id;
+    let clock = Arc::new(InputClock {
+        opened_ms: elapsed_ms(),
+        last_input_ms: AtomicU64::new(NO_INPUT_YET),
+    });
+    let current = Arc::new(AtomicBool::new(current));
+
+    let data_writer = sink.writer.clone();
+    let data_events = sink.events.clone();
+    let data_clock = clock.clone();
+    let data_current = current.clone();
+    let mut converter = Converter::new(
+        config.channels,
+        config.sample_rate,
+        sink.spec.channels,
+        sink.spec.sample_rate,
+    );
     let mut last_level_emit_ms = 0;
 
     // Surface stream errors (e.g. mic unplugged mid-recording) to the interface
     // and release the recorder so the next hotkey press can start fresh.
-    let err_events = events.clone();
+    let err_events = sink.events.clone();
+    let err_current = current.clone();
     let err_fn = move |err: StreamError| {
         if matches!(err, StreamError::BufferUnderrun) {
             log::warn!(target: "audio", "recording stream overrun id={id}");
+            return;
+        }
+        // A microphone that was taken over from may fail as it goes away.
+        if !err_current.load(Ordering::Relaxed) {
+            log::info!(target: "audio", "inactive input stream error id={id}: {err}");
             return;
         }
         // Errors can arrive on CoreAudio's realtime thread; tear down elsewhere.
@@ -152,59 +286,121 @@ pub fn start_recording_with_device(
 
     let stream = device
         .build_input_stream(
-            &config,
+            config,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                data_last_input_ms.store(elapsed_ms(), Ordering::Relaxed);
-                write_input_data_with_levels(
-                    data,
-                    &data_writer,
-                    &data_events,
-                    &mut last_level_emit_ms,
-                );
+                data_clock
+                    .last_input_ms
+                    .store(elapsed_ms(), Ordering::Relaxed);
+                // `current` is read under the writer's lock, which switching
+                // microphones takes: no sample of the previous microphone
+                // follows one of the next.
+                if let Ok(mut guard) = data_writer.try_lock()
+                    && data_current.load(Ordering::Relaxed)
+                    && let Some(writer) = guard.as_mut()
+                {
+                    write_input_data_with_levels(
+                        converter.convert(data),
+                        writer,
+                        &data_events,
+                        &mut last_level_emit_ms,
+                    );
+                }
             },
             err_fn,
             None,
         )
-        .map_err(|err| err.to_string())
-        .and_then(|stream| {
-            stream.play().map_err(|err| err.to_string())?;
-            Ok(stream)
+        .map_err(|err| err.to_string())?;
+    stream.play().map_err(|err| err.to_string())?;
+
+    Ok(Input {
+        stream: SafeStream(stream),
+        kind,
+        clock,
+        current,
+    })
+}
+
+/// Reports a lid change. When the lid closes during a recording from the
+/// built-in microphone, another microphone takes over.
+pub fn lid_changed(closed: bool) {
+    log::info!(target: "audio", "lid_changed closed={closed}");
+    if !closed {
+        return;
+    }
+    // This runs on IOKit's notification queue, and opening a microphone can
+    // take seconds.
+    let spawned = std::thread::Builder::new()
+        .name("audio-input-switch".into())
+        .spawn(take_over_from_built_in_microphone);
+    if let Err(err) = spawned {
+        log::warn!(target: "audio", "failed to spawn input switch thread: {err}");
+    }
+}
+
+/// Moves the running recording from the built-in microphone to another. What
+/// was said so far stays in the file, and the next microphone's samples are
+/// converted to its format.
+fn take_over_from_built_in_microphone() {
+    let sink = RECORDING.lock().ok().and_then(|mut active| {
+        let recording = active
+            .as_mut()
+            .filter(|recording| recording.input.kind == InputKind::BuiltIn)?;
+        recording.switching_input = true;
+        Some(recording.sink.clone())
+    });
+    let Some(sink) = sink else {
+        return;
+    };
+    let id = sink.id;
+
+    let host = cpal::default_host();
+    let input = microphones::replacement(&host)
+        .ok_or_else(|| "no other microphone".to_string())
+        .and_then(|(device, kind)| {
+            let config = device
+                .default_input_config()
+                .map_err(|err| err.to_string())?
+                .config();
+            let input = open_input(&sink, &device, kind, &config, false)?;
+            Ok((input, read_device_name(&device).unwrap_or_default(), config))
         });
-    let stream = match stream {
-        Ok(stream) => stream,
+
+    let Ok(mut active) = RECORDING.lock() else {
+        return;
+    };
+    let Some(recording) = active.as_mut().filter(|recording| recording.sink.id == id) else {
+        // The recording ended meanwhile.
+        drop(active);
+        if let Ok((input, _, _)) = input {
+            close_stream(input.stream);
+        }
+        return;
+    };
+    recording.switching_input = false;
+
+    let (input, device_name, config) = match input {
+        Ok(input) => input,
         Err(err) => {
-            discard_recording_file(&writer, &save_path);
-            return Err(err);
+            log::warn!(target: "audio", "input_switch_failed id={id} reason=lid_closed error={err}");
+            return;
         }
     };
-
-    // Only publish the recording once the stream is running — any error above
-    // leaves the recorder ready for a retry.
-    *active = Some(Recording {
-        id,
-        stream: SafeStream(stream),
-        writer,
-        save_path,
-    });
+    {
+        let _writer = recording.sink.writer.lock();
+        recording.input.current.store(false, Ordering::Relaxed);
+        input.current.store(true, Ordering::Relaxed);
+    }
+    let kind = input.kind;
+    let previous = std::mem::replace(&mut recording.input, input);
     drop(active);
+    close_stream(previous.stream);
 
     log::info!(
         target: "audio",
-        "recording_started id={id} device={:?} sample_rate={} channels={}",
-        read_device_name(&device).unwrap_or_default(),
+        "input_switched id={id} reason=lid_closed device={device_name:?} kind={kind:?} sample_rate={} channels={}",
         config.sample_rate,
         config.channels
     );
-
-    let watchdog_events = events.clone();
-    let spawned = std::thread::Builder::new()
-        .name("audio-input-watchdog".into())
-        .spawn(move || watch_input(id, watchdog_events, last_input_ms));
-    if let Err(err) = spawned {
-        log::warn!(target: "audio", "input watchdog not started id={id} error={err}");
-    }
-
-    Ok(())
 }
 
 pub fn stop_recording_with_device() -> Result<PathBuf, String> {
@@ -216,11 +412,12 @@ pub fn stop_recording_with_device() -> Result<PathBuf, String> {
 
     // Take the writer first so callbacks still in flight stop writing.
     let writer = recording
+        .sink
         .writer
         .lock()
         .map_err(|err| err.to_string())?
         .take();
-    close_stream(recording.stream);
+    close_stream(recording.input.stream);
 
     if let Some(writer) = writer {
         writer.finalize().map_err(|err| err.to_string())?;
@@ -233,7 +430,11 @@ pub fn stop_recording_with_device() -> Result<PathBuf, String> {
 /// partial WAV and tells the interface. A no-op if that recording already ended.
 fn fail_recording(id: u64, events: &EventSender, message: String) {
     let recording = match RECORDING.lock() {
-        Ok(mut active) if active.as_ref().is_some_and(|recording| recording.id == id) => {
+        Ok(mut active)
+            if active
+                .as_ref()
+                .is_some_and(|recording| recording.sink.id == id) =>
+        {
             active.take()
         }
         _ => None,
@@ -243,8 +444,8 @@ fn fail_recording(id: u64, events: &EventSender, message: String) {
     };
 
     log::error!(target: "audio", "recording stream error id={id}: {message}");
-    discard_recording_file(&recording.writer, &recording.save_path);
-    close_stream(recording.stream);
+    discard_recording_file(&recording.sink.writer, &recording.save_path);
+    close_stream(recording.input.stream);
     events.emit(AppEvent::RecordingError { message });
 }
 
@@ -278,23 +479,24 @@ fn discard_recording_file(writer: &WavWriterHandle, save_path: &Path) {
 
 /// Fails recording `id` if its input stops delivering samples, which is how
 /// an unplugged system-default microphone shows up.
-fn watch_input(id: u64, events: EventSender, last_input_ms: Arc<AtomicU64>) {
-    let started_ms = elapsed_ms();
+fn watch_input(id: u64, events: EventSender) {
     loop {
         std::thread::sleep(INPUT_WATCHDOG_INTERVAL);
 
-        let is_active = RECORDING
-            .lock()
-            .map(|active| active.as_ref().is_some_and(|recording| recording.id == id))
-            .unwrap_or(false);
-        if !is_active {
-            return;
-        }
+        // The recording's current input, unless it has ended.
+        let clock = match RECORDING.lock() {
+            Ok(active) => match active.as_ref().filter(|recording| recording.sink.id == id) {
+                Some(recording) if recording.switching_input => continue,
+                Some(recording) => recording.input.clock.clone(),
+                None => return,
+            },
+            Err(_) => return,
+        };
 
         let now_ms = elapsed_ms();
-        let last_ms = last_input_ms.load(Ordering::Relaxed);
+        let last_ms = clock.last_input_ms.load(Ordering::Relaxed);
         let (silent_for, timeout) = if last_ms == NO_INPUT_YET {
-            (now_ms.saturating_sub(started_ms), FIRST_INPUT_TIMEOUT)
+            (now_ms.saturating_sub(clock.opened_ms), FIRST_INPUT_TIMEOUT)
         } else {
             (now_ms.saturating_sub(last_ms), INPUT_STALL_TIMEOUT)
         };
@@ -375,38 +577,178 @@ fn elapsed_ms() -> u64 {
 
 fn write_input_data_with_levels(
     input: &[f32],
-    writer: &WavWriterHandle,
+    writer: &mut Wav,
     events: &EventSender,
     last_emit_ms: &mut u64,
 ) {
     if input.is_empty() {
         return;
     }
-    if let Ok(mut guard) = writer.try_lock()
-        && let Some(writer) = guard.as_mut()
-    {
-        // Calculate RMS (root mean square) for audio level
-        let mut sum: f64 = 0.0;
-        let mut peak: f64 = 0.0;
 
-        for &sample in input.iter() {
-            writer.write_sample(sample).ok();
+    // Calculate RMS (root mean square) for audio level
+    let mut sum: f64 = 0.0;
+    let mut peak: f64 = 0.0;
 
-            let value_f64 = sample as f64;
-            sum += value_f64 * value_f64;
-            peak = peak.max(value_f64.abs());
+    for &sample in input.iter() {
+        writer.write_sample(sample).ok();
+
+        let value_f64 = sample as f64;
+        sum += value_f64 * value_f64;
+        peak = peak.max(value_f64.abs());
+    }
+
+    // Calculate RMS and normalize to 0-100 range
+    let rms = (sum / input.len() as f64).sqrt();
+    // Use a combination of RMS and peak for more responsive visualization
+    let level = ((rms * 0.7 + peak * 0.3) * 150.0).min(100.0);
+
+    // Throttle to ~30fps (every ~33ms)
+    let now = elapsed_ms();
+    if now - *last_emit_ms >= 33 {
+        *last_emit_ms = now;
+        events.emit(AppEvent::AudioLevel(level as f32));
+    }
+}
+
+/// Brings a microphone's samples to the recording's format when a microphone
+/// with another format takes over mid-recording: mixes the channels down,
+/// resamples linearly and repeats the result in every channel of the file.
+/// Transcription mixes down and resamples to 16 kHz anyway.
+struct Converter {
+    from_channels: usize,
+    to_channels: usize,
+    /// Input frames per output frame.
+    step: f64,
+    /// Where the next output frame falls, in input frames from the start of
+    /// the next buffer. Below zero it falls between the previous buffer's
+    /// last frame and the next buffer's first.
+    position: f64,
+    /// The previous buffer's last frame, mixed down.
+    previous: f32,
+    output: Vec<f32>,
+}
+
+impl Converter {
+    fn new(from_channels: u16, from_rate: u32, to_channels: u16, to_rate: u32) -> Self {
+        Self {
+            from_channels: usize::from(from_channels.max(1)),
+            to_channels: usize::from(to_channels.max(1)),
+            step: f64::from(from_rate.max(1)) / f64::from(to_rate.max(1)),
+            position: 0.0,
+            previous: 0.0,
+            output: Vec::new(),
+        }
+    }
+
+    fn convert<'a>(&'a mut self, input: &'a [f32]) -> &'a [f32] {
+        if self.from_channels == self.to_channels && self.step == 1.0 {
+            return input;
         }
 
-        // Calculate RMS and normalize to 0-100 range
-        let rms = (sum / input.len() as f64).sqrt();
-        // Use a combination of RMS and peak for more responsive visualization
-        let level = ((rms * 0.7 + peak * 0.3) * 150.0).min(100.0);
+        let channels = self.from_channels;
+        let frames = input.len() / channels;
+        let mono = |frame: usize| {
+            input[frame * channels..(frame + 1) * channels]
+                .iter()
+                .sum::<f32>()
+                / channels as f32
+        };
 
-        // Throttle to ~30fps (every ~33ms)
-        let now = elapsed_ms();
-        if now - *last_emit_ms >= 33 {
-            *last_emit_ms = now;
-            events.emit(AppEvent::AudioLevel(level as f32));
+        self.output.clear();
+        if frames == 0 {
+            return &self.output;
+        }
+
+        let last = (frames - 1) as f64;
+        while self.position <= last {
+            let index = self.position.floor();
+            let fraction = (self.position - index) as f32;
+            let before = if index < 0.0 {
+                self.previous
+            } else {
+                mono(index as usize)
+            };
+            let sample = if fraction == 0.0 {
+                before
+            } else {
+                let after = mono((index + 1.0) as usize);
+                before + (after - before) * fraction
+            };
+
+            self.output
+                .extend(std::iter::repeat_n(sample, self.to_channels));
+            self.position += self.step;
+        }
+
+        self.position -= frames as f64;
+        self.previous = mono(frames - 1);
+        &self.output
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Converter;
+
+    fn convert_in_chunks(converter: &mut Converter, input: &[f32], chunk: usize) -> Vec<f32> {
+        input
+            .chunks(chunk)
+            .flat_map(|chunk| converter.convert(chunk).to_vec())
+            .collect()
+    }
+
+    #[test]
+    fn the_same_format_passes_through() {
+        let mut converter = Converter::new(2, 48_000, 2, 48_000);
+        let input = [0.1, 0.2, 0.3, 0.4];
+
+        assert_eq!(converter.convert(&input), &input);
+    }
+
+    #[test]
+    fn channels_are_mixed_down_and_repeated() {
+        let mut stereo_to_mono = Converter::new(2, 48_000, 1, 48_000);
+        assert_eq!(stereo_to_mono.convert(&[1.0, 3.0, 2.0, 4.0]), &[2.0, 3.0]);
+
+        let mut mono_to_stereo = Converter::new(1, 48_000, 2, 48_000);
+        assert_eq!(mono_to_stereo.convert(&[1.0, 2.0]), &[1.0, 1.0, 2.0, 2.0]);
+    }
+
+    #[test]
+    fn a_faster_input_is_thinned_out() {
+        let mut converter = Converter::new(1, 48_000, 1, 24_000);
+        let ramp: Vec<f32> = (0..8).map(|n| n as f32).collect();
+
+        assert_eq!(converter.convert(&ramp), &[0.0, 2.0, 4.0, 6.0]);
+    }
+
+    #[test]
+    fn a_slower_input_is_interpolated_across_buffers() {
+        let ramp: Vec<f32> = (0..60).map(|n| n as f32).collect();
+        let output = convert_in_chunks(&mut Converter::new(1, 12_000, 1, 48_000), &ramp, 7);
+
+        // Every output frame is a quarter of an input frame further along.
+        assert_eq!(output.len(), 237);
+        for (index, sample) in output.iter().enumerate() {
+            assert_eq!(*sample, index as f32 / 4.0);
+        }
+    }
+
+    #[test]
+    fn buffer_boundaries_do_not_change_the_result() {
+        let signal: Vec<f32> = (0..480).map(|n| (n as f32 * 0.37).sin()).collect();
+        let whole = Converter::new(2, 48_000, 1, 32_000)
+            .convert(&signal)
+            .to_vec();
+        assert_eq!(whole.len(), 160);
+
+        for chunk in [2, 10, 64, 130] {
+            let chunked =
+                convert_in_chunks(&mut Converter::new(2, 48_000, 1, 32_000), &signal, chunk);
+            assert_eq!(chunked.len(), whole.len(), "chunks of {chunk}");
+            for (a, b) in chunked.iter().zip(&whole) {
+                assert!((a - b).abs() < 1e-5, "chunks of {chunk}");
+            }
         }
     }
 }

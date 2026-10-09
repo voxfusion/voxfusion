@@ -143,6 +143,9 @@ const AUDIO_DEVICE_PROPERTY_DEVICE_IS_RUNNING_SOMEWHERE: AudioObjectPropertySele
     u32::from_be_bytes(*b"gone");
 
 #[cfg(target_os = "macos")]
+const AUDIO_DEVICE_PROPERTY_DATA_SOURCE: AudioObjectPropertySelector = u32::from_be_bytes(*b"ssrc");
+
+#[cfg(target_os = "macos")]
 const AUDIO_DEVICE_TRANSPORT_TYPE_BLUETOOTH: u32 = u32::from_be_bytes(*b"blue");
 
 #[cfg(target_os = "macos")]
@@ -492,6 +495,24 @@ fn is_bluetooth(device_id: AudioObjectId) -> bool {
         transport == AUDIO_DEVICE_TRANSPORT_TYPE_BLUETOOTH
             || transport == AUDIO_DEVICE_TRANSPORT_TYPE_BLUETOOTH_LE
     })
+}
+
+/// What the input device with this UID is connected through (its transport
+/// type), and the source it records from, for devices that have several.
+#[cfg(target_os = "macos")]
+pub(super) fn input_connection(uid: &str) -> Option<(u32, Option<u32>)> {
+    let device_id = find_device_by_uid(uid)?;
+    let transport = get_u32_property(
+        device_id,
+        AUDIO_DEVICE_PROPERTY_TRANSPORT_TYPE,
+        AUDIO_OBJECT_PROPERTY_SCOPE_GLOBAL,
+    )?;
+    let source = get_u32_property(
+        device_id,
+        AUDIO_DEVICE_PROPERTY_DATA_SOURCE,
+        AUDIO_DEVICE_PROPERTY_SCOPE_INPUT,
+    );
+    Some((transport, source))
 }
 
 /// Whether the output is a Bluetooth headset whose microphone is recording.
