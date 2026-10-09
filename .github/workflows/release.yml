@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*'
+  # daily-release.yml starts it on the tag it pushes: a tag pushed with
+  # GITHUB_TOKEN starts no workflows.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,6 +17,9 @@ env:
 
 jobs:
   build:
+    # The version comes from the tag; started by hand on a branch, there is
+    # nothing to release.
+    if: github.ref_type == 'tag'
     runs-on: macos-15
     steps:
       - name: Checkout repository
