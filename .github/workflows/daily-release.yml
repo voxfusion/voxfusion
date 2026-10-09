@@ -1,0 +1,146 @@
+# Releases main once a day, as the next patch version, when the app has
+# changed since the last release.
+#
+# Only commits that touch packages/app count: the marketing site deploys on
+# its own, and a release without app changes would still ask every installed
+# copy to update. The release is the newest commit on main whose CI passed,
+# so commits whose CI failed or has not finished wait for a later run.
+# Changes are counted from the last published release: when a release fails,
+# the next run releases its changes again under the next version.
+#
+# A tag pushed with GITHUB_TOKEN starts no workflows, so this one starts
+# release.yml on the new tag itself (workflow_dispatch is the exception to
+# that rule). It then waits for the release, so that a failed release fails
+# this run too and GitHub notifies about it.
+name: Daily release
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: daily-release
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Find what to release
+        id: next
+        run: |
+          RUNNING=$(gh run list --workflow release.yml --limit 20 --json status \
+            --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$RUNNING" != "0" ]; then
+            echo "::notice::A release is already running; nothing to start."
+            exit 0
+          fi
+
+          # The newest commit still on main whose CI passed. A run stays in
+          # the history after its commit is force-pushed away from main.
+          PASSED=$(gh run list --workflow ci.yml --branch main --event push --status success \
+            --limit 50 --json headSha --jq '.[].headSha')
+          COMMIT=""
+          for SHA in $PASSED; do
+            if git merge-base --is-ancestor "$SHA" HEAD 2> /dev/null; then
+              COMMIT=$SHA
+              break
+            fi
+          done
+          if [ -z "$COMMIT" ]; then
+            echo "::notice::No commit on main has passed CI; nothing to release."
+            exit 0
+          fi
+
+          # Changes count from the newest tag that has a published release, so
+          # the changes of a tag whose release failed go out with the next one.
+          TAGS=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r)
+          RELEASED=$(gh release list --limit 100 --exclude-drafts --json tagName --jq '.[].tagName')
+          LAST=""
+          for CANDIDATE in $TAGS; do
+            if grep -qxF "$CANDIDATE" <<< "$RELEASED"; then
+              LAST=$CANDIDATE
+              break
+            fi
+          done
+          if [ -z "$LAST" ]; then
+            echo "::error::No vX.Y.Z tag has a published release to count changes from."
+            exit 1
+          fi
+
+          CHANGES=$(git rev-list --count "$LAST..$COMMIT" -- packages/app)
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "::notice::The app has not changed between $LAST and ${COMMIT:0:7}; nothing to release."
+            exit 0
+          fi
+
+          # Tags from before this workflow existed have a release.yml that
+          # only starts on a tag push.
+          RELEASE_WORKFLOW=$(git show "$COMMIT:.github/workflows/release.yml")
+          if ! grep -q '^  workflow_dispatch:' <<< "$RELEASE_WORKFLOW"; then
+            echo "::notice::release.yml at ${COMMIT:0:7} cannot be started on a tag; waiting for a newer commit to pass CI."
+            exit 0
+          fi
+
+          HIGHEST=$(head -1 <<< "$TAGS")
+          if [ "$HIGHEST" != "$LAST" ]; then
+            echo "::warning::$HIGHEST has no published release; its changes go out in the next version."
+          fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "${HIGHEST#v}"
+          TAG="v$MAJOR.$MINOR.$((PATCH + 1))"
+          echo "Releasing ${COMMIT:0:7} as $TAG, with $CHANGES app commits since $LAST:"
+          git log --oneline "$LAST..$COMMIT" -- packages/app
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Tag the release
+        if: steps.next.outputs.tag
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+          COMMIT: ${{ steps.next.outputs.commit }}
+        run: |
+          git tag "$TAG" "$COMMIT"
+          git push origin "$TAG"
+
+      - name: Run the release
+        if: steps.next.outputs.tag
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+        run: |
+          gh workflow run release.yml --ref "$TAG"
+
+          RUN=""
+          for attempt in $(seq 1 30); do
+            sleep 10
+            RUN=$(gh run list --workflow release.yml --branch "$TAG" --event workflow_dispatch \
+              --limit 1 --json databaseId --jq '.[0].databaseId // empty') || true
+            if [ -n "$RUN" ]; then break; fi
+          done
+          if [ -z "$RUN" ]; then
+            echo "::error::The release run for $TAG did not start."
+            exit 1
+          fi
+
+          URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$RUN"
+          echo "Release run: $URL"
+          while [ "$(gh run view "$RUN" --json status --jq .status)" != "completed" ]; do
+            sleep 60
+          done
+          CONCLUSION=$(gh run view "$RUN" --json conclusion --jq .conclusion)
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::The release of $TAG ended with \"$CONCLUSION\": $URL"
+            exit 1
+          fi
+          echo "::notice::Released $TAG: $URL"
