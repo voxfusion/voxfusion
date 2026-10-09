@@ -11,9 +11,13 @@
 //!
 //! It has to be launched as an app (`open`), not from a shell: macOS holds a
 //! program started from a terminal to the terminal's permissions.
+//!
+//! `--microphones-report <file>` writes whether the lid is closed, the
+//! microphones and how each is connected, and the one a recording would use
+//! now. It needs no permission, so a shell can run the executable directly.
 
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::backend::PermissionState;
@@ -44,6 +48,18 @@ struct Report {
 /// process should then exit instead of starting the app.
 pub fn run_if_asked() -> bool {
     let arguments: Vec<String> = std::env::args().collect();
+
+    if let Some(position) = arguments
+        .iter()
+        .position(|argument| argument == "--microphones-report")
+    {
+        match arguments.get(position + 1) {
+            Some(path) => write_json(Path::new(path), &native::microphones_report()),
+            None => eprintln!("--microphones-report needs a file to write to"),
+        }
+        return true;
+    }
+
     let Some(position) = arguments
         .iter()
         .position(|argument| argument == "--permissions-report")
@@ -63,12 +79,7 @@ pub fn run_if_asked() -> bool {
         microphone_request,
         audio_capture_error,
     };
-    let write = |report: Report| {
-        let contents = serde_json::to_string_pretty(&report).expect("the report serializes");
-        if let Err(error) = std::fs::write(&path, contents) {
-            eprintln!("cannot write {}: {error}", path.display());
-        }
-    };
+    let write = |report: Report| write_json(&path, &report);
 
     // The state before asking is written first: asking blocks until the
     // prompt is answered, which a script watching for the prompt never does.
@@ -98,4 +109,11 @@ pub fn run_if_asked() -> bool {
     }
 
     true
+}
+
+fn write_json(path: &Path, report: &impl Serialize) {
+    let contents = serde_json::to_string_pretty(report).expect("the report serializes");
+    if let Err(error) = std::fs::write(path, contents) {
+        eprintln!("cannot write {}: {error}", path.display());
+    }
 }
