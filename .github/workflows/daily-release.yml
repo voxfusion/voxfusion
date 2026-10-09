@@ -5,6 +5,8 @@
 # its own, and a release without app changes would still ask every installed
 # copy to update. The release is the newest commit on main whose CI passed,
 # so commits whose CI failed or has not finished wait for a later run.
+# Changes are counted from the last published release: when a release fails,
+# the next run releases its changes again under the next version.
 #
 # A tag pushed with GITHUB_TOKEN starts no workflows, so this one starts
 # release.yml on the new tag itself (workflow_dispatch is the exception to
@@ -39,16 +41,41 @@ jobs:
       - name: Find what to release
         id: next
         run: |
-          COMMIT=$(gh run list --workflow ci.yml --branch main --event push --status success \
-            --limit 1 --json headSha --jq '.[0].headSha // empty')
+          if [ "$(gh run list --workflow release.yml --limit 20 --json status \
+            --jq '[.[] | select(.status != "completed")] | length')" != "0" ]; then
+            echo "::notice::A release is already running; nothing to start."
+            exit 0
+          fi
+
+          # The newest commit still on main whose CI passed. A run stays in
+          # the history after its commit is force-pushed away from main.
+          PASSED=$(gh run list --workflow ci.yml --branch main --event push --status success \
+            --limit 50 --json headSha --jq '.[].headSha')
+          COMMIT=""
+          for SHA in $PASSED; do
+            if git merge-base --is-ancestor "$SHA" HEAD 2> /dev/null; then
+              COMMIT=$SHA
+              break
+            fi
+          done
           if [ -z "$COMMIT" ]; then
             echo "::notice::No commit on main has passed CI; nothing to release."
             exit 0
           fi
 
-          LAST=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          # Changes count from the newest tag that has a published release, so
+          # the changes of a tag whose release failed go out with the next one.
+          TAGS=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r)
+          RELEASED=$(gh release list --limit 100 --exclude-drafts --json tagName --jq '.[].tagName')
+          LAST=""
+          for CANDIDATE in $TAGS; do
+            if grep -qxF "$CANDIDATE" <<< "$RELEASED"; then
+              LAST=$CANDIDATE
+              break
+            fi
+          done
           if [ -z "$LAST" ]; then
-            echo "::error::No vX.Y.Z tag to count the next version from."
+            echo "::error::No vX.Y.Z tag has a published release to count changes from."
             exit 1
           fi
 
@@ -58,7 +85,19 @@ jobs:
             exit 0
           fi
 
-          IFS=. read -r MAJOR MINOR PATCH <<< "${LAST#v}"
+          # Tags from before this workflow existed have a release.yml that
+          # only starts on a tag push.
+          RELEASE_WORKFLOW=$(git show "$COMMIT:.github/workflows/release.yml")
+          if ! grep -q '^  workflow_dispatch:' <<< "$RELEASE_WORKFLOW"; then
+            echo "::notice::release.yml at ${COMMIT:0:7} cannot be started on a tag; waiting for a newer commit to pass CI."
+            exit 0
+          fi
+
+          HIGHEST=$(head -1 <<< "$TAGS")
+          if [ "$HIGHEST" != "$LAST" ]; then
+            echo "::warning::$HIGHEST has no published release; its changes go out in the next version."
+          fi
+          IFS=. read -r MAJOR MINOR PATCH <<< "${HIGHEST#v}"
           TAG="v$MAJOR.$MINOR.$((PATCH + 1))"
           echo "Releasing ${COMMIT:0:7} as $TAG, with $CHANGES app commits since $LAST:"
           git log --oneline "$LAST..$COMMIT" -- packages/app
