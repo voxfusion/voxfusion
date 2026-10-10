@@ -114,8 +114,9 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 	.title-accent { color: #ff4d19; }
 	.hero-description { max-width: 420px; font-size: 16px; line-height: 1.75; color: #a8a8a8; margin-bottom: 40px; }
 	.hero-actions { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
-	.btn-primary { display: inline-flex; justify-content: center; align-items: center; gap: 12px; padding: 17px 24px; font-size: 13px; font-weight: 600; background: #ff4d19; border: 1px solid #ff4d19; color: #090909; box-shadow: 4px 4px 0 #7a2409; transition: background .2s, border-color .2s, transform .12s, box-shadow .12s; }
-	.btn-primary:hover { background: #ff7045; border-color: #ff7045; transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #7a2409; }
+	/* Outlined at rest, filled on hover: one solid orange block above the fold reads as "dark page, neon button". */
+	.btn-primary { display: inline-flex; justify-content: center; align-items: center; gap: 12px; padding: 17px 24px; font-size: 13px; font-weight: 600; background: #0a0a0a; border: 1px solid #ff4d19; color: #ff4d19; box-shadow: 4px 4px 0 #7a2409; transition: background .2s, border-color .2s, color .2s, transform .12s, box-shadow .12s; }
+	.btn-primary:hover { background: #ff4d19; color: #090909; transform: translate(-1px, -1px); box-shadow: 5px 5px 0 #7a2409; }
 	.btn-primary:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #7a2409; }
 	.btn-icon { font-size: 18px; transition: transform .2s var(--ease-out); }
 	.btn-primary:hover .btn-icon { transform: translateY(2px); }
