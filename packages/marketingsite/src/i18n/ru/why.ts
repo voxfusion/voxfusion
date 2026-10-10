@@ -15,8 +15,5 @@ export const why = {
 	"why.flow.cloud.note": "never contacted",
 	"why.flow.alt":
 		"Diagram: your voice goes from the microphone to the speech model to your cursor, all inside your Mac. Nothing is sent to a cloud server.",
-	"why.list1": "Offline after one download",
-	"why.list2": "Signed and notarized by Apple",
-	"why.list3": "Analytics optional, never audio or text",
 	"why.source": "Read the source",
 } as const;
