@@ -140,6 +140,8 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MACOSX_DEPLOYMENT_TARGET: "11.0"
           NOTARIZE: "1"
+          # Only these builds send usage analytics (`src/analytics.rs`).
+          VOXFUSION_RELEASE_BUILD: "1"
         run: |
           for target in aarch64-apple-darwin x86_64-apple-darwin; do
             bash scripts/bundle-macos.sh --target "$target" \
