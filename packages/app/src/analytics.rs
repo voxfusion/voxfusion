@@ -25,6 +25,10 @@ const DISTINCT_ID_FILE: &str = "analytics_id";
 
 const SEND_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// Set by `release.yml` for the builds it publishes. Only those report usage:
+/// development, CI and QA builds would each count as another user.
+const RELEASE_BUILD: bool = option_env!("VOXFUSION_RELEASE_BUILD").is_some();
+
 struct Analytics {
     /// The setting, shared with the sending thread.
     enabled: Arc<AtomicBool>,
@@ -43,9 +47,10 @@ struct Event {
 /// the setting from then on. Events captured before this are dropped, since
 /// the choice is not known yet.
 pub fn init(cx: &mut App) {
-    // Scripted runs must not show up in the product's statistics.
-    #[cfg(feature = "fixture")]
-    if std::env::var_os("VOXFUSION_FIXTURE").is_some() {
+    // A profile of its own (`VOXFUSION_APP_ID`) is a test run, such as CI's
+    // and the release check's launches of a published build. Its fresh
+    // identifier would show up as a new user.
+    if !RELEASE_BUILD || std::env::var_os("VOXFUSION_APP_ID").is_some() {
         return;
     }
 
