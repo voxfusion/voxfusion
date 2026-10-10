@@ -11,7 +11,6 @@ export const common = {
 
 	"cta.title": "Say your next email instead of typing it.",
 	"cta.button": "Download for Mac",
-	"cta.note": "macOS 11+ / Apple Silicon & Intel",
 
 	"notFound.title": "Page not found",
 	"notFound.description": "The page you are looking for does not exist or has moved.",

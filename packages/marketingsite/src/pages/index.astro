@@ -31,10 +31,6 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 	<main id="main-content">
 	<header class="hero">
 		<div class="hero-content">
-			<div class="hero-label enter">
-				<span class="label-line" aria-hidden="true"></span>
-				<span class="label-text">{t("hero.label")}</span>
-			</div>
 			<h1 class="hero-title">
 				<span class="title-line"><span style="--d: .08s">{t("hero.title.line1")}</span></span>
 				<span class="title-line"><span style="--d: .18s">{t("hero.title.line2")}</span></span>
@@ -48,7 +44,6 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 				</a>
 				<a href={githubHref} target="_blank" rel="noopener noreferrer" class="text-link" data-umami-event="hero_github_click">{t("hero.cta.github")} <span aria-hidden="true">→</span></a>
 			</div>
-			<p class="hero-note enter" style="--d: .6s">{t("hero.note")}</p>
 		</div>
 		<div class="hero-demo enter" style="--d: .35s"><HeroDemo lang={lang} /></div>
 	</header>
@@ -66,12 +61,7 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 	<section id="privacy" class="section">
 		<SectionHeading number="03" tag={t("why.section")} title={t("why.title")} description={t("why.description")} viewEvent="view_privacy" />
 		<PrivacyFlow lang={lang} />
-		<div class="privacy-points">
-			<ul>
-				<li><span aria-hidden="true">[✓]</span> {t("why.list1")}</li>
-				<li><span aria-hidden="true">[✓]</span> {t("why.list2")}</li>
-				<li><span aria-hidden="true">[✓]</span> {t("why.list3")}</li>
-			</ul>
+		<div class="privacy-source">
 			<a href={githubHref} target="_blank" rel="noopener noreferrer" class="text-link" data-umami-event="privacy_github_click">{t("why.source")} <span aria-hidden="true">→</span></a>
 		</div>
 	</section>
@@ -89,7 +79,6 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 				<span class="btn-icon" aria-hidden="true">↓</span>
 				<span>{t("cta.button")}</span>
 			</a>
-			<span class="cta-note">{t("cta.note")}</span>
 		</div>
 	</section>
 	</main>
@@ -107,9 +96,6 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 	.title-line > span { display: block; animation: line-up .9s var(--ease-out) var(--d, 0s) backwards; }
 	@keyframes line-up { from { transform: translateY(110%); } }
 
-	.hero-label { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
-	.label-line { width: 7px; height: 7px; background: #ff3e00; }
-	.label-text { font-size: 11px; color: #a3a3a3; letter-spacing: .14em; }
 	.hero-title { font-size: clamp(40px, 5vw, 70px); font-weight: 600; line-height: 1.06; letter-spacing: -.06em; margin-bottom: 32px; white-space: nowrap; }
 	.title-accent { color: #ff4d19; }
 	.hero-description { max-width: 420px; font-size: 16px; line-height: 1.75; color: #a8a8a8; margin-bottom: 40px; }
@@ -124,20 +110,15 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 	.text-link:hover { color: #fff; border-color: #ff6b3d; }
 	.text-link span { display: inline-block; transition: transform .2s var(--ease-out); }
 	.text-link:hover span { transform: translateX(3px); }
-	.hero-note { margin-top: 28px; color: #7a7a7a; font-size: 11px; letter-spacing: .04em; }
 
 	.section { padding-top: 168px; }
 
-	.privacy-points { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px 40px; margin-top: 40px; }
-	.privacy-points ul { display: flex; flex-wrap: wrap; gap: 12px 40px; list-style: none; }
-	.privacy-points li { display: flex; gap: 12px; color: #a8a8a8; font-size: 13px; line-height: 1.7; }
-	.privacy-points li span { flex-shrink: 0; color: #ff6b3d; }
+	.privacy-source { margin-top: 40px; }
 
 	.cta { padding-bottom: 168px; }
 	.cta-rule { height: 1px; margin-bottom: 72px; background: #292929; }
 	.cta h2 { max-width: 860px; font-size: clamp(30px, 4.4vw, 60px); line-height: 1.12; font-weight: 500; letter-spacing: -.055em; }
-	.cta-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; margin-top: 44px; }
-	.cta-note { color: #7a7a7a; font-size: 11px; letter-spacing: .04em; }
+	.cta-actions { margin-top: 44px; }
 
 	@media (max-width: 1050px) {
 		.hero { gap: 40px; }
@@ -155,11 +136,9 @@ const githubHref = "https://github.com/voxfusion/voxfusion";
 	@media (max-width: 540px) {
 		.hero, .section { padding-inline: 20px; }
 		.hero { padding-top: 112px; gap: 44px; }
-		.hero-label { margin-bottom: 24px; }
 		.hero-title { font-size: clamp(30px, 9.6vw, 48px); margin-bottom: 24px; }
 		.hero-description { font-size: 15px; margin-bottom: 32px; }
 		.section { padding-top: 88px; }
-		.privacy-points ul { flex-direction: column; gap: 10px; }
 		.cta { padding-bottom: 88px; }
 	}
 	@media (prefers-reduced-motion: reduce) {
