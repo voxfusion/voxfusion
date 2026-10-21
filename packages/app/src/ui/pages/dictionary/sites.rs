@@ -7,7 +7,7 @@ use gpui_kit::{
 };
 
 use crate::analytics;
-use crate::ui::pages::section::{empty_state, list_header};
+use crate::ui::pages::section::{empty_state, list_header, load_failed};
 use crate::ui::widgets::add_site_form::{AddSiteForm, SiteAdded};
 use crate::ui::{t, t_with};
 
@@ -39,7 +39,23 @@ impl SiteDictionaries {
             }),
         ];
 
-        let fetch = groups.update(cx, |groups, cx| groups.fetch(cx));
+        let mut page = Self {
+            groups,
+            form,
+            loading: true,
+            _subscriptions: subscriptions,
+        };
+        page.load(cx);
+        page
+    }
+
+    /// Fetches the dictionaries: when the page opens, and again after they
+    /// could not be listed.
+    fn load(&mut self, cx: &mut Context<Self>) {
+        self.loading = true;
+        cx.notify();
+
+        let fetch = self.groups.update(cx, |groups, cx| groups.fetch(cx));
         cx.spawn(async move |this, cx| {
             fetch.await;
 
@@ -50,20 +66,15 @@ impl SiteDictionaries {
             .ok();
         })
         .detach();
-
-        Self {
-            groups,
-            form,
-            loading: true,
-            _subscriptions: subscriptions,
-        }
     }
 }
 
 impl Render for SiteDictionaries {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let count = self.groups.read(cx).len();
-        let count_label = (count > 0)
+        let groups = self.groups.read(cx);
+        let count = groups.len();
+        let load_error = groups.load_error();
+        let count_label = (count > 0 && load_error.is_none())
             .then(|| t_with(cx, "dictionary.siteCount", &[("count", &count.to_string())]));
 
         div()
@@ -74,7 +85,14 @@ impl Render for SiteDictionaries {
             ))
             .child(self.form.clone())
             .when(!self.loading, |page| {
-                if count == 0 {
+                if let Some(error) = load_error {
+                    page.child(load_failed(
+                        t(cx, "dictionary.sitesLoadFailed"),
+                        error,
+                        cx.listener(|this, _, _, cx| this.load(cx)),
+                        cx,
+                    ))
+                } else if count == 0 {
                     page.child(empty_state(
                         "NO_SITES_CONFIGURED",
                         t(cx, "dictionary.sitesEmptyState"),
