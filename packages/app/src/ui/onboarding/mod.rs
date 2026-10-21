@@ -1,5 +1,5 @@
 //! The first-run wizard: permissions, the microphone, hotkeys, privacy, the
-//! model download and a try-out, one step at a time.
+//! choice and download of a model, and a try-out, one step at a time.
 
 mod accessibility_permission;
 mod completion;
@@ -26,7 +26,7 @@ use self::hotkey::HotkeyStep;
 use self::learning::{LearningStep, TranscriptionTried};
 use self::microphone::MicrophoneStep;
 use self::microphone_permission::MicrophonePermissionStep;
-use self::model_download::{DownloadComplete, ModelDownloadStep};
+use self::model_download::{ModelDownloadStep, ModelReady};
 use self::parts::{PermissionChanged, accent_button, button_label};
 use self::privacy::privacy_step;
 use self::step_indicator::{format_step, step_indicator};
@@ -83,7 +83,7 @@ pub struct OnboardingWizard {
     max_width: Tween,
     mic_permission_granted: bool,
     accessibility_permission_granted: bool,
-    model_downloaded: bool,
+    model_ready: bool,
     learning_completed: bool,
     step_events: Option<Subscription>,
 }
@@ -99,7 +99,7 @@ impl OnboardingWizard {
             max_width: Tween::resting(layout_width(initial_step), WIDTH_TRANSITION),
             mic_permission_granted: false,
             accessibility_permission_granted: false,
-            model_downloaded: false,
+            model_ready: false,
             learning_completed: false,
             step_events: None,
         };
@@ -138,11 +138,10 @@ impl OnboardingWizard {
             HOTKEY_STEP => StepView::Hotkey(cx.new(HotkeyStep::new)),
             MODEL_DOWNLOAD_STEP => {
                 let step = cx.new(ModelDownloadStep::new);
-                self.step_events =
-                    Some(cx.subscribe(&step, |this, _, _: &DownloadComplete, cx| {
-                        this.model_downloaded = true;
-                        cx.notify();
-                    }));
+                self.step_events = Some(cx.subscribe(&step, |this, _, event: &ModelReady, cx| {
+                    this.model_ready = event.0;
+                    cx.notify();
+                }));
                 StepView::ModelDownload(step)
             }
             LEARNING_STEP => {
@@ -163,7 +162,7 @@ impl OnboardingWizard {
         match self.current_step {
             MICROPHONE_PERMISSION_STEP => self.mic_permission_granted,
             ACCESSIBILITY_PERMISSION_STEP => self.accessibility_permission_granted,
-            MODEL_DOWNLOAD_STEP => self.model_downloaded,
+            MODEL_DOWNLOAD_STEP => self.model_ready,
             LEARNING_STEP => self.learning_completed,
             _ => true,
         }

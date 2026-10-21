@@ -692,8 +692,9 @@ pub fn services(
         update: data.update.clone(),
         download_events,
     };
-    let backend = FixtureBackend::new(data);
+    let backend = std::sync::Arc::new(FixtureBackend::new(data));
 
+    let script_backend = backend.clone();
     std::thread::spawn(move || {
         for line in std::io::stdin().lines() {
             let Ok(line) = line else { break };
@@ -703,7 +704,20 @@ pub fn services(
 
             match serde_json::from_str::<Command>(&line) {
                 Ok(Command::Emit { event, payload }) => match parse_event(event, payload) {
-                    Ok(event) => events.emit(event),
+                    Ok(event) => {
+                        // A scripted download that finishes leaves its model
+                        // on disk, as a real one does.
+                        if let AppEvent::ModelDownloadProgress(report) = &event
+                            && report.progress >= 100
+                        {
+                            script_backend.with(|data| {
+                                for model in &mut data.models {
+                                    model.downloaded |= model.id == report.model_id;
+                                }
+                            });
+                        }
+                        events.emit(event);
+                    }
                     Err(error) => eprintln!("fixture: unknown event in {line}: {error}"),
                 },
                 Ok(Command::UpdateEvent { message }) => {
@@ -720,11 +734,7 @@ pub fn services(
         }
     });
 
-    (
-        std::sync::Arc::new(backend),
-        std::sync::Arc::new(updater),
-        wheels,
-    )
+    (backend, std::sync::Arc::new(updater), wheels)
 }
 
 #[cfg(test)]

@@ -19,9 +19,10 @@ use crate::ui::download_format::{format_eta, format_mb};
 use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::model_summary::model_summary;
 use crate::ui::widgets::progress_bar::{Progress, progress_bar};
 use crate::ui::widgets::{icon, spinning};
-use crate::ui::{t, t_upper, t_with, upper};
+use crate::ui::{t, t_upper, t_with};
 
 /// How far a download has come, and how fast it is going.
 struct DownloadStats {
@@ -514,37 +515,7 @@ impl ModelSettings {
                     .items_start()
                     .justify_between()
                     .gap_3()
-                    .child(
-                        div()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_2()
-                                    .flex_wrap()
-                                    .child(div().type_sm().text_color(p.txt_primary).child(
-                                        text(upper(&model.name)).tracking_wider().truncate(),
-                                    ))
-                                    .when(model.recommended, |row| {
-                                        row.child(badge(
-                                            t_upper(cx, "settings.modelRecommended"),
-                                            p.ac,
-                                            p.ac,
-                                        ))
-                                    })
-                                    .when(model.experimental, |row| {
-                                        row.child(badge(
-                                            t_upper(cx, "settings.modelExperimental"),
-                                            p.txt_muted,
-                                            p.border_strong,
-                                        ))
-                                    }),
-                            )
-                            .child(div().mt_1p5().type_xs().text_color(p.txt_faint).child(text(
-                                format!("{} · {}", model.size_label, model.languages),
-                            ))),
-                    )
+                    .child(model_summary(model, cx))
                     .child(div().flex_shrink_0().children(status)),
             )
             .children(download)
@@ -556,18 +527,6 @@ impl ModelSettings {
             })
             .into_any_element()
     }
-}
-
-/// A small framed label after a model's name.
-fn badge(label: SharedString, color: Hsla, border: Hsla) -> Div {
-    div()
-        .px_1p5()
-        .py_0p5()
-        .border_1()
-        .border_color(border)
-        .type_px(10.)
-        .text_color(color)
-        .child(text(label).tracking_wider())
 }
 
 /// A remark under a model's details.
