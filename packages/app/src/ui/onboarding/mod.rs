@@ -1,5 +1,5 @@
 //! The first-run wizard: permissions, the microphone, hotkeys, privacy, the
-//! model download and a try-out, one step at a time.
+//! choice and download of a model, and a try-out, one step at a time.
 
 mod accessibility_permission;
 mod completion;
@@ -16,7 +16,7 @@ mod transition;
 use gpui_kit::{
     AnimationExt as _, AppContext as _, Context, Div, Entity, IntoElement, ParentElement as _,
     Render, StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::*,
-    px,
+    px, relative,
 };
 use std::time::Duration;
 
@@ -26,7 +26,7 @@ use self::hotkey::HotkeyStep;
 use self::learning::{LearningStep, TranscriptionTried};
 use self::microphone::MicrophoneStep;
 use self::microphone_permission::MicrophonePermissionStep;
-use self::model_download::{DownloadComplete, ModelDownloadStep};
+use self::model_download::{ModelDownloadStep, ModelReady};
 use self::parts::{PermissionChanged, accent_button, button_label};
 use self::privacy::privacy_step;
 use self::step_indicator::{format_step, step_indicator};
@@ -83,7 +83,7 @@ pub struct OnboardingWizard {
     max_width: Tween,
     mic_permission_granted: bool,
     accessibility_permission_granted: bool,
-    model_downloaded: bool,
+    model_ready: bool,
     learning_completed: bool,
     step_events: Option<Subscription>,
 }
@@ -99,7 +99,7 @@ impl OnboardingWizard {
             max_width: Tween::resting(layout_width(initial_step), WIDTH_TRANSITION),
             mic_permission_granted: false,
             accessibility_permission_granted: false,
-            model_downloaded: false,
+            model_ready: false,
             learning_completed: false,
             step_events: None,
         };
@@ -107,7 +107,8 @@ impl OnboardingWizard {
         wizard
     }
 
-    /// Replaces the step shown with a fresh one for the current step number.
+    /// Replaces the step shown with the one for the current step number: a
+    /// fresh one, except the model step, which keeps its download going.
     fn mount_step(&mut self, cx: &mut Context<Self>) {
         self.step_events = None;
 
@@ -137,12 +138,12 @@ impl OnboardingWizard {
             MICROPHONE_STEP => StepView::Microphone(cx.new(MicrophoneStep::new)),
             HOTKEY_STEP => StepView::Hotkey(cx.new(HotkeyStep::new)),
             MODEL_DOWNLOAD_STEP => {
-                let step = cx.new(ModelDownloadStep::new);
-                self.step_events =
-                    Some(cx.subscribe(&step, |this, _, _: &DownloadComplete, cx| {
-                        this.model_downloaded = true;
-                        cx.notify();
-                    }));
+                let step = ModelDownloadStep::shared(cx);
+                self.model_ready = step.read(cx).is_ready();
+                self.step_events = Some(cx.subscribe(&step, |this, _, event: &ModelReady, cx| {
+                    this.model_ready = event.0;
+                    cx.notify();
+                }));
                 StepView::ModelDownload(step)
             }
             LEARNING_STEP => {
@@ -163,7 +164,7 @@ impl OnboardingWizard {
         match self.current_step {
             MICROPHONE_PERMISSION_STEP => self.mic_permission_granted,
             ACCESSIBILITY_PERMISSION_STEP => self.accessibility_permission_granted,
-            MODEL_DOWNLOAD_STEP => self.model_downloaded,
+            MODEL_DOWNLOAD_STEP => self.model_ready,
             LEARNING_STEP => self.learning_completed,
             _ => true,
         }
@@ -227,6 +228,7 @@ impl OnboardingWizard {
 
     fn complete(&mut self, cx: &mut Context<Self>) {
         analytics::capture(cx, "onboarding_completed", &[]);
+        ModelDownloadStep::release(cx);
         settings::mark_onboarding_complete(cx);
     }
 
@@ -312,13 +314,22 @@ impl Render for OnboardingWizard {
                 },
             );
 
+        // A step taller than the window scrolls between the step indicator
+        // and the navigation, which stay where they are.
         let content_area = div()
+            .id("step-area")
             .flex_1()
-            .flex()
-            .items_center()
-            .justify_center()
+            .min_h_0()
             .w_full()
-            .child(content)
+            .overflow_y_scroll()
+            .child(
+                div()
+                    .min_h(relative(1.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(content),
+            )
             .with_animation(
                 max_width.animation_id("content-width"),
                 max_width.animation(),

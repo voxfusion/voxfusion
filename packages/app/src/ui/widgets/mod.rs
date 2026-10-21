@@ -5,6 +5,7 @@ pub mod app_icon;
 pub mod app_search;
 pub mod focus;
 mod icon;
+pub mod model_summary;
 pub mod progress_bar;
 pub mod select;
 pub mod style_select;

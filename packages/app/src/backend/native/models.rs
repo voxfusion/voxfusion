@@ -26,6 +26,15 @@ impl Engine {
             Engine::Parakeet => "parakeet",
         }
     }
+
+    /// Whether this build can run the engine: Whisper is compiled in, while
+    /// Parakeet's engine is a binary that release builds bundle.
+    pub fn is_available(self) -> bool {
+        match self {
+            Engine::Whisper => true,
+            Engine::Parakeet => super::parakeet::engine_available(),
+        }
+    }
 }
 
 /// Static metadata describing a downloadable transcription model.
@@ -36,7 +45,9 @@ pub struct ModelSpec {
     pub engine: Engine,
     /// Local filename inside the models directory.
     pub filename: &'static str,
-    /// Direct (single-file) download URL.
+    /// Direct (single-file) download URL, at a fixed revision of its
+    /// repository: a file replaced upstream would fail the size and checksum
+    /// checks below.
     pub url: &'static str,
     /// Exact size in bytes when known; used for download validation and as a
     /// progress fallback when the server omits `Content-Length`.
@@ -60,7 +71,7 @@ const MODELS: &[ModelSpec] = &[
         name: "Whisper Large v3 Turbo",
         engine: Engine::Whisper,
         filename: "ggml-large-v3-turbo.bin",
-        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
+        url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo.bin",
         expected_size: Some(1_624_555_275),
         sha256: Some("1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69"),
         size_label: "~1.5 GB",
@@ -74,8 +85,9 @@ const MODELS: &[ModelSpec] = &[
         engine: Engine::Parakeet,
         filename: "parakeet-tdt-0.6b-v3-q8_0.gguf",
         // GGUF port of NVIDIA's Parakeet TDT 0.6B v3 (q8_0), run via the crispasr
-        // engine (see `super::parakeet`).
-        url: "https://huggingface.co/cstr/parakeet-tdt-0.6b-v3-GGUF/resolve/main/parakeet-tdt-0.6b-v3-q8_0.gguf",
+        // engine (see `super::parakeet`). The file on `main` was requantized on
+        // 2026-07-11 (674,342,336 bytes); this is the revision before it.
+        url: "https://huggingface.co/cstr/parakeet-tdt-0.6b-v3-GGUF/resolve/815cc1bcb5cfb92f9cd0bbd22c7bc2f6e2d4ec13/parakeet-tdt-0.6b-v3-q8_0.gguf",
         expected_size: Some(745_121_600),
         sha256: Some("e8bc983c89342a1f36a5bfa1a7a2dc6fab8f9ebdc2e305738f36e3ff60cbc313"),
         size_label: "~745 MB",
@@ -165,6 +177,8 @@ const STALL_TIMEOUT: Duration = Duration::from_secs(60);
 /// How often the download loop wakes up to check the cancellation flag while
 /// waiting for the next chunk.
 const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(250);
+/// How a failed checksum verification's error starts.
+const CHECKSUM_MISMATCH_ERROR: &str = "Checksum mismatch";
 /// How much of the file is hashed between two checks of the cancellation
 /// flag during verification.
 const HASH_CHUNK_SIZE: usize = 1024 * 1024;
@@ -268,26 +282,19 @@ pub async fn download_model_file(events: &EventSender, model: &ModelSpec) -> Res
         stream_to_temp(events, model, &temp_path, existing_len, &cancel).await?;
     }
 
-    let actual_size = tokio::fs::metadata(&temp_path)
-        .await
-        .map_err(|e| e.to_string())?
-        .len();
-    match model.expected_size {
-        Some(expected) if actual_size != expected => {
-            // Keep the short temp file so the next attempt resumes from here.
-            return Err(format!(
-                "Download incomplete: got {} bytes, expected {}",
-                actual_size, expected
-            ));
+    let mut actual_size = downloaded_size(model, &temp_path).await?;
+    if let Err(error) = verify_checksum(events, model, &temp_path, &cancel).await {
+        if existing_len == 0 || !error.starts_with(CHECKSUM_MISMATCH_ERROR) {
+            return Err(error);
         }
-        None if actual_size == 0 => {
-            let _ = tokio::fs::remove_file(&temp_path).await;
-            return Err("Download incomplete: empty file".to_string());
-        }
-        _ => {}
+        // The bytes kept from an earlier attempt may come from an older
+        // upload of the file, which the checksum cannot tell apart from a
+        // corrupted download: fetch the whole file once more.
+        log::warn!(target: "models", "resumed_download_corrupt model_id={} restarting", model.id);
+        stream_to_temp(events, model, &temp_path, 0, &cancel).await?;
+        actual_size = downloaded_size(model, &temp_path).await?;
+        verify_checksum(events, model, &temp_path, &cancel).await?;
     }
-
-    verify_checksum(events, model, &temp_path, &cancel).await?;
 
     tokio::fs::rename(&temp_path, &destination)
         .await
@@ -296,6 +303,29 @@ pub async fn download_model_file(events: &EventSender, model: &ModelSpec) -> Res
     emit_progress(events, model.id, 100, actual_size, actual_size);
 
     Ok(())
+}
+
+/// The size of the downloaded temp file, if it is the size the model's file
+/// should be.
+async fn downloaded_size(model: &ModelSpec, temp_path: &Path) -> Result<u64, String> {
+    let actual_size = tokio::fs::metadata(temp_path)
+        .await
+        .map_err(|e| e.to_string())?
+        .len();
+    match model.expected_size {
+        Some(expected) if actual_size != expected => {
+            // Keep the short temp file so the next attempt resumes from here.
+            Err(format!(
+                "Download incomplete: got {} bytes, expected {}",
+                actual_size, expected
+            ))
+        }
+        None if actual_size == 0 => {
+            let _ = tokio::fs::remove_file(temp_path).await;
+            Err("Download incomplete: empty file".to_string())
+        }
+        _ => Ok(actual_size),
+    }
 }
 
 /// Streams the model URL into `temp_path`, resuming from `existing_len` bytes
@@ -465,7 +495,7 @@ async fn verify_checksum(
     if actual != expected {
         let _ = tokio::fs::remove_file(temp_path).await;
         return Err(format!(
-            "Checksum mismatch for {}: expected sha256 {}, got {}. The download was corrupted — please try again.",
+            "{CHECKSUM_MISMATCH_ERROR} for {}: expected sha256 {}, got {}. The download was corrupted — please try again.",
             model.name, expected, actual
         ));
     }
@@ -489,6 +519,7 @@ pub fn list_models(active: &ActiveModel) -> Vec<ModelInfo> {
             languages: model.languages.to_string(),
             experimental: model.experimental,
             recommended: model.recommended,
+            available: model.engine.is_available(),
             downloaded: is_downloaded(model),
             active: model.id == active_id,
         })
@@ -509,7 +540,7 @@ pub fn set_active_model(active: &ActiveModel, model_id: &str) -> Result<(), Stri
     }
     // A Parakeet model is only usable when the crispasr engine is present
     // (bundled in release builds); fail here rather than on every transcription.
-    if model.engine == Engine::Parakeet && !super::parakeet::engine_available() {
+    if !model.engine.is_available() {
         return Err(format!(
             "{} cannot be activated: the crispasr engine that runs Parakeet models is missing from this build. Reinstall VoxFusion, or run packages/app/scripts/build-parakeet-engine.sh in development.",
             model.name

@@ -119,8 +119,16 @@ pub struct ModelInfo {
     pub languages: String,
     pub experimental: bool,
     pub recommended: bool,
+    /// Whether this build has the engine that runs the model. Release builds
+    /// bundle Parakeet's; a development build may not have it.
+    #[serde(default = "engine_present")]
+    pub available: bool,
     pub downloaded: bool,
     pub active: bool,
+}
+
+fn engine_present() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

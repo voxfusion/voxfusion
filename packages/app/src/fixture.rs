@@ -724,7 +724,20 @@ pub fn services(
 
             match serde_json::from_str::<Command>(&line) {
                 Ok(Command::Emit { event, payload }) => match parse_event(event, payload) {
-                    Ok(event) => events.emit(event),
+                    Ok(event) => {
+                        // A scripted download that finishes leaves its model
+                        // on disk, as a real one does.
+                        if let AppEvent::ModelDownloadProgress(report) = &event
+                            && report.progress >= 100
+                        {
+                            scripted.with(|data| {
+                                for model in &mut data.models {
+                                    model.downloaded |= model.id == report.model_id;
+                                }
+                            });
+                        }
+                        events.emit(event);
+                    }
                     Err(error) => eprintln!("fixture: unknown event in {line}: {error}"),
                 },
                 Ok(Command::UpdateEvent { message }) => {
