@@ -35,6 +35,14 @@ pub struct HomePage {
     hovered: Option<String>,
     retry_hovered: bool,
     copied: HashSet<String>,
+    /// Transcriptions deleted here. A list fetched before the deletion
+    /// reached the database leaves them out.
+    deleted: HashSet<String>,
+    /// Counts the times the history was cleared; a list fetched before the
+    /// last time is dropped.
+    generation: u64,
+    /// A reload asked for while a fetch was running, done after it.
+    reload_pending: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -49,7 +57,9 @@ impl HomePage {
                     this.fetch(None, cx);
                 }
                 AppEvent::TranscriptionsCleared => {
+                    this.generation += 1;
                     this.transcriptions.clear();
+                    this.deleted.clear();
                     this.copied.clear();
                     this.hovered = None;
                     this.next_cursor = None;
@@ -71,6 +81,9 @@ impl HomePage {
             hovered: None,
             retry_hovered: false,
             copied: HashSet::new(),
+            deleted: HashSet::new(),
+            generation: 0,
+            reload_pending: false,
             _subscriptions: subscriptions,
         };
         page.fetch(None, cx);
@@ -79,6 +92,9 @@ impl HomePage {
 
     fn fetch(&mut self, cursor: Option<String>, cx: &mut Context<Self>) {
         if self.loading {
+            if cursor.is_none() {
+                self.reload_pending = true;
+            }
             return;
         }
 
@@ -91,11 +107,18 @@ impl HomePage {
             move |backend| backend.list_transcriptions(PAGE_SIZE, cursor)
         });
 
+        let generation = self.generation;
+
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
             this.update(cx, |this, cx| {
                 this.loading = false;
+                if generation != this.generation {
+                    this.reload_pending = false;
+                    this.fetch(None, cx);
+                    return;
+                }
                 this.initial_loading = false;
 
                 match result {
@@ -106,10 +129,14 @@ impl HomePage {
                             .map(|item| item.created_at.clone());
                         this.has_more = page.has_more;
 
+                        let listed = page
+                            .transcriptions
+                            .into_iter()
+                            .filter(|item| !this.deleted.contains(&item.id));
                         if cursor.is_some() {
-                            this.transcriptions.extend(page.transcriptions);
+                            this.transcriptions.extend(listed);
                         } else {
-                            this.transcriptions = page.transcriptions;
+                            this.transcriptions = listed.collect();
                         }
                     }
                     Err(error) => {
@@ -117,6 +144,9 @@ impl HomePage {
                     }
                 }
 
+                if std::mem::take(&mut this.reload_pending) {
+                    this.fetch(None, cx);
+                }
                 cx.notify();
             })
             .ok();
@@ -167,11 +197,15 @@ impl HomePage {
         self.transcriptions
             .retain(|transcription| transcription.id != id);
         self.copied.remove(id);
+        self.deleted.insert(id.to_string());
         self.hovered = None;
         cx.notify();
 
         let id = id.to_string();
-        let request = backend::call(cx, move |backend| backend.delete_transcription(&id));
+        let request = backend::call(cx, {
+            let id = id.clone();
+            move |backend| backend.delete_transcription(&id)
+        });
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
@@ -181,8 +215,9 @@ impl HomePage {
                 // listed one deleted, the next page is fetched.
                 if let Err(error) = &result {
                     log::error!(target: "home", "delete_transcription_failed error={error}");
-                }
-                if result.is_err() || (this.transcriptions.is_empty() && this.has_more) {
+                    this.deleted.remove(&id);
+                    this.fetch(None, cx);
+                } else if this.transcriptions.is_empty() && this.has_more {
                     this.fetch(None, cx);
                 }
             })

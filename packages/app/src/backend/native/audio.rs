@@ -606,21 +606,70 @@ pub fn delete_recording(name: &str) -> Result<(), String> {
     }
 }
 
-/// Deletes every recording kept on disk, except the one being made.
+/// Recordings being transcribed. Clearing the history leaves them, and the
+/// files made from them, to the transcription.
+static TRANSCRIBING: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+/// Marks `path` as being transcribed until the guard is dropped.
+pub struct Transcribing(PathBuf);
+
+pub fn transcribing(path: &Path) -> Transcribing {
+    if let Ok(mut transcribing) = TRANSCRIBING.lock() {
+        transcribing.push(path.to_path_buf());
+    }
+    Transcribing(path.to_path_buf())
+}
+
+impl Drop for Transcribing {
+    fn drop(&mut self) {
+        if let Ok(mut transcribing) = TRANSCRIBING.lock()
+            && let Some(index) = transcribing.iter().position(|path| *path == self.0)
+        {
+            transcribing.remove(index);
+        }
+    }
+}
+
+/// Whether `path` is `source` or a file made from it, such as the copy
+/// Parakeet reads (`<stem>.parakeet16k.wav`).
+fn made_from(path: &Path, source: &Path) -> bool {
+    let (Some(name), Some(stem)) = (path.file_name(), source.file_stem()) else {
+        return false;
+    };
+    path.parent() == source.parent()
+        && name
+            .to_string_lossy()
+            .starts_with(&format!("{}.", stem.to_string_lossy()))
+}
+
+/// Deletes every recording kept on disk, except the one being made and those
+/// being transcribed. Fails if any recording could not be listed or deleted.
 pub fn delete_recordings() -> Result<(), String> {
-    let recordings = match recordings() {
-        Ok(recordings) => recordings,
+    let entries = match std::fs::read_dir(recordings_dir()) {
+        Ok(entries) => entries,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(err) => return Err(format!("Failed to list recordings: {err}")),
     };
-    let active = RECORDING
+    let mut keep: Vec<PathBuf> = RECORDING
         .lock()
         .ok()
-        .and_then(|active| Some(active.as_ref()?.save_path.clone()));
+        .and_then(|active| Some(active.as_ref()?.save_path.clone()))
+        .into_iter()
+        .collect();
+    // Held while deleting, so a transcription cannot start on a file that
+    // is about to go.
+    let transcribing = TRANSCRIBING.lock().map_err(|err| err.to_string())?;
+    keep.extend(transcribing.iter().cloned());
 
     let mut failed = 0;
-    for (_, path) in recordings {
-        if Some(&path) == active.as_ref() {
+    for entry in entries {
+        let path = match entry {
+            Ok(entry) => entry.path(),
+            Err(err) => return Err(format!("Failed to list recordings: {err}")),
+        };
+        if path.extension().and_then(|ext| ext.to_str()) != Some("wav")
+            || keep.iter().any(|source| made_from(&path, source))
+        {
             continue;
         }
         if let Err(err) = std::fs::remove_file(&path) {

@@ -67,6 +67,14 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
     {
         conn.execute_batch("ALTER TABLE transcriptions ADD COLUMN recording TEXT")
             .map_err(|e| format!("Failed to add transcriptions.recording: {}", e))?;
+
+        // Versions without it ran without `secure_delete`, which left old
+        // copies of moved rows in free space. Rebuilding the file once drops
+        // them, so that deleting a transcription leaves nothing of it.
+        if let Err(err) = conn.execute_batch("VACUUM") {
+            log::warn!(target: "runtime", "database_vacuum_failed error={err}");
+        }
+        truncate_wal(conn);
     }
 
     super::apps::run_migrations(conn)?;
@@ -203,7 +211,7 @@ pub fn delete_transcription(state: &DbState, id: &str) -> Result<(), String> {
 }
 
 /// Deletes every transcription, then rebuilds the database file, so that
-/// nothing of them is left in pages freed before `secure_delete` was on.
+/// not even the space they took is left.
 pub fn clear_transcriptions(state: &DbState) -> Result<(), String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM transcriptions", [])
