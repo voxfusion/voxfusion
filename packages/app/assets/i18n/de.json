@@ -32,6 +32,7 @@
 	"settings.modelDownloaded": "Heruntergeladen",
 	"settings.modelDownload": "Herunterladen",
 	"settings.modelDownloading": "Wird heruntergeladen…",
+	"settings.modelVerifying": "Modell wird überprüft…",
 	"settings.modelDownloadFailed": "Download fehlgeschlagen",
 	"settings.modelDownloadedOfTotal": "{{downloaded}} / {{total}} MB",
 	"settings.modelDownloadSpeed": "{{speed}} MB/s",
