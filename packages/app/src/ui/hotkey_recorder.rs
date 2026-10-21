@@ -18,6 +18,10 @@ use crate::ui::hotkeys::{
     validate_hold_to_speak_hotkey,
 };
 
+/// The key context of a view while one of its recorders records, where Tab
+/// is a key for the hotkey rather than the way to the next control.
+pub const RECORDING_CONTEXT: &str = "HotkeyRecorder";
+
 /// Which of the two dictation hotkeys a recorder sets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HotkeyKind {
