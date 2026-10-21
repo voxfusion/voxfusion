@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::backend::DictionaryWord;
+use crate::backend::{DictionaryWord, MAX_WORD_CHARS};
 use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -26,6 +26,81 @@ use crate::ui::{t, t_with, upper};
 pub enum Variant {
     Page,
     Nested,
+}
+
+/// What could not be done to a word or a dictionary, and the error the
+/// services gave for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Notice {
+    pub title: SharedString,
+    pub error: SharedString,
+}
+
+impl Notice {
+    /// A notice titled by the interface string `key`.
+    pub fn new(key: &str, error: impl Into<SharedString>, cx: &App) -> Self {
+        Self {
+            title: t(cx, key),
+            error: error.into(),
+        }
+    }
+}
+
+/// The notice under a form or a word: an alert with what failed, and the
+/// error under it.
+fn notice(notice: &Notice, cx: &App) -> Div {
+    let p = palette(cx);
+
+    div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .type_xs()
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .text_color(p.ac)
+                .child(icon("alert-circle").size_4())
+                .child(text(notice.title.clone())),
+        )
+        .when(!notice.error.is_empty(), |block| {
+            // Under the title, past the icon and the gap.
+            block.child(
+                div()
+                    .pl_6()
+                    .text_color(p.txt_muted)
+                    .child(text(notice.error.clone()).break_all()),
+            )
+        })
+}
+
+/// Whether `word` is longer than a dictionary takes.
+pub fn too_long(word: &str) -> bool {
+    word.trim().chars().count() > MAX_WORD_CHARS
+}
+
+/// The line under a field whose word is too long, saying by how much.
+fn length_warning(word: &str, cx: &App) -> Option<Div> {
+    let p = palette(cx);
+
+    too_long(word).then(|| {
+        let count = word.trim().chars().count().to_string();
+        let message = t_with(
+            cx,
+            "dictionary.wordTooLong",
+            &[("max", &MAX_WORD_CHARS.to_string()), ("count", &count)],
+        );
+
+        div().flex().justify_end().child(
+            div()
+                .type_xs()
+                .text_right()
+                .text_color(p.ac)
+                .child(text(message)),
+        )
+    })
 }
 
 /// A field for a new word, with the placeholder the add forms share.
@@ -76,20 +151,23 @@ pub fn add_button(
         .child(text(upper(&label)).tracking_wider())
 }
 
-/// The form that adds a word: the field and its button.
+/// The form that adds a word: the field and its button, then a warning
+/// while the word is too long, or `error` once one could not be added.
 pub fn add_word_form(
     variant: Variant,
     field: &Entity<TextField>,
     adding: bool,
+    error: Option<&Notice>,
     on_submit: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
     window: &Window,
     cx: &App,
 ) -> Div {
     let p = palette(cx);
     let focused = field.focus_handle(cx).is_focused(window);
-    let disabled = field.read(cx).value(cx).trim().is_empty() || adding;
+    let value = field.read(cx).value(cx);
+    let disabled = value.trim().is_empty() || too_long(&value) || adding;
 
-    div()
+    let row = div()
         .flex()
         .map(|row| match variant {
             Variant::Page => row.gap_3(),
@@ -115,7 +193,15 @@ pub fn add_word_form(
             disabled,
             on_submit,
             cx,
-        ))
+        ));
+
+    div()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .child(row)
+        .children(length_warning(&value, cx))
+        .children(error.map(|error| notice(error, cx)))
 }
 
 /// What the buttons of a word's row ask for.
@@ -128,11 +214,13 @@ pub enum WordAction {
 }
 
 /// A word with its edit and delete buttons, or, while it is being edited,
-/// `editing` with save and cancel.
+/// `editing` with save and cancel and a warning while the word is too long.
+/// `error` says why the last change to the word was refused.
 pub fn word_row(
     variant: Variant,
     word: &DictionaryWord,
     editing: Option<&Entity<TextField>>,
+    error: Option<&Notice>,
     on_action: impl Fn(&WordAction, &mut Window, &mut App) + 'static,
     window: &Window,
     cx: &App,
@@ -221,9 +309,19 @@ pub fn word_row(
             }
         });
 
-    word_row_frame(variant, &word.id, cx)
+    let line = div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .when(variant == Variant::Nested, |line| line.gap_2())
         .child(content)
-        .child(actions)
+        .child(actions);
+    let warning = editing.and_then(|field| length_warning(&field.read(cx).value(cx), cx));
+
+    word_row_frame(variant, &word.id, cx)
+        .child(line)
+        .children(warning)
+        .children(error.map(|error| notice(error, cx)))
 }
 
 fn word_row_frame(variant: Variant, word_id: &str, cx: &App) -> Faded {
@@ -234,8 +332,8 @@ fn word_row_frame(variant: Variant, word_id: &str, cx: &App) -> Faded {
         .group("word")
         .transition_colors()
         .flex()
-        .items_center()
-        .justify_between()
+        .flex_col()
+        .gap_2()
         .border_1()
         .border_color(p.border);
 
@@ -245,7 +343,7 @@ fn word_row_frame(variant: Variant, word_id: &str, cx: &App) -> Faded {
             .py_3()
             .bg(p.surface)
             .hover(|row| row.border_color(p.border_strong)),
-        Variant::Nested => row.px_3().py_2().gap_2().bg(p.input),
+        Variant::Nested => row.px_3().py_2().bg(p.input),
     }
 }
 
@@ -306,6 +404,10 @@ pub struct WordListEditor {
     expanded: HashSet<SharedString>,
     new_words: HashMap<SharedString, NewWord>,
     adding: HashSet<SharedString>,
+    /// Why a word could not be added to a group, or the group removed.
+    group_errors: HashMap<SharedString, Notice>,
+    /// Why a change to a word was refused, by the word's id.
+    word_errors: HashMap<String, Notice>,
     editing: Option<Editing>,
     focus_handle: FocusHandle,
 }
@@ -319,13 +421,17 @@ impl WordListEditor {
             expanded: HashSet::new(),
             new_words: HashMap::new(),
             adding: HashSet::new(),
+            group_errors: HashMap::new(),
+            word_errors: HashMap::new(),
             editing: None,
             focus_handle: cx.focus_handle(),
         }
     }
 
     /// Shows `groups`. The editor is not on screen while there are none, and
-    /// starts over when it comes back: only which groups are open is kept.
+    /// starts over when it comes back: only which groups are open is kept,
+    /// and why changes were refused. A group whose removal was refused is
+    /// gone until the stored ones are fetched again, and says why once back.
     pub fn set_groups(&mut self, groups: Vec<WordGroup>, cx: &mut Context<Self>) {
         if groups.is_empty() {
             self.new_words.clear();
@@ -360,7 +466,10 @@ impl WordListEditor {
         let subscription = cx.subscribe(&field, {
             let key = key.clone();
             move |this, _, event, cx| match event {
-                TextFieldEvent::Change => cx.notify(),
+                TextFieldEvent::Change => {
+                    this.group_errors.remove(&key);
+                    cx.notify();
+                }
                 TextFieldEvent::Enter => this.add_word(&key, cx),
                 _ => {}
             }
@@ -377,6 +486,7 @@ impl WordListEditor {
 
     fn remove_group(&mut self, key: SharedString, cx: &mut Context<Self>) {
         self.expanded.remove(&key);
+        self.group_errors.remove(&key);
         cx.emit(WordListEvent::RemoveGroup(key));
         cx.notify();
     }
@@ -387,10 +497,11 @@ impl WordListEditor {
         };
         let word = new_word.field.read(cx).value(cx).trim().to_string();
 
-        if word.is_empty() || self.adding.contains(key) {
+        if word.is_empty() || too_long(&word) || self.adding.contains(key) {
             return;
         }
 
+        self.group_errors.remove(key);
         self.adding.insert(key.clone());
         cx.emit(WordListEvent::AddWord {
             key: key.clone(),
@@ -408,9 +519,27 @@ impl WordListEditor {
         }
     }
 
-    /// Lets the group take another word.
-    pub fn finish_adding(&mut self, key: &str, cx: &mut Context<Self>) {
+    /// Lets the group take another word. `error` says why this one was
+    /// refused; what was typed stays in the field.
+    pub fn finish_adding(&mut self, key: &str, error: Option<Notice>, cx: &mut Context<Self>) {
         self.adding.remove(key);
+        if let Some(error) = error {
+            self.group_errors.insert(key.to_string().into(), error);
+        }
+        cx.notify();
+    }
+
+    /// Says, on the word, why a change to it was refused.
+    pub fn fail_word(&mut self, word_id: String, error: Notice, cx: &mut Context<Self>) {
+        self.word_errors.insert(word_id, error);
+        cx.notify();
+    }
+
+    /// Says, in the group, why it could not be removed. The group is opened,
+    /// so that the notice shows once it is back.
+    pub fn fail_group(&mut self, key: SharedString, error: Notice, cx: &mut Context<Self>) {
+        self.expanded.insert(key.clone());
+        self.group_errors.insert(key, error);
         cx.notify();
     }
 
@@ -425,12 +554,14 @@ impl WordListEditor {
         let subscription = cx.subscribe_in(&field, window, {
             let word_id = word.id.clone();
             move |this, _, event, window, cx| match event {
+                TextFieldEvent::Change => cx.notify(),
                 TextFieldEvent::Enter => this.save_edit(&word_id, window, cx),
                 TextFieldEvent::Escape => this.cancel_edit(window, cx),
                 _ => {}
             }
         });
 
+        self.word_errors.remove(&word.id);
         self.editing = Some(Editing {
             word_id: word.id.clone(),
             field,
@@ -452,7 +583,7 @@ impl WordListEditor {
         };
         let word = editing.field.read(cx).value(cx).trim().to_string();
 
-        if word.is_empty() {
+        if word.is_empty() || too_long(&word) {
             return;
         }
 
@@ -474,9 +605,12 @@ impl WordListEditor {
             WordAction::StartEdit => self.start_edit(word, window, cx),
             WordAction::SaveEdit => self.save_edit(&word.id, window, cx),
             WordAction::CancelEdit => self.cancel_edit(window, cx),
-            WordAction::Delete => cx.emit(WordListEvent::DeleteWord {
-                word_id: word.id.clone(),
-            }),
+            WordAction::Delete => {
+                self.word_errors.remove(&word.id);
+                cx.emit(WordListEvent::DeleteWord {
+                    word_id: word.id.clone(),
+                });
+            }
         }
     }
 
@@ -578,6 +712,7 @@ impl WordListEditor {
             Variant::Nested,
             &new_word.field,
             self.adding.contains(&group.key),
+            self.group_errors.get(&group.key),
             cx.listener(move |this, _, _, cx| this.add_word(&key, cx)),
             window,
             cx,
@@ -594,6 +729,7 @@ impl WordListEditor {
                 Variant::Nested,
                 word,
                 editing,
+                self.word_errors.get(&word.id),
                 cx.listener({
                     let word = word.clone();
                     move |this, action: &WordAction, window, cx| {

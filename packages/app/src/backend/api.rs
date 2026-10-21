@@ -45,6 +45,10 @@ pub struct DictionaryWord {
     pub updated_at: String,
 }
 
+/// The most characters a dictionary word may have. The services refuse a
+/// longer one, and the forms say so before it is sent.
+pub const MAX_WORD_CHARS: usize = 100;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppDictionary {
     pub bundle_id: String,

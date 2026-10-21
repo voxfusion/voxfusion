@@ -9,7 +9,7 @@ use std::rc::Rc;
 use crate::analytics;
 use crate::backend::{self, AppDictionary, Backend, CommandResult, DictionaryWord, SiteDictionary};
 use crate::ui::widgets::app_icon::AppIcons;
-use crate::ui::widgets::word_list::{GroupIcon, WordGroup, WordListEditor, WordListEvent};
+use crate::ui::widgets::word_list::{GroupIcon, Notice, WordGroup, WordListEditor, WordListEvent};
 
 /// Whose dictionaries these are.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,9 +138,17 @@ impl Scope {
     }
 }
 
+/// What a change was made to, to say there why it was refused.
+enum Changed {
+    Word(String),
+    Group(SharedString),
+}
+
 pub struct DictionaryGroups {
     scope: Scope,
     stored: Vec<Group>,
+    /// Why the stored dictionaries could not be listed, the last time.
+    load_error: Option<SharedString>,
     /// Apps or sites added here that have no words yet. A dictionary is
     /// stored from its first word on.
     pending: Vec<Group>,
@@ -157,6 +165,7 @@ impl DictionaryGroups {
         Self {
             scope,
             stored: Vec::new(),
+            load_error: None,
             pending: Vec::new(),
             icons: Rc::default(),
             editor,
@@ -176,6 +185,12 @@ impl DictionaryGroups {
 
     pub fn len(&self) -> usize {
         self.groups().count()
+    }
+
+    /// Why the stored dictionaries could not be listed. The page shows that
+    /// instead of the dictionaries, which would look empty or out of date.
+    pub fn load_error(&self) -> Option<SharedString> {
+        self.load_error.clone()
     }
 
     /// The bundle ids or domains that have a dictionary.
@@ -218,9 +233,13 @@ impl DictionaryGroups {
 
             this.update(cx, |this, cx| {
                 match result {
-                    Ok(stored) => this.stored = stored,
+                    Ok(stored) => {
+                        this.stored = stored;
+                        this.load_error = None;
+                    }
                     Err(error) => {
                         log::error!(target: "dictionary", "list_failed scope={scope:?} error={error}");
+                        this.load_error = Some(error.into());
                     }
                 }
                 this.changed(cx);
@@ -230,18 +249,33 @@ impl DictionaryGroups {
     }
 
     /// Stores a change the list already shows. If it is refused, the stored
-    /// dictionaries are fetched again.
+    /// dictionaries are fetched again, and what was `changed` says why with
+    /// the notice titled by `failure`.
     fn persist<T: Send + 'static>(
         &self,
+        changed: Changed,
+        failure: &'static str,
         change: impl FnOnce(&dyn Backend) -> CommandResult<T> + Send + 'static,
         cx: &mut Context<Self>,
     ) {
+        let scope = self.scope;
         let request = backend::call(cx, change);
 
         cx.spawn(async move |this, cx| {
-            if request.await.is_err()
-                && let Ok(fetch) = this.update(cx, |this, cx| this.fetch(cx))
-            {
+            let Err(error) = request.await else {
+                return;
+            };
+            log::error!(target: "dictionary", "change_failed scope={scope:?} error={error}");
+
+            let fetch = this.update(cx, |this, cx| {
+                let notice = Notice::new(failure, error, cx);
+                this.editor.update(cx, |editor, cx| match changed {
+                    Changed::Word(word_id) => editor.fail_word(word_id, notice, cx),
+                    Changed::Group(key) => editor.fail_group(key, notice, cx),
+                });
+                this.fetch(cx)
+            });
+            if let Ok(fetch) = fetch {
                 fetch.await;
             }
         })
@@ -308,13 +342,15 @@ impl DictionaryGroups {
             .cloned()
         else {
             self.editor
-                .update(cx, |editor, cx| editor.finish_adding(&key, cx));
+                .update(cx, |editor, cx| editor.finish_adding(&key, None, cx));
             return;
         };
         let request = backend::call(cx, move |backend| scope.add_word(backend, &group, &word));
 
         cx.spawn_in(window, async move |this, cx| {
-            if request.await.is_ok() {
+            let result = request.await;
+
+            if result.is_ok() {
                 let fetch = this.update_in(cx, |this, window, cx| {
                     this.editor
                         .update(cx, |editor, cx| editor.clear_new_word(&key, window, cx));
@@ -331,8 +367,14 @@ impl DictionaryGroups {
             }
 
             this.update(cx, |this, cx| {
+                // What was typed stays in the field, to be corrected or sent
+                // again.
+                let error = result.err().map(|error| {
+                    log::error!(target: "dictionary", "add_failed scope={scope:?} error={error}");
+                    Notice::new("dictionary.addFailed", error, cx)
+                });
                 this.editor
-                    .update(cx, |editor, cx| editor.finish_adding(&key, cx));
+                    .update(cx, |editor, cx| editor.finish_adding(&key, error, cx));
             })
             .ok();
         })
@@ -350,6 +392,8 @@ impl DictionaryGroups {
         self.changed(cx);
 
         self.persist(
+            Changed::Word(word_id.clone()),
+            "dictionary.saveFailed",
             move |backend| scope.update_word(backend, &word_id, &word),
             cx,
         );
@@ -364,7 +408,12 @@ impl DictionaryGroups {
         }
         self.changed(cx);
 
-        self.persist(move |backend| scope.delete_word(backend, &word_id), cx);
+        self.persist(
+            Changed::Word(word_id.clone()),
+            "dictionary.deleteFailed",
+            move |backend| scope.delete_word(backend, &word_id),
+            cx,
+        );
     }
 
     fn remove_group(&mut self, key: &str, cx: &mut Context<Self>) {
@@ -382,7 +431,12 @@ impl DictionaryGroups {
 
         if stored {
             let key = key.to_string();
-            self.persist(move |backend| scope.delete_group(backend, &key), cx);
+            self.persist(
+                Changed::Group(key.clone().into()),
+                "dictionary.removeFailed",
+                move |backend| scope.delete_group(backend, &key),
+                cx,
+            );
         }
     }
 }
