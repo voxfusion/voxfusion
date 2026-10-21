@@ -7,7 +7,7 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use super::microphones::{self, InputKind};
 use crate::backend::{AppEvent, AudioDevice, EventSender};
@@ -526,20 +526,10 @@ fn get_save_path() -> Result<PathBuf, String> {
     Ok(save_path)
 }
 
-/// Prunes the recordings directory down to the `keep` newest `.wav` files by
-/// modification time. Called after each successful transcription so dictation
-/// audio is not retained forever. IO failures are logged and otherwise
-/// ignored — cleanup must never fail a transcription.
-pub fn cleanup_old_recordings(keep: usize) {
-    let entries = match std::fs::read_dir(recordings_dir()) {
-        Ok(entries) => entries,
-        Err(err) => {
-            log::warn!(target: "audio", "recordings cleanup failed to read dir: {err}");
-            return;
-        }
-    };
-
-    let mut recordings: Vec<(std::time::SystemTime, PathBuf)> = entries
+/// The `.wav` files in the recordings directory, with when each was last
+/// written.
+fn recordings() -> std::io::Result<Vec<(SystemTime, PathBuf)>> {
+    Ok(std::fs::read_dir(recordings_dir())?
         .filter_map(|entry| entry.ok())
         .filter_map(|entry| {
             let path = entry.path();
@@ -549,7 +539,21 @@ pub fn cleanup_old_recordings(keep: usize) {
             let modified = entry.metadata().ok()?.modified().ok()?;
             Some((modified, path))
         })
-        .collect();
+        .collect())
+}
+
+/// Prunes the recordings directory down to the `keep` newest `.wav` files by
+/// modification time. Called after each successful transcription so dictation
+/// audio is not retained forever. IO failures are logged and otherwise
+/// ignored — cleanup must never fail a transcription.
+pub fn cleanup_old_recordings(keep: usize) {
+    let mut recordings = match recordings() {
+        Ok(recordings) => recordings,
+        Err(err) => {
+            log::warn!(target: "audio", "recordings cleanup failed to read dir: {err}");
+            return;
+        }
+    };
 
     if recordings.len() <= keep {
         return;
@@ -566,6 +570,73 @@ pub fn cleanup_old_recordings(keep: usize) {
             );
         }
     }
+}
+
+/// The name `path` has in the recordings directory, if it is one of the
+/// recordings.
+pub fn recording_name(path: &Path) -> Option<String> {
+    if path.parent()? != recordings_dir() {
+        return None;
+    }
+    path.file_name()?.to_str().map(str::to_owned)
+}
+
+/// The newest recording last written between `from` and `to`.
+pub fn recording_finished_between(from: SystemTime, to: SystemTime) -> Option<String> {
+    recordings()
+        .ok()?
+        .into_iter()
+        .filter(|(modified, _)| (from..=to).contains(modified))
+        .max_by_key(|(modified, _)| *modified)
+        .and_then(|(_, path)| recording_name(&path))
+}
+
+/// Deletes the recording called `name`, if it is still kept.
+pub fn delete_recording(name: &str) -> Result<(), String> {
+    // A bare file name only, so nothing outside the directory is reached.
+    if Path::new(name).file_name() != Some(name.as_ref()) {
+        return Err(format!("Not a recording: {name}"));
+    }
+
+    match std::fs::remove_file(recordings_dir().join(name)) {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
+            Err(format!("Failed to delete recording {name}: {err}"))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Deletes every recording kept on disk, except the one being made.
+pub fn delete_recordings() -> Result<(), String> {
+    let recordings = match recordings() {
+        Ok(recordings) => recordings,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(format!("Failed to list recordings: {err}")),
+    };
+    let active = RECORDING
+        .lock()
+        .ok()
+        .and_then(|active| Some(active.as_ref()?.save_path.clone()));
+
+    let mut failed = 0;
+    for (_, path) in recordings {
+        if Some(&path) == active.as_ref() {
+            continue;
+        }
+        if let Err(err) = std::fs::remove_file(&path) {
+            log::warn!(
+                target: "audio",
+                "failed to delete recording {}: {err}",
+                path.display()
+            );
+            failed += 1;
+        }
+    }
+
+    if failed > 0 {
+        return Err(format!("Failed to delete {failed} recordings"));
+    }
+    Ok(())
 }
 
 // Timestamp tracking for throttling - using a static Instant for reference

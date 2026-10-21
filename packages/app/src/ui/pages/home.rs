@@ -1,8 +1,8 @@
 //! The Home page: the history of transcriptions, grouped by day.
 
 use gpui_kit::{
-    ClipboardItem, Context, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Subscription, Window, canvas, div, prelude::*, px,
+    ClickEvent, ClipboardItem, Context, IntoElement, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Window, canvas, div, prelude::*, px,
 };
 use std::collections::HashSet;
 use std::time::Duration;
@@ -43,11 +43,20 @@ impl HomePage {
         analytics::capture(cx, "$pageview", &[("$current_url", "/".into())]);
 
         let subscriptions = vec![
-            cx.subscribe(&events::hub(cx), |this, _, event, cx| {
-                if matches!(event, AppEvent::TranscriptionCreated) {
+            cx.subscribe(&events::hub(cx), |this, _, event, cx| match event {
+                AppEvent::TranscriptionCreated => {
                     analytics::capture(cx, "transcription_created", &[]);
                     this.fetch(None, cx);
                 }
+                AppEvent::TranscriptionsCleared => {
+                    this.transcriptions.clear();
+                    this.copied.clear();
+                    this.hovered = None;
+                    this.next_cursor = None;
+                    this.has_more = false;
+                    this.fetch(None, cx);
+                }
+                _ => {}
             }),
             cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
         ];
@@ -153,6 +162,35 @@ impl HomePage {
         .detach();
     }
 
+    fn delete(&mut self, id: &str, cx: &mut Context<Self>) {
+        analytics::capture(cx, "transcription_deleted", &[]);
+        self.transcriptions
+            .retain(|transcription| transcription.id != id);
+        self.copied.remove(id);
+        self.hovered = None;
+        cx.notify();
+
+        let id = id.to_string();
+        let request = backend::call(cx, move |backend| backend.delete_transcription(&id));
+
+        cx.spawn(async move |this, cx| {
+            let result = request.await;
+
+            this.update(cx, |this, cx| {
+                // A refused deletion brings the transcription back. With every
+                // listed one deleted, the next page is fetched.
+                if let Err(error) = &result {
+                    log::error!(target: "home", "delete_transcription_failed error={error}");
+                }
+                if result.is_err() || (this.transcriptions.is_empty() && this.has_more) {
+                    this.fetch(None, cx);
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
+
     fn date_label(&self, created_at: &str, cx: &Context<Self>) -> SharedString {
         let Some(date) = datetime::parse(created_at) else {
             return created_at.to_string().into();
@@ -239,28 +277,52 @@ impl HomePage {
             )
             .when(hovered || copied, |card| {
                 let transcription = transcription.clone();
-
-                card.child(
+                let button = |id: &'static str| {
                     div()
-                        .id("copy")
-                        .absolute()
-                        .top_2()
-                        .right_2()
+                        .id(id)
                         .p_1p5()
                         .bg(p.base)
                         .border_1()
                         .border_color(p.border_strong)
                         .transition_colors()
-                        .hover(|button| button.border_color(p.ac))
                         .text_color(p.txt_secondary)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.copy(&transcription, cx);
-                        }))
-                        .child(if copied {
-                            icon("check").size_3p5().text_color(p.success)
-                        } else {
-                            icon("copy").size_3p5()
-                        }),
+                };
+
+                card.child(
+                    div()
+                        .absolute()
+                        .top_2()
+                        .right_2()
+                        .flex()
+                        .gap_1()
+                        .when(hovered, |buttons| {
+                            buttons.child(
+                                button("delete")
+                                    .hover(|button| button.border_color(p.ac).text_color(p.ac))
+                                    .on_click(cx.listener(
+                                        move |this, event: &ClickEvent, _, cx| {
+                                            // The next transcription moves up under the
+                                            // pointer; a double click deletes only one.
+                                            if event.click_count() == 1 {
+                                                this.delete(&id, cx);
+                                            }
+                                        },
+                                    ))
+                                    .child(icon("trash-2").size_3p5()),
+                            )
+                        })
+                        .child(
+                            button("copy")
+                                .hover(|button| button.border_color(p.ac))
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.copy(&transcription, cx);
+                                }))
+                                .child(if copied {
+                                    icon("check").size_3p5().text_color(p.success)
+                                } else {
+                                    icon("copy").size_3p5()
+                                }),
+                        ),
                 )
             })
     }

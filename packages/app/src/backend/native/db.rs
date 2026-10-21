@@ -1,5 +1,5 @@
 use chrono::Utc;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OptionalExtension as _, params};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -19,9 +19,12 @@ pub fn init_db() -> Result<DbState, String> {
     let db_path = get_db_path()?;
     let conn = Connection::open(&db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
+    // `secure_delete` overwrites what is deleted instead of leaving it in
+    // free space, where deleted transcriptions could still be read.
     conn.execute_batch(
         "PRAGMA journal_mode=WAL;
-         PRAGMA foreign_keys=ON;",
+         PRAGMA foreign_keys=ON;
+         PRAGMA secure_delete=ON;",
     )
     .map_err(|e| e.to_string())?;
 
@@ -40,7 +43,8 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
             word_count INTEGER NOT NULL DEFAULT 0,
             processing_time_ms INTEGER NOT NULL DEFAULT 0,
             audio_duration_ms INTEGER,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            recording TEXT
         );
         CREATE TABLE IF NOT EXISTS dictionary_words (
             id TEXT PRIMARY KEY,
@@ -53,6 +57,16 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create tables: {}", e))?;
 
+    // The file name of the recording a transcription was made from, in the
+    // recordings directory. Transcriptions saved before it was added have none.
+    if conn
+        .prepare("SELECT recording FROM transcriptions LIMIT 0")
+        .is_err()
+    {
+        conn.execute_batch("ALTER TABLE transcriptions ADD COLUMN recording TEXT")
+            .map_err(|e| format!("Failed to add transcriptions.recording: {}", e))?;
+    }
+
     super::apps::run_migrations(conn)?;
     super::sites::run_migrations(conn)?;
 
@@ -62,14 +76,15 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
 pub fn save_transcription(
     state: &DbState,
     result: &TranscriptionResult,
+    recording: Option<&str>,
 ) -> Result<Transcription, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
     conn.execute(
-        "INSERT INTO transcriptions (id, text, word_count, processing_time_ms, audio_duration_ms, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![id, result.text, result.word_count, result.processing_time_ms, result.audio_duration_ms, now],
+        "INSERT INTO transcriptions (id, text, word_count, processing_time_ms, audio_duration_ms, created_at, recording) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![id, result.text, result.word_count, result.processing_time_ms, result.audio_duration_ms, now, recording],
     )
     .map_err(|e| e.to_string())?;
 
@@ -145,6 +160,71 @@ pub fn list_transcriptions(
         transcriptions,
         has_more,
     })
+}
+
+/// What the recording of a transcription can be found by.
+pub struct TranscriptionSource {
+    /// The recording's file name, if it was saved with the transcription.
+    pub recording: Option<String>,
+    pub created_at: String,
+    pub processing_time_ms: i64,
+}
+
+/// The source of transcription `id`, if there is one.
+pub fn transcription_source(
+    state: &DbState,
+    id: &str,
+) -> Result<Option<TranscriptionSource>, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    conn.query_row(
+        "SELECT recording, created_at, processing_time_ms FROM transcriptions WHERE id = ?1",
+        params![id],
+        |row| {
+            Ok(TranscriptionSource {
+                recording: row.get(0)?,
+                created_at: row.get(1)?,
+                processing_time_ms: row.get(2)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(|e| e.to_string())
+}
+
+pub fn delete_transcription(state: &DbState, id: &str) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM transcriptions WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+
+    truncate_wal(&conn);
+    Ok(())
+}
+
+/// Deletes every transcription, then rebuilds the database file, so that
+/// nothing of them is left in pages freed before `secure_delete` was on.
+pub fn clear_transcriptions(state: &DbState) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM transcriptions", [])
+        .map_err(|e| e.to_string())?;
+    if let Err(err) = conn.execute_batch("VACUUM") {
+        log::warn!(target: "runtime", "database_vacuum_failed error={err}");
+    }
+
+    truncate_wal(&conn);
+    Ok(())
+}
+
+/// Writes the log back into the database and empties it, as it can still
+/// hold earlier copies of the pages a deletion overwrote.
+fn truncate_wal(conn: &Connection) {
+    let busy = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+        row.get::<_, i64>(0)
+    });
+    match busy {
+        Ok(0) => {}
+        Ok(_) => log::warn!(target: "runtime", "database_checkpoint_busy"),
+        Err(err) => log::warn!(target: "runtime", "database_checkpoint_failed error={err}"),
+    }
 }
 
 pub fn list_dictionary_words(state: &DbState) -> Result<Vec<DictionaryWord>, String> {
@@ -311,7 +391,7 @@ mod tests {
             audio_duration_ms: Some(1800),
         };
 
-        let saved = save_transcription(&state, &result).unwrap();
+        let saved = save_transcription(&state, &result, None).unwrap();
         assert_eq!(saved.text, "Hello there");
         assert_eq!(saved.word_count, 2);
         assert_eq!(saved.processing_time_ms, 420);

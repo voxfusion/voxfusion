@@ -138,7 +138,7 @@ impl SettingsModal {
             Section::Hotkey => self.render_hotkeys(cx).into_any_element(),
             Section::Appearance => appearance::render(cx).into_any_element(),
             Section::Language => language::render(window, cx).into_any_element(),
-            Section::Privacy => privacy::render(cx).into_any_element(),
+            Section::Privacy => privacy::render(window, cx).into_any_element(),
         }
     }
 }

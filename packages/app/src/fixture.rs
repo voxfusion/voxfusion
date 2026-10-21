@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
@@ -280,7 +280,11 @@ impl Backend for FixtureBackend {
         })
     }
 
-    fn save_transcription(&self, result: &TranscriptionResult) -> CommandResult<Transcription> {
+    fn save_transcription(
+        &self,
+        result: &TranscriptionResult,
+        _audio_path: &Path,
+    ) -> CommandResult<Transcription> {
         let word = self.new_word("");
         Ok(Transcription {
             id: word.id,
@@ -316,6 +320,18 @@ impl Backend for FixtureBackend {
                 transcriptions: items.into_iter().take(limit).collect(),
             }
         }))
+    }
+
+    fn delete_transcription(&self, id: &str) -> CommandResult<()> {
+        self.gate("delete_transcription")?;
+        self.with(|data| data.transcriptions.retain(|item| item.id != id));
+        Ok(())
+    }
+
+    fn clear_transcriptions(&self) -> CommandResult<()> {
+        self.gate("clear_transcriptions")?;
+        self.with(|data| data.transcriptions.clear());
+        Ok(())
     }
 
     fn check_model_status(&self) -> CommandResult<bool> {
