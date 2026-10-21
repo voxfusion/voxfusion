@@ -322,6 +322,12 @@ impl ModelSettings {
         cx.spawn(async move |this, cx| {
             let result = activate.await;
 
+            // The Style page listens for this, even when this view has been
+            // closed in the meantime.
+            if result.is_ok() {
+                cx.update(|cx| events::emit(cx, AppEvent::ActiveModelChanged));
+            }
+
             this.update(cx, |this, cx| {
                 this.busy_id = None;
                 cx.notify();
@@ -391,7 +397,7 @@ impl ModelSettings {
         if model.experimental {
             return Some(
                 status
-                    .text_color(p.txt_muted)
+                    .text_color(p.txt_secondary)
                     .child(icon("check").size_3p5().text_color(p.success))
                     .child(text(t_upper(cx, "settings.modelDownloaded")).tracking_wider())
                     .into_any_element(),
@@ -470,7 +476,7 @@ impl ModelSettings {
 
             div()
                 .type_px(11.)
-                .text_color(p.txt_faint)
+                .text_color(p.txt_hint)
                 .child(text(figures))
         });
 
@@ -570,12 +576,12 @@ impl ModelSettings {
                                     .when(model.experimental, |row| {
                                         row.child(badge(
                                             t_upper(cx, "settings.modelExperimental"),
-                                            p.txt_muted,
+                                            p.txt_secondary,
                                             p.border_strong,
                                         ))
                                     }),
                             )
-                            .child(div().mt_1p5().type_xs().text_color(p.txt_faint).child(text(
+                            .child(div().mt_1p5().type_xs().text_color(p.txt_hint).child(text(
                                 format!("{} · {}", model.size_label, model.languages),
                             ))),
                     )
@@ -583,10 +589,10 @@ impl ModelSettings {
             )
             .children(download)
             .when(self.has_partial_download(model), |card| {
-                card.child(note(t(cx, "settings.modelResumeNote"), p.txt_faint))
+                card.child(note(t(cx, "settings.modelResumeNote"), p.txt_hint))
             })
             .when(model.experimental, |card| {
-                card.child(note(t(cx, "settings.modelExperimentalNote"), p.txt_faint))
+                card.child(note(t(cx, "settings.modelExperimentalNote"), p.txt_hint))
             })
             .into_any_element()
     }
@@ -642,7 +648,7 @@ impl Render for ModelSettings {
                     block.child(
                         div()
                             .type_px(11.)
-                            .text_color(p.txt_faint)
+                            .text_color(p.txt_hint)
                             .child(text(error).break_all()),
                     )
                 })
@@ -655,7 +661,7 @@ impl Render for ModelSettings {
             .child(
                 div()
                     .type_xs()
-                    .text_color(p.txt_faint)
+                    .text_color(p.txt_hint)
                     .child(text(t(cx, "settings.modelsDescription"))),
             )
             // With no models the list is an empty block, whose margin

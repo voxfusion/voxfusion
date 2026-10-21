@@ -107,7 +107,7 @@ fn render_hotkey(
             div()
                 .mb_3()
                 .type_xs()
-                .text_color(p.txt_muted)
+                .text_color(p.txt_secondary)
                 .child(text(label).tracking_wider()),
         )
         .child(
@@ -141,7 +141,7 @@ fn render_hotkey(
             div()
                 .mt_3()
                 .type_xs()
-                .text_color(p.txt_faint)
+                .text_color(p.txt_hint)
                 .child(text(description)),
         )
 }

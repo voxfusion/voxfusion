@@ -1,8 +1,9 @@
 //! What the Dictionary and Style pages share: the frame with the title and
-//! the three tabs, the line above a list, and the card for an empty list.
+//! the three tabs, the line above a list, and the cards for an empty list
+//! and for one that could not be loaded.
 
 use gpui_kit::{
-    App, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
+    App, ClickEvent, Div, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
     StatefulInteractiveElement as _, Styled as _, Window, div, prelude::*, px,
 };
 
@@ -177,6 +178,58 @@ pub fn empty_state(
 ) -> impl IntoElement {
     let p = palette(cx);
 
+    state_card("[INFO]", code, title, cx).child(
+        div()
+            .mt_2()
+            .max_w(px(384.))
+            .type_xs()
+            .text_color(p.txt_muted)
+            .child(text(description).center()),
+    )
+}
+
+/// The card shown in place of a list that could not be loaded: what failed,
+/// the error, and a button that tries again. It tells a failed load apart
+/// from a list that is empty.
+pub fn load_failed(
+    title: SharedString,
+    error: SharedString,
+    on_retry: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    cx: &App,
+) -> impl IntoElement {
+    let p = palette(cx);
+
+    state_card("[ERROR]", "LOAD_FAILED", title, cx)
+        .child(
+            div()
+                .mt_2()
+                .max_w(px(384.))
+                .type_xs()
+                .text_color(p.txt_muted)
+                .child(text(error).break_all().center()),
+        )
+        .child(
+            div()
+                .id("retry")
+                .transition_colors()
+                .mt_6()
+                .px_4()
+                .py_2()
+                .type_xs()
+                .border_1()
+                .border_color(p.ac)
+                .text_color(p.ac)
+                .hover(|button| button.bg(p.ac).text_color(p.ac_on))
+                .on_click(on_retry)
+                .child(text(t_upper(cx, "dictionary.retry")).tracking_wider()),
+        )
+}
+
+/// The card of [`empty_state`] and [`load_failed`]: the `[TAG] CODE` line
+/// and the title.
+fn state_card(tag: &'static str, code: &str, title: SharedString, cx: &App) -> Div {
+    let p = palette(cx);
+
     div()
         .p_12()
         .bg(p.surface)
@@ -187,25 +240,16 @@ pub fn empty_state(
         .items_center()
         .justify_center()
         .child(
-            div().mb_4().type_sm().text_color(p.txt_muted).child(
-                text("[INFO]")
-                    .color(p.ac)
-                    .plain(format!(" {code}"))
-                    .center(),
-            ),
+            div()
+                .mb_4()
+                .type_sm()
+                .text_color(p.txt_muted)
+                .child(text(tag).color(p.ac).plain(format!(" {code}")).center()),
         )
         .child(
             div()
                 .type_xs()
                 .text_color(p.txt_secondary)
                 .child(text(upper(&title)).tracking_wide().center()),
-        )
-        .child(
-            div()
-                .mt_2()
-                .max_w(px(384.))
-                .type_xs()
-                .text_color(p.txt_muted)
-                .child(text(description).center()),
         )
 }

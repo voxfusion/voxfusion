@@ -400,7 +400,7 @@ impl ModelDownloadStep {
                     div()
                         .mt_2()
                         .type_xs()
-                        .text_color(p.txt_faint)
+                        .text_color(p.txt_hint)
                         .child(text(error).break_all().center()),
                 )
             })
