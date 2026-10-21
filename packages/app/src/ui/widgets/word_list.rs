@@ -429,13 +429,13 @@ impl WordListEditor {
     }
 
     /// Shows `groups`. The editor is not on screen while there are none, and
-    /// starts over when it comes back: only which groups are open is kept.
+    /// starts over when it comes back: only which groups are open is kept,
+    /// and why changes were refused. A group whose removal was refused is
+    /// gone until the stored ones are fetched again, and says why once back.
     pub fn set_groups(&mut self, groups: Vec<WordGroup>, cx: &mut Context<Self>) {
         if groups.is_empty() {
             self.new_words.clear();
             self.adding.clear();
-            self.group_errors.clear();
-            self.word_errors.clear();
             self.editing = None;
         }
 
