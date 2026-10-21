@@ -4,7 +4,7 @@ use rusqlite::params;
 use super::apps::normalize_style;
 use super::browser::normalize_domain;
 use super::db::DbState;
-use crate::backend::{DictionaryWord, SiteDictionary, SiteStyle};
+use crate::backend::{DictionaryWord, MAX_WORD_CHARS, SiteDictionary, SiteStyle};
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute_batch(
@@ -54,8 +54,10 @@ fn validate_domain(input: &str) -> Result<String, String> {
 
 fn validate_word(input: &str) -> Result<&str, String> {
     let word = input.trim();
-    if word.is_empty() || word.len() > 100 {
-        Err("Word must be between 1 and 100 characters".to_string())
+    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
+        Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ))
     } else {
         Ok(word)
     }
