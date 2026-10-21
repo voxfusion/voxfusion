@@ -1,9 +1,9 @@
 //! Step 6: choosing the transcription model and downloading it.
 
 use gpui_kit::{
-    AnimationExt as _, Context, Div, EventEmitter, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, Window, div, prelude::*, relative,
+    AnimationExt as _, App, AppContext as _, Context, Div, Entity, EventEmitter, Global,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::*, relative,
 };
 use std::time::{Duration, Instant};
 
@@ -89,8 +89,38 @@ pub struct ModelDownloadStep {
 
 impl EventEmitter<ModelReady> for ModelDownloadStep {}
 
+/// The step shown on every visit until onboarding is over.
+struct SharedStep(Entity<ModelDownloadStep>);
+
+impl Global for SharedStep {}
+
 impl ModelDownloadStep {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    /// The step, kept from one visit to the next: a download started on it is
+    /// followed to the end, and its model made the active one, while another
+    /// step is shown or the window is closed.
+    pub fn shared(cx: &mut App) -> Entity<Self> {
+        if let Some(SharedStep(step)) = cx.try_global::<SharedStep>() {
+            return step.clone();
+        }
+
+        let step = cx.new(Self::new);
+        cx.set_global(SharedStep(step.clone()));
+        step
+    }
+
+    /// Lets the step go once onboarding is over, so that it leaves later
+    /// downloads, from Settings, alone.
+    pub fn release(cx: &mut App) {
+        if cx.has_global::<SharedStep>() {
+            cx.remove_global::<SharedStep>();
+        }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.ready
+    }
+
+    fn new(cx: &mut Context<Self>) -> Self {
         let events = cx.subscribe(&events::hub(cx), |this, _, event, cx| {
             if let AppEvent::ModelDownloadProgress(report) = event {
                 this.handle_progress(report, cx);
@@ -272,9 +302,9 @@ impl ModelDownloadStep {
 
     fn handle_progress(&mut self, report: &ModelDownloadProgress, cx: &mut Context<Self>) {
         if self.selected.as_ref() != Some(&report.model_id) {
-            // A download may already be streaming, started on an earlier
-            // visit to this step: show it, unless the step is busy with
-            // another model or has one ready.
+            // A download may already be streaming, started in Settings
+            // before onboarding came back to this step: show it, unless the
+            // step is busy with another model or has one ready.
             let offered = self.models.iter().any(|model| model.id == report.model_id);
             let busy = self.downloading || self.ready || self.activating.is_some();
             if !offered || busy || report.progress >= 100 {

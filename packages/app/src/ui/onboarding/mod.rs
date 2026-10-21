@@ -16,7 +16,7 @@ mod transition;
 use gpui_kit::{
     AnimationExt as _, AppContext as _, Context, Div, Entity, IntoElement, ParentElement as _,
     Render, StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::*,
-    px,
+    px, relative,
 };
 use std::time::Duration;
 
@@ -107,7 +107,8 @@ impl OnboardingWizard {
         wizard
     }
 
-    /// Replaces the step shown with a fresh one for the current step number.
+    /// Replaces the step shown with the one for the current step number: a
+    /// fresh one, except the model step, which keeps its download going.
     fn mount_step(&mut self, cx: &mut Context<Self>) {
         self.step_events = None;
 
@@ -137,7 +138,8 @@ impl OnboardingWizard {
             MICROPHONE_STEP => StepView::Microphone(cx.new(MicrophoneStep::new)),
             HOTKEY_STEP => StepView::Hotkey(cx.new(HotkeyStep::new)),
             MODEL_DOWNLOAD_STEP => {
-                let step = cx.new(ModelDownloadStep::new);
+                let step = ModelDownloadStep::shared(cx);
+                self.model_ready = step.read(cx).is_ready();
                 self.step_events = Some(cx.subscribe(&step, |this, _, event: &ModelReady, cx| {
                     this.model_ready = event.0;
                     cx.notify();
@@ -226,6 +228,7 @@ impl OnboardingWizard {
 
     fn complete(&mut self, cx: &mut Context<Self>) {
         analytics::capture(cx, "onboarding_completed", &[]);
+        ModelDownloadStep::release(cx);
         settings::mark_onboarding_complete(cx);
     }
 
@@ -311,13 +314,22 @@ impl Render for OnboardingWizard {
                 },
             );
 
+        // A step taller than the window scrolls between the step indicator
+        // and the navigation, which stay where they are.
         let content_area = div()
+            .id("step-area")
             .flex_1()
-            .flex()
-            .items_center()
-            .justify_center()
+            .min_h_0()
             .w_full()
-            .child(content)
+            .overflow_y_scroll()
+            .child(
+                div()
+                    .min_h(relative(1.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(content),
+            )
             .with_animation(
                 max_width.animation_id("content-width"),
                 max_width.animation(),
