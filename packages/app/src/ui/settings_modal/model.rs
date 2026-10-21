@@ -309,6 +309,7 @@ impl ModelSettings {
                 }
 
                 analytics::capture(cx, "settings_model_changed", &[("model", model_id.into())]);
+                events::emit(cx, AppEvent::ActiveModelChanged);
                 this.refresh(cx);
             })
             .ok();

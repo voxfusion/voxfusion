@@ -169,6 +169,8 @@ pub enum PermissionState {
 #[serde(tag = "event", content = "payload", rename_all = "kebab-case")]
 pub enum AppEvent {
     ModelDownloadProgress(ModelDownloadProgress),
+    /// Another model was made the one that transcribes.
+    ActiveModelChanged,
     AudioLevel(f32),
     RecordingError {
         message: String,
