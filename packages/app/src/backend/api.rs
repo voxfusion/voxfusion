@@ -3,7 +3,7 @@
 //! that both the native services and the fixture stand-in implement.
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub type CommandResult<T> = Result<T, String>;
@@ -211,6 +211,8 @@ pub enum AppEvent {
         key_code: i64,
     },
     TranscriptionCreated,
+    /// Every transcription was deleted.
+    TranscriptionsCleared,
     Navigate(String),
     SelectMicrophone(String),
     CheckForUpdates,
@@ -269,12 +271,22 @@ pub trait Backend: Send + Sync + 'static {
         domain: Option<String>,
         fallback_style: String,
     ) -> CommandResult<TranscriptionResult>;
-    fn save_transcription(&self, result: &TranscriptionResult) -> CommandResult<Transcription>;
+    /// Saves `result` to the history along with the recording at
+    /// `audio_path` it was transcribed from, which goes when it is deleted.
+    fn save_transcription(
+        &self,
+        result: &TranscriptionResult,
+        audio_path: &Path,
+    ) -> CommandResult<Transcription>;
     fn list_transcriptions(
         &self,
         limit: i64,
         cursor: Option<String>,
     ) -> CommandResult<TranscriptionPage>;
+    /// Deletes a transcription and its recording.
+    fn delete_transcription(&self, id: &str) -> CommandResult<()>;
+    /// Deletes every transcription and every recording kept on disk.
+    fn clear_transcriptions(&self) -> CommandResult<()>;
 
     // ---- models ----
     fn check_model_status(&self) -> CommandResult<bool>;

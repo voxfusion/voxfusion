@@ -15,8 +15,9 @@ mod sites;
 mod text;
 mod whisper;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use crate::backend::{
     AppDictionary, AppInstruction, AudioDevice, Backend, CommandResult, DictionaryWord,
@@ -85,6 +86,20 @@ impl NativeBackend {
             runtime,
         }))
     }
+}
+
+/// For a transcription saved before transcriptions kept the name of their
+/// recording: when that recording was last written. Transcription starts as
+/// soon as the recording ends and the result is saved when it finishes, so
+/// the recording ended shortly before the save, less the processing time.
+fn legacy_recording_window(source: &db::TranscriptionSource) -> Option<(SystemTime, SystemTime)> {
+    const SLACK: Duration = Duration::from_secs(3);
+
+    let saved_at = SystemTime::from(chrono::DateTime::parse_from_rfc3339(&source.created_at).ok()?);
+    let started_at = saved_at.checked_sub(Duration::from_millis(
+        source.processing_time_ms.try_into().ok()?,
+    ))?;
+    Some((started_at.checked_sub(SLACK)?, started_at))
 }
 
 impl Backend for NativeBackend {
@@ -160,8 +175,13 @@ impl Backend for NativeBackend {
         result
     }
 
-    fn save_transcription(&self, result: &TranscriptionResult) -> CommandResult<Transcription> {
-        db::save_transcription(&self.db, result)
+    fn save_transcription(
+        &self,
+        result: &TranscriptionResult,
+        audio_path: &Path,
+    ) -> CommandResult<Transcription> {
+        let recording = audio::recording_name(audio_path);
+        db::save_transcription(&self.db, result, recording.as_deref())
     }
 
     fn list_transcriptions(
@@ -170,6 +190,27 @@ impl Backend for NativeBackend {
         cursor: Option<String>,
     ) -> CommandResult<TranscriptionPage> {
         db::list_transcriptions(&self.db, limit, cursor)
+    }
+
+    fn delete_transcription(&self, id: &str) -> CommandResult<()> {
+        // The recording goes first: if it cannot be deleted, the transcription
+        // stays listed and can be deleted again.
+        if let Some(source) = db::transcription_source(&self.db, id)? {
+            let recording = source.recording.clone().or_else(|| {
+                let (from, to) = legacy_recording_window(&source)?;
+                audio::recording_finished_between(from, to)
+            });
+            if let Some(recording) = recording {
+                audio::delete_recording(&recording)?;
+            }
+        }
+
+        db::delete_transcription(&self.db, id)
+    }
+
+    fn clear_transcriptions(&self) -> CommandResult<()> {
+        audio::delete_recordings()?;
+        db::clear_transcriptions(&self.db)
     }
 
     fn check_model_status(&self) -> CommandResult<bool> {

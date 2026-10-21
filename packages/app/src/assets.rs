@@ -30,6 +30,7 @@ const FILES: &[(&str, &[u8])] = embedded![
     "icons/shield-check.svg",
     "icons/shield.svg",
     "icons/spinner-ring.svg",
+    "icons/trash-2.svg",
     "icons/wand-2.svg",
     "icons/x.svg",
     "images/app-icon.svg",
