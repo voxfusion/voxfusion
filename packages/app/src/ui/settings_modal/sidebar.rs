@@ -2,7 +2,7 @@
 
 use gpui_kit::{
     App, ClipboardItem, Context, Div, Global, InteractiveElement as _, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, div, prelude::*, px,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, prelude::*, px,
 };
 use std::time::Duration;
 
@@ -10,6 +10,7 @@ use super::{Section, SettingsModal};
 use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::focus::{focus_ring, focus_visible};
 use crate::ui::widgets::icon;
 use crate::ui::{t_upper, upper};
 
@@ -79,13 +80,21 @@ impl SettingsModal {
         .detach();
     }
 
-    fn render_section_item(&self, section: Section, cx: &mut Context<Self>) -> Faded {
+    fn render_section_item(
+        &self,
+        section: Section,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Faded {
         let p = palette(cx);
         let active = self.section == section;
+        let focus_handle = &self.section_focus[section as usize];
 
         div()
             .id(section.number())
             .transition_colors()
+            .track_focus(focus_handle)
+            .relative()
             .flex()
             .items_center()
             .gap_3()
@@ -110,14 +119,19 @@ impl SettingsModal {
                     .child(text(section.number()).tracking_wider()),
             )
             .child(text(t_upper(cx, section.label_key())).tracking_wider())
+            // Over the whole row, the 2px marker on its left included.
+            .when(focus_visible(focus_handle, window), |item| {
+                item.child(focus_ring(0., cx).left(px(-2.)))
+            })
     }
 
-    pub(super) fn render_sidebar(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn render_sidebar(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let p = palette(cx);
         let version = app_version(cx);
         let title = format!("[VOXFUSION] > {}", crate::ui::t(cx, "settings.title"));
+        let version_focused = focus_visible(&self.version_focus, window);
 
-        let sections = Section::ALL.map(|section| self.render_section_item(section, cx));
+        let sections = Section::ALL.map(|section| self.render_section_item(section, window, cx));
 
         // The button is as wide as its text, which a row makes it.
         let version_row = (!version.is_empty()).then(|| {
@@ -132,6 +146,8 @@ impl SettingsModal {
                         .id("copy-version")
                         .group("copy-version")
                         .transition_all()
+                        .track_focus(&self.version_focus)
+                        .relative()
                         .flex()
                         .items_center()
                         .gap_1p5()
@@ -146,11 +162,12 @@ impl SettingsModal {
                             div()
                                 .id("copy-icon")
                                 .transition_opacity()
-                                .opacity(0.)
+                                .opacity(if version_focused { 1. } else { 0. })
                                 .group_hover("copy-version", |icon| icon.opacity(1.))
                                 .child(icon("copy").size_3())
                                 .into_any_element()
-                        }),
+                        })
+                        .when(version_focused, |button| button.child(focus_ring(4., cx))),
                 )
         });
 
