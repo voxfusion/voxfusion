@@ -7,7 +7,7 @@ use gpui_kit::{
 
 use crate::analytics;
 use crate::ui::apps_cache::{self, InstalledApps};
-use crate::ui::pages::section::{empty_state, list_header};
+use crate::ui::pages::section::{empty_state, list_header, load_failed};
 use crate::ui::widgets::app_search::{AppSearch, AppSelected, SKELETON_ROWS, app_row_skeleton};
 use crate::ui::{t, t_with};
 
@@ -107,12 +107,32 @@ impl AppDictionaries {
         })
         .detach();
     }
+
+    /// Fetches the dictionaries again, after they could not be listed.
+    fn reload(&mut self, cx: &mut Context<Self>) {
+        self.loading = true;
+        cx.notify();
+
+        let fetch = self.groups.update(cx, |groups, cx| groups.fetch(cx));
+        cx.spawn(async move |this, cx| {
+            fetch.await;
+
+            this.update(cx, |this, cx| {
+                this.loading = false;
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
 }
 
 impl Render for AppDictionaries {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let count = self.groups.read(cx).len();
-        let count_label = (count > 0).then(|| {
+        let groups = self.groups.read(cx);
+        let count = groups.len();
+        let load_error = groups.load_error();
+        let count_label = (count > 0 && load_error.is_none()).then(|| {
             t_with(
                 cx,
                 "appInstructions.appCount",
@@ -130,6 +150,14 @@ impl Render for AppDictionaries {
                         .map(|index| app_row_skeleton(index, Some(size(px(80.), px(16.))), cx)),
                 )
                 .into_any_element()
+        } else if let Some(error) = load_error {
+            load_failed(
+                t(cx, "dictionary.perAppLoadFailed"),
+                error,
+                cx.listener(|this, _, _, cx| this.reload(cx)),
+                cx,
+            )
+            .into_any_element()
         } else if count == 0 {
             empty_state(
                 "NO_APPS_CONFIGURED",

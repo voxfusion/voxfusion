@@ -659,6 +659,10 @@ enum Command {
         state: ShortcutState,
     },
     Wheel(Wheel),
+    /// Replaces the scenario's `failures`, so that a retry can succeed.
+    Failures {
+        failures: HashMap<String, String>,
+    },
 }
 
 /// A scroll by an exact distance, which a virtual display's wheel clicks
@@ -692,7 +696,8 @@ pub fn services(
         update: data.update.clone(),
         download_events,
     };
-    let backend = FixtureBackend::new(data);
+    let backend = std::sync::Arc::new(FixtureBackend::new(data));
+    let scripted = backend.clone();
 
     std::thread::spawn(move || {
         for line in std::io::stdin().lines() {
@@ -715,16 +720,15 @@ pub fn services(
                 Ok(Command::Wheel(wheel)) => {
                     let _ = wheel_sender.send_blocking(wheel);
                 }
+                Ok(Command::Failures { failures }) => {
+                    scripted.with(|data| data.failures = failures);
+                }
                 Err(error) => eprintln!("fixture: cannot parse {line}: {error}"),
             }
         }
     });
 
-    (
-        std::sync::Arc::new(backend),
-        std::sync::Arc::new(updater),
-        wheels,
-    )
+    (backend, std::sync::Arc::new(updater), wheels)
 }
 
 #[cfg(test)]
