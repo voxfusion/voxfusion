@@ -221,6 +221,8 @@ impl ModelDownloadStep {
 
                 match result {
                     Ok(()) => {
+                        // As after a change in Settings → Models.
+                        events::emit(cx, AppEvent::ActiveModelChanged);
                         for model in &mut this.models {
                             model.active = model.id == model_id;
                         }
@@ -573,7 +575,7 @@ impl ModelDownloadStep {
                     div()
                         .mt_2()
                         .type_xs()
-                        .text_color(p.txt_faint)
+                        .text_color(p.txt_hint)
                         .child(text(error).break_all().center()),
                 )
             })

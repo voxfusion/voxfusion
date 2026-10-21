@@ -42,10 +42,10 @@ pub fn toggle_option(
                 .child(
                     div()
                         .mb_1()
-                        .text_color(p.txt_muted)
+                        .text_color(p.txt_secondary)
                         .child(text(upper(label)).tracking_wider()),
                 )
-                .child(div().text_color(p.txt_faint).child(text(description))),
+                .child(div().text_color(p.txt_hint).child(text(description))),
         )
         .child(
             div()

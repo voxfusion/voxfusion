@@ -140,7 +140,7 @@ impl SettingsModal {
                     .child(
                         div()
                             .type_xs()
-                            .text_color(p.txt_muted)
+                            .text_color(p.txt_secondary)
                             .child(text("INPUT_DEVICE").tracking_wider()),
                     )
                     .child(
@@ -185,7 +185,7 @@ impl SettingsModal {
                 div()
                     .mt_3()
                     .type_xs()
-                    .text_color(p.txt_faint)
+                    .text_color(p.txt_hint)
                     .child(text(t(cx, "settings.microphoneDescription"))),
             );
 

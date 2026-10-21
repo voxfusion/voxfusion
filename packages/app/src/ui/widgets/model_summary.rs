@@ -29,7 +29,7 @@ pub fn model_summary(model: &ModelInfo, cx: &App) -> Div {
         .when(model.experimental, |row| {
             row.child(badge(
                 t_upper(cx, "settings.modelExperimental"),
-                p.txt_muted,
+                p.txt_secondary,
                 p.border_strong,
             ))
         });
@@ -38,7 +38,7 @@ pub fn model_summary(model: &ModelInfo, cx: &App) -> Div {
         div()
             .mt_1p5()
             .type_xs()
-            .text_color(p.txt_faint)
+            .text_color(p.txt_hint)
             .child(text(label))
     };
 

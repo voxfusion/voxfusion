@@ -8,7 +8,9 @@ use std::panic;
 use std::path::{Path, PathBuf};
 
 use super::db::DbState;
-use crate::backend::{AppDictionary, AppInstruction, DictionaryWord, FrontmostApp, InstalledApp};
+use crate::backend::{
+    AppDictionary, AppInstruction, DictionaryWord, FrontmostApp, InstalledApp, MAX_WORD_CHARS,
+};
 
 pub struct StyleDef {
     pub key: &'static str,
@@ -538,8 +540,10 @@ pub fn add_app_dictionary_word(
     if bundle_id.is_empty() || app_name.is_empty() {
         return Err("bundle_id and app_name are required".to_string());
     }
-    if word.is_empty() || word.len() > 100 {
-        return Err("Word must be between 1 and 100 characters".to_string());
+    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
+        return Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ));
     }
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
@@ -567,8 +571,10 @@ pub fn update_app_dictionary_word(
     word: &str,
 ) -> Result<DictionaryWord, String> {
     let word = word.trim();
-    if word.is_empty() || word.len() > 100 {
-        return Err("Word must be between 1 and 100 characters".to_string());
+    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
+        return Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ));
     }
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().to_rfc3339();

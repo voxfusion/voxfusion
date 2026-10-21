@@ -28,7 +28,7 @@ pub(super) fn render(cx: &App) -> Div {
         .child(
             div()
                 .type_xs()
-                .text_color(p.txt_faint)
+                .text_color(p.txt_hint)
                 .child(text(t(cx, "settings.analyticsNote"))),
         )
 }

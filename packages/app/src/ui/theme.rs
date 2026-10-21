@@ -27,6 +27,11 @@ pub struct Palette {
     pub txt_primary: Hsla,
     pub txt_secondary: Hsla,
     pub txt_muted: Hsla,
+    /// Text that explains a control, such as a setting's description: at
+    /// least 4.5:1 against `base`, `surface` and `ac_bg`, which `txt_muted`
+    /// and `txt_faint` are not.
+    pub txt_hint: Hsla,
+    /// Text not needed to use the interface, such as section numbers.
     pub txt_faint: Hsla,
 
     pub ac: Hsla,
@@ -70,6 +75,7 @@ impl Palette {
             txt_primary: hex(0x1a1a1a),
             txt_secondary: hex(0x555555),
             txt_muted: hex(0x888888),
+            txt_hint: hex(0x666666),
             txt_faint: hex(0xaaaaaa),
             ac: hex(0xff3e00),
             ac_hover: hex(0xe03800),
@@ -95,6 +101,7 @@ impl Palette {
             txt_primary: hex(0xe0e0e0),
             txt_secondary: hex(0x888888),
             txt_muted: hex(0x666666),
+            txt_hint: hex(0x808080),
             txt_faint: hex(0x444444),
             ac: hex(0xff3e00),
             ac_hover: hex(0xff5500),
