@@ -49,7 +49,7 @@ pub(super) fn render(window: &mut Window, cx: &mut App) -> Div {
         .child(
             div()
                 .type_xs()
-                .text_color(p.txt_faint)
+                .text_color(p.txt_hint)
                 .child(text(t(cx, "settings.analyticsNote"))),
         )
         .child(clear_history(window, cx))
@@ -85,12 +85,12 @@ fn clear_history(window: &mut Window, cx: &mut App) -> Div {
                 .child(
                     div()
                         .mb_1()
-                        .text_color(p.txt_muted)
+                        .text_color(p.txt_secondary)
                         .child(text(t_upper(cx, "settings.history")).tracking_wider()),
                 )
                 .child(
                     div()
-                        .text_color(p.txt_faint)
+                        .text_color(p.txt_hint)
                         .child(text(t(cx, "settings.historyDescription"))),
                 ),
         )

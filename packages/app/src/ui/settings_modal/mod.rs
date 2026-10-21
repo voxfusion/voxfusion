@@ -177,7 +177,7 @@ impl Render for SettingsModal {
             .border_t_1()
             .border_color(p.border)
             .type_px(10.)
-            .text_color(p.txt_faint)
+            .text_color(p.txt_hint)
             .child(text("ESC TO CLOSE | CHANGES SAVED AUTOMATICALLY"));
 
         let main = div()

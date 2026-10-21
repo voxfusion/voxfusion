@@ -127,7 +127,7 @@ pub(super) fn render(cx: &App) -> Div {
             div()
                 .mb_4()
                 .type_xs()
-                .text_color(p.txt_muted)
+                .text_color(p.txt_secondary)
                 .child(text("THEME_MODE").tracking_wider()),
         )
         .child(

@@ -3,7 +3,9 @@ use rusqlite::{Connection, OptionalExtension as _, params};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use crate::backend::{DictionaryWord, Transcription, TranscriptionPage, TranscriptionResult};
+use crate::backend::{
+    DictionaryWord, MAX_WORD_CHARS, Transcription, TranscriptionPage, TranscriptionResult,
+};
 
 pub struct DbState {
     pub conn: Mutex<Connection>,
@@ -253,8 +255,10 @@ pub fn list_dictionary_words(state: &DbState) -> Result<Vec<DictionaryWord>, Str
 
 pub fn add_dictionary_word(state: &DbState, word: &str) -> Result<DictionaryWord, String> {
     let word = word.trim();
-    if word.is_empty() || word.len() > 100 {
-        return Err("Word must be between 1 and 100 characters".to_string());
+    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
+        return Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ));
     }
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
@@ -281,8 +285,10 @@ pub fn update_dictionary_word(
     word: &str,
 ) -> Result<DictionaryWord, String> {
     let word = word.trim();
-    if word.is_empty() || word.len() > 100 {
-        return Err("Word must be between 1 and 100 characters".to_string());
+    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
+        return Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ));
     }
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;

@@ -98,9 +98,9 @@ impl SettingsModal {
                 if active {
                     item.text_color(p.ac).border_color(p.ac).bg(p.surface)
                 } else {
-                    item.text_color(p.txt_muted)
+                    item.text_color(p.txt_secondary)
                         .border_color(gpui_kit::transparent_black())
-                        .hover(|item| item.text_color(p.txt_secondary).bg(p.surface))
+                        .hover(|item| item.text_color(p.txt_primary).bg(p.surface))
                 }
             })
             .on_click(cx.listener(move |this, _, _, cx| this.show_section(section, cx)))

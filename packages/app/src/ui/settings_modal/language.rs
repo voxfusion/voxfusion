@@ -34,7 +34,7 @@ pub(super) fn render(window: &mut Window, cx: &mut App) -> Div {
             div()
                 .mb_3()
                 .type_xs()
-                .text_color(p.txt_muted)
+                .text_color(p.txt_secondary)
                 .child(text("INTERFACE_LANGUAGE").tracking_wider()),
         )
         .child(select(
