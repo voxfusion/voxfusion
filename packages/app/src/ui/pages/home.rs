@@ -1,8 +1,8 @@
 //! The Home page: the history of transcriptions, grouped by day.
 
 use gpui_kit::{
-    ClipboardItem, Context, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Subscription, Window, canvas, div, prelude::*, px,
+    ClickEvent, ClipboardItem, Context, IntoElement, ParentElement as _, Render, SharedString,
+    Styled as _, Subscription, Window, canvas, div, prelude::*, px,
 };
 use std::collections::HashSet;
 use std::time::Duration;
@@ -35,6 +35,14 @@ pub struct HomePage {
     hovered: Option<String>,
     retry_hovered: bool,
     copied: HashSet<String>,
+    /// Transcriptions deleted here. A list fetched before the deletion
+    /// reached the database leaves them out.
+    deleted: HashSet<String>,
+    /// Counts the times the history was cleared; a list fetched before the
+    /// last time is dropped.
+    generation: u64,
+    /// A reload asked for while a fetch was running, done after it.
+    reload_pending: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -43,11 +51,22 @@ impl HomePage {
         analytics::capture(cx, "$pageview", &[("$current_url", "/".into())]);
 
         let subscriptions = vec![
-            cx.subscribe(&events::hub(cx), |this, _, event, cx| {
-                if matches!(event, AppEvent::TranscriptionCreated) {
+            cx.subscribe(&events::hub(cx), |this, _, event, cx| match event {
+                AppEvent::TranscriptionCreated => {
                     analytics::capture(cx, "transcription_created", &[]);
                     this.fetch(None, cx);
                 }
+                AppEvent::TranscriptionsCleared => {
+                    this.generation += 1;
+                    this.transcriptions.clear();
+                    this.deleted.clear();
+                    this.copied.clear();
+                    this.hovered = None;
+                    this.next_cursor = None;
+                    this.has_more = false;
+                    this.fetch(None, cx);
+                }
+                _ => {}
             }),
             cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
         ];
@@ -62,6 +81,9 @@ impl HomePage {
             hovered: None,
             retry_hovered: false,
             copied: HashSet::new(),
+            deleted: HashSet::new(),
+            generation: 0,
+            reload_pending: false,
             _subscriptions: subscriptions,
         };
         page.fetch(None, cx);
@@ -70,6 +92,9 @@ impl HomePage {
 
     fn fetch(&mut self, cursor: Option<String>, cx: &mut Context<Self>) {
         if self.loading {
+            if cursor.is_none() {
+                self.reload_pending = true;
+            }
             return;
         }
 
@@ -82,11 +107,18 @@ impl HomePage {
             move |backend| backend.list_transcriptions(PAGE_SIZE, cursor)
         });
 
+        let generation = self.generation;
+
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
             this.update(cx, |this, cx| {
                 this.loading = false;
+                if generation != this.generation {
+                    this.reload_pending = false;
+                    this.fetch(None, cx);
+                    return;
+                }
                 this.initial_loading = false;
 
                 match result {
@@ -97,10 +129,14 @@ impl HomePage {
                             .map(|item| item.created_at.clone());
                         this.has_more = page.has_more;
 
+                        let listed = page
+                            .transcriptions
+                            .into_iter()
+                            .filter(|item| !this.deleted.contains(&item.id));
                         if cursor.is_some() {
-                            this.transcriptions.extend(page.transcriptions);
+                            this.transcriptions.extend(listed);
                         } else {
-                            this.transcriptions = page.transcriptions;
+                            this.transcriptions = listed.collect();
                         }
                     }
                     Err(error) => {
@@ -108,6 +144,9 @@ impl HomePage {
                     }
                 }
 
+                if std::mem::take(&mut this.reload_pending) {
+                    this.fetch(None, cx);
+                }
                 cx.notify();
             })
             .ok();
@@ -147,6 +186,40 @@ impl HomePage {
             this.update(cx, |this, cx| {
                 this.copied.remove(&id);
                 cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    fn delete(&mut self, id: &str, cx: &mut Context<Self>) {
+        analytics::capture(cx, "transcription_deleted", &[]);
+        self.transcriptions
+            .retain(|transcription| transcription.id != id);
+        self.copied.remove(id);
+        self.deleted.insert(id.to_string());
+        self.hovered = None;
+        cx.notify();
+
+        let id = id.to_string();
+        let request = backend::call(cx, {
+            let id = id.clone();
+            move |backend| backend.delete_transcription(&id)
+        });
+
+        cx.spawn(async move |this, cx| {
+            let result = request.await;
+
+            this.update(cx, |this, cx| {
+                // A refused deletion brings the transcription back. With every
+                // listed one deleted, the next page is fetched.
+                if let Err(error) = &result {
+                    log::error!(target: "home", "delete_transcription_failed error={error}");
+                    this.deleted.remove(&id);
+                    this.fetch(None, cx);
+                } else if this.transcriptions.is_empty() && this.has_more {
+                    this.fetch(None, cx);
+                }
             })
             .ok();
         })
@@ -239,28 +312,52 @@ impl HomePage {
             )
             .when(hovered || copied, |card| {
                 let transcription = transcription.clone();
-
-                card.child(
+                let button = |id: &'static str| {
                     div()
-                        .id("copy")
-                        .absolute()
-                        .top_2()
-                        .right_2()
+                        .id(id)
                         .p_1p5()
                         .bg(p.base)
                         .border_1()
                         .border_color(p.border_strong)
                         .transition_colors()
-                        .hover(|button| button.border_color(p.ac))
                         .text_color(p.txt_secondary)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.copy(&transcription, cx);
-                        }))
-                        .child(if copied {
-                            icon("check").size_3p5().text_color(p.success)
-                        } else {
-                            icon("copy").size_3p5()
-                        }),
+                };
+
+                card.child(
+                    div()
+                        .absolute()
+                        .top_2()
+                        .right_2()
+                        .flex()
+                        .gap_1()
+                        .when(hovered, |buttons| {
+                            buttons.child(
+                                button("delete")
+                                    .hover(|button| button.border_color(p.ac).text_color(p.ac))
+                                    .on_click(cx.listener(
+                                        move |this, event: &ClickEvent, _, cx| {
+                                            // The next transcription moves up under the
+                                            // pointer; a double click deletes only one.
+                                            if event.click_count() == 1 {
+                                                this.delete(&id, cx);
+                                            }
+                                        },
+                                    ))
+                                    .child(icon("trash-2").size_3p5()),
+                            )
+                        })
+                        .child(
+                            button("copy")
+                                .hover(|button| button.border_color(p.ac))
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.copy(&transcription, cx);
+                                }))
+                                .child(if copied {
+                                    icon("check").size_3p5().text_color(p.success)
+                                } else {
+                                    icon("copy").size_3p5()
+                                }),
+                        ),
                 )
             })
     }

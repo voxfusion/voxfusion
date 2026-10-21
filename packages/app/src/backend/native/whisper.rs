@@ -121,6 +121,7 @@ pub fn transcribe_audio(
     domain: Option<&str>,
     fallback_style: &str,
 ) -> Result<TranscriptionResult, String> {
+    let _transcribing = audio::transcribing(audio_path);
     let active_id = models::active_model_id(active);
     let model = models::find_model(&active_id)
         .ok_or_else(|| format!("Unknown active model: {}", active_id))?;

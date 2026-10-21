@@ -567,7 +567,9 @@ impl VoiceController {
 
         let saved = cx.update(|cx| {
             let result = result.clone();
-            backend::call(cx, move |backend| backend.save_transcription(&result))
+            backend::call(cx, move |backend| {
+                backend.save_transcription(&result, &audio_path)
+            })
         });
         if let Err(error) = saved.await {
             log::error!(target: "voice", "save_transcription_failed error={error}");
