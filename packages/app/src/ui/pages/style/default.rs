@@ -85,8 +85,15 @@ impl DefaultStyle {
             return;
         }
 
-        SettingsStore::update(cx, |settings| settings.default_style = style.into());
+        let saved = SettingsStore::update(cx, |settings| settings.default_style = style.into());
         analytics::capture(cx, "default_style_changed", &[("style", style.into())]);
+
+        // A style that could not be written to disk is in use, but not saved.
+        if !saved {
+            self.saved = None;
+            cx.notify();
+            return;
+        }
 
         // Replacing the task starts the time over.
         self.saved = Some(cx.spawn(async move |this, cx| {

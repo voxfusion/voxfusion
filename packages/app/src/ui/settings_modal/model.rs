@@ -299,6 +299,12 @@ impl ModelSettings {
         cx.spawn(async move |this, cx| {
             let result = activate.await;
 
+            // The Style page listens for this, even when this view has been
+            // closed in the meantime.
+            if result.is_ok() {
+                cx.update(|cx| events::emit(cx, AppEvent::ActiveModelChanged));
+            }
+
             this.update(cx, |this, cx| {
                 this.busy_id = None;
                 cx.notify();
@@ -309,7 +315,6 @@ impl ModelSettings {
                 }
 
                 analytics::capture(cx, "settings_model_changed", &[("model", model_id.into())]);
-                events::emit(cx, AppEvent::ActiveModelChanged);
                 this.refresh(cx);
             })
             .ok();

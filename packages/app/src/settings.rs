@@ -190,22 +190,28 @@ impl SettingsStore {
         &self.settings
     }
 
-    /// Changes the settings, saves them and notifies observers.
-    pub fn update(cx: &mut App, change: impl FnOnce(&mut Settings)) {
+    /// Changes the settings, saves them and notifies observers. Returns false
+    /// when the file could not be written: the change then lasts only until
+    /// the app quits.
+    pub fn update(cx: &mut App, change: impl FnOnce(&mut Settings)) -> bool {
         Self::entity(cx).update(cx, |store, cx: &mut Context<SettingsStore>| {
             let before = store.settings.clone();
             change(&mut store.settings);
 
-            if store.settings != before {
-                store.save();
-                cx.notify();
+            if store.settings == before {
+                return true;
             }
-        });
+
+            let saved = store.save();
+            cx.notify();
+            saved
+        })
     }
 
-    fn save(&mut self) {
+    /// Writes the settings to the file. Returns false when that failed.
+    fn save(&mut self) -> bool {
         let Ok(Value::Object(current)) = serde_json::to_value(&self.settings) else {
-            return;
+            return false;
         };
 
         let mut changed = false;
@@ -217,7 +223,7 @@ impl SettingsStore {
         }
 
         let Some(path) = self.path.as_ref().filter(|_| changed) else {
-            return;
+            return true;
         };
 
         if let Some(parent) = path.parent() {
@@ -225,12 +231,17 @@ impl SettingsStore {
         }
 
         match serde_json::to_string_pretty(&self.stored) {
-            Ok(contents) => {
-                if let Err(error) = std::fs::write(path, contents) {
+            Ok(contents) => match std::fs::write(path, contents) {
+                Ok(()) => true,
+                Err(error) => {
                     log::error!(target: "settings", "save_failed error={error}");
+                    false
                 }
+            },
+            Err(error) => {
+                log::error!(target: "settings", "serialize_failed error={error}");
+                false
             }
-            Err(error) => log::error!(target: "settings", "serialize_failed error={error}"),
         }
     }
 }
