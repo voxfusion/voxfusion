@@ -44,6 +44,8 @@ struct Sample {
 struct Download {
     model_id: String,
     bar: Progress,
+    /// Every byte is in and the file is being checked against its checksum.
+    verifying: bool,
 }
 
 /// The download rate after a new sample: the rate since the last sample,
@@ -97,10 +99,10 @@ pub(super) struct ModelSettings {
 
 impl ModelSettings {
     pub(super) fn new(cx: &mut Context<Self>) -> Self {
-        let subscription = cx.subscribe(&events::hub(cx), |this, _, event, cx| {
-            if let AppEvent::ModelDownloadProgress(progress) = event {
-                this.handle_progress(progress, cx);
-            }
+        let subscription = cx.subscribe(&events::hub(cx), |this, _, event, cx| match event {
+            AppEvent::ModelDownloadProgress(progress) => this.handle_progress(progress, cx),
+            AppEvent::ModelVerifying { model_id } => this.handle_verifying(model_id, cx),
+            _ => {}
         });
 
         let mut section = Self {
@@ -152,6 +154,7 @@ impl ModelSettings {
         self.downloading = Some(Download {
             model_id: model_id.to_string(),
             bar: Progress::new(progress as f32),
+            verifying: false,
         });
     }
 
@@ -211,6 +214,26 @@ impl ModelSettings {
             && download.model_id == *model_id
         {
             download.bar.set(progress.progress as f32);
+            download.verifying = false;
+        }
+        cx.notify();
+    }
+
+    fn handle_verifying(&mut self, model_id: &str, cx: &mut Context<Self>) {
+        // A download may be verifying already, started before this section
+        // was opened: show it.
+        if self.downloading.is_none() {
+            self.show_download(model_id);
+        }
+
+        if let Some(download) = &mut self.downloading
+            && download.model_id == model_id
+        {
+            // The transfer is over: the bar is full while the file is
+            // checked. The progress stays where the transfer left it, so a
+            // cancelled check still notes that the download resumes.
+            download.bar.set(100.);
+            download.verifying = true;
         }
         cx.notify();
     }
@@ -415,31 +438,40 @@ impl ModelSettings {
         let model_id = download.model_id.clone();
 
         let figures = stats.map(|stats| {
+            // A file being checked has every byte, and the speed and the time
+            // left of its transfer are stale.
+            let downloaded_bytes = if download.verifying {
+                stats.total_bytes
+            } else {
+                stats.downloaded_bytes
+            };
             let mut figures = t_with(
                 cx,
                 "settings.modelDownloadedOfTotal",
                 &[
-                    ("downloaded", &format_mb(stats.downloaded_bytes as f64)),
+                    ("downloaded", &format_mb(downloaded_bytes as f64)),
                     ("total", &format_mb(stats.total_bytes as f64)),
                 ],
             )
             .to_string();
 
-            if let Some(bytes_per_second) = stats.bytes_per_second {
-                figures.push_str(" · ");
-                figures.push_str(&t_with(
-                    cx,
-                    "settings.modelDownloadSpeed",
-                    &[("speed", &format_mb(bytes_per_second))],
-                ));
-            }
-            if let Some(eta_seconds) = stats.eta_seconds {
-                figures.push_str(" · ");
-                figures.push_str(&t_with(
-                    cx,
-                    "settings.modelEta",
-                    &[("eta", &format_eta(eta_seconds))],
-                ));
+            if !download.verifying {
+                if let Some(bytes_per_second) = stats.bytes_per_second {
+                    figures.push_str(" · ");
+                    figures.push_str(&t_with(
+                        cx,
+                        "settings.modelDownloadSpeed",
+                        &[("speed", &format_mb(bytes_per_second))],
+                    ));
+                }
+                if let Some(eta_seconds) = stats.eta_seconds {
+                    figures.push_str(" · ");
+                    figures.push_str(&t_with(
+                        cx,
+                        "settings.modelEta",
+                        &[("eta", &format_eta(eta_seconds))],
+                    ));
+                }
             }
 
             div()
@@ -468,10 +500,12 @@ impl ModelSettings {
                             .type_xs()
                             .text_color(p.txt_secondary)
                             .child(spinning("download-spinner", icon("loader").size_3p5()))
-                            .child(text(format!(
-                                "{progress}% — {}",
-                                t(cx, "settings.modelDownloading")
-                            ))),
+                            .child(text(if download.verifying {
+                                t(cx, "settings.modelVerifying")
+                            } else {
+                                format!("{progress}% — {}", t(cx, "settings.modelDownloading"))
+                                    .into()
+                            })),
                     )
                     .child(
                         div()

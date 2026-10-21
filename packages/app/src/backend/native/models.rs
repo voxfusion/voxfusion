@@ -165,6 +165,9 @@ const STALL_TIMEOUT: Duration = Duration::from_secs(60);
 /// How often the download loop wakes up to check the cancellation flag while
 /// waiting for the next chunk.
 const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(250);
+/// How much of the file is hashed between two checks of the cancellation
+/// flag during verification.
+const HASH_CHUNK_SIZE: usize = 1024 * 1024;
 
 /// In-flight downloads: model id -> cancellation flag. Guards against two
 /// concurrent downloads of the same model interleaving into one temp file.
@@ -221,9 +224,10 @@ fn emit_progress(
 /// Streams a model's file to disk, emitting `model-download-progress` events
 /// (`{ modelId, progress, downloadedBytes, totalBytes }`) at most once per
 /// whole-percent change. The download goes to a `.download.tmp` file that is
-/// checksum-verified and atomically renamed into place. A leftover temp file
-/// from an earlier failed or cancelled attempt is resumed with an HTTP Range
-/// request instead of being restarted from scratch.
+/// checksum-verified (announced by a `model-verifying` event) and atomically
+/// renamed into place. A leftover temp file from an earlier failed or
+/// cancelled attempt is resumed with an HTTP Range request instead of being
+/// restarted from scratch.
 pub async fn download_model_file(events: &EventSender, model: &ModelSpec) -> Result<(), String> {
     let destination = model_path(model)?;
 
@@ -283,7 +287,7 @@ pub async fn download_model_file(events: &EventSender, model: &ModelSpec) -> Res
         _ => {}
     }
 
-    verify_checksum(model, &temp_path).await?;
+    verify_checksum(events, model, &temp_path, &cancel).await?;
 
     tokio::fs::rename(&temp_path, &destination)
         .await
@@ -408,24 +412,55 @@ async fn stream_to_temp(
 }
 
 /// Verifies the downloaded temp file against the model's expected SHA-256
-/// (hashing runs on a blocking thread). Deletes the temp file on mismatch so
-/// the next attempt starts clean.
-async fn verify_checksum(model: &ModelSpec, temp_path: &Path) -> Result<(), String> {
+/// (hashing runs on a blocking thread), after telling the interface the
+/// transfer is over. Checks the cancellation flag between chunks; a cancelled
+/// check keeps the complete temp file, so the next attempt only hashes it
+/// again. Deletes the temp file on mismatch so the next attempt starts clean.
+async fn verify_checksum(
+    events: &EventSender,
+    model: &ModelSpec,
+    temp_path: &Path,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(), String> {
     let Some(expected) = model.sha256 else {
         return Ok(());
     };
 
+    events.emit(AppEvent::ModelVerifying {
+        model_id: model.id.to_string(),
+    });
+
     let path = temp_path.to_path_buf();
+    let cancel = cancel.clone();
     let actual = tokio::task::spawn_blocking(move || -> Result<String, String> {
         use sha2::{Digest, Sha256};
+        use std::io::Read;
+
         let mut file = std::fs::File::open(&path)
             .map_err(|e| format!("Failed to open file for checksum: {}", e))?;
         let mut hasher = Sha256::new();
-        std::io::copy(&mut file, &mut hasher).map_err(|e| format!("Failed to hash file: {}", e))?;
+        let mut buffer = vec![0; HASH_CHUNK_SIZE];
+        loop {
+            if cancel.load(Ordering::SeqCst) {
+                return Err(DOWNLOAD_CANCELLED_ERROR.to_string());
+            }
+            let read = match file.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(read) => read,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => return Err(format!("Failed to hash file: {}", e)),
+            };
+            hasher.update(&buffer[..read]);
+        }
         Ok(format!("{:x}", hasher.finalize()))
     })
     .await
-    .map_err(|e| format!("Checksum task failed: {}", e))??;
+    .map_err(|e| format!("Checksum task failed: {}", e))?
+    .inspect_err(|error| {
+        if error == DOWNLOAD_CANCELLED_ERROR {
+            log::info!(target: "models", "verification cancelled model_id={}", model.id);
+        }
+    })?;
 
     if actual != expected {
         let _ = tokio::fs::remove_file(temp_path).await;
@@ -496,9 +531,10 @@ pub async fn download_model(events: &EventSender, model_id: &str) -> Result<(), 
     download_model_file(events, model).await
 }
 
-/// Requests cancellation of an in-flight model download. The in-progress
-/// `download_model` call returns `Err("Download cancelled")` and keeps its
-/// partial `.download.tmp` file so a later download resumes where it left off.
+/// Requests cancellation of an in-flight model download, during the transfer
+/// or the checksum verification after it. The in-progress `download_model`
+/// call returns `Err("Download cancelled")` and keeps its `.download.tmp` file
+/// so a later download resumes where it left off.
 pub fn cancel_model_download(model_id: &str) -> Result<(), String> {
     let active = ACTIVE_DOWNLOADS.lock().map_err(|e| e.to_string())?;
     match active.get(model_id) {

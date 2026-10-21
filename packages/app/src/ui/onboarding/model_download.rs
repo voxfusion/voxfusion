@@ -70,6 +70,8 @@ pub struct ModelDownloadStep {
     transferred: Option<(u64, u64)>,
     meter: DownloadMeter,
     downloading: bool,
+    /// Every byte is in and the file is being checked against its checksum.
+    verifying: bool,
     downloaded: bool,
     error: Option<SharedString>,
     cancel_requested: bool,
@@ -82,10 +84,10 @@ impl EventEmitter<DownloadComplete> for ModelDownloadStep {}
 
 impl ModelDownloadStep {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let events = cx.subscribe(&events::hub(cx), |this, _, event, cx| {
-            if let AppEvent::ModelDownloadProgress(report) = event {
-                this.handle_progress(report, cx);
-            }
+        let events = cx.subscribe(&events::hub(cx), |this, _, event, cx| match event {
+            AppEvent::ModelDownloadProgress(report) => this.handle_progress(report, cx),
+            AppEvent::ModelVerifying { model_id } => this.handle_verifying(model_id, cx),
+            _ => {}
         });
 
         let model_status = backend::call(cx, |backend| backend.check_model_status());
@@ -107,6 +109,7 @@ impl ModelDownloadStep {
             transferred: None,
             meter: DownloadMeter::default(),
             downloading: false,
+            verifying: false,
             downloaded: false,
             error: None,
             cancel_requested: false,
@@ -153,8 +156,21 @@ impl ModelDownloadStep {
             // A download may already be streaming (started from Settings
             // before this step was shown): reflect it.
             self.downloading = true;
+            self.verifying = false;
         }
 
+        cx.notify();
+    }
+
+    fn handle_verifying(&mut self, model_id: &str, cx: &mut Context<Self>) {
+        if model_id != DEFAULT_MODEL_ID || self.downloaded {
+            return;
+        }
+
+        // The transfer is over: the bar is full while the file is checked.
+        self.set_progress(100);
+        self.downloading = true;
+        self.verifying = true;
         cx.notify();
     }
 
@@ -162,6 +178,7 @@ impl ModelDownloadStep {
         // The progress is not reset: the backend resumes a partial download,
         // so the bar jumps forward with the first report, not back to 0.
         self.downloading = true;
+        self.verifying = false;
         self.error = None;
         self.cancel_requested = false;
         self.bar.jump_to(self.progress as f32);
@@ -191,6 +208,7 @@ impl ModelDownloadStep {
         }
 
         self.downloading = false;
+        self.verifying = false;
         if !self.cancel_requested && !message.contains(DOWNLOAD_CANCELLED_ERROR) {
             self.error = Some(message.into());
         }
@@ -220,8 +238,10 @@ impl ModelDownloadStep {
     }
 
     /// The transferred size, then the speed and the time left once they are
-    /// known.
+    /// known. A file being checked has every byte, and the speed and the time
+    /// left of its transfer are stale.
     fn transfer_summary(&self, downloaded: u64, total: u64, cx: &Context<Self>) -> String {
+        let downloaded = if self.verifying { total } else { downloaded };
         let mut summary = t_with(
             cx,
             "settings.modelDownloadedOfTotal",
@@ -231,6 +251,9 @@ impl ModelDownloadStep {
             ],
         )
         .to_string();
+        if self.verifying {
+            return summary;
+        }
 
         if let Some(speed) = self.meter.bytes_per_second {
             summary.push_str(" · ");
@@ -276,6 +299,17 @@ impl ModelDownloadStep {
             .on_click(cx.listener(|this, _, _, cx| this.cancel(cx)))
             .child(text(t_upper(cx, "settings.cancel")).tracking_wider());
 
+        let status = if self.verifying {
+            t(cx, "settings.modelVerifying")
+        } else {
+            format!(
+                "{}% — {}",
+                self.progress,
+                t(cx, "onboarding.modelDownloading")
+            )
+            .into()
+        };
+
         div()
             .flex()
             .flex_col()
@@ -290,12 +324,7 @@ impl ModelDownloadStep {
             )
             .child(status_row(
                 spinning("downloading", icon("loader").size_4()),
-                format!(
-                    "{}% — {}",
-                    self.progress,
-                    t(cx, "onboarding.modelDownloading")
-                )
-                .into(),
+                status,
                 p.txt_secondary,
             ))
             .when_some(self.transferred, |block, (downloaded, total)| {
