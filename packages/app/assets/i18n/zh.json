@@ -32,6 +32,7 @@
 	"settings.modelDownloaded": "已下载",
 	"settings.modelDownload": "下载",
 	"settings.modelDownloading": "下载中…",
+	"settings.modelVerifying": "正在校验模型…",
 	"settings.modelDownloadFailed": "下载失败",
 	"settings.modelDownloadedOfTotal": "{{downloaded}} / {{total}} MB",
 	"settings.modelDownloadSpeed": "{{speed}} MB/s",

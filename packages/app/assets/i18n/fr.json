@@ -32,6 +32,7 @@
 	"settings.modelDownloaded": "Téléchargé",
 	"settings.modelDownload": "Télécharger",
 	"settings.modelDownloading": "Téléchargement…",
+	"settings.modelVerifying": "Vérification du modèle…",
 	"settings.modelDownloadFailed": "Échec du téléchargement",
 	"settings.modelDownloadedOfTotal": "{{downloaded}} / {{total}} Mo",
 	"settings.modelDownloadSpeed": "{{speed}} Mo/s",

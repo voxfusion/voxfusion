@@ -2,7 +2,7 @@
 
 use gpui_kit::{
     App, Div, InteractiveElement as _, ParentElement as _, StatefulInteractiveElement as _,
-    Styled as _, div, prelude::*, px, rgb,
+    Styled as _, Window, div, prelude::*, px, rgb,
 };
 
 use crate::analytics;
@@ -10,6 +10,7 @@ use crate::settings::{SettingsStore, ThemeMode};
 use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::focus::{focus_ring, focus_visible, keyed_focus_handle};
 
 const THEMES: [(ThemeMode, &str); 3] = [
     (ThemeMode::Light, "LIGHT"),
@@ -44,9 +45,10 @@ fn preview(dark: bool, bar_width: f32) -> Div {
         .child(div().w(px(bar_width)).h_1p5().bg(bar))
 }
 
-fn theme_option(theme: ThemeMode, label: &'static str, cx: &App) -> Faded {
+fn theme_option(theme: ThemeMode, label: &'static str, window: &mut Window, cx: &mut App) -> Faded {
     let p = palette(cx);
     let selected = SettingsStore::get(cx).theme == theme;
+    let focus_handle = keyed_focus_handle(label, window, cx);
 
     let picture = match theme {
         ThemeMode::Light => preview(false, 32.).border_1(),
@@ -73,6 +75,7 @@ fn theme_option(theme: ThemeMode, label: &'static str, cx: &App) -> Faded {
     div()
         .id(label)
         .transition_all()
+        .track_focus(&focus_handle)
         .relative()
         .p_4()
         .border_1()
@@ -117,9 +120,12 @@ fn theme_option(theme: ThemeMode, label: &'static str, cx: &App) -> Faded {
                     .child(text("[*]")),
             )
         })
+        .when(focus_visible(&focus_handle, window), |option| {
+            option.child(focus_ring(4., cx))
+        })
 }
 
-pub(super) fn render(cx: &App) -> Div {
+pub(super) fn render(window: &mut Window, cx: &mut App) -> Div {
     let p = palette(cx);
 
     div()
@@ -135,6 +141,6 @@ pub(super) fn render(cx: &App) -> Div {
                 .grid()
                 .grid_cols(3)
                 .gap_4()
-                .children(THEMES.map(|(theme, label)| theme_option(theme, label, cx))),
+                .children(THEMES.map(|(theme, label)| theme_option(theme, label, window, cx))),
         )
 }

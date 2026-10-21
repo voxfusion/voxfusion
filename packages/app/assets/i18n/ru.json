@@ -32,6 +32,7 @@
 	"settings.modelDownloaded": "Загружено",
 	"settings.modelDownload": "Загрузить",
 	"settings.modelDownloading": "Загрузка…",
+	"settings.modelVerifying": "Проверка модели…",
 	"settings.modelDownloadFailed": "Не удалось загрузить",
 	"settings.modelDownloadedOfTotal": "{{downloaded}} / {{total}} МБ",
 	"settings.modelDownloadSpeed": "{{speed}} МБ/с",

@@ -181,6 +181,12 @@ pub enum PermissionState {
 #[serde(tag = "event", content = "payload", rename_all = "kebab-case")]
 pub enum AppEvent {
     ModelDownloadProgress(ModelDownloadProgress),
+    /// A model's file has every byte and is being checked against its
+    /// checksum. A `ModelDownloadProgress` at 100 follows if it passes.
+    #[serde(rename_all = "camelCase")]
+    ModelVerifying {
+        model_id: String,
+    },
     /// Another model was made the one that transcribes.
     ActiveModelChanged,
     AudioLevel(f32),
