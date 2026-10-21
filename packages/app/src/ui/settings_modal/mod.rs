@@ -12,7 +12,6 @@ mod sidebar;
 #[cfg(feature = "fixture")]
 pub use sidebar::set_app_version;
 
-use gpui_kit::base::FocusTrapElement as _;
 use gpui_kit::{
     App, AppContext as _, ClickEvent, Context, DismissEvent, Entity, EventEmitter, FocusHandle,
     Global, InteractiveElement as _, IntoElement, KeyDownEvent, ParentElement as _, Render,
@@ -20,8 +19,9 @@ use gpui_kit::{
     px,
 };
 
+use crate::actions::{NextControl, PreviousControl};
 use crate::settings::SettingsStore;
-use crate::ui::hotkey_recorder::{HotkeyKind, HotkeyRecorder, RECORDING_CONTEXT, route_keys};
+use crate::ui::hotkey_recorder::{HotkeyKind, HotkeyRecorder, route_keys};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::focus::{focus_ring, focus_visible};
@@ -150,6 +150,35 @@ impl SettingsModal {
         cx.notify();
     }
 
+    /// Moves the keyboard focus to the next control, or the previous one.
+    /// It goes round inside the settings: the window behind them is out of
+    /// reach for as long as they are open.
+    fn move_focus(&self, forward: bool, window: &mut Window, cx: &mut App) {
+        // Between the last control here and the first come the window's own,
+        // however many there are.
+        let mut first_outside = None;
+        loop {
+            if forward {
+                window.focus_next(cx);
+            } else {
+                window.focus_prev(cx);
+            }
+
+            let Some(focused) = window.focused(cx) else {
+                return;
+            };
+            if self.focus_handle.contains_focused(window, cx) {
+                return;
+            }
+            // All the way round without finding a control here.
+            match &first_outside {
+                Some(first) if *first == focused => return,
+                Some(_) => {}
+                None => first_outside = Some(focused),
+            }
+        }
+    }
+
     fn is_recording_hotkey(&self, cx: &App) -> bool {
         self.hands_free_recorder.read(cx).is_recording()
             || self.hold_to_speak_recorder.read(cx).is_recording()
@@ -242,12 +271,19 @@ impl Render for SettingsModal {
             self.hold_to_speak_recorder.clone(),
         ];
         let overlay = route_keys(div().id("settings-modal"), &recorders)
-            // Tab goes round the controls in here, never out to the window
-            // behind. A recorder takes Tab like any other key.
-            .focus_trap("settings-modal", &self.focus_handle)
-            .when(self.is_recording_hotkey(cx), |overlay| {
-                overlay.key_context(RECORDING_CONTEXT)
+            .track_focus(&self.focus_handle)
+            // A recorder takes Tab like any other key.
+            .key_context(if self.is_recording_hotkey(cx) {
+                "HotkeyRecorder"
+            } else {
+                "Settings"
             })
+            .on_action(cx.listener(|this, _: &NextControl, window, cx| {
+                this.move_focus(true, window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &PreviousControl, window, cx| {
+                this.move_focus(false, window, cx);
+            }))
             // A recorder takes Escape like any other key.
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                 if event.keystroke.key == "escape" && !this.is_recording_hotkey(cx) {
