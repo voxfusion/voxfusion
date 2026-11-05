@@ -57,7 +57,7 @@ export const privacy = {
 		"7.3. Analytics events are retained for up to 12 months from the date of receipt.",
 	"privacy.section8.title": "8. User rights",
 	"privacy.section8.p1":
-		"8.1. Because we do not store your audio or transcripts, the most direct way to delete that data is on your device: delete an entry from the history on the app’s Home screen to delete that transcription and its recording, or use Settings → Privacy → Clear History to delete every transcription and recording. Removing the app does not delete this data by itself; to remove it completely, also delete the ~/Library/Application Support/io.voxfusion.app folder.",
+		"8.1. Because we do not store your audio or transcripts, the most direct way to delete that data is on your device: delete an entry from the history on the app’s Home screen to delete that transcription and its recording, or use Settings → Privacy → Clear History to delete every transcription and recording (wait until any dictation in progress has finished transcribing first, as the recording being processed is kept and saved once it completes). Removing the app does not delete this data by itself; to remove it completely, also delete the ~/Library/Application Support/io.voxfusion.app folder.",
 	"privacy.section8.p2":
 		"8.2. You may also request information about, correction of, or deletion of any personal data the Operator processes, and withdraw consent at any time. Contact: hello@voxfusion.io.",
 	"privacy.section9.title": "9. Policy changes",
