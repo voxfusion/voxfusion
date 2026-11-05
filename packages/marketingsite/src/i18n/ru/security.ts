@@ -2,7 +2,7 @@ export const security = {
 	"security.title": "Security",
 	"security.meta.description":
 		"How VoxFusion protects your data: on-device transcription, no server-side audio processing, signed and notarized builds, and local-only storage.",
-	"security.lastUpdated": "Last updated: May 11, 2026",
+	"security.lastUpdated": "Last updated: November 5, 2026",
 	"security.intro":
 		"Protecting our users’ data is a priority for VoxFusion. VoxFusion is a local-first application — audio is transcribed on-device and never leaves your Mac. This document describes the measures we take to protect information in accordance with Federal Law No. 149-FZ dated July 27, 2006 “On Information, Information Technologies, and Information Protection.”",
 	"security.section1.title": "1. Security architecture",
@@ -18,7 +18,9 @@ export const security = {
 	"security.section2.p2":
 		"2.2. The custom dictionary and app settings are stored locally on the device.",
 	"security.section2.p3":
-		"2.3. Temporary audio buffers are held in memory only and discarded immediately after transcription completes.",
+		"2.3. Audio recordings are saved on the User’s device. While you dictate, the app writes the recording to a file in the recordings folder of its application support directory (~/Library/Application Support/io.voxfusion.app/recordings), protected by the same macOS file-system permissions, and links it to the transcription made from it in the transcription history. The app keeps only the most recent recordings (currently the latest 20) and automatically deletes older ones after each successful transcription; a recording whose transcription failed is kept so that it can be retried. Saving recordings cannot currently be turned off.",
+	"security.section2.p4":
+		"2.4. To delete recordings, delete an entry from the history on the app’s Home screen, which deletes its recording too, or use Settings → Privacy → Clear History, which deletes every saved transcription and every recording kept on the device. Wait until any dictation in progress has finished recording and transcribing before clearing: the recording being processed is kept and its transcription is saved once it completes. Deleted recordings are removed from disk, not moved to the Trash. Removing the app does not delete them by itself; to remove recordings and history completely, also delete the ~/Library/Application Support/io.voxfusion.app folder.",
 	"security.section3.title": "3. Application security",
 	"security.section3.p1":
 		"3.1. The app is signed with an Apple developer certificate and notarized by Apple.",

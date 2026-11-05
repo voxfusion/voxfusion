@@ -2,7 +2,7 @@ export const privacy = {
 	"privacy.title": "Privacy Policy",
 	"privacy.meta.description":
 		"VoxFusion Privacy Policy: transcription runs entirely on your Mac. We never collect, transmit, or store your audio or transcribed text on any server.",
-	"privacy.lastUpdated": "Last updated: May 11, 2026",
+	"privacy.lastUpdated": "Last updated: November 5, 2026",
 	"privacy.intro":
 		"VoxFusion is a local-first application. Voice transcription runs entirely on your Mac. We do not collect, transmit, or store your audio recordings or transcribed text on any server. This Privacy Policy explains the limited data we do process, in accordance with Federal Law No. 152-FZ dated July 27, 2006 “On Personal Data” and other applicable laws of the Russian Federation.",
 	"privacy.section1.title": "1. General provisions",
@@ -50,14 +50,14 @@ export const privacy = {
 		"6.4. Data may be disclosed upon request from authorized government authorities in cases required by Russian law.",
 	"privacy.section7.title": "7. Data retention",
 	"privacy.section7.p1":
-		"7.1. Audio recordings are stored locally on your device; the app keeps only the most recent recordings (currently the latest 20) and automatically deletes older ones after each transcription. They never leave your device.",
+		"7.1. Audio recordings are saved locally on your device, alongside the transcription history. The app keeps only the most recent recordings (currently the latest 20) and automatically deletes older ones after each successful transcription; a recording whose transcription failed is kept so that it can be retried. They never leave your device.",
 	"privacy.section7.p2":
-		"7.2. Transcribed text and dictionary entries are retained on your device until you delete them or uninstall the app. The Operator has no copy.",
+		"7.2. Transcribed text and dictionary entries are retained on your device until you delete them. The Operator has no copy.",
 	"privacy.section7.p3":
 		"7.3. Analytics events are retained for up to 12 months from the date of receipt.",
 	"privacy.section8.title": "8. User rights",
 	"privacy.section8.p1":
-		"8.1. Because we do not store your audio or transcripts, the most direct way to delete that data is to delete it on your device or uninstall the app.",
+		"8.1. Because we do not store your audio or transcripts, the most direct way to delete that data is on your device: delete an entry from the history on the app’s Home screen to delete that transcription and its recording, or use Settings → Privacy → Clear History to delete every transcription and recording (wait until any dictation in progress has finished transcribing first, as the recording being processed is kept and saved once it completes). Removing the app does not delete this data by itself; to remove it completely, also delete the ~/Library/Application Support/io.voxfusion.app folder.",
 	"privacy.section8.p2":
 		"8.2. You may also request information about, correction of, or deletion of any personal data the Operator processes, and withdraw consent at any time. Contact: hello@voxfusion.io.",
 	"privacy.section9.title": "9. Policy changes",
