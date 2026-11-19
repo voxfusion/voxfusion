@@ -1,16 +1,10 @@
 export const common = {
 	"meta.title": "VoxFusion - Free Offline Dictation & Voice to Text for Mac",
 	"meta.description":
-		"Press a shortcut, speak, and your words are typed into any Mac app. Free, open-source dictation that runs on your Mac. Your voice never leaves it.",
+		"VoxFusion is free, open-source dictation for macOS. Hold a key and speak, and it types the text into the app you use. Speech recognition runs on your Mac.",
 
-	"nav.features": "Features",
-	"nav.privacy": "Privacy",
-	"nav.faq": "FAQ",
 	"nav.download": "Download",
 	"nav.github": "GitHub",
-
-	"cta.title": "Say your next email instead of typing it.",
-	"cta.button": "Download for Mac",
 
 	"notFound.title": "Page not found",
 	"notFound.description": "The page you are looking for does not exist or has moved.",
