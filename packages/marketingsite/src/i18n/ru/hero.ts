@@ -1,13 +1,9 @@
 export const hero = {
-	"hero.title.line1": "You talk.",
-	"hero.title.line2": "It types.",
-	"hero.title.line3": "In any Mac app.",
-	"hero.subtitle": "Free and open source. Your voice never leaves your Mac.",
+	"hero.title.line1": "Offline",
+	"hero.title.line2": "dictation",
+	"hero.title.line3": "for Mac.",
+	"hero.subtitle":
+		"Hold Right ⌘ and speak, or press ⌃ ⌥ to start and stop. VoxFusion types the text at your cursor in any app. It is free and open source.",
 	"hero.cta.download": "Download for Mac",
 	"hero.cta.github": "View source",
-	"hero.demo.alt":
-		"Demo: a spoken sentence is transcribed on the Mac and typed into the app in use",
-	"hero.demo.say": "YOU SAY",
-	"hero.demo.stop": "Stop",
-	"hero.demo.replay": "Replay",
 } as const;

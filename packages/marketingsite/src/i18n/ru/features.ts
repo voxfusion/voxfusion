@@ -1,25 +1,15 @@
 export const features = {
-	"features.tag": "Features",
-	"features.title": "Built for people who write all day.",
-	"features.description": "Email, chat, docs, prompts for your coding agent.",
 	"features.window.alt":
 		"The VoxFusion window: today's and yesterday's dictations, each with its time.",
-	"features.onDevice.label": "On device",
-	"features.onDevice.lead": "Runs on your Mac.",
-	"features.onDevice.rest": "Whisper or Parakeet, offline after one download.",
+	"features.offline.label": "Offline",
+	"features.offline.text":
+		"Whisper or Parakeet runs on your Mac. After you download a model, VoxFusion works without internet.",
 	"features.languages.label": "Languages",
-	"features.languages.lead": "99 languages.",
-	"features.languages.rest": "Detected as you speak.",
-	"features.dictionary.label": "Vocabulary",
-	"features.dictionary.lead": "Teach it your words.",
-	"features.dictionary.rest": "Names and jargon come out spelled right.",
-	"features.styles.label": "Styles",
-	"features.styles.lead": "A tone for every app.",
-	"features.styles.rest": "Professional, Casual or Agents. Whisper only.",
-	"features.focus.label": "Focus",
-	"features.focus.lead": "Quiet while you talk.",
-	"features.focus.rest": "Music turns down, then comes back.",
-	"features.history.label": "History",
-	"features.history.lead": "Everything you've said.",
-	"features.history.rest": "Kept on your Mac, one click to copy.",
+	"features.languages.text":
+		"Whisper understands 99 languages. Parakeet understands 25 European languages.",
+	"features.dictionary.label": "Dictionary",
+	"features.dictionary.text": "Add names and terms to help VoxFusion spell them correctly.",
+	"features.private.label": "Private",
+	"features.private.text":
+		"Your audio and text stay on your Mac. Usage analytics are optional and contain no audio or text.",
 } as const;

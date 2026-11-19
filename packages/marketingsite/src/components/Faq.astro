@@ -12,17 +12,11 @@ const items = faqItems(t);
 ---
 
 <div class="faq">
-	<div class="faq-intro" data-umami-view="view_faq">
-		<h2>{t("faq.title")}</h2>
-		<div class="faq-contact">
-			<a href="https://github.com/voxfusion/voxfusion/issues" target="_blank" rel="noopener noreferrer" data-umami-event="faq_github_click">{t("faq.contact.github")} <span aria-hidden="true">→</span></a>
-		</div>
-	</div>
+	<h2 class="faq-title" data-umami-view="view_faq">{t("faq.tag")}</h2>
 	<div class="faq-list">
 		{items.map((item) => (
 			<details class="faq-item">
 				<summary data-umami-event="faq_toggle" data-umami-event-question={item.id}>
-					<span class="faq-index">{item.id}</span>
 					<h3>{item.question}</h3>
 					<span class="faq-marker" aria-hidden="true"></span>
 				</summary>
@@ -30,48 +24,35 @@ const items = faqItems(t);
 			</details>
 		))}
 	</div>
+	<a class="faq-contact" href="https://github.com/voxfusion/voxfusion/issues" target="_blank" rel="noopener noreferrer" data-umami-event="faq_github_click">{t("faq.contact.github")} <span aria-hidden="true">→</span></a>
 </div>
 
 <style>
-	.faq { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr); gap: 72px; align-items: start; }
-	.faq-intro { position: sticky; top: 120px; }
-	.faq-intro h2 { font-size: clamp(26px, 2.8vw, 38px); line-height: 1.3; letter-spacing: -.05em; font-weight: 500; }
-	.faq-contact { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 28px; font-size: 12px; }
-	.faq-contact a { color: #ff754c; border-bottom: 1px solid #5a3424; padding-bottom: 3px; transition: color .2s, border-color .2s; }
-	.faq-contact a:hover { color: #ff9470; border-color: #ff754c; }
-	.faq-contact a span { display: inline-block; transition: transform .2s var(--ease-out); }
-	.faq-contact a:hover span { transform: translateX(3px); }
+	.faq { max-width: 760px; }
+	.faq-title { margin-bottom: 20px; color: #8a8a8a; font-size: 11px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; }
 
-	.faq-list { border-top: 1px solid #343434; }
-	.faq-item { border-bottom: 1px solid #343434; interpolate-size: allow-keywords; }
-	.faq-item summary { display: grid; grid-template-columns: 36px 1fr auto; align-items: baseline; gap: 12px; padding: 22px 4px; cursor: pointer; list-style: none; }
+	.faq-list { border-top: 1px solid #262626; }
+	.faq-item { border-bottom: 1px solid #262626; interpolate-size: allow-keywords; }
+	.faq-item summary { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 20px 0; cursor: pointer; list-style: none; }
 	.faq-item summary::-webkit-details-marker { display: none; }
 	.faq-item summary:hover h3, .faq-item[open] h3 { color: #fff; }
-	.faq-item summary:focus-visible { outline: 2px solid #ff7045; outline-offset: -2px; }
-	.faq-index { font-size: 11px; color: #ff6b3d; }
-	.faq-item h3 { font-size: 16px; font-weight: 500; letter-spacing: -.03em; line-height: 1.5; color: #dcdcdc; text-wrap: pretty; transition: color .2s; }
-	.faq-marker { font-size: 13px; color: #ff6b3d; white-space: nowrap; }
-	.faq-marker::before { content: "[ + ]"; }
-	.faq-item[open] .faq-marker::before { content: "[ − ]"; }
-	.faq-item p { max-width: 640px; padding: 0 4px 26px 52px; color: #a8a8a8; font-size: 13px; line-height: 1.9; }
+	.faq-item summary:focus-visible { outline: 2px solid #ff7045; outline-offset: 2px; }
+	.faq-item h3 { font-size: 15px; font-weight: 400; line-height: 1.5; color: #d4d4d4; text-wrap: pretty; transition: color .2s; }
+	.faq-marker { font-size: 15px; color: #6f6f6f; }
+	.faq-marker::before { content: "+"; }
+	.faq-item[open] .faq-marker::before { content: "−"; }
+	.faq-item p { max-width: 640px; padding-bottom: 22px; color: #a8a8a8; font-size: 13px; line-height: 1.9; }
 	/* Answers slide open where the browser can animate to height: auto. */
-	.faq-item::details-content { block-size: 0; overflow: clip; opacity: 0; transition: block-size .35s var(--ease-out), opacity .35s, content-visibility .35s allow-discrete; }
+	.faq-item::details-content { block-size: 0; overflow: clip; opacity: 0; transition: block-size .3s var(--ease-out), opacity .3s, content-visibility .3s allow-discrete; }
 	.faq-item[open]::details-content { block-size: auto; opacity: 1; }
 
-	@media (max-width: 1050px) {
-		.faq { gap: 44px; }
-	}
-	@media (max-width: 800px) {
-		.faq { grid-template-columns: 1fr; gap: 36px; }
-		.faq-intro { position: static; }
-		.faq-contact { flex-direction: row; flex-wrap: wrap; gap: 14px 28px; margin-top: 22px; }
-	}
+	.faq-contact { display: inline-block; margin-top: 28px; padding-bottom: 3px; border-bottom: 1px solid #3a3a3a; color: #a8a8a8; font-size: 12px; transition: color .2s, border-color .2s; }
+	.faq-contact:hover { color: #fff; border-color: #ff6b3d; }
+
 	@media (max-width: 540px) {
-		.faq-item summary { grid-template-columns: 28px 1fr auto; gap: 10px; padding-block: 20px; }
-		.faq-item h3 { font-size: 15px; }
-		.faq-item p { padding: 0 4px 24px 42px; }
+		.faq-item h3 { font-size: 14px; }
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.faq-item::details-content { transition: none; }
+		.faq-item::details-content, .faq-item h3, .faq-contact { transition: none; }
 	}
 </style>

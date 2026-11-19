@@ -1,12 +1,12 @@
 ---
 /**
  * Shared page shell for the whole site: head (Seo, fonts, favicons),
- * fixed nav with logo, grid overlay, footer, Umami analytics, and the
+ * fixed nav with logo, footer, Umami analytics, and the
  * global base styles every page relies on.
  *
  * Nav variants:
- *   - showNavLinks renders the landing-section / GitHub link group.
- *   - ctaHref + ctaLabel render the bordered CTA on the right.
+ *   - showNavLinks renders the GitHub link.
+ *   - ctaHref + ctaLabel render the text link on the right.
  *   - <slot name="nav-extra" /> renders inside <nav> after .nav-inner
  *     (used by the download page's mobile menu).
  *   - showFooter=false lets a page render its own footer (404).
@@ -62,7 +62,6 @@ const home = getLocalizedPath("/", lang);
 	<title>{title}</title>
 </head>
 <body class={bodyClass}>
-	<div class="grid-overlay" aria-hidden="true"></div>
 
 	<nav class="nav">
 		<div class="nav-inner">
@@ -70,14 +69,9 @@ const home = getLocalizedPath("/", lang);
 				<span class="logo-bracket">[</span>VOX<span class="logo-accent">FUSION</span><span class="logo-bracket">]</span>
 			</a>
 			{showNavLinks && (
-				<div class="nav-links">
-					<a href={`${home}#features`} class="nav-link"><span class="link-index">01</span>{t("nav.features")}</a>
-					<a href={`${home}#privacy`} class="nav-link"><span class="link-index">02</span>{t("nav.privacy")}</a>
-					<a href={`${home}#faq`} class="nav-link"><span class="link-index">03</span>{t("nav.faq")}</a>
-					<a href="https://github.com/voxfusion/voxfusion" target="_blank" rel="noopener noreferrer" class="nav-link"><span class="link-index">04</span>{t("nav.github")}</a>
-				</div>
+				<a href="https://github.com/voxfusion/voxfusion" target="_blank" rel="noopener noreferrer" class="nav-link">{t("nav.github")}</a>
 			)}
-			{ctaHref && ctaLabel && <a href={ctaHref} class="nav-cta">{ctaLabel}</a>}
+			{ctaHref && ctaLabel && <a href={ctaHref} class="nav-link nav-cta">{ctaLabel}</a>}
 		</div>
 		<slot name="nav-extra" />
 	</nav>
@@ -86,28 +80,6 @@ const home = getLocalizedPath("/", lang);
 
 	{showFooter && <Footer lang={lang} />}
 	<Umami />
-	<script is:inline>
-		if ("IntersectionObserver" in window) {
-			// Highlight the nav link of the section crossing the middle of the viewport.
-			var navLinks = {};
-			document.querySelectorAll(".nav-link[href*='#']").forEach(function (link) {
-				navLinks[link.getAttribute("href").split("#")[1]] = link;
-			});
-			var sectionObserver = new IntersectionObserver(
-				function (entries) {
-					entries.forEach(function (entry) {
-						var link = navLinks[entry.target.id];
-						if (link) link.classList.toggle("is-active", entry.isIntersecting);
-					});
-				},
-				{ rootMargin: "-45% 0px -55% 0px" },
-			);
-			Object.keys(navLinks).forEach(function (id) {
-				var section = document.getElementById(id);
-				if (section) sectionObserver.observe(section);
-			});
-		}
-	</script>
 </body>
 </html>
 
@@ -164,17 +136,6 @@ const home = getLocalizedPath("/", lang);
 		text-wrap: balance;
 	}
 
-	.grid-overlay {
-		position: fixed;
-		inset: 0;
-		background-image:
-			linear-gradient(rgba(255,255,255,0.014) 1px, transparent 1px),
-			linear-gradient(90deg, rgba(255,255,255,0.014) 1px, transparent 1px);
-		background-size: 64px 64px;
-		pointer-events: none;
-		z-index: 0;
-	}
-
 	/* Navigation */
 	.nav {
 		position: fixed;
@@ -216,13 +177,10 @@ const home = getLocalizedPath("/", lang);
 		color: #666;
 	}
 
-	.nav-links {
-		display: flex;
-		gap: 32px;
-	}
+	.nav-inner .logo { margin-right: auto; }
 
 	.nav-link {
-		position: relative;
+		margin-left: 32px;
 		font-size: 11px;
 		color: #888;
 		text-transform: uppercase;
@@ -231,65 +189,17 @@ const home = getLocalizedPath("/", lang);
 		transition: color 0.2s;
 	}
 
-	.nav-link::after {
-		content: "";
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: -8px;
-		height: 1px;
-		background: var(--accent);
-		transform: scaleX(0);
-		transform-origin: 0 50%;
-		transition: transform .3s var(--ease-out);
-	}
-
-	.nav-link:hover,
-	.nav-link.is-active {
-		color: #fff;
-	}
-
-	.nav-link.is-active::after {
-		transform: scaleX(1);
-	}
-
-	.link-index {
-		color: #ff3e00;
-		margin-right: 8px;
-	}
-
-	.nav-cta {
-		padding: 10px 16px;
-		border: 1px solid #ff3e00;
-		color: #ff3e00;
-		font-size: 11px;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		white-space: nowrap;
-		transition: all 0.2s;
-	}
-
-	.nav-cta:hover {
-		background: #ff3e00;
-		color: #000;
-	}
+	.nav-link:hover { color: #fff; }
+	.nav-cta { color: #e0e0e0; }
+	.nav-cta:hover { color: #ff4d19; }
 
 	::selection { background: #ff4d19; color: #0a0a0a; }
 	a:focus-visible, button:focus-visible { outline: 2px solid #ff7045; outline-offset: 5px; }
-
-	/* Typewriter (scripts/typewriter.ts): the untyped remainder holds its space, and carries the caret. */
-	.tw-rest { visibility: hidden; }
-	.tw-caret .tw-rest::before { content: ""; position: absolute; width: 2px; height: 1.15em; margin: .22em 0 0 2px; background: var(--accent); visibility: visible; }
 
 	@media (prefers-reduced-motion: reduce) {
 		html { scroll-behavior: auto; }
 		.logo-bracket { transition: none; }
 	}
-	@media (max-width: 1050px) { .nav-inner { padding-inline: 28px; } .nav-links { gap: 20px; } }
-	@media (max-width: 540px) { .nav-inner { padding: 18px 20px; } .logo { font-size: 13px; } .nav-cta { font-size: 10px; padding: 10px 12px; } }
-	@media (max-width: 940px) {
-		.nav-links {
-			display: none;
-		}
-	}
+	@media (max-width: 1050px) { .nav-inner { padding-inline: 28px; } }
+	@media (max-width: 540px) { .nav-inner { padding: 18px 20px; } .logo { font-size: 13px; } .nav-link { margin-left: 20px; font-size: 10px; } }
 </style>

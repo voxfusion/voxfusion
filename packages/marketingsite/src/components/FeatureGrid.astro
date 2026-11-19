@@ -1,8 +1,7 @@
 ---
 /**
- * Features: the app's own window (a real capture, not a drawing; its empty
- * lower edge is cropped away on wide screens), then six lines of text, each
- * a short claim with a quieter second sentence.
+ * The app's own window (a real capture, not a drawing; its empty lower edge
+ * is cropped away on wide screens), then four plain facts under small labels.
  */
 import appWindowPhone from "../assets/app-history-phone.webp";
 import appWindow from "../assets/app-history.webp";
@@ -14,13 +13,9 @@ interface Props {
 
 const { lang = defaultLang } = Astro.props;
 const t = useTranslations(lang);
-const features = (
-	["onDevice", "languages", "dictionary", "styles", "focus", "history"] as const
-).map((key, i) => ({
-	index: `0${i + 1}`,
+const features = (["offline", "languages", "dictionary", "private"] as const).map((key) => ({
 	label: t(`features.${key}.label`),
-	lead: t(`features.${key}.lead`),
-	rest: t(`features.${key}.rest`),
+	text: t(`features.${key}.text`),
 }));
 ---
 
@@ -29,31 +24,27 @@ const features = (
 	<img src={appWindow.src} width={appWindow.width / 3} height={appWindow.height / 3} alt={t("features.window.alt")} loading="lazy" decoding="async" />
 </picture>
 
-<ul class="features">
+<ul class="features" data-umami-view="view_features">
 	{features.map((feature) => (
 		<li>
-			<span class="feature-label"><b>{feature.index}</b>{feature.label}</span>
-			<p><strong>{feature.lead}</strong> {feature.rest}</p>
+			<h2>{feature.label}</h2>
+			<p>{feature.text}</p>
 		</li>
 	))}
 </ul>
 
 <style>
-	.app-window img { display: block; width: 100%; height: auto; aspect-ratio: 1024 / 650; object-fit: cover; object-position: top; border: 1px solid #3b3b3b; box-shadow: 10px 10px 0 #0a0a0a, 11px 11px 0 #272727; }
+	.app-window img { display: block; width: 100%; height: auto; aspect-ratio: 1024 / 650; object-fit: cover; object-position: top; border: 1px solid #2e2e2e; }
 
-	.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 56px; margin-top: 88px; list-style: none; }
-	.features li { min-width: 0; padding-top: 20px; border-top: 1px solid #303030; }
-	.feature-label { display: flex; gap: 14px; margin-bottom: 16px; color: #a3a3a3; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
-	.feature-label b { color: #ff6b3d; font-weight: 400; }
-	.features p { color: #8a8a8a; font-size: 15px; line-height: 1.7; letter-spacing: -.01em; }
-	.features strong { color: #e6e6e6; font-weight: 500; }
+	.features { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 40px; margin-top: 64px; list-style: none; }
+	.features h2 { margin-bottom: 12px; color: #8a8a8a; font-size: 11px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; }
+	.features p { color: #c4c4c4; font-size: 14px; line-height: 1.7; }
 
 	@media (max-width: 1050px) {
-		.features { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 36px; margin-top: 72px; }
+		.features { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px 36px; }
 	}
 	@media (max-width: 540px) {
-		.app-window img { aspect-ratio: auto; box-shadow: 6px 6px 0 #0a0a0a, 7px 7px 0 #272727; }
-		.features { grid-template-columns: 1fr; gap: 28px; margin-top: 56px; }
-		.features p { font-size: 14px; }
+		.app-window img { aspect-ratio: auto; }
+		.features { grid-template-columns: 1fr; gap: 28px; margin-top: 48px; }
 	}
 </style>
