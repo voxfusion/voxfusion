@@ -3,20 +3,20 @@ export const faq = {
 	"faq.contact.github": "Ask on GitHub",
 	"faq.item1.question": "Is VoxFusion free?",
 	"faq.item1.answer":
-		"Yes. It is open source under the MIT license. It has no subscription and needs no account.",
-	"faq.item2.question": "How is it different from the dictation built into macOS?",
+		"VoxFusion is free and open source under the MIT License. You need no subscription and no account to use it.",
+	"faq.item2.question": "How does VoxFusion differ from built-in macOS dictation?",
 	"faq.item2.answer":
-		"It uses Whisper Large v3 Turbo or Parakeet. It uses your dictionary for names and terms, and it keeps a history of your dictations. With Whisper, it can also change the tone of the text for each app.",
-	"faq.item3.question": "Will it work in the app I use?",
+		"VoxFusion transcribes locally with Whisper Large v3 Turbo or Parakeet and keeps a history of your transcriptions. It applies your custom dictionary to names and terms. With Whisper, you can also adjust the tone for each app.",
+	"faq.item3.question": "Does VoxFusion work in any Mac app?",
 	"faq.item3.answer":
-		"If you can type in the app, you can dictate into it. VoxFusion types at your cursor like a keyboard, so it needs no plugins.",
-	"faq.item4.question": "Does it work without internet?",
+		"If you can type in an app, you can dictate into it. VoxFusion types at the cursor like a keyboard and needs no plugins.",
+	"faq.item4.question": "Does VoxFusion work without an internet connection?",
 	"faq.item4.answer":
-		"Yes, after you download a model once. Whisper is about 1.5 GB. Parakeet is about 745 MB.",
-	"faq.item5.question": "Which Macs are supported?",
+		"After you download a model once, VoxFusion works completely offline. Whisper requires approximately 1.5 GB, and Parakeet requires approximately 745 MB.",
+	"faq.item5.question": "Which Macs does VoxFusion support?",
 	"faq.item5.answer":
-		"Apple Silicon and Intel Macs with macOS 11 Big Sur or later. Transcription is faster on Apple Silicon.",
-	"faq.item6.question": "Why does it ask for Accessibility access?",
+		"VoxFusion supports Apple Silicon and Intel Macs with macOS 11 Big Sur or later. Transcription runs faster on Apple Silicon.",
+	"faq.item6.question": "Why does VoxFusion ask for Accessibility permission?",
 	"faq.item6.answer":
-		"macOS requires this access for an app that types into other apps. VoxFusion uses the microphone only while you record.",
+		"macOS requires Accessibility permission for any app that types into other apps. VoxFusion uses your microphone only while you record.",
 } as const;

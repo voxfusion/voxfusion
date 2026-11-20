@@ -1,14 +1,15 @@
 export const downloads = {
-	"downloads.meta.title": "Download VoxFusion for Mac - Free Offline Voice to Text",
+	"downloads.meta.title": "Download VoxFusion for Mac - Free Offline Dictation",
 	"downloads.meta.description":
-		"Download VoxFusion free for macOS (Apple Silicon and Intel). Local, offline voice-to-text dictation: press a hotkey, speak, and text appears in any app.",
+		"Download VoxFusion free for Apple Silicon and Intel Macs. Hold a key to speak, and VoxFusion types your words offline in any app.",
 	"downloads.title": "Download VoxFusion",
-	"downloads.subtitle": "Free for macOS 11 and later. Pick the build that matches your Mac's chip.",
+	"downloads.subtitle":
+		"VoxFusion is free for macOS 11 Big Sur or later. Choose the build for your Mac.",
 	"downloads.hint":
-		"Not sure which one? Open the Apple menu, choose About This Mac, and check the Chip or Processor line.",
+		"To find your Mac chip, open the Apple menu and select About This Mac. Read the Chip or Processor line.",
 	"downloads.macos.title": "macOS",
-	"downloads.macos.latest": "macOS Apple Silicon",
-	"downloads.macos.latest.description": "For Macs with Apple Silicon (M1, M2, M3, M4)",
-	"downloads.macos.intel": "macOS Intel",
-	"downloads.macos.intel.description": "For Intel-based Macs",
+	"downloads.macos.latest": "Apple Silicon",
+	"downloads.macos.latest.description": "Use this build on Macs with Apple Silicon (M1 or later).",
+	"downloads.macos.intel": "Intel",
+	"downloads.macos.intel.description": "Use this build on Macs with an Intel processor.",
 } as const;

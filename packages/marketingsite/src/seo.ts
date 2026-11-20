@@ -7,7 +7,7 @@ export function softwareApplicationSchema(description: string) {
 		name: "VoxFusion",
 		description,
 		url: SITE_URL,
-		downloadUrl: `${SITE_URL}/download`,
+		downloadUrl: `${SITE_URL}/download/`,
 		image: `${SITE_URL}/og.png`,
 		operatingSystem: "macOS",
 		applicationCategory: "UtilitiesApplication",
