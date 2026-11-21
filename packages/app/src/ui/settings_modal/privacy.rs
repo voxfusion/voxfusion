@@ -1,5 +1,5 @@
-//! The Privacy section: whether anonymous usage events are sent, and
-//! deleting the history of transcriptions.
+//! The Privacy section: whether anonymous usage events are sent, whether
+//! transcription history is saved, and deleting the history of transcriptions.
 
 use gpui_kit::{
     App, AsyncApp, ClickEvent, Div, Entity, InteractiveElement as _, ParentElement as _,
@@ -9,7 +9,7 @@ use gpui_kit::{
 use crate::analytics;
 use crate::backend::{self, AppEvent};
 use crate::events;
-use crate::settings::SettingsStore;
+use crate::settings::{self, SettingsStore};
 use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -51,6 +51,73 @@ pub(super) fn render(window: &mut Window, cx: &mut App) -> Div {
                 .type_xs()
                 .text_color(p.txt_hint)
                 .child(text(t(cx, "settings.analyticsNote"))),
+        )
+        .child(history_section(window, cx))
+}
+
+/// Controlling whether future dictations are saved, and clearing existing
+/// saved transcriptions and recordings as a separate action.
+fn history_section(window: &mut Window, cx: &mut App) -> Div {
+    let p = palette(cx);
+    let save_history = SettingsStore::get(cx).save_transcription_history;
+    let save_failed = SettingsStore::save_history_save_failed(cx).then(|| {
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .gap_3()
+            .type_xs()
+            .child(div().flex_1().text_color(p.ac).child(text(format!(
+                "[ERROR] {}",
+                t(cx, "settings.saveHistorySaveFailed")
+            ))))
+            .child(
+                div()
+                    .id("retry-save-history-setting")
+                    .transition_colors()
+                    .flex_shrink_0()
+                    .px_2p5()
+                    .py_1()
+                    .border_1()
+                    .border_color(p.ac)
+                    .text_color(p.ac)
+                    .hover(|button| button.bg(p.ac).text_color(p.ac_on))
+                    .on_click(move |_, _, cx| {
+                        settings::set_save_transcription_history(cx, save_history);
+                    })
+                    .child(text(t_upper(cx, "voiceControl.retry")).tracking_wider()),
+            )
+    });
+
+    div()
+        .pt_6()
+        .border_t_1()
+        .border_color(p.border)
+        .flex()
+        .flex_col()
+        .gap_6()
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .child(toggle_option(
+                    "save-transcription-history",
+                    &t(cx, "settings.saveHistory"),
+                    t(cx, "settings.saveHistoryDescription"),
+                    save_history,
+                    |enabled, _, cx| {
+                        if settings::set_save_transcription_history(cx, enabled) {
+                            analytics::capture(
+                                cx,
+                                "settings_save_transcription_history_changed",
+                                &[("enabled", enabled.into())],
+                            );
+                        }
+                    },
+                    cx,
+                ))
+                .children(save_failed),
         )
         .child(clear_history(window, cx))
 }
@@ -208,9 +275,6 @@ fn clear_history(window: &mut Window, cx: &mut App) -> Div {
     };
 
     div()
-        .pt_6()
-        .border_t_1()
-        .border_color(p.border)
         .flex()
         .flex_col()
         .gap_4()

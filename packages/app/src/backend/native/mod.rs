@@ -16,7 +16,7 @@ mod text;
 mod whisper;
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use crate::backend::{
@@ -161,6 +161,7 @@ impl Backend for NativeBackend {
         bundle_id: Option<String>,
         domain: Option<String>,
         fallback_style: String,
+        retain_recording: bool,
     ) -> CommandResult<TranscriptionResult> {
         let result = whisper::transcribe_audio(
             &self.db,
@@ -169,19 +170,38 @@ impl Backend for NativeBackend {
             bundle_id.as_deref(),
             domain.as_deref(),
             &fallback_style,
+            retain_recording,
         );
 
         crate::memory::release_free_pages();
         result
     }
 
+    fn discard_recording(&self, audio_path: &Path) -> CommandResult<()> {
+        audio::discard_recording(audio_path)
+    }
+
+    fn begin_shutdown(&self) {
+        audio::begin_shutdown();
+    }
+
     fn save_transcription(
         &self,
         result: &TranscriptionResult,
         audio_path: &Path,
-    ) -> CommandResult<Transcription> {
+        may_save: &Mutex<bool>,
+    ) -> CommandResult<Option<Transcription>> {
         let recording = audio::recording_name(audio_path);
-        db::save_transcription(&self.db, result, recording.as_deref())
+        let Some(saved) =
+            db::save_transcription_if(&self.db, result, recording.as_deref(), may_save)?
+        else {
+            audio::discard_recording(audio_path)?;
+            return Ok(None);
+        };
+        // Prune only after the new transcription is persisted so opted-out or
+        // failed dictations never evict older saved recordings.
+        audio::cleanup_old_recordings(audio::RECORDINGS_TO_KEEP);
+        Ok(Some(saved))
     }
 
     fn list_transcriptions(

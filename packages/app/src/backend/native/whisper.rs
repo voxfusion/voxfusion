@@ -113,6 +113,23 @@ fn fetch_dictionary_words(conn: &rusqlite::Connection) -> Option<String> {
     }
 }
 
+/// Deletes `path` when dropped if `active`, so opting out of history leaves no
+/// temporary recording on disk on any exit path (success, error, or panic).
+struct DiscardOnDrop<'a> {
+    path: &'a Path,
+    active: bool,
+}
+
+impl Drop for DiscardOnDrop<'_> {
+    fn drop(&mut self) {
+        if self.active
+            && let Err(err) = audio::discard_recording(self.path)
+        {
+            log::warn!(target: "audio", "discard_recording_failed error={err}");
+        }
+    }
+}
+
 pub fn transcribe_audio(
     db_state: &DbState,
     active: &models::ActiveModel,
@@ -120,8 +137,15 @@ pub fn transcribe_audio(
     bundle_id: Option<&str>,
     domain: Option<&str>,
     fallback_style: &str,
+    retain_recording: bool,
 ) -> Result<TranscriptionResult, String> {
+    // Declared before `_discard` so `_discard` runs first while `audio_path` is
+    // still protected from a concurrent Clear History.
     let _transcribing = audio::transcribing(audio_path);
+    let _discard = DiscardOnDrop {
+        path: audio_path,
+        active: !retain_recording,
+    };
     let (model, model_path, _model_use) = models::begin_transcription(active)?;
 
     let start = std::time::Instant::now();
@@ -149,9 +173,11 @@ pub fn transcribe_audio(
     }?;
     let processing_time_ms = start.elapsed().as_millis() as i64;
 
-    // One successful-transcription lifecycle for both engines. Failures retain
-    // their source audio so the existing Retry action can still use it.
-    audio::cleanup_old_recordings(audio::RECORDINGS_TO_KEEP);
+    // One transcription lifecycle for both engines. When history saving is
+    // off, `_discard` deletes this temporary recording on exit without pruning
+    // older saved recordings. When history saving is on, pruning happens only
+    // after `save_transcription` succeeds so an opt-out mid-transcription
+    // never evicts an older saved recording.
     Ok(TranscriptionResult {
         word_count: text.split_whitespace().count() as i64,
         text,

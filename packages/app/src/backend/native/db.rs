@@ -98,12 +98,11 @@ fn run_migrations(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
-pub fn save_transcription(
-    state: &DbState,
+fn insert_transcription_row(
+    conn: &Connection,
     result: &TranscriptionResult,
     recording: Option<&str>,
 ) -> Result<Transcription, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
@@ -132,6 +131,36 @@ fn row_to_transcription(row: &Row<'_>) -> rusqlite::Result<Transcription> {
         audio_duration_ms: row.get(4)?,
         created_at: row.get(5)?,
     })
+}
+
+/// Inserts a transcription while holding `may_save` across the database commit
+/// so an opt-out cannot race with committing the row.
+pub fn save_transcription_if(
+    state: &DbState,
+    result: &TranscriptionResult,
+    recording: Option<&str>,
+    may_save: &Mutex<bool>,
+) -> Result<Option<Transcription>, String> {
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let allowed = may_save.lock().unwrap_or_else(|e| e.into_inner());
+    if !*allowed {
+        return Ok(None);
+    }
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let saved = insert_transcription_row(&tx, result, recording)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(Some(saved))
+}
+
+#[cfg(test)]
+pub fn save_transcription(
+    state: &DbState,
+    result: &TranscriptionResult,
+    recording: Option<&str>,
+) -> Result<Transcription, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    insert_transcription_row(&conn, result, recording)
 }
 
 /// A page of transcriptions, newest first, older than `cursor` (the

@@ -10,6 +10,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use super::audio;
+
 const BIN_NAME: &str = "crispasr";
 
 /// Resolves the `crispasr` engine binary. Search order:
@@ -51,27 +53,34 @@ fn missing_engine_error() -> String {
 }
 
 /// Writes mono 16 kHz f32 samples as a 16-bit PCM WAV the engine can read,
-/// alongside the source file. Returns the temp path (caller deletes it).
+/// alongside the source file. Held under the audio shutdown gate so shutdown
+/// cannot finish cleanup before this file exists. Returns the temp path
+/// (caller deletes it).
 fn write_temp_wav_16k(audio_path: &Path, samples: &[f32]) -> Result<PathBuf, String> {
-    let temp_path = audio_path.with_extension("parakeet16k.wav");
-    let spec = hound::WavSpec {
-        channels: 1,
-        sample_rate: 16000,
-        bits_per_sample: 16,
-        sample_format: hound::SampleFormat::Int,
-    };
-    let mut writer = hound::WavWriter::create(&temp_path, spec)
-        .map_err(|e| format!("Failed to create temp WAV: {}", e))?;
-    for &sample in samples {
-        let scaled = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
-        writer
-            .write_sample(scaled)
-            .map_err(|e| format!("Failed to write WAV sample: {}", e))?;
-    }
-    writer
-        .finalize()
-        .map_err(|e| format!("Failed to finalize temp WAV: {}", e))?;
-    Ok(temp_path)
+    audio::while_not_shutting_down(|| {
+        let temp_path = audio_path.with_extension("parakeet16k.wav");
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 16000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut writer = hound::WavWriter::create(&temp_path, spec)
+            .map_err(|e| format!("Failed to create temp WAV: {}", e))?;
+        for &sample in samples {
+            let scaled = (sample.clamp(-1.0, 1.0) * 32767.0) as i16;
+            if let Err(e) = writer.write_sample(scaled) {
+                drop(writer);
+                let _ = std::fs::remove_file(&temp_path);
+                return Err(format!("Failed to write WAV sample: {}", e));
+            }
+        }
+        if let Err(e) = writer.finalize() {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(format!("Failed to finalize temp WAV: {}", e));
+        }
+        Ok(temp_path)
+    })
 }
 
 /// Transcribes the given 16 kHz mono samples with the Parakeet GGUF at
@@ -118,9 +127,10 @@ pub fn transcribe(
     })?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let tail: String = stderr.lines().rev().take(5).collect::<Vec<_>>().join(" | ");
-        return Err(format!("Parakeet engine failed: {}", tail.trim()));
+        return Err(match output.status.code() {
+            Some(code) => format!("Parakeet engine failed with exit code {code}."),
+            None => "Parakeet engine terminated unexpectedly.".to_string(),
+        });
     }
 
     let text = String::from_utf8_lossy(&output.stdout).trim().to_string();

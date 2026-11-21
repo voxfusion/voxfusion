@@ -40,6 +40,7 @@ pub struct Settings {
     pub recording_sounds_enabled: bool,
     pub default_style: String,
     pub analytics_enabled: bool,
+    pub save_transcription_history: bool,
     pub onboarding_complete: bool,
     pub onboarding_step: u32,
     pub onboarding_version: u32,
@@ -58,6 +59,7 @@ impl Default for Settings {
             recording_sounds_enabled: false,
             default_style: "default".into(),
             analytics_enabled: true,
+            save_transcription_history: true,
             onboarding_complete: false,
             onboarding_step: 1,
             onboarding_version: CURRENT_ONBOARDING_VERSION,
@@ -115,6 +117,8 @@ impl Settings {
                 .unwrap_or(defaults.recording_sounds_enabled),
             default_style,
             analytics_enabled: parse(get("analyticsEnabled")).unwrap_or(defaults.analytics_enabled),
+            save_transcription_history: parse(get("saveTranscriptionHistory"))
+                .unwrap_or(defaults.save_transcription_history),
             onboarding_complete,
             onboarding_step: normalize_onboarding_step(
                 parse(get("onboardingStep")).unwrap_or(defaults.onboarding_step),
@@ -154,6 +158,10 @@ pub struct SettingsStore {
     /// Everything in the file, including keys this version does not know.
     stored: Map<String, Value>,
     path: Option<PathBuf>,
+    /// Set when changing `save_transcription_history` could not be written to
+    /// `settings.json`, cleared once a write succeeds or the setting matches
+    /// what is on disk again.
+    save_history_save_failed: bool,
 }
 
 struct GlobalSettings(Entity<SettingsStore>);
@@ -170,15 +178,17 @@ impl SettingsStore {
 
         let mut settings = Settings::from_stored(&stored);
         if unreadable {
-            // The file holds the user's analytics choice. When it cannot be
-            // read, the choice is unknown, and unknown must not mean yes.
+            // The file holds the user's privacy choices. When it cannot be
+            // read, those choices are unknown, and unknown must not mean yes.
             settings.analytics_enabled = false;
+            settings.save_transcription_history = false;
         }
 
         let store = cx.new(|_| SettingsStore {
             settings,
             stored,
             path,
+            save_history_save_failed: false,
         });
 
         // Normalizing may have changed the stored onboarding step or version.
@@ -196,6 +206,13 @@ impl SettingsStore {
 
     pub fn settings(&self) -> &Settings {
         &self.settings
+    }
+
+    pub fn save_history_save_failed(cx: &App) -> bool {
+        cx.global::<GlobalSettings>()
+            .0
+            .read(cx)
+            .save_history_save_failed
     }
 
     /// Changes the settings, saves them and notifies observers. Returns false
@@ -217,20 +234,25 @@ impl SettingsStore {
     }
 
     /// Writes the settings to the file. Returns false when that failed.
+    /// `self.stored` is updated only after a write succeeds so a failed write
+    /// is retried on the next save attempt.
     fn save(&mut self) -> bool {
         let Ok(Value::Object(current)) = serde_json::to_value(&self.settings) else {
             return false;
         };
 
+        let mut next_stored = self.stored.clone();
         let mut changed = false;
         for (key, value) in current {
-            if self.stored.get(&key) != Some(&value) {
-                self.stored.insert(key, value);
+            if next_stored.get(&key) != Some(&value) {
+                next_stored.insert(key, value);
                 changed = true;
             }
         }
 
         let Some(path) = self.path.as_ref().filter(|_| changed) else {
+            self.stored = next_stored;
+            self.save_history_save_failed = false;
             return true;
         };
 
@@ -238,9 +260,13 @@ impl SettingsStore {
             let _ = std::fs::create_dir_all(parent);
         }
 
-        match serde_json::to_string_pretty(&self.stored) {
+        match serde_json::to_string_pretty(&next_stored) {
             Ok(contents) => match std::fs::write(path, contents) {
-                Ok(()) => true,
+                Ok(()) => {
+                    self.stored = next_stored;
+                    self.save_history_save_failed = false;
+                    true
+                }
                 Err(error) => {
                     log::error!(target: "settings", "save_failed error={error}");
                     false
@@ -252,6 +278,20 @@ impl SettingsStore {
             }
         }
     }
+}
+
+/// Updates whether future dictations are saved to history and persists the
+/// choice to `settings.json`. Returns false if writing the file failed, in
+/// which case the choice still applies to the running session and the failure
+/// is surfaced in Privacy settings so the user can retry.
+pub fn set_save_transcription_history(cx: &mut App, enabled: bool) -> bool {
+    SettingsStore::entity(cx).update(cx, |store, cx: &mut Context<SettingsStore>| {
+        store.settings.save_transcription_history = enabled;
+        let saved = store.save();
+        store.save_history_save_failed = !saved;
+        cx.notify();
+        saved
+    })
 }
 
 /// Muting and muffling are alternatives: turning one on turns the other off.

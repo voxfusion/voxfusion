@@ -784,7 +784,9 @@ impl HomePage {
 
     fn render_list(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette(cx);
-        let hotkey = hotkey_display_name(&SettingsStore::get(cx).hotkey);
+        let settings = SettingsStore::get(cx);
+        let hotkey = hotkey_display_name(&settings.hotkey);
+        let save_history = settings.save_transcription_history;
         let has_items = !self.transcriptions.is_empty();
         let search_pending = self.search_pending();
         let showing_search = self.showing_search_results();
@@ -887,6 +889,22 @@ impl HomePage {
                         ),
                 );
             } else {
+                let empty_message = if save_history {
+                    div().type_sm().text_color(p.txt_muted).child(
+                        text(t_with(
+                            cx,
+                            "transcriptionList.useCommandToRecord",
+                            &[("hotkey", &hotkey)],
+                        ))
+                        .center(),
+                    )
+                } else {
+                    div()
+                        .type_sm()
+                        .text_color(p.txt_hint)
+                        .child(text(t(cx, "transcriptionList.historyPaused")).center())
+                };
+
                 list = list.child(
                     div()
                         .py_12()
@@ -900,21 +918,27 @@ impl HomePage {
                                 .text_color(p.txt_secondary)
                                 .child(text("[INFO] NO_TRANSCRIPTIONS").center()),
                         )
-                        .child(
-                            div().type_sm().text_color(p.txt_muted).child(
-                                text(t_with(
-                                    cx,
-                                    "transcriptionList.useCommandToRecord",
-                                    &[("hotkey", &hotkey)],
-                                ))
-                                .center(),
-                            ),
-                        ),
+                        .child(empty_message),
                 );
             }
         }
 
         if !self.initial_loading && has_items {
+            if !save_history {
+                list = list.child(
+                    div().relative().child(above_grid(cx)).child(
+                        div()
+                            .px_3()
+                            .py_2()
+                            .bg(p.surface)
+                            .border_1()
+                            .border_color(p.border)
+                            .type_xs()
+                            .text_color(p.txt_hint)
+                            .child(text(t(cx, "home.historyPaused"))),
+                    ),
+                );
+            }
             for (label, items) in self.groups(cx) {
                 let mut cards = div().bg(p.surface).border_1().border_color(p.border);
                 for (index, transcription) in items.iter().enumerate() {

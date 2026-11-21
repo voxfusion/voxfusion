@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub type CommandResult<T> = Result<T, String>;
 
@@ -320,20 +320,34 @@ pub trait Backend: Send + Sync + 'static {
     fn request_muffle_permission(&self);
 
     // ---- transcription ----
+    /// Transcribes the recording at `audio_path`. When `retain_recording` is
+    /// false, the recording is deleted as soon as transcription finishes,
+    /// whether it succeeds or fails, without pruning older saved recordings.
     fn transcribe_audio(
         &self,
         audio_path: PathBuf,
         bundle_id: Option<String>,
         domain: Option<String>,
         fallback_style: String,
+        retain_recording: bool,
     ) -> CommandResult<TranscriptionResult>;
+    /// Deletes a recording that is not kept in history, such as a cancelled
+    /// recording or one opted out of retention.
+    fn discard_recording(&self, audio_path: &Path) -> CommandResult<()>;
+    /// Prevents new recordings or temporary transcription scratch files from
+    /// being created once application shutdown begins.
+    fn begin_shutdown(&self) {}
     /// Saves `result` to the history along with the recording at
     /// `audio_path` it was transcribed from, which goes when it is deleted.
+    /// Holds `may_save` across the storage commit so an opt-out cannot overlap
+    /// with persisting the row; if `may_save` is false, discards `audio_path`
+    /// instead and returns `Ok(None)`.
     fn save_transcription(
         &self,
         result: &TranscriptionResult,
         audio_path: &Path,
-    ) -> CommandResult<Transcription>;
+        may_save: &Mutex<bool>,
+    ) -> CommandResult<Option<Transcription>>;
     fn list_transcriptions(
         &self,
         limit: i64,
