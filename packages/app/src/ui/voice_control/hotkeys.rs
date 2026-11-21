@@ -7,6 +7,8 @@
 use gpui_kit::{AsyncApp, Context, EventEmitter, Result, Subscription, Task, WeakEntity};
 use std::time::Duration;
 
+use global_hotkey::hotkey::HotKey;
+
 use crate::backend::{self, AppEvent, ShortcutState, SystemKey};
 use crate::events;
 use crate::settings::{DEFAULT_HOLD_TO_SPEAK_HOTKEY, DEFAULT_HOTKEY, Settings};
@@ -131,34 +133,59 @@ impl SystemHotkey {
 }
 
 /// The hotkeys in `settings`, with the default in place of one that neither
-/// backend can register.
-pub fn dictation_hotkeys(settings: &Settings) -> (String, String) {
-    let valid_or = |hotkey: &str, default: &str| {
-        if is_valid_hotkey(hotkey) {
-            hotkey.to_string()
-        } else {
-            default.to_string()
-        }
+/// backend can register. Hold-to-speak is optional and stays unset when cleared.
+pub fn dictation_hotkeys(settings: &Settings) -> (String, Option<String>) {
+    let toggle = if is_valid_hotkey(&settings.hotkey) {
+        settings.hotkey.clone()
+    } else {
+        DEFAULT_HOTKEY.to_string()
     };
 
-    (
-        valid_or(&settings.hotkey, DEFAULT_HOTKEY),
-        valid_or(&settings.hold_to_speak_hotkey, DEFAULT_HOLD_TO_SPEAK_HOTKEY),
-    )
+    let hold = settings
+        .hold_to_speak_hotkey
+        .as_deref()
+        .filter(|hotkey| !hotkey.trim().is_empty())
+        .map(|hotkey| {
+            if is_valid_hotkey(hotkey) {
+                hotkey.to_string()
+            } else {
+                DEFAULT_HOLD_TO_SPEAK_HOTKEY.to_string()
+            }
+        });
+
+    (toggle, hold)
 }
 
 /// What to do about the dictation hotkeys after something they depend on
 /// changed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HotkeyPlan {
-    Register { toggle: String, hold: String },
+    Register {
+        toggle: String,
+        hold: Option<String>,
+    },
     Unregister,
     Keep,
 }
 
+/// Whether two hotkey strings name the same OS shortcut (for example
+/// `Command+Shift+K` and `Shift+Command+K`, or `Command+K` and `Cmd+K`).
+fn same_shortcut(a: &str, b: &str) -> bool {
+    if a == b {
+        return true;
+    }
+    if let (Some(a), Some(b)) = (system_keys_from_hotkey(a), system_keys_from_hotkey(b)) {
+        return a.iter().all(|key| b.contains(key)) && b.iter().all(|key| a.contains(key));
+    }
+    if let (Ok(a), Ok(b)) = (a.parse::<HotKey>(), b.parse::<HotKey>()) {
+        return a.id() == b.id();
+    }
+    false
+}
+
 /// Identifies a pair of dictation hotkeys.
-fn registration_key(toggle: &str, hold: &str) -> String {
-    format!("{toggle}|{hold}")
+fn registration_key(toggle: &str, hold: Option<&str>) -> String {
+    format!("{toggle}|{}", hold.unwrap_or_default())
 }
 
 /// `live` says whether dictation may be started at all; `registered` is
@@ -166,7 +193,7 @@ fn registration_key(toggle: &str, hold: &str) -> String {
 pub fn hotkey_plan(
     live: bool,
     toggle: &str,
-    hold: &str,
+    hold: Option<&str>,
     registered: Option<&str>,
     force: bool,
 ) -> HotkeyPlan {
@@ -177,7 +204,7 @@ pub fn hotkey_plan(
     if force || registered != Some(registration_key(toggle, hold).as_str()) {
         HotkeyPlan::Register {
             toggle: toggle.to_string(),
-            hold: hold.to_string(),
+            hold: hold.map(str::to_string),
         }
     } else {
         HotkeyPlan::Keep
@@ -195,8 +222,12 @@ struct DictationHotkey {
 /// Registers the shortcuts and turns their key events into [`HotkeyEvent`]s.
 pub struct Hotkeys {
     dictation: Vec<DictationHotkey>,
-    /// The pair of hotkeys last registered successfully.
+    /// The pair of hotkeys last asked for (and registered once pending work
+    /// finishes), or `None` when unregistered or a registration failed.
     registered: Option<String>,
+    /// Incremented on every dictation change so stale async work skips itself
+    /// and never overwrites a newer request's `registered` key.
+    generation: u64,
     escape: bool,
     /// The registration changes still to be made, in the order asked for.
     pending: Task<()>,
@@ -210,6 +241,7 @@ impl Hotkeys {
         Self {
             dictation: Vec::new(),
             registered: None,
+            generation: 0,
             escape: false,
             pending: Task::ready(()),
             _subscription: cx.subscribe(&events::hub(cx), |this, _, event, cx| {
@@ -223,17 +255,38 @@ impl Hotkeys {
     }
 
     /// Replaces the dictation hotkeys. One hotkey given for both is the
-    /// hands-free hotkey.
-    pub fn register_dictation(&mut self, toggle: String, hold: String, cx: &mut Context<Self>) {
+    /// hands-free hotkey. When `force` is false, any shortcut that is unchanged
+    /// keeps its existing registration without interruption.
+    pub fn register_dictation(
+        &mut self,
+        toggle: String,
+        hold: Option<String>,
+        force: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let key = registration_key(&toggle, hold.as_deref());
+        self.generation += 1;
+        let generation = self.generation;
+        self.registered = Some(key.clone());
+
         self.enqueue(cx, async move |this, cx| {
-            Self::replace_dictation(&this, cx, toggle, hold).await.ok();
+            Self::replace_dictation(&this, cx, toggle, hold, key, force, generation)
+                .await
+                .ok();
         });
     }
 
     pub fn unregister_dictation(&mut self, cx: &mut Context<Self>) {
+        self.generation += 1;
+        let generation = self.generation;
+        self.registered = None;
+
         self.enqueue(cx, async move |this, cx| {
-            if Self::release_dictation(&this, cx).await.is_ok() {
-                this.update(cx, |this, _| this.registered = None).ok();
+            let current = this
+                .update(cx, |this, _| this.generation == generation)
+                .unwrap_or(false);
+            if current {
+                let _ = Self::release_dictation(&this, cx).await;
             }
         });
     }
@@ -277,22 +330,92 @@ impl Hotkeys {
         });
     }
 
+    fn current_registration_key(dictation: &[DictationHotkey]) -> Option<String> {
+        let toggle = dictation
+            .iter()
+            .find(|hotkey| hotkey.role == HotkeyRole::Toggle)?;
+        let hold = dictation
+            .iter()
+            .find(|hotkey| hotkey.role == HotkeyRole::Hold)
+            .map(|hotkey| hotkey.hotkey.as_str());
+        Some(registration_key(&toggle.hotkey, hold))
+    }
+
     async fn replace_dictation(
         this: &WeakEntity<Self>,
         cx: &mut AsyncApp,
         toggle: String,
-        hold: String,
+        hold: Option<String>,
+        key: String,
+        force: bool,
+        generation: u64,
     ) -> Result<()> {
-        Self::release_dictation(this, cx).await?;
-
-        let key = registration_key(&toggle, &hold);
         let mut wanted = vec![(toggle, HotkeyRole::Toggle)];
-        if hold != wanted[0].0 {
+        if let Some(hold) = hold
+            && !same_shortcut(&hold, &wanted[0].0)
+        {
             wanted.push((hold, HotkeyRole::Hold));
         }
 
-        let mut dictation = Vec::new();
-        for (hotkey, role) in wanted {
+        let Some((removed, to_register)) = this.update(cx, |this, _| {
+            if this.generation != generation {
+                return None;
+            }
+
+            if force {
+                let removed = std::mem::take(&mut this.dictation);
+                return Some((removed, wanted));
+            }
+
+            let mut kept = Vec::new();
+            let mut removed = Vec::new();
+            for existing in std::mem::take(&mut this.dictation) {
+                if wanted
+                    .iter()
+                    .any(|(hotkey, role)| existing.hotkey == *hotkey && existing.role == *role)
+                {
+                    kept.push(existing);
+                } else {
+                    removed.push(existing);
+                }
+            }
+
+            // Unregistering a removed global shortcut drops any kept entry that
+            // shares the same OS shortcut identity (such as different modifier
+            // spelling or order), so re-register any kept entry that collides.
+            let mut safe_kept = Vec::new();
+            for existing in kept {
+                let collides = existing.system.is_none()
+                    && removed.iter().any(|other| {
+                        other.system.is_none() && same_shortcut(&existing.hotkey, &other.hotkey)
+                    });
+                if collides {
+                    removed.push(existing);
+                } else {
+                    safe_kept.push(existing);
+                }
+            }
+
+            let to_register: Vec<_> = wanted
+                .into_iter()
+                .filter(|(hotkey, role)| {
+                    !safe_kept
+                        .iter()
+                        .any(|existing| existing.hotkey == *hotkey && existing.role == *role)
+                })
+                .collect();
+
+            this.dictation = safe_kept;
+            Some((removed, to_register))
+        })?
+        else {
+            return Ok(());
+        };
+
+        Self::unregister_shortcuts(cx, removed).await;
+
+        let mut added = Vec::new();
+        for (hotkey, role) in to_register {
             let system_keys = system_keys_from_hotkey(&hotkey);
             let modifier_only = system_keys.is_some();
 
@@ -311,11 +434,17 @@ impl Hotkeys {
 
             if let Err(error) = registration.await {
                 log::error!(target: "voice", "hotkey_registration_failed hotkey={hotkey} error={error}");
-                Self::unregister_shortcuts(cx, dictation).await;
+                Self::unregister_shortcuts(cx, added).await;
+                this.update(cx, |this, _| {
+                    if this.generation == generation {
+                        this.registered = Self::current_registration_key(&this.dictation);
+                    }
+                })
+                .ok();
                 return Ok(());
             }
 
-            dictation.push(DictationHotkey {
+            added.push(DictationHotkey {
                 hotkey,
                 role,
                 system: system_keys.map(SystemHotkey::new),
@@ -323,10 +452,18 @@ impl Hotkeys {
             });
         }
 
-        this.update(cx, |this, _| {
-            this.dictation = dictation;
+        let stale = this.update(cx, |this, _| {
+            if this.generation != generation {
+                return Some(added);
+            }
+            this.dictation.extend(added);
             this.registered = Some(key);
-        })
+            None
+        })?;
+        if let Some(stale) = stale {
+            Self::unregister_shortcuts(cx, stale).await;
+        }
+        Ok(())
     }
 
     /// Stops listening to the dictation hotkeys.
@@ -397,6 +534,7 @@ impl Hotkeys {
     ) {
         for index in 0..self.dictation.len() {
             let hotkey = &mut self.dictation[index];
+            let role = hotkey.role;
             let Some(system) = hotkey.system.as_mut() else {
                 continue;
             };
@@ -406,26 +544,30 @@ impl Hotkeys {
                 Reaction::AwaitStability => {
                     hotkey.stability_timer = Some(cx.spawn(async move |this, cx| {
                         cx.background_executor().timer(MATCH_STABILITY).await;
-                        this.update(cx, |this, cx| this.stabilized(index, cx)).ok();
+                        this.update(cx, |this, cx| this.stabilized(role, cx)).ok();
                     }));
                 }
                 Reaction::Cancelled { released } => {
                     hotkey.stability_timer = None;
                     if released {
-                        cx.emit(HotkeyEvent::Released(hotkey.role));
+                        cx.emit(HotkeyEvent::Released(role));
                     }
                 }
             }
         }
     }
 
-    fn stabilized(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some(hotkey) = self.dictation.get_mut(index) else {
+    fn stabilized(&mut self, role: HotkeyRole, cx: &mut Context<Self>) {
+        let Some(hotkey) = self
+            .dictation
+            .iter_mut()
+            .find(|hotkey| hotkey.role == role)
+        else {
             return;
         };
 
         if hotkey.system.as_mut().is_some_and(SystemHotkey::stabilized) {
-            cx.emit(HotkeyEvent::Pressed(hotkey.role));
+            cx.emit(HotkeyEvent::Pressed(role));
         }
     }
 }
@@ -573,13 +715,13 @@ mod tests {
     fn hotkeys_that_cannot_be_registered_fall_back_to_the_defaults() {
         let settings = Settings {
             hotkey: "K".into(),
-            hold_to_speak_hotkey: "Alt+Space".into(),
+            hold_to_speak_hotkey: Some("Alt+Space".into()),
             ..Settings::default()
         };
 
         assert_eq!(
             dictation_hotkeys(&settings),
-            (DEFAULT_HOTKEY.to_string(), "Alt+Space".to_string())
+            (DEFAULT_HOTKEY.to_string(), Some("Alt+Space".to_string()))
         );
     }
 
@@ -587,22 +729,28 @@ mod tests {
     fn hotkeys_are_registered_when_they_change_and_dictation_is_live() {
         let register = HotkeyPlan::Register {
             toggle: "A".into(),
-            hold: "B".into(),
+            hold: Some("B".into()),
         };
 
-        assert_eq!(hotkey_plan(true, "A", "B", None, false), register);
-        assert_eq!(hotkey_plan(true, "A", "B", Some("A|C"), false), register);
+        assert_eq!(hotkey_plan(true, "A", Some("B"), None, false), register);
         assert_eq!(
-            hotkey_plan(true, "A", "B", Some("A|B"), false),
+            hotkey_plan(true, "A", Some("B"), Some("A|C"), false),
+            register
+        );
+        assert_eq!(
+            hotkey_plan(true, "A", Some("B"), Some("A|B"), false),
             HotkeyPlan::Keep
         );
-        assert_eq!(hotkey_plan(true, "A", "B", Some("A|B"), true), register);
         assert_eq!(
-            hotkey_plan(false, "A", "B", Some("A|B"), true),
+            hotkey_plan(true, "A", Some("B"), Some("A|B"), true),
+            register
+        );
+        assert_eq!(
+            hotkey_plan(false, "A", Some("B"), Some("A|B"), true),
             HotkeyPlan::Unregister
         );
         assert_eq!(
-            hotkey_plan(false, "A", "B", None, false),
+            hotkey_plan(false, "A", Some("B"), None, false),
             HotkeyPlan::Unregister
         );
     }

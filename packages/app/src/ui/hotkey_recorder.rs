@@ -7,7 +7,7 @@
 
 use gpui_kit::{
     App, Context, Entity, EntityId, Global, InteractiveElement, KeyDownEvent, KeyUpEvent,
-    Modifiers, ModifiersChangedEvent, SharedString, Subscription,
+    Modifiers, ModifiersChangedEvent, SharedString, Subscription, Task,
 };
 
 use crate::backend::{self, AppEvent, SystemKey, command_error};
@@ -36,7 +36,7 @@ impl HotkeyKind {
     fn save(self, hotkey: String, cx: &mut App) {
         SettingsStore::update(cx, |settings| match self {
             HotkeyKind::HandsFree => settings.hotkey = hotkey,
-            HotkeyKind::HoldToSpeak => settings.hold_to_speak_hotkey = hotkey,
+            HotkeyKind::HoldToSpeak => settings.hold_to_speak_hotkey = Some(hotkey),
         });
     }
 }
@@ -183,6 +183,7 @@ pub struct HotkeyRecorder {
     /// The modifiers as of the latest change, to tell presses from releases.
     modifiers: Modifiers,
     starting_watcher: bool,
+    start_task: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -206,6 +207,7 @@ impl HotkeyRecorder {
             error: None,
             modifiers: Modifiers::default(),
             starting_watcher: false,
+            start_task: None,
             _subscriptions: subscriptions,
         }
     }
@@ -233,6 +235,25 @@ impl HotkeyRecorder {
         }
     }
 
+    /// Disables the optional hold-to-speak hotkey, ending any in-progress
+    /// recording or error on this recorder.
+    pub fn clear(&mut self, cx: &mut Context<Self>) {
+        if self.kind != HotkeyKind::HoldToSpeak {
+            return;
+        }
+
+        self.start_task = None;
+        self.starting_watcher = false;
+        self.error = None;
+        if self.recording {
+            self.finish_recording(cx);
+        }
+        SettingsStore::update(cx, |settings| {
+            settings.hold_to_speak_hotkey = None;
+        });
+        cx.notify();
+    }
+
     fn start_recording(&mut self, cx: &mut Context<Self>) {
         let recorder = cx.entity_id();
         if !cx.default_global::<ActiveRecorder>().is_free_for(recorder) {
@@ -247,11 +268,12 @@ impl HotkeyRecorder {
         self.starting_watcher = true;
 
         let watcher = backend::call(cx, |backend| backend.start_system_key_watcher());
-        cx.spawn(async move |this, cx| {
+        self.start_task = Some(cx.spawn(async move |this, cx| {
             let started = watcher.await;
 
             this.update(cx, |this, cx| {
                 this.starting_watcher = false;
+                this.start_task = None;
 
                 if let Err(error) = started {
                     this.error = Some(command_error("start_system_key_watcher", &error).into());
@@ -267,8 +289,7 @@ impl HotkeyRecorder {
                 cx.notify();
             })
             .ok();
-        })
-        .detach();
+        }));
     }
 
     /// Ends the recording and lets another recorder start. Every way out of

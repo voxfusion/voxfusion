@@ -13,8 +13,9 @@ use crate::ui::hotkeys::hotkey_display_name;
 use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::focus::{focus_ring, focus_visible, keyed_focus_handle};
 use crate::ui::widgets::icon;
-use crate::ui::{t, upper};
+use crate::ui::{t, t_upper, upper};
 
 pub struct HotkeyStep {
     hands_free: Entity<HotkeyRecorder>,
@@ -22,6 +23,8 @@ pub struct HotkeyStep {
     /// Holds the keyboard focus while a hotkey is recorded, so the keys
     /// pressed reach the recorders.
     focus_handle: FocusHandle,
+    /// Window-bound recorder observers are attached on the first render.
+    observing_recorders: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -30,18 +33,48 @@ impl HotkeyStep {
         let hands_free = cx.new(|cx| HotkeyRecorder::new(HotkeyKind::HandsFree, cx));
         let hold_to_speak = cx.new(|cx| HotkeyRecorder::new(HotkeyKind::HoldToSpeak, cx));
 
-        let subscriptions = vec![
-            cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
-            cx.observe(&hands_free, |_, _, cx| cx.notify()),
-            cx.observe(&hold_to_speak, |_, _, cx| cx.notify()),
-        ];
+        let subscriptions = vec![cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify())];
 
         Self {
             hands_free,
             hold_to_speak,
             focus_handle: cx.focus_handle(),
+            observing_recorders: false,
             _subscriptions: subscriptions,
         }
+    }
+
+    /// While a hotkey is recorded every key belongs to it: the focus leaves
+    /// whatever control had it (even if Tab moved it while the watcher was
+    /// starting), so keys reach `route_keys` and Enter or Space cannot press
+    /// a button.
+    fn recorder_changed(
+        &mut self,
+        recorder: Entity<HotkeyRecorder>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if recorder.read(cx).is_recording() {
+            window.focus(&self.focus_handle, cx);
+        }
+        cx.notify();
+    }
+
+    fn ensure_recorder_observers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.observing_recorders {
+            return;
+        }
+        self.observing_recorders = true;
+        self._subscriptions.push(cx.observe_in(
+            &self.hands_free,
+            window,
+            Self::recorder_changed,
+        ));
+        self._subscriptions.push(cx.observe_in(
+            &self.hold_to_speak,
+            window,
+            Self::recorder_changed,
+        ));
     }
 
     /// One hotkey: its name, what it is (or what has been pressed while
@@ -53,23 +86,30 @@ impl HotkeyStep {
         &self,
         id: &'static str,
         name: SharedString,
-        hotkey: &str,
+        hotkey: Option<&str>,
         record_label: SharedString,
+        allow_disable: bool,
         recorder: &Entity<HotkeyRecorder>,
         other: &Entity<HotkeyRecorder>,
         first: bool,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement + use<> {
         let p = palette(cx);
         let state = recorder.read(cx);
         let recording = state.is_recording();
         let error = state.error();
-        let shown: SharedString = if !recording {
-            hotkey_display_name(hotkey).into()
-        } else if state.pending_hotkey().is_empty() {
-            t(cx, "onboarding.pressKeys")
+        let (shown, is_unset): (SharedString, bool) = if recording {
+            let pending = if state.pending_hotkey().is_empty() {
+                t(cx, "onboarding.pressKeys")
+            } else {
+                state.pending_hotkey().to_string().into()
+            };
+            (pending, false)
+        } else if let Some(hotkey) = hotkey {
+            (hotkey_display_name(hotkey).into(), false)
         } else {
-            state.pending_hotkey().to_string().into()
+            (t(cx, "settings.hotkeyDisabled"), true)
         };
 
         let other = other.read(cx);
@@ -83,9 +123,44 @@ impl HotkeyStep {
             }
         };
 
+        let button_focus = keyed_focus_handle(id, window, cx);
+        let disable_action = (allow_disable && hotkey.is_some()).then(|| {
+            let disable_focus = keyed_focus_handle("disable-hold-to-speak", window, cx);
+            let disable_recorder = recorder.clone();
+            let next_focus = button_focus.clone();
+
+            div()
+                .id("disable-hold-to-speak")
+                .transition_colors()
+                .when(!disabled, |button| button.track_focus(&disable_focus))
+                .relative()
+                .type_xs()
+                .text_color(shade(p.txt_secondary))
+                .when(!disabled, |button| {
+                    button
+                        .hover(move |button| button.text_color(p.ac))
+                        .on_click(move |_, window, cx| {
+                            disable_recorder.update(cx, |recorder, cx| recorder.clear(cx));
+                            // Removing this button would drop keyboard focus; move
+                            // it to the shortcut button so Tab keeps working.
+                            window.focus(&next_focus, cx);
+                        })
+                })
+                .child(
+                    text(t_upper(cx, "settings.disableHotkey"))
+                        .tracking_wider()
+                        .nowrap(),
+                )
+                .when(!disabled && focus_visible(&disable_focus, window), |button| {
+                    button.child(focus_ring(4., cx))
+                })
+        });
+
         let button = div()
             .id(id)
             .transition_colors()
+            .when(!disabled, |button| button.track_focus(&button_focus))
+            .relative()
             .px_6()
             .py_3()
             .type_sm()
@@ -96,16 +171,20 @@ impl HotkeyStep {
                         .border_1()
                         .border_color(shade(p.border_strong))
                         .text_color(shade(p.txt_secondary))
-                        .hover(move |button| {
-                            button
-                                .border_color(shade(p.ac))
-                                .text_color(shade(p.txt_primary))
+                        .when(!disabled, |button| {
+                            button.hover(move |button| {
+                                button
+                                    .border_color(shade(p.ac))
+                                    .text_color(shade(p.txt_primary))
+                            })
                         })
                 } else {
                     button
                         .bg(shade(p.ac))
                         .text_color(shade(p.ac_on))
-                        .hover(move |button| button.bg(shade(p.ac_hover)))
+                        .when(!disabled, |button| {
+                            button.hover(move |button| button.bg(shade(p.ac_hover)))
+                        })
                 }
             })
             .when(!disabled, |button| {
@@ -118,7 +197,10 @@ impl HotkeyStep {
                 t(cx, "settings.cancel")
             } else {
                 record_label
-            }));
+            }))
+            .when(!disabled && focus_visible(&button_focus, window), |button| {
+                button.child(focus_ring(4., cx))
+            });
 
         div()
             .flex()
@@ -127,9 +209,17 @@ impl HotkeyStep {
             .child(
                 div()
                     .when(!first, |label| label.pt_4())
-                    .type_xs()
-                    .text_color(p.txt_muted)
-                    .child(text(upper(&name)).tracking_wider()),
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_2()
+                    .child(
+                        div()
+                            .type_xs()
+                            .text_color(p.txt_muted)
+                            .child(text(upper(&name)).tracking_wider()),
+                    )
+                    .children(disable_action),
             )
             .child(
                 div()
@@ -140,6 +230,11 @@ impl HotkeyStep {
                     .map(|display| {
                         if recording {
                             display.border_color(p.ac).bg(p.ac_bg).text_color(p.ac)
+                        } else if is_unset {
+                            display
+                                .border_color(p.border)
+                                .bg(p.base)
+                                .text_color(p.txt_hint)
                         } else {
                             display
                                 .border_color(p.border_strong)
@@ -160,9 +255,12 @@ impl HotkeyStep {
 }
 
 impl Render for HotkeyStep {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.ensure_recorder_observers(window, cx);
         let p = palette(cx);
         let settings = SettingsStore::get(cx).clone();
+        let recording = self.hands_free.read(cx).is_recording()
+            || self.hold_to_speak.read(cx).is_recording();
 
         let hotkeys = div()
             .flex()
@@ -171,21 +269,25 @@ impl Render for HotkeyStep {
             .child(self.render_hotkey(
                 "record-hands-free",
                 t(cx, "onboarding.handsFreeHotkey"),
-                &settings.hotkey,
+                Some(&settings.hotkey),
                 t(cx, "onboarding.recordHotkey"),
+                false,
                 &self.hands_free.clone(),
                 &self.hold_to_speak.clone(),
                 true,
+                window,
                 cx,
             ))
             .child(self.render_hotkey(
                 "record-hold-to-speak",
                 t(cx, "onboarding.holdToSpeakHotkey"),
-                &settings.hold_to_speak_hotkey,
+                settings.hold_to_speak_hotkey.as_deref(),
                 t(cx, "onboarding.recordHoldToSpeakHotkey"),
+                true,
                 &self.hold_to_speak.clone(),
                 &self.hands_free.clone(),
                 false,
+                window,
                 cx,
             ));
 
@@ -202,7 +304,8 @@ impl Render for HotkeyStep {
         route_keys(
             step_column("[STEP_04] > HOTKEY_CONFIG", p.ac)
                 .id("hotkey-step")
-                .track_focus(&self.focus_handle),
+                .track_focus(&self.focus_handle)
+                .when(recording, |step| step.key_context("HotkeyRecorder")),
             &recorders,
         )
         .child(card(content, cx))

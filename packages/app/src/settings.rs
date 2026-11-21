@@ -32,7 +32,7 @@ pub enum ThemeMode {
 pub struct Settings {
     pub theme: ThemeMode,
     pub hotkey: String,
-    pub hold_to_speak_hotkey: String,
+    pub hold_to_speak_hotkey: Option<String>,
     pub selected_microphone_id: Option<String>,
     pub language: Locale,
     pub mute_media_while_recording: bool,
@@ -50,7 +50,7 @@ impl Default for Settings {
         Self {
             theme: ThemeMode::System,
             hotkey: DEFAULT_HOTKEY.into(),
-            hold_to_speak_hotkey: DEFAULT_HOLD_TO_SPEAK_HOTKEY.into(),
+            hold_to_speak_hotkey: Some(DEFAULT_HOLD_TO_SPEAK_HOTKEY.into()),
             selected_microphone_id: None,
             language: Locale::En,
             mute_media_while_recording: false,
@@ -92,11 +92,19 @@ impl Settings {
             .filter(|style| STYLE_LIST.contains(&style.as_str()))
             .unwrap_or(defaults.default_style);
 
+        let hold_to_speak_hotkey = match stored.get("holdToSpeakHotkey") {
+            None => defaults.hold_to_speak_hotkey,
+            Some(Value::Null) => None,
+            Some(Value::String(hotkey)) if hotkey.trim().is_empty() => None,
+            Some(value) => parse::<String>(Some(value))
+                .map(Some)
+                .unwrap_or(defaults.hold_to_speak_hotkey),
+        };
+
         Settings {
             theme: parse(get("theme")).unwrap_or(defaults.theme),
             hotkey: parse(get("hotkey")).unwrap_or(defaults.hotkey),
-            hold_to_speak_hotkey: parse(get("holdToSpeakHotkey"))
-                .unwrap_or(defaults.hold_to_speak_hotkey),
+            hold_to_speak_hotkey,
             selected_microphone_id: parse(get("selectedMicrophoneId")),
             language: parse(get("language")).unwrap_or(defaults.language),
             mute_media_while_recording: parse(get("muteMediaWhileRecording"))
@@ -306,7 +314,10 @@ mod tests {
 
         assert_eq!(settings.theme, ThemeMode::Dark);
         assert_eq!(settings.hotkey, "Command+Shift+K");
-        assert_eq!(settings.hold_to_speak_hotkey, "RightOption");
+        assert_eq!(
+            settings.hold_to_speak_hotkey.as_deref(),
+            Some("RightOption")
+        );
         assert_eq!(settings.selected_microphone_id, None);
         assert_eq!(settings.language, Locale::Ru);
         assert!(settings.mute_media_while_recording);

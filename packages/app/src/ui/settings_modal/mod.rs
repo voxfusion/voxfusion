@@ -188,7 +188,7 @@ impl SettingsModal {
         match self.section {
             Section::Audio => self.render_audio(window, cx).into_any_element(),
             Section::Model => div().children(self.model.clone()).into_any_element(),
-            Section::Hotkey => self.render_hotkeys(cx).into_any_element(),
+            Section::Hotkey => self.render_hotkeys(window, cx).into_any_element(),
             Section::Appearance => appearance::render(window, cx).into_any_element(),
             Section::Language => language::render(window, cx).into_any_element(),
             Section::Privacy => privacy::render(window, cx).into_any_element(),
