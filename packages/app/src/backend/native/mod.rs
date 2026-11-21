@@ -22,7 +22,7 @@ use std::time::{Duration, SystemTime};
 use crate::backend::{
     AppDictionary, AppInstruction, AudioDevice, Backend, CommandResult, DictionaryWord,
     EventSender, FrontmostApp, InstalledApp, ModelInfo, PermissionState, SiteDictionary, SiteStyle,
-    Transcription, TranscriptionPage, TranscriptionResult,
+    Transcription, TranscriptionCursor, TranscriptionPage, TranscriptionResult,
 };
 
 pub use hotkeys::resynchronize_system_keys;
@@ -190,6 +190,15 @@ impl Backend for NativeBackend {
         cursor: Option<String>,
     ) -> CommandResult<TranscriptionPage> {
         db::list_transcriptions(&self.db, limit, cursor)
+    }
+
+    fn search_transcriptions(
+        &self,
+        query: &str,
+        limit: i64,
+        cursor: Option<TranscriptionCursor>,
+    ) -> CommandResult<TranscriptionPage> {
+        db::search_transcriptions(&self.db, query, limit, cursor)
     }
 
     fn delete_transcription(&self, id: &str) -> CommandResult<()> {

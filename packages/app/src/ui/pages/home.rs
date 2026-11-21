@@ -1,24 +1,31 @@
-//! The Home page: the history of transcriptions, grouped by day.
+//! The Home page: the history of transcriptions, grouped by day, with live
+//! search across all saved dictations.
 
 use gpui_kit::{
-    ClickEvent, ClipboardItem, Context, IntoElement, MouseButton, ParentElement as _, Render,
-    SharedString, Styled as _, Subscription, Window, canvas, div, prelude::*, px,
+    App, AppContext as _, ClickEvent, ClipboardItem, Context, Entity, FocusHandle, Focusable,
+    FontWeight, Hsla, InteractiveElement as _, IntoElement, KeyDownEvent, MouseButton,
+    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, Task, Window, canvas, div, prelude::*, px,
 };
 use std::collections::HashSet;
 use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::analytics;
-use crate::backend::{self, AppEvent, Transcription, command_error};
+use crate::backend::{
+    self, AppEvent, Transcription, TranscriptionCursor, command_error, fold_search_char,
+    fold_search_text,
+};
 use crate::events;
 use crate::settings::SettingsStore;
 use crate::ui::datetime::{self, format_long_date, format_time, same_day};
 use crate::ui::grid::above_grid;
 use crate::ui::hotkeys::hotkey_display_name;
 use crate::ui::motion::Transitions as _;
-use crate::ui::text::{TypeScale as _, text};
+use crate::ui::text::{Text, TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::focus::{focus_ring, focus_visible, keyed_focus_handle};
+use crate::ui::widgets::text_field::{TextField, TextFieldEvent, field_box};
 use crate::ui::widgets::{icon, spinning, turning};
 use crate::ui::{locale, t, t_upper, t_with, upper};
 
@@ -28,12 +35,27 @@ const PREVIEW_MAX_LINES: usize = 3;
 /// How far below the visible area the end of the list may be before the next
 /// page is requested.
 const LOAD_MORE_MARGIN: f32 = 100.;
+/// Short delay while typing before querying storage.
+const SEARCH_DEBOUNCE: Duration = Duration::from_millis(120);
+/// Maximum length (in UTF-16 code units) of a dictation preview on Home.
+const PREVIEW_MAX_UNITS: usize = 150;
+/// Context kept before a match when windowing a long dictation preview.
+const SNIPPET_LEADING_UNITS: usize = 40;
 
 pub struct HomePage {
+    search_field: Entity<TextField>,
+    focus_handle: FocusHandle,
+    /// Trimmed query currently entered in the search field.
+    query: String,
+    /// Trimmed query that `transcriptions`, `total_count`, and `error` belong to.
+    results_query: String,
     transcriptions: Vec<Transcription>,
+    /// Total matching transcriptions across all pages when `results_query` is
+    /// non-empty.
+    total_count: Option<usize>,
     loading: bool,
     initial_loading: bool,
-    next_cursor: Option<String>,
+    next_cursor: Option<TranscriptionCursor>,
     has_more: bool,
     error: Option<SharedString>,
     hovered: Option<String>,
@@ -43,42 +65,74 @@ pub struct HomePage {
     /// Transcriptions deleted here. A list fetched before the deletion
     /// reached the database leaves them out.
     deleted: HashSet<String>,
-    /// Counts the times the history was cleared; a list fetched before the
-    /// last time is dropped.
-    generation: u64,
-    /// A reload asked for while a fetch was running, done after it.
-    reload_pending: bool,
+    /// Monotonically increasing request id; stale async responses are dropped.
+    request_id: u64,
+    /// Counts the times the history was cleared; failed deletions before the
+    /// last clear do not restore expanded state.
+    clear_generation: u64,
+    /// Pending debounced search task; dropped automatically when superseded.
+    debounce_task: Option<Task<()>>,
     _subscriptions: Vec<Subscription>,
 }
 
 impl HomePage {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         analytics::capture(cx, "$pageview", &[("$current_url", "/".into())]);
 
+        let search_field = cx.new(|cx| {
+            TextField::new(window, cx).placeholder(|cx| t(cx, "home.searchPlaceholder"))
+        });
+
         let subscriptions = vec![
-            cx.subscribe(&events::hub(cx), |this, _, event, cx| match event {
-                AppEvent::TranscriptionCreated => {
-                    analytics::capture(cx, "transcription_created", &[]);
-                    this.fetch(None, cx);
+            cx.subscribe_in(&events::hub(cx), window, |this, _, event, window, cx| {
+                match event {
+                    AppEvent::TranscriptionCreated => {
+                        analytics::capture(cx, "transcription_created", &[]);
+                        this.start_fetch(None, cx);
+                    }
+                    AppEvent::TranscriptionsCleared => {
+                        this.request_id += 1;
+                        this.clear_generation += 1;
+                        this.debounce_task = None;
+                        this.query.clear();
+                        this.results_query.clear();
+                        this.search_field
+                            .update(cx, |field, cx| field.set_value("", window, cx));
+                        this.transcriptions.clear();
+                        this.total_count = None;
+                        this.deleted.clear();
+                        this.copied.clear();
+                        this.expanded.clear();
+                        this.hovered = None;
+                        this.next_cursor = None;
+                        this.has_more = false;
+                        this.error = None;
+                        this.loading = false;
+                        this.start_fetch(None, cx);
+                    }
+                    _ => {}
                 }
-                AppEvent::TranscriptionsCleared => {
-                    this.generation += 1;
-                    this.transcriptions.clear();
-                    this.deleted.clear();
-                    this.copied.clear();
-                    this.expanded.clear();
-                    this.hovered = None;
-                    this.next_cursor = None;
-                    this.has_more = false;
-                    this.fetch(None, cx);
-                }
-                _ => {}
             }),
+            cx.subscribe_in(
+                &search_field,
+                window,
+                |this, _, event: &TextFieldEvent, window, cx| match event {
+                    TextFieldEvent::Change => this.handle_search_change(cx),
+                    TextFieldEvent::Enter => this.submit_search_now(cx),
+                    TextFieldEvent::Escape => this.handle_search_escape(window, cx),
+                    TextFieldEvent::Focus | TextFieldEvent::Blur => cx.notify(),
+                },
+            ),
             cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
         ];
 
         let mut page = Self {
+            search_field,
+            focus_handle: cx.focus_handle(),
+            query: String::new(),
+            results_query: String::new(),
             transcriptions: Vec::new(),
+            total_count: None,
             loading: false,
             initial_loading: true,
             next_cursor: None,
@@ -89,63 +143,175 @@ impl HomePage {
             copied: HashSet::new(),
             expanded: HashSet::new(),
             deleted: HashSet::new(),
-            generation: 0,
-            reload_pending: false,
+            request_id: 0,
+            clear_generation: 0,
+            debounce_task: None,
             _subscriptions: subscriptions,
         };
-        page.fetch(None, cx);
+        page.start_fetch(None, cx);
         page
     }
 
-    fn fetch(&mut self, cursor: Option<String>, cx: &mut Context<Self>) {
-        if self.loading {
-            if cursor.is_none() {
-                self.reload_pending = true;
+    /// Focuses the search field and selects any existing text so typing
+    /// replaces it right away.
+    pub fn focus_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.search_field.update(cx, |field, cx| {
+            field.focus(window, cx);
+            if !field.value(cx).is_empty() {
+                field.select_all(window, cx);
             }
+        });
+        cx.notify();
+    }
+
+    fn handle_search_change(&mut self, cx: &mut Context<Self>) {
+        let trimmed = self.search_field.read(cx).value(cx).trim().to_string();
+        if trimmed == self.query {
+            cx.notify();
             return;
         }
+
+        self.query = trimmed;
+        self.error = None;
+        self.hovered = None;
+        self.debounce_task = None;
+
+        if self.query.is_empty() {
+            self.start_fetch(None, cx);
+            return;
+        }
+
+        // Invalidate any in-flight fetch for an earlier query right away.
+        self.request_id += 1;
+        self.loading = false;
+        let req_id = self.request_id;
+        cx.notify();
+
+        self.debounce_task = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(SEARCH_DEBOUNCE).await;
+            this.update(cx, |this, cx| {
+                if this.request_id != req_id {
+                    return;
+                }
+                this.debounce_task = None;
+                this.start_fetch(None, cx);
+            })
+            .ok();
+        }));
+    }
+
+    fn submit_search_now(&mut self, cx: &mut Context<Self>) {
+        if self.debounce_task.is_some() || self.results_query != self.query || self.error.is_some()
+        {
+            self.start_fetch(None, cx);
+        }
+    }
+
+    fn handle_search_escape(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.clear_search(false, window, cx);
+    }
+
+    fn clear_search(&mut self, refocus: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let had_raw = !self.search_field.read(cx).value(cx).is_empty();
+        let had_query = !self.query.is_empty() || !self.results_query.is_empty();
+
+        if had_raw {
+            self.search_field
+                .update(cx, |field, cx| field.set_value("", window, cx));
+        }
+
+        if refocus {
+            self.search_field
+                .update(cx, |field, cx| field.focus(window, cx));
+        } else {
+            window.focus(&self.focus_handle, cx);
+        }
+
+        if had_query {
+            self.query.clear();
+            self.error = None;
+            self.hovered = None;
+            self.start_fetch(None, cx);
+        } else {
+            cx.notify();
+        }
+    }
+
+    fn start_fetch(&mut self, cursor: Option<TranscriptionCursor>, cx: &mut Context<Self>) {
+        self.debounce_task = None;
+        self.request_id += 1;
+        let req_id = self.request_id;
+        let query = self.query.clone();
+        let is_load_more = cursor.is_some();
 
         self.loading = true;
         self.error = None;
         cx.notify();
 
-        let request = backend::call(cx, {
-            let cursor = cursor.clone();
-            move |backend| backend.list_transcriptions(PAGE_SIZE, cursor)
-        });
+        let command_name = if query.is_empty() {
+            "list_transcriptions"
+        } else {
+            "search_transcriptions"
+        };
 
-        let generation = self.generation;
+        let request = backend::call(cx, {
+            let query = query.clone();
+            let cursor = cursor.clone();
+            move |backend| {
+                if query.is_empty() {
+                    backend.list_transcriptions(PAGE_SIZE, cursor.map(|c| c.created_at))
+                } else {
+                    backend.search_transcriptions(&query, PAGE_SIZE, cursor)
+                }
+            }
+        });
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
             this.update(cx, |this, cx| {
-                this.loading = false;
-                if generation != this.generation {
-                    this.reload_pending = false;
-                    this.fetch(None, cx);
+                if req_id != this.request_id {
                     return;
                 }
+
+                this.loading = false;
                 this.initial_loading = false;
 
                 match result {
                     Ok(page) => {
-                        this.next_cursor = page
-                            .transcriptions
-                            .last()
-                            .map(|item| item.created_at.clone());
+                        this.results_query = query;
+                        this.next_cursor =
+                            page.transcriptions.last().map(|item| TranscriptionCursor {
+                                created_at: item.created_at.clone(),
+                                id: item.id.clone(),
+                            });
                         this.has_more = page.has_more;
 
-                        let listed = page
+                        let raw_len = page.transcriptions.len();
+                        let listed: Vec<Transcription> = page
                             .transcriptions
                             .into_iter()
-                            .filter(|item| !this.deleted.contains(&item.id));
-                        if cursor.is_some() {
+                            .filter(|item| !this.deleted.contains(&item.id))
+                            .collect();
+                        let dropped = raw_len - listed.len();
+
+                        if is_load_more {
                             this.transcriptions.extend(listed);
+                            if let Some(total) = this.total_count {
+                                this.total_count = Some(total.max(this.transcriptions.len()));
+                            }
                         } else {
-                            this.transcriptions = listed.collect();
+                            this.transcriptions = listed;
+                            this.total_count = page.total_count.map(|total| {
+                                total
+                                    .saturating_sub(dropped)
+                                    .max(this.transcriptions.len())
+                            });
                         }
-                        if !this.has_more && !this.reload_pending {
+                        if !this.has_more
+                            && this.results_query.is_empty()
+                            && this.debounce_task.is_none()
+                        {
                             this.expanded.retain(|id| {
                                 this.transcriptions
                                     .iter()
@@ -154,13 +320,17 @@ impl HomePage {
                         }
                     }
                     Err(error) => {
-                        this.error = Some(command_error("list_transcriptions", &error).into());
+                        this.results_query = query;
+                        if !is_load_more {
+                            this.transcriptions.clear();
+                            this.total_count = None;
+                            this.next_cursor = None;
+                            this.has_more = false;
+                        }
+                        this.error = Some(command_error(command_name, &error).into());
                     }
                 }
 
-                if std::mem::take(&mut this.reload_pending) {
-                    this.fetch(None, cx);
-                }
                 cx.notify();
             })
             .ok();
@@ -169,11 +339,29 @@ impl HomePage {
     }
 
     fn load_more(&mut self, cx: &mut Context<Self>) {
-        if !self.has_more || self.loading {
+        if !self.has_more
+            || self.loading
+            || self.debounce_task.is_some()
+            || self.error.is_some()
+            || self.results_query != self.query
+        {
             return;
         }
         if let Some(cursor) = self.next_cursor.clone() {
-            self.fetch(Some(cursor), cx);
+            self.start_fetch(Some(cursor), cx);
+        }
+    }
+
+    fn retry(&mut self, cx: &mut Context<Self>) {
+        self.error = None;
+        if !self.transcriptions.is_empty()
+            && self.has_more
+            && self.next_cursor.is_some()
+            && self.results_query == self.query
+        {
+            self.load_more(cx);
+        } else {
+            self.start_fetch(None, cx);
         }
     }
 
@@ -215,8 +403,14 @@ impl HomePage {
 
     fn delete(&mut self, id: &str, cx: &mut Context<Self>) {
         analytics::capture(cx, "transcription_deleted", &[]);
+        let before = self.transcriptions.len();
         self.transcriptions
             .retain(|transcription| transcription.id != id);
+        if self.transcriptions.len() < before
+            && let Some(total) = &mut self.total_count
+        {
+            *total = total.saturating_sub(1);
+        }
         self.copied.remove(id);
         let was_expanded = self.expanded.remove(id);
         self.deleted.insert(id.to_string());
@@ -224,27 +418,33 @@ impl HomePage {
         cx.notify();
 
         let id = id.to_string();
+        let request_id_at_start = self.request_id;
+        let fetch_was_in_flight = self.loading;
         let request = backend::call(cx, {
             let id = id.clone();
             move |backend| backend.delete_transcription(&id)
         });
-        let generation = self.generation;
+        let clear_generation = self.clear_generation;
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
             this.update(cx, |this, cx| {
                 // A refused deletion brings the transcription back. With every
-                // listed one deleted, the next page is fetched.
+                // listed one deleted, or if a search fetch overlapped this
+                // deletion, re-fetch to stay in sync with storage.
                 if let Err(error) = &result {
                     log::error!(target: "home", "delete_transcription_failed error={error}");
                     this.deleted.remove(&id);
-                    if was_expanded && generation == this.generation {
+                    if was_expanded && clear_generation == this.clear_generation {
                         this.expanded.insert(id.clone());
                     }
-                    this.fetch(None, cx);
-                } else if this.transcriptions.is_empty() && this.has_more {
-                    this.fetch(None, cx);
+                    this.start_fetch(None, cx);
+                } else if (this.transcriptions.is_empty() && this.has_more)
+                    || (!this.query.is_empty()
+                        && (fetch_was_in_flight || this.request_id != request_id_at_start))
+                {
+                    this.start_fetch(None, cx);
                 }
             })
             .ok();
@@ -284,6 +484,100 @@ impl HomePage {
         groups
     }
 
+    fn search_pending(&self) -> bool {
+        self.debounce_task.is_some() || (self.loading && self.results_query != self.query)
+    }
+
+    fn showing_search_results(&self) -> bool {
+        !self.results_query.is_empty() && self.results_query == self.query
+    }
+
+    fn render_search_bar(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let p = palette(cx);
+        let search_focus = self.search_field.focus_handle(cx);
+        let focused = search_focus.is_focused(window);
+        let has_raw_query = !self.search_field.read(cx).value(cx).is_empty();
+        let search_busy = !self.query.is_empty() && self.search_pending();
+        let clear_button = has_raw_query.then(|| {
+            let clear_focus = keyed_focus_handle("home-clear-search", window, cx);
+            let clear_focused = focus_visible(&clear_focus, window);
+
+            // Enter and Space on the focused button arrive as a click.
+            div()
+                .id("clear-search")
+                .transition_colors()
+                .track_focus(&clear_focus)
+                .relative()
+                .mr_2()
+                .p_1()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_color(p.txt_hint)
+                .hover(|button| button.text_color(p.ac))
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.clear_search(true, window, cx);
+                }))
+                .child(icon("x").size_3p5())
+                .when(clear_focused, |button| button.child(focus_ring(2., cx)))
+        });
+
+        let leading_icon = if search_busy {
+            spinning("search-loader", icon("loader").size_4().text_color(p.ac)).into_any_element()
+        } else {
+            icon("search")
+                .size_4()
+                .text_color(if focused { p.ac } else { p.txt_hint })
+                .into_any_element()
+        };
+
+        div()
+            .id("home-search-bar")
+            .transition_colors()
+            .bg(p.surface)
+            .border_1()
+            .border_color(if focused { p.ac } else { p.border })
+            .hover(|bar| bar.border_color(if focused { p.ac } else { p.border_strong }))
+            .flex()
+            .items_center()
+            .child(
+                div()
+                    .pl_3()
+                    .py_2p5()
+                    .flex()
+                    .items_center()
+                    .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                        window.focus(&search_focus, cx);
+                        window.prevent_default();
+                    })
+                    .child(leading_icon),
+            )
+            .child(
+                field_box(&self.search_field, cx)
+                    .flex_1()
+                    .min_w_0()
+                    .px_3()
+                    .py_2p5()
+                    .type_sm()
+                    .text_color(p.txt_primary),
+            )
+            .children(clear_button)
+            .when(!has_raw_query && !focused, |bar| {
+                bar.child(
+                    div()
+                        .mr_3()
+                        .px_1p5()
+                        .py_0p5()
+                        .border_1()
+                        .border_color(p.border)
+                        .bg(p.base)
+                        .type_xs()
+                        .text_color(p.txt_hint)
+                        .child(text("⌘F")),
+                )
+            })
+    }
+
     fn render_card(
         &self,
         index: usize,
@@ -295,13 +589,25 @@ impl HomePage {
         let id = transcription.id.clone();
         let hovered = self.hovered.as_deref() == Some(id.as_str());
         let copied = self.copied.contains(&id);
-        let preview = preview_text(&transcription.text, PREVIEW_MAX_CHARS, PREVIEW_MAX_LINES);
-        let expandable = preview.truncated;
-        let expanded = expandable && self.expanded.contains(&id);
-        let display_text = if expanded {
-            normalize_newlines(&transcription.text)
+        let normalized = normalize_newlines(&transcription.text);
+        let (expandable, collapsed_preview) = if self.results_query.is_empty() {
+            let preview = preview_text(&transcription.text, PREVIEW_MAX_CHARS, PREVIEW_MAX_LINES);
+            (preview.truncated, Some(preview.text))
         } else {
-            preview.text
+            (normalized.encode_utf16().count() > PREVIEW_MAX_UNITS, None)
+        };
+        let expanded = expandable && self.expanded.contains(&id);
+        let body_text = if self.results_query.is_empty() {
+            if expanded {
+                text(normalized)
+            } else {
+                text(collapsed_preview.unwrap_or(normalized))
+            }
+        } else if expanded {
+            highlighted_text(&normalized, &self.results_query, p.ac_text)
+        } else {
+            let snippet = snippet_for_query(&normalized, &self.results_query, PREVIEW_MAX_UNITS);
+            highlighted_text(&snippet, &self.results_query, p.ac_text)
         };
         let time = datetime::parse(&transcription.created_at)
             .map(|time| format_time(&time, locale(cx)))
@@ -363,7 +669,7 @@ impl HomePage {
                     .type_sm()
                     .leading_relaxed(14.)
                     .text_color(p.txt_primary)
-                    .child(text(display_text).pre_wrap().break_words()),
+                    .child(body_text.pre_wrap().break_words()),
             )
             .child(
                 div()
@@ -480,6 +786,8 @@ impl HomePage {
         let p = palette(cx);
         let hotkey = hotkey_display_name(&SettingsStore::get(cx).hotkey);
         let has_items = !self.transcriptions.is_empty();
+        let search_pending = self.search_pending();
+        let showing_search = self.showing_search_results();
 
         let mut list = div().flex().flex_col().gap_6();
 
@@ -511,37 +819,99 @@ impl HomePage {
                                 this.retry_hovered = *hovered;
                                 cx.notify();
                             }))
-                            .on_click(cx.listener(|this, _, _, cx| this.fetch(None, cx)))
+                            .on_click(cx.listener(|this, _, _, cx| this.retry(cx)))
                             .child(text("[RETRY]").underline(self.retry_hovered)),
                     ),
             );
         }
 
         if !self.initial_loading && self.error.is_none() && !has_items {
-            list = list.child(
-                div()
-                    .py_12()
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .child(
-                        div()
-                            .mb_2()
-                            .type_base()
-                            .text_color(p.txt_secondary)
-                            .child(text("[INFO] NO_TRANSCRIPTIONS").center()),
-                    )
-                    .child(
-                        div().type_sm().text_color(p.txt_muted).child(
-                            text(t_with(
-                                cx,
-                                "transcriptionList.useCommandToRecord",
-                                &[("hotkey", &hotkey)],
-                            ))
-                            .center(),
+            if search_pending || self.loading || self.has_more {
+                list = list.child(div().flex().items_center().justify_center().py_12().child(
+                    spinning("search-list-loader", icon("loader").size_5().text_color(p.ac)),
+                ));
+            } else if showing_search {
+                let clear_empty_focus = keyed_focus_handle("home-clear-search-empty", window, cx);
+                let clear_empty_focused = focus_visible(&clear_empty_focus, window);
+
+                list = list.child(
+                    div()
+                        .py_12()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .child(
+                            div()
+                                .mb_2()
+                                .type_base()
+                                .text_color(p.txt_secondary)
+                                .child(text("[INFO] NO_MATCHES").center()),
+                        )
+                        .child(
+                            div().max_w(px(480.)).type_sm().text_color(p.txt_hint).child(
+                                text(t_with(
+                                    cx,
+                                    "home.searchNoMatches",
+                                    &[("query", &self.results_query)],
+                                ))
+                                .center(),
+                            ),
+                        )
+                        .child(
+                            // Enter and Space on the focused button arrive as a click.
+                            div()
+                                .id("clear-search-empty")
+                                .transition_colors()
+                                .track_focus(&clear_empty_focus)
+                                .relative()
+                                .mt_4()
+                                .px_3()
+                                .py_1p5()
+                                .type_xs()
+                                .border_1()
+                                .border_color(p.border_strong)
+                                .text_color(p.txt_secondary)
+                                .hover(|button| {
+                                    button
+                                        .border_color(p.ac)
+                                        .bg(p.ac_bg)
+                                        .text_color(p.txt_primary)
+                                })
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.clear_search(false, window, cx);
+                                }))
+                                .child(text(t_upper(cx, "home.clearSearch")).tracking_wider())
+                                .when(clear_empty_focused, |button| {
+                                    button.child(focus_ring(3., cx))
+                                }),
                         ),
-                    ),
-            );
+                );
+            } else {
+                list = list.child(
+                    div()
+                        .py_12()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .child(
+                            div()
+                                .mb_2()
+                                .type_base()
+                                .text_color(p.txt_secondary)
+                                .child(text("[INFO] NO_TRANSCRIPTIONS").center()),
+                        )
+                        .child(
+                            div().type_sm().text_color(p.txt_muted).child(
+                                text(t_with(
+                                    cx,
+                                    "transcriptionList.useCommandToRecord",
+                                    &[("hotkey", &hotkey)],
+                                ))
+                                .center(),
+                            ),
+                        ),
+                );
+            }
         }
 
         if !self.initial_loading && has_items {
@@ -565,38 +935,49 @@ impl HomePage {
                 );
             }
 
-            // Requests the next page once the end of the list is near the
-            // visible area.
-            let page = cx.entity().downgrade();
-            list = list.child(
-                canvas(
-                    move |bounds, window, cx| {
-                        let viewport_bottom = window.viewport_size().height;
-                        if bounds.top() < viewport_bottom + px(LOAD_MORE_MARGIN) {
-                            let page = page.clone();
-                            window.defer(cx, move |_, cx| {
-                                page.update(cx, |page, cx| page.load_more(cx)).ok();
-                            });
-                        }
-                    },
-                    |_, _, _, _| {},
-                )
-                .h_4(),
-            );
+            if self.has_more && !search_pending && self.error.is_none() {
+                // Requests the next page once the end of the list is near the
+                // visible area.
+                let page = cx.entity().downgrade();
+                list = list.child(
+                    canvas(
+                        move |bounds, window, cx| {
+                            let viewport_bottom = window.viewport_size().height;
+                            if bounds.top() < viewport_bottom + px(LOAD_MORE_MARGIN) {
+                                let page = page.clone();
+                                window.defer(cx, move |_, cx| {
+                                    page.update(cx, |page, cx| page.load_more(cx)).ok();
+                                });
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .h_4(),
+                );
+            }
 
-            if self.loading {
+            if self.loading && !search_pending {
                 list = list.child(div().flex().items_center().justify_center().py_4().child(
                     spinning("more-loader", icon("loader").size_5().text_color(p.ac)),
                 ));
             }
 
-            if !self.has_more {
+            if !self.has_more && !search_pending {
+                let no_more_key = if showing_search {
+                    "home.searchNoMore"
+                } else {
+                    "transcriptionList.noMore"
+                };
                 list = list.child(
                     div()
                         .py_4()
                         .type_xs()
-                        .text_color(p.txt_muted)
-                        .child(text(t(cx, "transcriptionList.noMore")).center()),
+                        .text_color(if showing_search {
+                            p.txt_hint
+                        } else {
+                            p.txt_muted
+                        })
+                        .child(text(t(cx, no_more_key)).center()),
                 );
             }
         }
@@ -605,12 +986,44 @@ impl HomePage {
     }
 }
 
+impl Focusable for HomePage {
+    fn focus_handle(&self, _: &App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
 impl Render for HomePage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette(cx);
         let hotkey = hotkey_display_name(&SettingsStore::get(cx).hotkey);
 
+        let result_count = (self.showing_search_results()
+            && !self.initial_loading
+            && self.error.is_none())
+        .then_some(self.total_count)
+        .flatten()
+        .filter(|&count| count > 0)
+        .map(|count| {
+            if count == 1 {
+                t(cx, "home.searchResultCountOne")
+            } else {
+                t_with(
+                    cx,
+                    "home.searchResultCount",
+                    &[("count", &count.to_string())],
+                )
+            }
+        });
+
         div()
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if event.keystroke.key == "escape"
+                    && !this.search_field.read(cx).value(cx).is_empty()
+                {
+                    this.clear_search(false, window, cx);
+                }
+            }))
             .min_h(window.viewport_size().height)
             .px_6()
             .py_8()
@@ -638,7 +1051,7 @@ impl Render for HomePage {
                     )
                     .child(
                         div()
-                            .mb_8()
+                            .mb_5()
                             .type_xs()
                             .text_color(p.txt_muted)
                             .child(text(t_with(
@@ -646,6 +1059,21 @@ impl Render for HomePage {
                                 "home.pressToRecord",
                                 &[("hotkey", &hotkey)],
                             ))),
+                    )
+                    .child(
+                        div()
+                            .mb_6()
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .child(self.render_search_bar(window, cx))
+                            .children(result_count.map(|label| {
+                                div()
+                                    .px_1()
+                                    .type_xs()
+                                    .text_color(p.txt_hint)
+                                    .child(text(upper(&label)).tracking_wider())
+                            })),
                     )
                     .child(self.render_list(window, cx)),
             )
@@ -705,6 +1133,168 @@ fn preview_text(text: &str, max_length: usize, max_lines: usize) -> Preview {
             truncated: false,
         },
     }
+}
+
+/// Finds non-overlapping byte ranges in `haystack` whose folded form matches
+/// `fold_search_text(needle)`, using the exact same Unicode case folding as
+/// the search backends and remaining safe when character byte length changes
+/// under folding (such as `İ` or `ß`).
+fn find_match_ranges(haystack: &str, needle: &str) -> Vec<(usize, usize)> {
+    let needle_folded = fold_search_text(needle);
+    if needle_folded.is_empty() {
+        return Vec::new();
+    }
+
+    let mut folded = String::with_capacity(haystack.len());
+    let mut byte_map: Vec<(usize, usize)> = Vec::with_capacity(haystack.len());
+    for (orig_start, ch) in haystack.char_indices() {
+        let orig_end = orig_start + ch.len_utf8();
+        let start_len = folded.len();
+        fold_search_char(ch, &mut folded);
+        for _ in start_len..folded.len() {
+            byte_map.push((orig_start, orig_end));
+        }
+    }
+
+    let mut ranges = Vec::new();
+    let mut search_from = 0;
+    while search_from < folded.len() {
+        let Some(rel) = folded[search_from..].find(&needle_folded) else {
+            break;
+        };
+        let match_start = search_from + rel;
+        let match_end = match_start + needle_folded.len();
+        let orig_start = byte_map[match_start].0;
+        let orig_end = byte_map[match_end - 1].1;
+        if ranges
+            .last()
+            .is_none_or(|&(_, prev_end)| orig_start >= prev_end)
+        {
+            ranges.push((orig_start, orig_end));
+        }
+        search_from = match_end;
+    }
+
+    ranges
+}
+
+/// Returns a preview of `full_text` capped at `max_units` UTF-16 code units,
+/// sliding the window onto the first match when it appears past the opening
+/// preview and reserving space for the match before adding leading context.
+fn snippet_for_query(full_text: &str, query: &str, max_units: usize) -> String {
+    if query.is_empty() || full_text.encode_utf16().count() <= max_units {
+        return truncate_text(full_text, max_units);
+    }
+
+    let ranges = find_match_ranges(full_text, query);
+    let Some(&(match_start, match_end)) = ranges.first() else {
+        return truncate_text(full_text, max_units);
+    };
+
+    if full_text[..match_end].encode_utf16().count() <= max_units {
+        return truncate_text(full_text, max_units);
+    }
+
+    let match_units = full_text[match_start..match_end].encode_utf16().count();
+    let leading_budget = max_units
+        .saturating_sub(match_units)
+        .min(SNIPPET_LEADING_UNITS);
+
+    let mut slice_start = match_start;
+    let mut leading_units = 0usize;
+    for (idx, ch) in full_text[..match_start].char_indices().rev() {
+        let len = ch.len_utf16();
+        if leading_units + len > leading_budget {
+            break;
+        }
+        leading_units += len;
+        slice_start = idx;
+    }
+
+    if slice_start > 0
+        && !full_text[..slice_start]
+            .chars()
+            .next_back()
+            .is_some_and(char::is_whitespace)
+        && let Some(ws_rel) = full_text[slice_start..match_start].find(char::is_whitespace)
+    {
+        let after_ws = slice_start + ws_rel;
+        if let Some(non_ws_rel) =
+            full_text[after_ws..match_start].find(|c: char| !c.is_whitespace())
+        {
+            slice_start = after_ws + non_ws_rel;
+        }
+    }
+
+    let mut slice_end = slice_start;
+    let mut units = 0usize;
+    for (rel, ch) in full_text[slice_start..].char_indices() {
+        let len = ch.len_utf16();
+        if units + len > max_units {
+            break;
+        }
+        units += len;
+        slice_end = slice_start + rel + ch.len_utf8();
+    }
+
+    let prefix = if slice_start > 0 { "..." } else { "" };
+    let suffix = if slice_end < full_text.len() {
+        "..."
+    } else {
+        ""
+    };
+    format!("{prefix}{}{suffix}", &full_text[slice_start..slice_end])
+}
+
+/// Renders `snippet` with every occurrence of `query` highlighted in
+/// `highlight` and bold weight.
+fn highlighted_text(snippet: &str, query: &str, highlight: Hsla) -> Text {
+    let ranges = find_match_ranges(snippet, query);
+    if ranges.is_empty() {
+        return text(snippet.to_string());
+    }
+
+    let mut cursor = 0usize;
+    let mut built: Option<Text> = None;
+
+    let mut push_segment = |segment: &str, color: Option<Hsla>| {
+        if segment.is_empty() {
+            return;
+        }
+        built = Some(match (built.take(), color) {
+            (None, Some(color)) => text(segment.to_string())
+                .color(color)
+                .weight(FontWeight::BOLD),
+            (None, None) => text(segment.to_string()),
+            (Some(existing), Some(color)) => {
+                existing.span_weight(segment.to_string(), color, FontWeight::BOLD)
+            }
+            (Some(existing), None) => existing.plain(segment.to_string()),
+        });
+    };
+
+    for (start, end) in ranges {
+        if start > cursor {
+            push_segment(&snippet[cursor..start], None);
+        }
+        push_segment(&snippet[start..end], Some(highlight));
+        cursor = end;
+    }
+    if cursor < snippet.len() {
+        push_segment(&snippet[cursor..], None);
+    }
+
+    built.unwrap_or_else(|| text(snippet.to_string()))
+}
+
+/// The first `max_length` UTF-16 units of `text`, as the original measured.
+fn truncate_text(text: &str, max_length: usize) -> String {
+    let units: Vec<u16> = text.encode_utf16().collect();
+    if units.len() <= max_length {
+        return text.to_string();
+    }
+
+    format!("{}...", String::from_utf16_lossy(&units[..max_length]))
 }
 
 fn format_processing_time(milliseconds: i64) -> String {

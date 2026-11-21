@@ -1,6 +1,12 @@
 {
 	"home.yourTranscriptions": "你的转录",
 	"home.pressToRecord": "按 {{hotkey}} 开始新的录音",
+	"home.searchPlaceholder": "搜索转录...",
+	"home.clearSearch": "清除搜索",
+	"home.searchResultCountOne": "1 条匹配",
+	"home.searchResultCount": "{{count}} 条匹配",
+	"home.searchNoMatches": "没有与“{{query}}”匹配的转录",
+	"home.searchNoMore": "没有更多匹配的转录",
 	"about.title": "关于",
 	"about.welcomeDescription": "欢迎使用 VoxFusion - 一款使用 SolidJS 和 Tauri 构建的现代桌面应用程序。",
 	"about.navigationDescription": "此应用程序演示了页面导航和路由功能。",

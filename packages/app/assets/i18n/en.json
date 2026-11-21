@@ -1,6 +1,12 @@
 {
 	"home.yourTranscriptions": "Your Transcriptions",
 	"home.pressToRecord": "Press {{hotkey}} to start a new recording",
+	"home.searchPlaceholder": "Search transcriptions...",
+	"home.clearSearch": "Clear search",
+	"home.searchResultCountOne": "1 match",
+	"home.searchResultCount": "{{count}} matches",
+	"home.searchNoMatches": "No transcriptions match \"{{query}}\"",
+	"home.searchNoMore": "No more matching transcriptions",
 	"about.title": "About",
 	"about.welcomeDescription": "Welcome to VoxFusion - a modern desktop application built with SolidJS and Tauri.",
 	"about.navigationDescription": "This application demonstrates page navigation and routing functionality.",

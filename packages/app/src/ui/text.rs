@@ -81,6 +81,27 @@ impl Text {
         self
     }
 
+    /// Appends text in its own color and weight.
+    pub fn span_weight(
+        mut self,
+        content: impl Into<SharedString>,
+        color: Hsla,
+        weight: FontWeight,
+    ) -> Self {
+        self.spans.push(Span {
+            text: content.into(),
+            color: Some(color),
+            weight: Some(weight),
+        });
+        self
+    }
+
+    /// Sets the font weight of the first span.
+    pub fn weight(mut self, weight: FontWeight) -> Self {
+        self.spans[0].weight = Some(weight);
+        self
+    }
+
     /// Appends text in the inherited color.
     pub fn plain(mut self, content: impl Into<SharedString>) -> Self {
         self.spans.push(Span {

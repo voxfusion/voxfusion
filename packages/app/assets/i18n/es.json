@@ -1,6 +1,12 @@
 {
 	"home.yourTranscriptions": "Tus transcripciones",
 	"home.pressToRecord": "Presiona {{hotkey}} para iniciar una nueva grabación",
+	"home.searchPlaceholder": "Buscar transcripciones...",
+	"home.clearSearch": "Limpiar búsqueda",
+	"home.searchResultCountOne": "1 coincidencia",
+	"home.searchResultCount": "{{count}} coincidencias",
+	"home.searchNoMatches": "Ninguna transcripción coincide con «{{query}}»",
+	"home.searchNoMore": "No hay más transcripciones coincidentes",
 	"about.title": "Acerca de",
 	"about.welcomeDescription": "Bienvenido a VoxFusion - una aplicación de escritorio moderna creada con SolidJS y Tauri.",
 	"about.navigationDescription": "Esta aplicación demuestra la navegación de páginas y la funcionalidad de enrutamiento.",

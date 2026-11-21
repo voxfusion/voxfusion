@@ -101,6 +101,11 @@ impl TextField {
     pub fn focus(&self, window: &mut Window, cx: &mut Context<Self>) {
         self.input.update(cx, |input, cx| input.focus(window, cx));
     }
+
+    pub fn select_all(&self, window: &mut Window, cx: &mut Context<Self>) {
+        self.input
+            .update(cx, |input, cx| input.select_all(window, cx));
+    }
 }
 
 impl EventEmitter<TextFieldEvent> for TextField {}

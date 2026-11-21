@@ -1,6 +1,12 @@
 {
 	"home.yourTranscriptions": "Ваши транскрипции",
 	"home.pressToRecord": "Нажмите {{hotkey}}, чтобы начать запись",
+	"home.searchPlaceholder": "Поиск транскрипций...",
+	"home.clearSearch": "Сбросить поиск",
+	"home.searchResultCountOne": "1 совпадение",
+	"home.searchResultCount": "Совпадений: {{count}}",
+	"home.searchNoMatches": "Нет транскрипций по запросу «{{query}}»",
+	"home.searchNoMore": "Больше нет подходящих транскрипций",
 	"about.title": "О приложении",
 	"about.welcomeDescription": "Добро пожаловать в VoxFusion - современное десктопное приложение, созданное с SolidJS и Tauri.",
 	"about.navigationDescription": "Это приложение демонстрирует навигацию по страницам и функциональность маршрутизации.",

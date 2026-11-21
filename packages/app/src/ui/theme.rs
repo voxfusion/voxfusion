@@ -38,6 +38,9 @@ pub struct Palette {
     pub ac_hover: Hsla,
     pub ac_bg: Hsla,
     pub ac_on: Hsla,
+    /// Accent color for small text (such as highlighted search matches): at
+    /// least 4.5:1 against `base`, `surface`, and `hover` in both themes.
+    pub ac_text: Hsla,
 
     pub success: Hsla,
     pub grid_line: Hsla,
@@ -81,6 +84,7 @@ impl Palette {
             ac_hover: hex(0xe03800),
             ac_bg: css_rgba(255, 62, 0, 0.08),
             ac_on: hex(0xffffff),
+            ac_text: hex(0xb32b00),
             success: hex(0x16a34a),
             grid_line: css_rgba(0, 0, 0, 0.04),
             error: hex(0xef4444),
@@ -107,6 +111,7 @@ impl Palette {
             ac_hover: hex(0xff5500),
             ac_bg: hex(0x1a0a00),
             ac_on: hex(0x0a0a0a),
+            ac_text: hex(0xff5500),
             success: hex(0x00ff88),
             grid_line: css_rgba(255, 255, 255, 0.03),
             error: hex(0xef4444),

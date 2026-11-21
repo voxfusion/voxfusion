@@ -327,6 +327,52 @@ impl Backend for FixtureBackend {
             TranscriptionPage {
                 has_more: items.len() > limit,
                 transcriptions: items.into_iter().take(limit).collect(),
+                total_count: None,
+            }
+        }))
+    }
+
+    fn search_transcriptions(
+        &self,
+        query: &str,
+        limit: i64,
+        cursor: Option<TranscriptionCursor>,
+    ) -> CommandResult<TranscriptionPage> {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return self.list_transcriptions(limit, cursor.map(|c| c.created_at));
+        }
+
+        self.gate("search_transcriptions")?;
+        let needle = fold_search_text(trimmed);
+        Ok(self.with(|data| {
+            let mut matching: Vec<_> = data
+                .transcriptions
+                .iter()
+                .filter(|item| fold_search_text(&item.text).contains(&needle))
+                .cloned()
+                .collect();
+            matching.sort_by(|a, b| {
+                b.created_at
+                    .cmp(&a.created_at)
+                    .then_with(|| b.id.cmp(&a.id))
+            });
+            let total_count = matching.len();
+            let items: Vec<_> = matching
+                .into_iter()
+                .filter(|item| {
+                    cursor.as_ref().is_none_or(|cursor| {
+                        (item.created_at.as_str(), item.id.as_str())
+                            < (cursor.created_at.as_str(), cursor.id.as_str())
+                    })
+                })
+                .collect();
+            let limit = limit.max(0) as usize;
+
+            TranscriptionPage {
+                has_more: items.len() > limit,
+                transcriptions: items.into_iter().take(limit).collect(),
+                total_count: Some(total_count),
             }
         }))
     }

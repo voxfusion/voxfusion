@@ -1,6 +1,12 @@
 {
 	"home.yourTranscriptions": "Le tue trascrizioni",
 	"home.pressToRecord": "Premi {{hotkey}} per avviare una nuova registrazione",
+	"home.searchPlaceholder": "Cerca trascrizioni...",
+	"home.clearSearch": "Cancella ricerca",
+	"home.searchResultCountOne": "1 risultato",
+	"home.searchResultCount": "{{count}} risultati",
+	"home.searchNoMatches": "Nessuna trascrizione corrisponde a «{{query}}»",
+	"home.searchNoMore": "Non ci sono altre trascrizioni corrispondenti",
 	"about.title": "Informazioni",
 	"about.welcomeDescription": "Benvenuto su VoxFusion - un'applicazione desktop moderna realizzata con SolidJS e Tauri.",
 	"about.navigationDescription": "Questa applicazione dimostra la navigazione tra pagine e le funzionalità di routing.",
