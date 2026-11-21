@@ -482,21 +482,36 @@ impl Backend for FixtureBackend {
 
     fn add_site_dictionary_word(&self, domain: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("add_site_dictionary_word")?;
+        if domain.trim().is_empty() {
+            return Err("Invalid domain".to_string());
+        }
         let word = self.new_word(word);
-        self.with(|data| {
+        self.with(|data| -> CommandResult<()> {
+            if let Some(group) = data
+                .site_dictionaries
+                .iter_mut()
+                .find(|group| group.domain == domain)
+            {
+                group.words.push(word.clone());
+                return Ok(());
+            }
+
+            let domain =
+                normalize_storage_domain(domain).ok_or_else(|| "Invalid domain".to_string())?;
             let position = data
                 .site_dictionaries
                 .iter()
                 .position(|group| group.domain == domain)
                 .unwrap_or_else(|| {
                     data.site_dictionaries.push(SiteDictionary {
-                        domain: domain.to_string(),
+                        domain,
                         words: Vec::new(),
                     });
                     data.site_dictionaries.len() - 1
                 });
             data.site_dictionaries[position].words.push(word.clone());
-        });
+            Ok(())
+        })?;
         Ok(word)
     }
 
@@ -526,6 +541,9 @@ impl Backend for FixtureBackend {
 
     fn delete_site_dictionary(&self, domain: &str) -> CommandResult<()> {
         self.gate("delete_site_dictionary")?;
+        if domain.trim().is_empty() {
+            return Err("Invalid domain".to_string());
+        }
         self.with(|data| {
             data.site_dictionaries
                 .retain(|group| group.domain != domain)
@@ -595,27 +613,41 @@ impl Backend for FixtureBackend {
 
     fn set_site_style(&self, domain: &str, style: &str) -> CommandResult<SiteStyle> {
         self.gate("set_site_style")?;
+        if domain.trim().is_empty() {
+            return Err("Invalid domain".to_string());
+        }
         let fresh = self.new_word("");
-        Ok(self.with(|data| {
+        self.with(|data| {
             if let Some(existing) = data
                 .site_styles
                 .iter_mut()
                 .find(|site| site.domain == domain)
             {
                 existing.style = style.to_string();
-                return existing.clone();
+                return Ok(existing.clone());
+            }
+
+            let domain =
+                normalize_storage_domain(domain).ok_or_else(|| "Invalid domain".to_string())?;
+            if let Some(existing) = data
+                .site_styles
+                .iter_mut()
+                .find(|site| site.domain == domain)
+            {
+                existing.style = style.to_string();
+                return Ok(existing.clone());
             }
 
             let site = SiteStyle {
                 id: fresh.id,
-                domain: domain.to_string(),
+                domain,
                 style: style.to_string(),
                 created_at: fresh.created_at,
                 updated_at: fresh.updated_at,
             };
             data.site_styles.push(site.clone());
-            site
-        }))
+            Ok(site)
+        })
     }
 
     fn delete_site_style(&self, id: &str) -> CommandResult<()> {

@@ -108,6 +108,7 @@
 	"dictionary.sitesDomainPlaceholder": "example.com",
 	"dictionary.sitesAddSite": "添加网站",
 	"dictionary.sitesInvalidDomain": "请输入有效的域名",
+	"dictionary.sitesInvalidDomainHint": "例如 example.com、https://example.com 或 localhost",
 	"dictionary.siteCount": "{count} 个网站",
 	"dictionary.wordTooLong": "太长：{count} 个字符（最多 {max} 个）",
 	"dictionary.addFailed": "无法添加词汇",

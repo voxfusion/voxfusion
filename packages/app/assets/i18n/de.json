@@ -108,6 +108,7 @@
 	"dictionary.sitesDomainPlaceholder": "example.com",
 	"dictionary.sitesAddSite": "Hinzufügen",
 	"dictionary.sitesInvalidDomain": "Geben Sie eine gültige Domain ein",
+	"dictionary.sitesInvalidDomainHint": "Zum Beispiel example.com, https://example.com oder localhost",
 	"dictionary.siteCount": "{count} Seiten",
 	"dictionary.wordTooLong": "Zu lang: {count} Zeichen (max. {max})",
 	"dictionary.addFailed": "Wort konnte nicht hinzugefügt werden",

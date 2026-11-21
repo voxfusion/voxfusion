@@ -5,32 +5,14 @@ use gpui_kit::{
     Styled as _, Subscription, Window, div, prelude::*, px,
 };
 
+use crate::backend::normalize_domain;
 use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::app_icon::site_icon;
+use crate::ui::widgets::icon;
 use crate::ui::widgets::text_field::{TextField, TextFieldEvent, field_box};
 use crate::ui::widgets::word_list::{Variant, add_button};
-
-/// The domain a user means by `input`, which may be a whole URL: lowercase,
-/// without scheme, credentials, port, path or a leading `www.`.
-fn normalize_domain(input: &str) -> Option<String> {
-    let trimmed = input.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    let without_scheme = trimmed.split("://").nth(1).unwrap_or(trimmed);
-    let authority = without_scheme.split(['/', '?', '#']).next().unwrap_or("");
-    let host_with_port = authority.rsplit('@').next().unwrap_or("");
-    let host = host_with_port.split(':').next().unwrap_or("").trim();
-
-    let lowered = host.to_lowercase();
-    let lowered = lowered.trim_matches('.');
-    let stripped = lowered.strip_prefix("www.").unwrap_or(lowered);
-
-    (!stripped.is_empty()).then(|| stripped.to_string())
-}
 
 /// The domain to add.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,7 +50,12 @@ impl AddSiteForm {
     }
 
     fn add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(domain) = normalize_domain(&self.field.read(cx).value(cx)) else {
+        let input = self.field.read(cx).value(cx);
+        if input.trim().is_empty() {
+            return;
+        }
+
+        let Some(domain) = normalize_domain(&input) else {
             self.invalid = true;
             cx.notify();
             return;
@@ -93,7 +80,7 @@ impl Render for AddSiteForm {
             .p_4()
             .bg(p.surface)
             .border_1()
-            .border_color(p.border)
+            .border_color(if self.invalid { p.ac } else { p.border })
             .flex()
             .flex_col()
             .gap_3()
@@ -106,6 +93,7 @@ impl Render for AddSiteForm {
                     .child(
                         field_box(&self.field, cx)
                             .flex_1()
+                            .min_w_0()
                             .text_color(p.txt_primary),
                     )
                     .child(add_button(
@@ -118,12 +106,36 @@ impl Render for AddSiteForm {
             )
             .when(self.invalid, |form| {
                 form.child(
-                    div().flex().justify_end().child(
-                        div()
-                            .type_xs()
-                            .text_color(p.ac)
-                            .child(text(t(cx, "dictionary.sitesInvalidDomain"))),
-                    ),
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .type_xs()
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(
+                                    icon("alert-circle")
+                                        .size_4()
+                                        .flex_shrink_0()
+                                        .text_color(p.ac),
+                                )
+                                .child(
+                                    div()
+                                        .min_w_0()
+                                        .flex_1()
+                                        .text_color(p.txt_primary)
+                                        .child(text(t(cx, "dictionary.sitesInvalidDomain"))),
+                                ),
+                        )
+                        .child(
+                            div()
+                                .pl_6()
+                                .text_color(p.txt_hint)
+                                .child(text(t(cx, "dictionary.sitesInvalidDomainHint"))),
+                        ),
                 )
             })
     }
@@ -161,17 +173,18 @@ mod tests {
     }
 
     #[test]
-    fn only_a_leading_www_is_removed() {
+    fn leading_www_labels_are_removed() {
         assert_normalized("www.example.com", Some("example.com"));
-        assert_normalized("www.www.example.com", Some("www.example.com"));
+        assert_normalized("www.www.example.com", Some("example.com"));
         assert_normalized("awww.example.com", Some("awww.example.com"));
-        assert_normalized("www.", Some("www"));
+        assert_normalized("www.", None);
     }
 
     #[test]
-    fn dots_around_the_host_are_removed() {
-        assert_normalized(".example.com.", Some("example.com"));
-        assert_normalized("..example.com..", Some("example.com"));
+    fn only_a_single_trailing_dot_is_removed() {
+        assert_normalized("example.com.", Some("example.com"));
+        assert_normalized(".example.com.", None);
+        assert_normalized("..example.com..", None);
     }
 
     #[test]
@@ -186,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn only_what_follows_the_first_scheme_separator_counts() {
-        assert_normalized("a://b://c", Some("b"));
+    fn unsupported_schemes_are_refused() {
+        assert_normalized("a://b://c", None);
     }
 }

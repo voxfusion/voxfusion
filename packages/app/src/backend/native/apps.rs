@@ -150,14 +150,18 @@ pub fn resolve_style_key(
     domain: Option<&str>,
     fallback_style: Option<&str>,
 ) -> String {
-    if let Some(d) = domain.filter(|s| !s.is_empty())
-        && let Ok(style) = conn.query_row(
-            "SELECT style FROM site_styles WHERE domain = ?1",
-            params![d],
-            |row| row.get::<_, String>(0),
-        )
-    {
-        return style;
+    if let Some(d) = domain.filter(|s| !s.is_empty()) {
+        for group in crate::backend::domain_lookup_groups(d) {
+            for key in group {
+                if let Ok(style) = conn.query_row(
+                    "SELECT style FROM site_styles WHERE domain = ?1",
+                    params![key],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    return style;
+                }
+            }
+        }
     }
     if let Some(bid) = bundle_id.filter(|s| !s.is_empty())
         && let Ok(style) = conn.query_row(
@@ -371,7 +375,7 @@ pub fn get_frontmost_app() -> Option<FrontmostApp> {
         let pid: i32 = app.processIdentifier() as i32;
         let (url, domain) = if super::browser::is_known_browser(&bundle_id) {
             let url = super::browser::get_frontmost_browser_url(&bundle_id, pid);
-            let domain = url.as_deref().and_then(super::browser::normalize_domain);
+            let domain = url.as_deref().and_then(crate::backend::browser_domain);
             (url, domain)
         } else {
             (None, None)
