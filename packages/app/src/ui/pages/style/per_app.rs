@@ -6,9 +6,11 @@ use gpui_kit::{
 };
 
 use crate::analytics;
+use crate::settings::SettingsStore;
 use crate::ui::apps_cache::{self, InstalledApps};
 use crate::ui::pages::section::{empty_state, list_header};
 use crate::ui::widgets::app_search::{AppSearch, AppSelected, SKELETON_ROWS, app_row_skeleton};
+use crate::ui::widgets::style_select::style_label;
 use crate::ui::{t, t_with};
 
 use super::rules::{Scope, StyleRules};
@@ -18,7 +20,7 @@ pub struct AppStyles {
     search: Entity<AppSearch>,
     /// Whether the installed apps and the styles are still on their way.
     loading: bool,
-    _subscriptions: [Subscription; 2],
+    _subscriptions: [Subscription; 3],
 }
 
 impl AppStyles {
@@ -42,6 +44,7 @@ impl AppStyles {
                 cx.notify();
             }),
             cx.subscribe_in(&search, window, Self::add_app),
+            cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
         ];
 
         let mut page = Self {
@@ -125,6 +128,7 @@ impl AppStyles {
 impl Render for AppStyles {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let count = self.rules.read(cx).len();
+        let global_default = style_label(&SettingsStore::get(cx).default_style, cx);
         let count_label = (count > 0).then(|| {
             t_with(
                 cx,
@@ -157,7 +161,11 @@ impl Render for AppStyles {
 
         div()
             .child(list_header(
-                Some(t(cx, "appInstructions.description")),
+                Some(t_with(
+                    cx,
+                    "appInstructions.description",
+                    &[("style", global_default.as_ref())],
+                )),
                 count_label,
                 cx,
             ))

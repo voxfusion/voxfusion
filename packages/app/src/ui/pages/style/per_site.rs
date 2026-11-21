@@ -7,8 +7,10 @@ use gpui_kit::{
 };
 
 use crate::analytics;
+use crate::settings::SettingsStore;
 use crate::ui::pages::section::{empty_state, list_header};
 use crate::ui::widgets::add_site_form::{AddSiteForm, SiteAdded};
+use crate::ui::widgets::style_select::style_label;
 use crate::ui::{t, t_with};
 
 use super::rules::{Scope, StyleRules};
@@ -17,7 +19,7 @@ pub struct SiteStyles {
     rules: Entity<StyleRules>,
     form: Entity<AddSiteForm>,
     loading: bool,
-    _subscriptions: [Subscription; 2],
+    _subscriptions: [Subscription; 3],
 }
 
 impl SiteStyles {
@@ -34,6 +36,7 @@ impl SiteStyles {
                     .update(cx, |rules, cx| rules.add(domain.clone(), None, window, cx))
                     .detach();
             }),
+            cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
         ];
 
         let fetch = rules.update(cx, |rules, cx| rules.fetch(window, cx));
@@ -60,12 +63,17 @@ impl SiteStyles {
 impl Render for SiteStyles {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let count = self.rules.read(cx).len();
+        let global_default = style_label(&SettingsStore::get(cx).default_style, cx);
         let count_label = (count > 0)
             .then(|| t_with(cx, "dictionary.siteCount", &[("count", &count.to_string())]));
 
         div()
             .child(list_header(
-                Some(t(cx, "style.perSiteDescription")),
+                Some(t_with(
+                    cx,
+                    "style.perSiteDescription",
+                    &[("style", global_default.as_ref())],
+                )),
                 count_label,
                 cx,
             ))
