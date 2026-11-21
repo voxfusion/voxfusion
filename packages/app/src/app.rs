@@ -130,6 +130,8 @@ fn forget_main_window_when_closed(cx: &mut App) {
         if main == Some(closed) {
             cx.remove_global::<MainWindow>();
             ui::apps_cache::clear(cx);
+            let cutoff = backend::next_microphone_test_session();
+            backend::call(cx, move |backend| backend.stop_microphone_test(cutoff)).detach();
             log::info!(target: "runtime", "main_window_closed");
         }
     })

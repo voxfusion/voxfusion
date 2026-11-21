@@ -139,6 +139,18 @@ impl Backend for NativeBackend {
         audio::stop_recording_with_device()
     }
 
+    fn start_microphone_test(
+        &self,
+        device_name: Option<String>,
+        session_id: u64,
+    ) -> CommandResult<bool> {
+        audio::start_microphone_test(&self.events, device_name, session_id)
+    }
+
+    fn stop_microphone_test(&self, up_to_session: u64) -> CommandResult<()> {
+        audio::stop_microphone_test(up_to_session)
+    }
+
     fn mute_media_for_recording(&self) -> CommandResult<()> {
         media::mute_media_for_recording()
     }

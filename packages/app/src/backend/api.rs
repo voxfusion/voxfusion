@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 pub type CommandResult<T> = Result<T, String>;
 
@@ -144,6 +145,17 @@ pub struct ModelDownloadProgress {
 pub const DEFAULT_MODEL_ID: &str = "whisper-large-v3-turbo";
 pub const DOWNLOAD_IN_PROGRESS_ERROR: &str = "download already in progress";
 pub const DOWNLOAD_CANCELLED_ERROR: &str = "Download cancelled";
+pub const MICROPHONE_PERMISSION_DENIED_ERROR: &str = "microphone permission denied";
+pub const MICROPHONE_TEST_RECORDING_IN_PROGRESS_ERROR: &str =
+    "microphone test cannot run while recording";
+
+static NEXT_MICROPHONE_TEST_SESSION: AtomicU64 = AtomicU64::new(1);
+
+/// Allocates a monotonically increasing session identifier for a microphone
+/// level test so stale events or delayed stops cannot affect a newer test.
+pub fn next_microphone_test_session() -> u64 {
+    NEXT_MICROPHONE_TEST_SESSION.fetch_add(1, Ordering::Relaxed)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -190,6 +202,26 @@ pub enum AppEvent {
     /// Another model was made the one that transcribes.
     ActiveModelChanged,
     AudioLevel(f32),
+    #[serde(rename_all = "camelCase")]
+    MicrophoneTestLevel {
+        level: f32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session_id: Option<u64>,
+    },
+    #[serde(rename_all = "camelCase")]
+    MicrophoneTestError {
+        message: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        session_id: Option<u64>,
+    },
+    /// A running microphone test was stopped externally (for example because
+    /// dictation started). When `up_to_session` is `Some`, only sessions up to
+    /// that cutoff are affected so a delayed event cannot cancel a newer test.
+    #[serde(rename_all = "camelCase")]
+    MicrophoneTestStopped {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        up_to_session: Option<u64>,
+    },
     RecordingError {
         message: String,
     },
@@ -258,6 +290,18 @@ pub trait Backend: Send + Sync + 'static {
     fn list_audio_devices(&self) -> CommandResult<Vec<AudioDevice>>;
     fn start_recording(&self, device_name: Option<String>) -> CommandResult<()>;
     fn stop_recording(&self) -> CommandResult<PathBuf>;
+    /// Starts a capture-only microphone input level test for `session_id`.
+    /// Returns `Ok(true)` when capture started, or `Ok(false)` if the request
+    /// was already stopped or superseded before starting.
+    fn start_microphone_test(
+        &self,
+        device_name: Option<String>,
+        session_id: u64,
+    ) -> CommandResult<bool>;
+    /// Stops any active or opening microphone test whose session id is at most
+    /// `up_to_session`, leaving newer sessions untouched. Callers must capture
+    /// `up_to_session` synchronously when requesting the stop.
+    fn stop_microphone_test(&self, up_to_session: u64) -> CommandResult<()>;
     fn mute_media_for_recording(&self) -> CommandResult<()>;
     fn muffle_media_for_recording(&self);
     fn restore_media_after_recording(&self) -> CommandResult<()>;

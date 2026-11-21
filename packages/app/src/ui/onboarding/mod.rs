@@ -194,6 +194,10 @@ impl OnboardingWizard {
     /// Fades the current step out towards `direction`, then brings the
     /// neighbouring step in from the same side.
     fn change_step(&mut self, direction: Direction, cx: &mut Context<Self>) {
+        if let StepView::Microphone(step) = &self.step {
+            step.update(cx, |step, cx| step.stop_test(cx));
+        }
+
         self.animating = true;
         self.opacity.retarget(0.);
         self.offset.retarget(match direction {

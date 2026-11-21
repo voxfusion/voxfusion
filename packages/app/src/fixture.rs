@@ -123,8 +123,17 @@ pub fn now() -> Option<DateTime<Utc>> {
     Some(start + chrono::Duration::from_std(started_at.elapsed()).ok()?)
 }
 
+#[derive(Default)]
+struct FixtureAudioState {
+    recording: bool,
+    latest_mic_test_session: u64,
+    active_mic_test: Option<u64>,
+}
+
 pub struct FixtureBackend {
     data: Mutex<FixtureData>,
+    events: EventSender,
+    audio: Mutex<FixtureAudioState>,
     next_id: Mutex<u32>,
     /// Counts the cancellations asked for; downloads wait for the next one.
     download_cancellations: (Mutex<u32>, Condvar),
@@ -137,9 +146,11 @@ fn block_forever() -> ! {
 }
 
 impl FixtureBackend {
-    pub fn new(data: FixtureData) -> Self {
+    pub fn new(data: FixtureData, events: EventSender) -> Self {
         Self {
             data: Mutex::new(data),
+            events,
+            audio: Mutex::new(FixtureAudioState::default()),
             next_id: Mutex::new(1000),
             download_cancellations: (Mutex::new(0), Condvar::new()),
         }
@@ -244,12 +255,72 @@ impl Backend for FixtureBackend {
     }
 
     fn start_recording(&self, _device_name: Option<String>) -> CommandResult<()> {
-        self.gate("start_recording_with_device")
+        let (was_testing, cutoff) = {
+            let mut audio = self.audio.lock().unwrap();
+            if audio.recording {
+                return Err("Recording is already in progress.".into());
+            }
+            // Reserve recording capture before `gate` so a concurrent
+            // microphone test cannot activate during a scripted latency delay.
+            audio.recording = true;
+            let cutoff = next_microphone_test_session();
+            audio.latest_mic_test_session = audio.latest_mic_test_session.max(cutoff);
+            (audio.active_mic_test.take().is_some(), cutoff)
+        };
+        if was_testing {
+            self.events.emit(AppEvent::MicrophoneTestStopped {
+                up_to_session: Some(cutoff),
+            });
+        }
+        if let Err(err) = self.gate("start_recording_with_device") {
+            self.audio.lock().unwrap().recording = false;
+            return Err(err);
+        }
+        Ok(())
     }
 
     fn stop_recording(&self) -> CommandResult<PathBuf> {
-        self.gate("stop_recording_with_device")?;
+        let result = self.gate("stop_recording_with_device");
+        self.audio.lock().unwrap().recording = false;
+        result?;
         Ok(PathBuf::from("/tmp/mock-recording.wav"))
+    }
+
+    fn start_microphone_test(
+        &self,
+        _device_name: Option<String>,
+        session_id: u64,
+    ) -> CommandResult<bool> {
+        self.gate("start_microphone_test")?;
+        if self.microphone_permission() != PermissionState::Granted {
+            return Err(MICROPHONE_PERMISSION_DENIED_ERROR.into());
+        }
+        let mut audio = self.audio.lock().unwrap();
+        if audio.recording {
+            return Err(MICROPHONE_TEST_RECORDING_IN_PROGRESS_ERROR.into());
+        }
+        if session_id <= audio.latest_mic_test_session {
+            return Ok(false);
+        }
+        audio.latest_mic_test_session = session_id;
+        audio.active_mic_test = Some(session_id);
+        Ok(true)
+    }
+
+    fn stop_microphone_test(&self, up_to_session: u64) -> CommandResult<()> {
+        self.gate("stop_microphone_test")?;
+        let mut audio = self.audio.lock().unwrap();
+        if up_to_session < audio.latest_mic_test_session {
+            return Ok(());
+        }
+        audio.latest_mic_test_session = audio.latest_mic_test_session.max(up_to_session);
+        if audio
+            .active_mic_test
+            .is_some_and(|active| active <= up_to_session)
+        {
+            audio.active_mic_test = None;
+        }
+        Ok(())
     }
 
     fn mute_media_for_recording(&self) -> CommandResult<()> {
@@ -712,7 +783,7 @@ pub fn services(
         update: data.update.clone(),
         download_events,
     };
-    let backend = std::sync::Arc::new(FixtureBackend::new(data));
+    let backend = std::sync::Arc::new(FixtureBackend::new(data, events.clone()));
     let scripted = backend.clone();
 
     std::thread::spawn(move || {
@@ -735,6 +806,9 @@ pub fn services(
                                     model.downloaded |= model.id == report.model_id;
                                 }
                             });
+                        }
+                        if matches!(event, AppEvent::RecordingError { .. }) {
+                            scripted.audio.lock().unwrap().recording = false;
                         }
                         events.emit(event);
                     }

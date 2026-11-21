@@ -20,6 +20,8 @@ use gpui_kit::{
 };
 
 use crate::actions::{NextControl, PreviousControl};
+use crate::backend::AppEvent;
+use crate::events;
 use crate::settings::SettingsStore;
 use crate::ui::hotkey_recorder::{HotkeyKind, HotkeyRecorder, route_keys};
 use crate::ui::text::{TypeScale as _, text};
@@ -96,6 +98,11 @@ impl SettingsModal {
             cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
             cx.observe_in(&hands_free_recorder, window, Self::recorder_changed),
             cx.observe_in(&hold_to_speak_recorder, window, Self::recorder_changed),
+            cx.subscribe(&events::hub(cx), |this, _, event, cx| {
+                if matches!(event, AppEvent::AudioDevicesChanged) {
+                    this.fetch_audio_devices(cx);
+                }
+            }),
         ];
 
         // Keys go to the modal for as long as it is open.
@@ -106,9 +113,14 @@ impl SettingsModal {
             .try_global::<LastSection>()
             .map_or(Section::default(), |last| last.0);
 
+        let mut audio = AudioState::default();
+        if section == Section::Audio {
+            audio.ensure_tester(cx);
+        }
+
         let mut modal = Self {
             section,
-            audio: AudioState::default(),
+            audio,
             model: (section == Section::Model).then(|| cx.new(ModelSettings::new)),
             hands_free_recorder,
             hold_to_speak_recorder,
@@ -123,6 +135,11 @@ impl SettingsModal {
         modal
     }
 
+    fn dismiss(&mut self, cx: &mut Context<Self>) {
+        self.audio.stop_test(cx);
+        cx.emit(DismissEvent);
+    }
+
     fn show_section(&mut self, section: Section, cx: &mut Context<Self>) {
         if section == self.section {
             return;
@@ -132,6 +149,11 @@ impl SettingsModal {
         cx.set_global(LastSection(section));
 
         self.audio.stop_refresh_animation();
+        if section == Section::Audio {
+            self.audio.ensure_tester(cx);
+        } else {
+            self.audio.stop_test(cx);
+        }
         self.model = (section == Section::Model).then(|| cx.new(ModelSettings::new));
         cx.notify();
     }
@@ -223,7 +245,7 @@ impl Render for SettingsModal {
                     .relative()
                     .text_color(p.txt_muted)
                     .hover(|button| button.text_color(p.ac))
-                    .on_click(cx.listener(|_, _, _, cx| cx.emit(DismissEvent)))
+                    .on_click(cx.listener(|this, _, _, cx| this.dismiss(cx)))
                     .child(text("[X]"))
                     .when(close_focused, |button| button.child(focus_ring(4., cx))),
             );
@@ -287,14 +309,14 @@ impl Render for SettingsModal {
             // A recorder takes Escape like any other key.
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                 if event.keystroke.key == "escape" && !this.is_recording_hotkey(cx) {
-                    cx.emit(DismissEvent);
+                    this.dismiss(cx);
                 }
             }))
             // The overlay has the focus until Tab moves it to a control; Enter
             // and Space on it arrive as a click, which must not close it.
-            .on_click(cx.listener(|_, event: &ClickEvent, _, cx| {
+            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                 if !event.is_keyboard() {
-                    cx.emit(DismissEvent);
+                    this.dismiss(cx);
                 }
             }))
             .absolute()

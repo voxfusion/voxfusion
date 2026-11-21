@@ -1,19 +1,22 @@
 //! Step 3: choosing the microphone.
 
 use gpui_kit::{
-    Bounds, Context, FocusHandle, InteractiveElement as _, IntoElement, MouseDownEvent,
-    ParentElement as _, Pixels, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, Window, canvas, deferred, div, prelude::*, px, relative, transparent_black,
+    AppContext as _, Bounds, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
+    MouseDownEvent, ParentElement as _, Pixels, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Window, canvas, deferred, div,
+    prelude::*, px, relative, transparent_black,
 };
 use std::cell::Cell;
 use std::rc::Rc;
 
 use super::parts::{card, description, icon_box, step_column, title};
-use crate::backend::{self, AudioDevice};
+use crate::backend::{self, AppEvent, AudioDevice};
+use crate::events;
 use crate::settings::SettingsStore;
 use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::microphone_test::{MicrophoneTest, TestSurface};
 use crate::ui::widgets::turning;
 use crate::ui::widgets::{icon, spinning};
 use crate::ui::{t, t_upper};
@@ -30,29 +33,47 @@ struct MicrophoneOption {
 
 pub struct MicrophoneStep {
     devices: Vec<AudioDevice>,
+    fetch_generation: u64,
     loading: bool,
     list_open: bool,
     trigger_focus: FocusHandle,
     /// Where the select's button is, to tell a press on it from one outside.
     trigger_bounds: Rc<Cell<Bounds<Pixels>>>,
-    _settings: Subscription,
+    tester: Entity<MicrophoneTest>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl MicrophoneStep {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let subscriptions = vec![
+            cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
+            cx.subscribe(&events::hub(cx), |this, _, event, cx| {
+                if matches!(event, AppEvent::AudioDevicesChanged) {
+                    this.fetch_devices(cx);
+                }
+            }),
+        ];
         let mut step = Self {
             devices: Vec::new(),
+            fetch_generation: 0,
             loading: false,
             list_open: false,
             trigger_focus: cx.focus_handle(),
             trigger_bounds: Rc::default(),
-            _settings: cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
+            tester: cx.new(|cx| MicrophoneTest::new(TestSurface::Onboarding, cx)),
+            _subscriptions: subscriptions,
         };
         step.fetch_devices(cx);
         step
     }
 
+    pub fn stop_test(&mut self, cx: &mut Context<Self>) {
+        self.tester.update(cx, |tester, cx| tester.stop(cx));
+    }
+
     fn fetch_devices(&mut self, cx: &mut Context<Self>) {
+        self.fetch_generation = self.fetch_generation.wrapping_add(1);
+        let generation = self.fetch_generation;
         self.loading = true;
         cx.notify();
 
@@ -61,6 +82,11 @@ impl MicrophoneStep {
             let devices = devices.await.unwrap_or_default();
 
             this.update(cx, |this, cx| {
+                if this.fetch_generation != generation {
+                    return;
+                }
+                this.tester
+                    .update(cx, |tester, cx| tester.sync_devices(&devices, cx));
                 this.devices = devices;
                 this.loading = false;
                 cx.notify();
@@ -289,7 +315,8 @@ impl Render for MicrophoneStep {
                     .flex_col()
                     .gap_3()
                     .child(self.render_refresh(cx))
-                    .child(self.render_select(cx)),
+                    .child(self.render_select(cx))
+                    .child(self.tester.clone()),
             );
 
         step_column("[STEP_03] > MICROPHONE_SELECT", p.ac).child(card(content, cx))

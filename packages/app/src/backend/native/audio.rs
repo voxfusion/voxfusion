@@ -6,11 +6,15 @@ use std::fs::{File, create_dir_all};
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{Arc, Condvar, LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
 use super::microphones::{self, InputKind};
-use crate::backend::{AppEvent, AudioDevice, EventSender};
+use super::permissions;
+use crate::backend::{
+    AppEvent, AudioDevice, EventSender, MICROPHONE_PERMISSION_DENIED_ERROR,
+    MICROPHONE_TEST_RECORDING_IN_PROGRESS_ERROR, PermissionState, next_microphone_test_session,
+};
 
 type Wav = WavWriter<BufWriter<File>>;
 type WavWriterHandle = Arc<Mutex<Option<Wav>>>;
@@ -61,6 +65,126 @@ struct InputClock {
 
 static RECORDING: Mutex<Option<Recording>> = Mutex::new(None);
 static NEXT_RECORDING_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Coordinates exclusive capture ownership and detached teardown between
+/// dictation and live microphone tests without ever holding a lock across
+/// CoreAudio open, `play()`, `pause()`, or stream drop calls.
+///
+/// Lock discipline: `RECORDING` and `CAPTURE` are never held simultaneously.
+struct CaptureState {
+    /// Set while dictation is starting or actively recording.
+    recording: bool,
+    /// Lid-close handover threads currently opening a replacement dictation
+    /// stream off-lock, before the stream is installed or handed to teardown.
+    opening_recording: usize,
+    /// Detached `audio-stream-close` threads currently closing a dictation stream.
+    closing_recording: usize,
+    /// Highest microphone test session id seen from any start or stop request.
+    /// Older start requests are discarded so out-of-order threads cannot reopen
+    /// a stopped or superseded test.
+    latest_test_session: u64,
+    /// Microphone test session currently inside `open_test_input` off-lock.
+    opening_test: Option<u64>,
+    /// The live microphone test stream, if any.
+    active_test: Option<MicTest>,
+    /// Detached `audio-stream-close` threads currently closing a test stream.
+    closing_test: usize,
+}
+
+struct MicTest {
+    id: u64,
+    stream: SafeStream,
+    clock: Arc<InputClock>,
+    /// Cleared before teardown so callbacks stop emitting levels or errors.
+    current: Arc<AtomicBool>,
+}
+
+#[derive(Clone, Copy)]
+enum StreamKind {
+    Recording,
+    MicTest,
+}
+
+/// Accounts for one stream currently being torn down on a detached thread.
+/// Created while holding `CAPTURE`; dropping it decrements the matching count
+/// and wakes any caller waiting for exclusive capture access.
+struct CloseToken(StreamKind);
+
+impl Drop for CloseToken {
+    fn drop(&mut self) {
+        if let Ok(mut state) = CAPTURE.lock() {
+            match self.0 {
+                StreamKind::Recording => {
+                    state.closing_recording = state.closing_recording.saturating_sub(1);
+                }
+                StreamKind::MicTest => {
+                    state.closing_test = state.closing_test.saturating_sub(1);
+                }
+            }
+            CAPTURE_CHANGED.notify_all();
+        }
+    }
+}
+
+fn begin_close(state: &mut CaptureState, kind: StreamKind) -> CloseToken {
+    match kind {
+        StreamKind::Recording => state.closing_recording += 1,
+        StreamKind::MicTest => state.closing_test += 1,
+    }
+    CloseToken(kind)
+}
+
+/// Holds the dictation capture reservation during `start_recording_with_device`
+/// and automatically releases it on any early error return.
+struct RecordingReservation {
+    active: bool,
+}
+
+impl RecordingReservation {
+    fn commit(mut self) {
+        self.active = false;
+    }
+}
+
+impl Drop for RecordingReservation {
+    fn drop(&mut self) {
+        if self.active
+            && let Ok(mut state) = CAPTURE.lock()
+        {
+            state.recording = false;
+            CAPTURE_CHANGED.notify_all();
+        }
+    }
+}
+
+/// Tracks a lid-close replacement input open until the replacement stream is
+/// installed into `RECORDING` or handed off to tracked teardown.
+struct RecordingSwitchGuard;
+
+impl Drop for RecordingSwitchGuard {
+    fn drop(&mut self) {
+        if let Ok(mut state) = CAPTURE.lock() {
+            state.opening_recording = state.opening_recording.saturating_sub(1);
+            CAPTURE_CHANGED.notify_all();
+        }
+    }
+}
+
+/// How long starting dictation or a microphone test waits for an opposing
+/// capture stream open or detached teardown to finish before rejecting instead
+/// of opening an overlapping stream.
+const CAPTURE_HANDOFF_WAIT: Duration = Duration::from_millis(500);
+
+static CAPTURE: Mutex<CaptureState> = Mutex::new(CaptureState {
+    recording: false,
+    opening_recording: 0,
+    closing_recording: 0,
+    latest_test_session: 0,
+    opening_test: None,
+    active_test: None,
+    closing_test: 0,
+});
+static CAPTURE_CHANGED: Condvar = Condvar::new();
 
 /// How long a newly opened input may take to deliver its first samples.
 /// Bluetooth microphones switch profiles when opened and can take seconds.
@@ -167,10 +291,10 @@ pub fn start_recording_with_device(
     events: &EventSender,
     device_name: Option<String>,
 ) -> Result<(), String> {
-    let mut active = RECORDING.lock().map_err(|err| err.to_string())?;
-    if active.is_some() {
-        return Err("Recording is already in progress.".to_string());
-    }
+    // Reserve capture exclusively for dictation, stop any running or opening
+    // microphone test, and wait boundedly for test open/teardown to complete
+    // so dictation never blocks indefinitely and never overlaps a test stream.
+    let reservation = reserve_recording_capture(events)?;
 
     let host = cpal::default_host();
     let (device, kind) = input_device(&host, device_name.as_deref())?;
@@ -207,14 +331,17 @@ pub fn start_recording_with_device(
     };
 
     // Only publish the recording once the stream is running — any error above
-    // leaves the recorder ready for a retry.
-    *active = Some(Recording {
-        sink,
-        input,
-        switching_input: false,
-        save_path,
-    });
-    drop(active);
+    // drops `reservation` and leaves the recorder ready for a retry.
+    {
+        let mut active = RECORDING.lock().map_err(|err| err.to_string())?;
+        *active = Some(Recording {
+            sink,
+            input,
+            switching_input: false,
+            save_path,
+        });
+    }
+    reservation.commit();
 
     log::info!(
         target: "audio",
@@ -310,7 +437,10 @@ fn open_input(
             None,
         )
         .map_err(|err| err.to_string())?;
-    stream.play().map_err(|err| err.to_string())?;
+    if let Err(err) = stream.play() {
+        close_stream(SafeStream(stream), StreamKind::Recording);
+        return Err(err.to_string());
+    }
 
     Ok(Input {
         stream: SafeStream(stream),
@@ -341,6 +471,17 @@ pub fn lid_changed(closed: bool) {
 /// was said so far stays in the file, and the next microphone's samples are
 /// converted to its format.
 fn take_over_from_built_in_microphone() {
+    // Register the in-flight replacement open before checking `RECORDING` so
+    // stopping dictation mid-switch cannot let a microphone test open before
+    // this replacement stream is either installed or handed off to teardown.
+    let _switch_guard = match CAPTURE.lock() {
+        Ok(mut state) => {
+            state.opening_recording += 1;
+            RecordingSwitchGuard
+        }
+        Err(_) => return,
+    };
+
     let sink = RECORDING.lock().ok().and_then(|mut active| {
         let recording = active
             .as_mut()
@@ -366,13 +507,16 @@ fn take_over_from_built_in_microphone() {
         });
 
     let Ok(mut active) = RECORDING.lock() else {
+        if let Ok((input, _, _)) = input {
+            close_stream(input.stream, StreamKind::Recording);
+        }
         return;
     };
     let Some(recording) = active.as_mut().filter(|recording| recording.sink.id == id) else {
         // The recording ended meanwhile.
         drop(active);
         if let Ok((input, _, _)) = input {
-            close_stream(input.stream);
+            close_stream(input.stream, StreamKind::Recording);
         }
         return;
     };
@@ -393,7 +537,7 @@ fn take_over_from_built_in_microphone() {
     let kind = input.kind;
     let previous = std::mem::replace(&mut recording.input, input);
     drop(active);
-    close_stream(previous.stream);
+    close_stream(previous.stream, StreamKind::Recording);
 
     log::info!(
         target: "audio",
@@ -417,7 +561,7 @@ pub fn stop_recording_with_device() -> Result<PathBuf, String> {
         .lock()
         .map_err(|err| err.to_string())?
         .take();
-    close_stream(recording.input.stream);
+    finish_recording_stream(recording.input.stream);
 
     if let Some(writer) = writer {
         writer.finalize().map_err(|err| err.to_string())?;
@@ -445,17 +589,41 @@ fn fail_recording(id: u64, events: &EventSender, message: String) {
 
     log::error!(target: "audio", "recording stream error id={id}: {message}");
     discard_recording_file(&recording.sink.writer, &recording.save_path);
-    close_stream(recording.input.stream);
+    finish_recording_stream(recording.input.stream);
     events.emit(AppEvent::RecordingError { message });
 }
 
-/// Pauses and drops a capture stream on a detached thread. CoreAudio teardown
-/// can block on a device that has just disappeared, and that must not wedge
-/// the recorder or the command that stopped it.
-fn close_stream(stream: SafeStream) {
+/// Atomically marks the dictation stream as tearing down and releases the
+/// dictation capture reservation before spawning detached teardown.
+fn finish_recording_stream(stream: SafeStream) {
+    let token = CAPTURE.lock().ok().map(|mut state| {
+        let token = begin_close(&mut state, StreamKind::Recording);
+        state.recording = false;
+        CAPTURE_CHANGED.notify_all();
+        token
+    });
+    spawn_stream_close(stream, token);
+}
+
+/// Pauses and drops a capture stream on a detached thread, tracking teardown in
+/// `CAPTURE` so opposing capture operations wait or reject instead of
+/// overlapping while CoreAudio still holds the device.
+fn close_stream(stream: SafeStream, kind: StreamKind) {
+    let token = CAPTURE
+        .lock()
+        .ok()
+        .map(|mut state| begin_close(&mut state, kind));
+    spawn_stream_close(stream, token);
+}
+
+fn spawn_stream_close(stream: SafeStream, token: Option<CloseToken>) {
+    // Tuple fields drop in declaration order, so `stream` is always dropped
+    // before `token` decrements the teardown counter — even if spawning fails.
+    let closing = (stream, token);
     let spawned = std::thread::Builder::new()
         .name("audio-stream-close".into())
         .spawn(move || {
+            let (stream, _token) = closing;
             let _ = stream.0.pause();
             drop(stream);
         });
@@ -503,6 +671,529 @@ fn watch_input(id: u64, events: EventSender) {
         if silent_for > timeout.as_millis() as u64 {
             fail_recording(
                 id,
+                &events,
+                format!("Input device delivered no audio for {silent_for} ms"),
+            );
+            return;
+        }
+    }
+}
+
+/// Resolves the microphone to test. An explicitly chosen device must exist
+/// rather than silently testing a fallback; `"default"` / `None` follows the
+/// same resolution as dictation (including clamshell replacement).
+fn test_input_device(
+    host: &cpal::Host,
+    device_name: Option<&str>,
+) -> Result<(cpal::Device, InputKind), String> {
+    if let Some(name) = device_name.filter(|name| *name != "default" && !name.is_empty()) {
+        let device = host
+            .input_devices()
+            .map_err(|err| err.to_string())?
+            .find(|device| read_device_name(device).as_deref() == Some(name))
+            .ok_or_else(|| format!("Selected microphone is unavailable: {name}"))?;
+        let kind = microphones::kind(&device);
+        return Ok((device, kind));
+    }
+
+    input_device(host, None)
+}
+
+/// Reserves capture for dictation, preempting any active or opening microphone
+/// test and waiting up to [`CAPTURE_HANDOFF_WAIT`] for test capture to release
+/// the audio device. Rejects instead of overlapping if a test is still stalled.
+fn reserve_recording_capture(events: &EventSender) -> Result<RecordingReservation, String> {
+    let (previous, stop_cutoff) = {
+        let mut state = CAPTURE.lock().map_err(|err| err.to_string())?;
+        if state.recording {
+            return Err("Recording is already in progress.".to_string());
+        }
+        state.recording = true;
+
+        let cutoff = next_microphone_test_session();
+        let had_test = state.active_test.is_some() || state.opening_test.is_some();
+        state.latest_test_session = state.latest_test_session.max(cutoff);
+        let previous = state.active_test.take().map(|test| {
+            let token = begin_close(&mut state, StreamKind::MicTest);
+            (test, token)
+        });
+        CAPTURE_CHANGED.notify_all();
+        (previous, had_test.then_some(cutoff))
+    };
+
+    let reservation = RecordingReservation { active: true };
+
+    if let Some((test, token)) = previous {
+        test.current.store(false, Ordering::Release);
+        spawn_stream_close(test.stream, Some(token));
+        log::info!(
+            target: "audio",
+            "microphone_test_stopped id={} reason=recording_started",
+            test.id
+        );
+    }
+    if let Some(cutoff) = stop_cutoff {
+        events.emit(AppEvent::MicrophoneTestStopped {
+            up_to_session: Some(cutoff),
+        });
+    }
+
+    let deadline = Instant::now() + CAPTURE_HANDOFF_WAIT;
+    let mut state = CAPTURE.lock().map_err(|err| err.to_string())?;
+    while state.opening_test.is_some() || state.closing_test > 0 {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(
+                "Audio input device is still busy closing the microphone test.".to_string(),
+            );
+        }
+        let (guard, result) = CAPTURE_CHANGED
+            .wait_timeout(state, remaining)
+            .map_err(|err| err.to_string())?;
+        state = guard;
+        if result.timed_out() && (state.opening_test.is_some() || state.closing_test > 0) {
+            return Err(
+                "Audio input device is still busy closing the microphone test.".to_string(),
+            );
+        }
+    }
+
+    Ok(reservation)
+}
+
+/// Opens a capture-only stream for testing input levels. Does not write WAV
+/// files, trigger media mute/muffle, or play cues. Returns `Ok(true)` when
+/// capture started, or `Ok(false)` if stopped or superseded before opening.
+pub fn start_microphone_test(
+    events: &EventSender,
+    device_name: Option<String>,
+    session_id: u64,
+) -> Result<bool, String> {
+    if permissions::microphone_permission() != PermissionState::Granted {
+        return Err(MICROPHONE_PERMISSION_DENIED_ERROR.to_string());
+    }
+
+    // Stop any earlier microphone test and wake earlier queued starters.
+    let previous = {
+        let mut state = CAPTURE.lock().map_err(|err| err.to_string())?;
+        if state.recording {
+            return Err(MICROPHONE_TEST_RECORDING_IN_PROGRESS_ERROR.to_string());
+        }
+        if session_id <= state.latest_test_session {
+            return Ok(false);
+        }
+        state.latest_test_session = session_id;
+        let previous = state.active_test.take().map(|test| {
+            let token = begin_close(&mut state, StreamKind::MicTest);
+            (test, token)
+        });
+        CAPTURE_CHANGED.notify_all();
+        previous
+    };
+
+    if let Some((prev, token)) = previous {
+        prev.current.store(false, Ordering::Release);
+        spawn_stream_close(prev.stream, Some(token));
+        log::info!(
+            target: "audio",
+            "microphone_test_stopped id={} reason=replaced",
+            prev.id
+        );
+    }
+
+    // Wait boundedly for any in-flight open or detached teardown (from either
+    // dictation or an earlier test) so streams never overlap on the device.
+    let deadline = Instant::now() + CAPTURE_HANDOFF_WAIT;
+    {
+        let mut state = CAPTURE.lock().map_err(|err| err.to_string())?;
+        loop {
+            if state.recording {
+                return Err(MICROPHONE_TEST_RECORDING_IN_PROGRESS_ERROR.to_string());
+            }
+            if state.latest_test_session != session_id {
+                return Ok(false);
+            }
+            if state.opening_test.is_none()
+                && state.closing_test == 0
+                && state.opening_recording == 0
+                && state.closing_recording == 0
+            {
+                state.opening_test = Some(session_id);
+                break;
+            }
+
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(
+                    "Audio input device is still releasing the previous stream; try again."
+                        .to_string(),
+                );
+            }
+            let (guard, result) = CAPTURE_CHANGED
+                .wait_timeout(state, remaining)
+                .map_err(|err| err.to_string())?;
+            state = guard;
+            if result.timed_out()
+                && !state.recording
+                && state.latest_test_session == session_id
+                && (state.opening_test.is_some()
+                    || state.closing_test > 0
+                    || state.opening_recording > 0
+                    || state.closing_recording > 0)
+            {
+                return Err(
+                    "Audio input device is still releasing the previous stream; try again."
+                        .to_string(),
+                );
+            }
+        }
+    }
+
+    let opened = open_test_input(events, device_name.as_deref(), session_id);
+    let (stream, clock, current, early_error, resolved_name, kind, config) = match opened {
+        Ok(opened) => opened,
+        Err(err) => {
+            if let Ok(mut state) = CAPTURE.lock() {
+                if state.opening_test == Some(session_id) {
+                    state.opening_test = None;
+                }
+                CAPTURE_CHANGED.notify_all();
+            }
+            return Err(err);
+        }
+    };
+
+    let (discard_token, early_err) = {
+        let mut state = CAPTURE.lock().map_err(|err| err.to_string())?;
+        if state.opening_test == Some(session_id) {
+            state.opening_test = None;
+        }
+
+        if state.recording || state.latest_test_session != session_id {
+            let token = begin_close(&mut state, StreamKind::MicTest);
+            CAPTURE_CHANGED.notify_all();
+            (Some(token), None)
+        } else {
+            let early_err = {
+                let mut guard = early_error.lock().map_err(|err| err.to_string())?;
+                if let Some(err) = guard.take() {
+                    Some(err)
+                } else {
+                    current.store(true, Ordering::Release);
+                    None
+                }
+            };
+            if let Some(err) = early_err {
+                let token = begin_close(&mut state, StreamKind::MicTest);
+                CAPTURE_CHANGED.notify_all();
+                (Some(token), Some(err))
+            } else {
+                state.active_test = Some(MicTest {
+                    id: session_id,
+                    stream,
+                    clock,
+                    current,
+                });
+                CAPTURE_CHANGED.notify_all();
+                // Published: drop `state` and continue to logging/watchdog.
+                drop(state);
+                log::info!(
+                    target: "audio",
+                    "microphone_test_started id={session_id} device={resolved_name:?} kind={kind:?} sample_rate={} channels={}",
+                    config.sample_rate,
+                    config.channels
+                );
+
+                let watchdog_events = events.clone();
+                let spawned = std::thread::Builder::new()
+                    .name("audio-mic-test-watchdog".into())
+                    .spawn(move || watch_mic_test(session_id, watchdog_events));
+                if let Err(err) = spawned {
+                    log::warn!(
+                        target: "audio",
+                        "microphone test watchdog not started id={session_id} error={err}"
+                    );
+                }
+
+                return Ok(true);
+            }
+        }
+    };
+
+    current.store(false, Ordering::Release);
+    spawn_stream_close(stream, discard_token);
+    if let Some(err) = early_err {
+        return Err(err);
+    }
+    Ok(false)
+}
+
+type OpenedTestInput = (
+    SafeStream,
+    Arc<InputClock>,
+    Arc<AtomicBool>,
+    Arc<Mutex<Option<String>>>,
+    String,
+    InputKind,
+    cpal::StreamConfig,
+);
+
+fn open_test_input(
+    events: &EventSender,
+    device_name: Option<&str>,
+    session_id: u64,
+) -> Result<OpenedTestInput, String> {
+    let host = cpal::default_host();
+    let (device, kind) = test_input_device(&host, device_name)?;
+    let supported_config = device
+        .default_input_config()
+        .map_err(|err| err.to_string())?;
+    let sample_format = supported_config.sample_format();
+    let config = supported_config.config();
+    let resolved_name = read_device_name(&device).unwrap_or_default();
+
+    let clock = Arc::new(InputClock {
+        opened_ms: elapsed_ms(),
+        last_input_ms: AtomicU64::new(NO_INPUT_YET),
+    });
+    let current = Arc::new(AtomicBool::new(false));
+    let early_error: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+
+    let err_events = events.clone();
+    let err_current = current.clone();
+    let err_early = early_error.clone();
+    let err_fn = move |err: StreamError| {
+        if matches!(err, StreamError::BufferUnderrun) {
+            log::warn!(target: "audio", "microphone test stream overrun id={session_id}");
+            return;
+        }
+
+        let should_fail = if err_current.load(Ordering::Acquire) {
+            true
+        } else {
+            let Ok(mut guard) = err_early.lock() else {
+                return;
+            };
+            if err_current.load(Ordering::Acquire) {
+                true
+            } else {
+                if guard.is_none() {
+                    *guard = Some(err.to_string());
+                }
+                false
+            }
+        };
+        if !should_fail {
+            return;
+        }
+
+        // Errors can arrive on CoreAudio's realtime thread; tear down elsewhere.
+        let events = err_events.clone();
+        let message = err.to_string();
+        std::thread::spawn(move || fail_mic_test(session_id, &events, message));
+    };
+
+    let stream = build_test_stream(
+        &device,
+        sample_format,
+        &config,
+        session_id,
+        events.clone(),
+        clock.clone(),
+        current.clone(),
+        err_fn,
+    )?;
+    if let Err(err) = stream.play() {
+        // Route failed streams through detached teardown so a stalled driver
+        // cannot block the caller while dropping `stream`.
+        close_stream(SafeStream(stream), StreamKind::MicTest);
+        return Err(err.to_string());
+    }
+
+    Ok((
+        SafeStream(stream),
+        clock,
+        current,
+        early_error,
+        resolved_name,
+        kind,
+        config,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_test_stream<E>(
+    device: &cpal::Device,
+    sample_format: cpal::SampleFormat,
+    config: &cpal::StreamConfig,
+    session_id: u64,
+    events: EventSender,
+    clock: Arc<InputClock>,
+    current: Arc<AtomicBool>,
+    err_fn: E,
+) -> Result<Stream, String>
+where
+    E: FnMut(StreamError) + Send + 'static,
+{
+    let mut last_emit_ms = elapsed_ms().saturating_sub(33);
+    let mut peak_since_emit = 0.0f32;
+
+    let mut report_level = move |level: f32| {
+        clock.last_input_ms.store(elapsed_ms(), Ordering::Relaxed);
+        if !current.load(Ordering::Acquire) {
+            return;
+        }
+
+        peak_since_emit = peak_since_emit.max(level);
+        let now = elapsed_ms();
+        if now.saturating_sub(last_emit_ms) >= 33 {
+            last_emit_ms = now;
+            let emitted = std::mem::take(&mut peak_since_emit);
+            events.emit(AppEvent::MicrophoneTestLevel {
+                level: emitted,
+                session_id: Some(session_id),
+            });
+        }
+    };
+
+    match sample_format {
+        cpal::SampleFormat::I16 => device.build_input_stream(
+            config,
+            move |data: &[i16], _: &cpal::InputCallbackInfo| {
+                let level =
+                    compute_audio_level(data.iter().map(|&s| f32::from(s) / 32768.0), data.len());
+                report_level(level);
+            },
+            err_fn,
+            None,
+        ),
+        cpal::SampleFormat::U16 => device.build_input_stream(
+            config,
+            move |data: &[u16], _: &cpal::InputCallbackInfo| {
+                let level = compute_audio_level(
+                    data.iter().map(|&s| (f32::from(s) - 32768.0) / 32768.0),
+                    data.len(),
+                );
+                report_level(level);
+            },
+            err_fn,
+            None,
+        ),
+        cpal::SampleFormat::I32 => device.build_input_stream(
+            config,
+            move |data: &[i32], _: &cpal::InputCallbackInfo| {
+                let level = compute_audio_level(
+                    data.iter().map(|&s| s as f32 / i32::MAX as f32),
+                    data.len(),
+                );
+                report_level(level);
+            },
+            err_fn,
+            None,
+        ),
+        _ => device.build_input_stream(
+            config,
+            move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                let level = compute_audio_level(data.iter().copied(), data.len());
+                report_level(level);
+            },
+            err_fn,
+            None,
+        ),
+    }
+    .map_err(|err| err.to_string())
+}
+
+pub fn stop_microphone_test(up_to_session: u64) -> Result<(), String> {
+    let previous = {
+        let mut state = CAPTURE.lock().map_err(|err| err.to_string())?;
+        if up_to_session < state.latest_test_session {
+            return Ok(());
+        }
+        state.latest_test_session = state.latest_test_session.max(up_to_session);
+        // Keep `opening_test` intact until `open_test_input` returns so no
+        // overlapping stream opens while the cancelled open is still in flight.
+        let previous = if state
+            .active_test
+            .as_ref()
+            .is_some_and(|test| test.id <= up_to_session)
+        {
+            state.active_test.take().map(|test| {
+                let token = begin_close(&mut state, StreamKind::MicTest);
+                (test, token)
+            })
+        } else {
+            None
+        };
+        CAPTURE_CHANGED.notify_all();
+        previous
+    };
+
+    if let Some((test, token)) = previous {
+        test.current.store(false, Ordering::Release);
+        spawn_stream_close(test.stream, Some(token));
+        log::info!(target: "audio", "microphone_test_stopped id={}", test.id);
+    }
+
+    Ok(())
+}
+
+fn fail_mic_test(session_id: u64, events: &EventSender, message: String) {
+    let previous = match CAPTURE.lock() {
+        Ok(mut state)
+            if state
+                .active_test
+                .as_ref()
+                .is_some_and(|test| test.id == session_id) =>
+        {
+            let previous = state.active_test.take().map(|test| {
+                let token = begin_close(&mut state, StreamKind::MicTest);
+                (test, token)
+            });
+            CAPTURE_CHANGED.notify_all();
+            previous
+        }
+        _ => None,
+    };
+    let Some((test, token)) = previous else {
+        return;
+    };
+
+    log::error!(target: "audio", "microphone_test_error id={session_id}: {message}");
+    test.current.store(false, Ordering::Release);
+    spawn_stream_close(test.stream, Some(token));
+    events.emit(AppEvent::MicrophoneTestError {
+        message,
+        session_id: Some(session_id),
+    });
+}
+
+fn watch_mic_test(session_id: u64, events: EventSender) {
+    loop {
+        std::thread::sleep(INPUT_WATCHDOG_INTERVAL);
+
+        let clock = match CAPTURE.lock() {
+            Ok(state) => match state
+                .active_test
+                .as_ref()
+                .filter(|test| test.id == session_id)
+            {
+                Some(test) => test.clock.clone(),
+                None => return,
+            },
+            Err(_) => return,
+        };
+
+        let now_ms = elapsed_ms();
+        let last_ms = clock.last_input_ms.load(Ordering::Relaxed);
+        let (silent_for, timeout) = if last_ms == NO_INPUT_YET {
+            (now_ms.saturating_sub(clock.opened_ms), FIRST_INPUT_TIMEOUT)
+        } else {
+            (now_ms.saturating_sub(last_ms), INPUT_STALL_TIMEOUT)
+        };
+        if silent_for > timeout.as_millis() as u64 {
+            fail_mic_test(
+                session_id,
                 &events,
                 format!("Input device delivered no audio for {silent_for} ms"),
             );
@@ -695,6 +1386,30 @@ fn elapsed_ms() -> u64 {
     START_TIME.elapsed().as_millis() as u64
 }
 
+fn compute_audio_level<I>(samples: I, count: usize) -> f32
+where
+    I: IntoIterator<Item = f32>,
+{
+    if count == 0 {
+        return 0.0;
+    }
+
+    let mut sum: f64 = 0.0;
+    let mut peak: f64 = 0.0;
+    for sample in samples {
+        let value = f64::from(sample);
+        if !value.is_finite() {
+            continue;
+        }
+        sum += value * value;
+        peak = peak.max(value.abs());
+    }
+
+    let rms = (sum / count as f64).sqrt();
+    // Use a combination of RMS and peak for responsive visualization (0..=100).
+    ((rms * 0.7 + peak * 0.3) * 150.0).min(100.0) as f32
+}
+
 fn write_input_data_with_levels(
     input: &[f32],
     writer: &mut Wav,
@@ -705,28 +1420,17 @@ fn write_input_data_with_levels(
         return;
     }
 
-    // Calculate RMS (root mean square) for audio level
-    let mut sum: f64 = 0.0;
-    let mut peak: f64 = 0.0;
-
     for &sample in input.iter() {
         writer.write_sample(sample).ok();
-
-        let value_f64 = sample as f64;
-        sum += value_f64 * value_f64;
-        peak = peak.max(value_f64.abs());
     }
 
-    // Calculate RMS and normalize to 0-100 range
-    let rms = (sum / input.len() as f64).sqrt();
-    // Use a combination of RMS and peak for more responsive visualization
-    let level = ((rms * 0.7 + peak * 0.3) * 150.0).min(100.0);
+    let level = compute_audio_level(input.iter().copied(), input.len());
 
     // Throttle to ~30fps (every ~33ms)
     let now = elapsed_ms();
-    if now - *last_emit_ms >= 33 {
+    if now.saturating_sub(*last_emit_ms) >= 33 {
         *last_emit_ms = now;
-        events.emit(AppEvent::AudioLevel(level as f32));
+        events.emit(AppEvent::AudioLevel(level));
     }
 }
 

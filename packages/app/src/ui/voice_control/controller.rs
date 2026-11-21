@@ -152,6 +152,7 @@ impl VoiceController {
     pub fn shut_down(&mut self, cx: &App) {
         let backend = backend::backend(cx);
 
+        let _ = backend.stop_microphone_test(backend::next_microphone_test_session());
         if let Err(error) = backend.restore_media_after_recording() {
             log::error!(target: "voice", "restore_media_on_exit_failed error={error}");
         }
@@ -341,6 +342,13 @@ impl VoiceController {
         self.dictation.starting = true;
         self.clear_error_state();
         self.cancel_pending_media_quiet();
+        let cutoff = backend::next_microphone_test_session();
+        events::emit(
+            cx,
+            AppEvent::MicrophoneTestStopped {
+                up_to_session: Some(cutoff),
+            },
+        );
         cx.notify();
         log::info!(target: "voice", "start_recording_started mode={}", mode.name());
 

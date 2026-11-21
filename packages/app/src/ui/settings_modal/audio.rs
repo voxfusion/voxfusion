@@ -2,9 +2,9 @@
 //! sound while it does.
 
 use gpui_kit::{
-    Animation, AnimationExt as _, App, Context, InteractiveElement as _, IntoElement,
-    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _, Task, Window,
-    div, ease_in_out, prelude::*,
+    Animation, AnimationExt as _, App, AppContext as _, Context, Entity, InteractiveElement as _,
+    IntoElement, ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Task, Window, div, ease_in_out, prelude::*,
 };
 use std::time::Duration;
 
@@ -16,6 +16,7 @@ use crate::ui::motion::Transitions as _;
 use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::microphone_test::{MicrophoneTest, TestSurface};
 use crate::ui::widgets::select::{SelectOption, select};
 use crate::ui::widgets::toggle::toggle_option;
 use crate::ui::widgets::{animations_frozen, icon};
@@ -29,12 +30,35 @@ const DEFAULT_MICROPHONE: &str = "default";
 #[derive(Default)]
 pub(super) struct AudioState {
     devices: Vec<AudioDevice>,
+    devices_loaded: bool,
+    fetch_generation: u64,
     /// Whether the refresh button is making its turn, during which it is off.
     refreshing: bool,
     refresh_timer: Option<Task<()>>,
+    /// Exists while the Audio section is shown so leaving the section stops
+    /// any live test and starts fresh on return.
+    tester: Option<Entity<MicrophoneTest>>,
 }
 
 impl AudioState {
+    pub(super) fn ensure_tester(&mut self, cx: &mut App) {
+        if self.tester.is_none() {
+            let devices = self.devices.clone();
+            let loaded = self.devices_loaded;
+            let tester = cx.new(|cx| MicrophoneTest::new(TestSurface::Settings, cx));
+            if loaded {
+                tester.update(cx, |tester, cx| tester.sync_devices(&devices, cx));
+            }
+            self.tester = Some(tester);
+        }
+    }
+
+    pub(super) fn stop_test(&mut self, cx: &mut App) {
+        if let Some(tester) = self.tester.take() {
+            tester.update(cx, |tester, cx| tester.stop(cx));
+        }
+    }
+
     pub(super) fn stop_refresh_animation(&mut self) {
         self.refreshing = false;
         self.refresh_timer = None;
@@ -70,12 +94,21 @@ fn microphone_options(devices: &[AudioDevice], default_label: &str) -> Vec<Selec
 
 impl SettingsModal {
     pub(super) fn fetch_audio_devices(&mut self, cx: &mut Context<Self>) {
+        self.audio.fetch_generation = self.audio.fetch_generation.wrapping_add(1);
+        let generation = self.audio.fetch_generation;
         let devices = audio_input_devices(cx);
 
         cx.spawn(async move |this, cx| {
             let devices = devices.await;
             this.update(cx, |this, cx| {
+                if this.audio.fetch_generation != generation {
+                    return;
+                }
+                if let Some(tester) = &this.audio.tester {
+                    tester.update(cx, |tester, cx| tester.sync_devices(&devices, cx));
+                }
                 this.audio.devices = devices;
+                this.audio.devices_loaded = true;
                 cx.notify();
             })
             .ok();
@@ -187,7 +220,10 @@ impl SettingsModal {
                     .type_xs()
                     .text_color(p.txt_hint)
                     .child(text(t(cx, "settings.microphoneDescription"))),
-            );
+            )
+            .when_some(self.audio.tester.clone(), |section, tester| {
+                section.child(div().mt_4().child(tester))
+            });
 
         div()
             .flex()
