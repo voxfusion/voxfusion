@@ -61,7 +61,7 @@
 	"style.defaultStyleDescription": "Gilt für jedes Diktat, außer in Apps und auf Websites aus den anderen Tabs. Ein gewählter Stil gilt sofort.",
 	"style.inUse": "Aktiv",
 	"style.saved": "Gespeichert",
-	"style.parakeetIgnoresStyles": "Parakeet, das aktive Modell, ignoriert Stile.",
+	"style.modelIgnoresStyles": "{{model}}, das aktive Modell, ignoriert Stile.",
 	"style.tabDefault": "Standard",
 	"style.tabPerApp": "Pro App",
 	"style.tabSites": "Pro Site",

@@ -61,7 +61,7 @@
 	"style.defaultStyleDescription": "Используется для всех диктовок, кроме приложений и сайтов с других вкладок. Выбранный стиль применяется сразу.",
 	"style.inUse": "Используется",
 	"style.saved": "Сохранено",
-	"style.parakeetIgnoresStyles": "Parakeet, текущая модель, не учитывает стили.",
+	"style.modelIgnoresStyles": "{{model}}, текущая модель, не учитывает стили.",
 	"style.tabDefault": "По умолчанию",
 	"style.tabPerApp": "По приложению",
 	"style.tabSites": "По сайту",

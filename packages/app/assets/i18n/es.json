@@ -61,7 +61,7 @@
 	"style.defaultStyleDescription": "Se usa en cada dictado, excepto en apps y sitios de las otras pestañas. El estilo que elijas se aplica al instante.",
 	"style.inUse": "En uso",
 	"style.saved": "Guardado",
-	"style.parakeetIgnoresStyles": "Parakeet, el modelo en uso, ignora los estilos.",
+	"style.modelIgnoresStyles": "{{model}}, el modelo en uso, ignora los estilos.",
 	"style.tabDefault": "Predeterminado",
 	"style.tabPerApp": "Por App",
 	"style.tabSites": "Por Sitio",
