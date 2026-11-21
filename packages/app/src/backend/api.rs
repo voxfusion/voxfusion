@@ -125,6 +125,18 @@ pub struct ModelInfo {
     pub available: bool,
     pub downloaded: bool,
     pub active: bool,
+    /// Whether any file for this model currently exists on disk (final file or
+    /// partial `.download.tmp`), even when removing it would free 0 bytes.
+    #[serde(default)]
+    pub has_files: bool,
+    /// Reclaimable bytes on disk occupied by this model's files (including any
+    /// partial `.download.tmp` file), when known. `Some(0)` means removing the
+    /// files reclaims no space; `None` is only for fixtures that omit the field.
+    #[serde(default)]
+    pub disk_size_bytes: Option<u64>,
+    /// Whether a download is currently running for this model.
+    #[serde(default)]
+    pub downloading: bool,
 }
 
 fn engine_present() -> bool {
@@ -186,6 +198,17 @@ pub enum AppEvent {
     #[serde(rename_all = "camelCase")]
     ModelVerifying {
         model_id: String,
+    },
+    /// A model download stopped without finishing (cancelled or failed).
+    #[serde(rename_all = "camelCase")]
+    ModelDownloadStopped {
+        model_id: String,
+    },
+    /// A model's files were removed from disk.
+    #[serde(rename_all = "camelCase")]
+    ModelRemoved {
+        model_id: String,
+        freed_bytes: u64,
     },
     /// Another model was made the one that transcribes.
     ActiveModelChanged,
@@ -295,6 +318,9 @@ pub trait Backend: Send + Sync + 'static {
     /// Returns when the download has finished, failed or been cancelled.
     fn download_model(&self, model_id: &str) -> CommandResult<()>;
     fn cancel_model_download(&self, model_id: &str) -> CommandResult<()>;
+    /// Removes a model's files from disk and returns the bytes freed. Refuses
+    /// when the model is active, downloading, or in use by a transcription.
+    fn remove_model(&self, model_id: &str) -> CommandResult<u64>;
 
     // ---- dictionary ----
     fn list_dictionary_words(&self) -> CommandResult<Vec<DictionaryWord>>;

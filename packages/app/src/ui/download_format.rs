@@ -1,6 +1,17 @@
 //! How download sizes and the time a download has left are written.
 
+const BYTES_PER_KB: f64 = 1024.;
 const BYTES_PER_MB: f64 = 1024. * 1024.;
+const BYTES_PER_GB: f64 = 1024. * 1024. * 1024.;
+
+/// Binary unit chosen for a storage size readout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SizeUnit {
+    Bytes,
+    Kilobytes,
+    Megabytes,
+    Gigabytes,
+}
 
 /// `value` with one decimal, halves rounded up.
 fn one_decimal(value: f64) -> String {
@@ -22,6 +33,25 @@ fn one_decimal(value: f64) -> String {
 /// A number of bytes in megabytes, without the unit: `312.0`.
 pub fn format_mb(bytes: f64) -> String {
     one_decimal(bytes / BYTES_PER_MB)
+}
+
+/// A byte count formatted with one decimal in the largest fitting binary unit,
+/// promoting before one-decimal rounding would reach `1024.0`.
+pub fn format_storage(bytes: u64) -> (String, SizeUnit) {
+    const PROMOTE_THRESHOLD: f64 = 1023.95;
+
+    if bytes < 1024 {
+        return (bytes.to_string(), SizeUnit::Bytes);
+    }
+    let kb = bytes as f64 / BYTES_PER_KB;
+    if kb < PROMOTE_THRESHOLD {
+        return (one_decimal(kb), SizeUnit::Kilobytes);
+    }
+    let mb = bytes as f64 / BYTES_PER_MB;
+    if mb < PROMOTE_THRESHOLD {
+        return (one_decimal(mb), SizeUnit::Megabytes);
+    }
+    (one_decimal(bytes as f64 / BYTES_PER_GB), SizeUnit::Gigabytes)
 }
 
 /// The time left as `m:ss`, or `h:mm:ss` from an hour on.

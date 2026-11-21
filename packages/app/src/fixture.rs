@@ -10,7 +10,8 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Condvar, Mutex};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::backend::*;
@@ -123,11 +124,18 @@ pub fn now() -> Option<DateTime<Utc>> {
     Some(start + chrono::Duration::from_std(started_at.elapsed()).ok()?)
 }
 
+const DOWNLOAD_RUNNING: u8 = 0;
+const DOWNLOAD_COMPLETED: u8 = 1;
+const DOWNLOAD_CANCELLED: u8 = 2;
+
 pub struct FixtureBackend {
     data: Mutex<FixtureData>,
+    events: EventSender,
     next_id: Mutex<u32>,
-    /// Counts the cancellations asked for; downloads wait for the next one.
-    download_cancellations: (Mutex<u32>, Condvar),
+    /// In-flight downloads keyed by model id, each with its own attempt state
+    /// so duplicate calls are rejected and cancellations or completions apply
+    /// only to the registered attempt. Lock order: `downloads.0` -> `data`.
+    downloads: (Mutex<HashMap<String, Arc<AtomicU8>>>, Condvar),
 }
 
 fn block_forever() -> ! {
@@ -137,11 +145,12 @@ fn block_forever() -> ! {
 }
 
 impl FixtureBackend {
-    pub fn new(data: FixtureData) -> Self {
+    pub fn new(data: FixtureData, events: EventSender) -> Self {
         Self {
             data: Mutex::new(data),
+            events,
             next_id: Mutex::new(1000),
-            download_cancellations: (Mutex::new(0), Condvar::new()),
+            downloads: (Mutex::new(HashMap::new()), Condvar::new()),
         }
     }
 
@@ -359,25 +368,95 @@ impl Backend for FixtureBackend {
         if model_id == DEFAULT_MODEL_ID {
             self.gate("download_whisper_model")?;
         }
-        // Progress is scripted through events; a download ends only by being
-        // cancelled.
-        let (cancellations, cancelled) = &self.download_cancellations;
-        let mut count = cancellations.lock().unwrap();
-        let seen = *count;
-        while *count == seen {
-            count = cancelled.wait(count).unwrap();
+        let (downloads, changed) = &self.downloads;
+        let mut active = downloads.lock().unwrap();
+        let already_downloading = active.contains_key(model_id)
+            || self.with(|data| {
+                data.models
+                    .iter()
+                    .any(|model| model.id == model_id && model.downloading)
+            });
+        if already_downloading {
+            return Err(DOWNLOAD_IN_PROGRESS_ERROR.into());
         }
 
-        Err(DOWNLOAD_CANCELLED_ERROR.into())
+        let attempt = Arc::new(AtomicU8::new(DOWNLOAD_RUNNING));
+        active.insert(model_id.to_string(), attempt.clone());
+        self.with(|data| {
+            if let Some(model) = data.models.iter_mut().find(|model| model.id == model_id) {
+                model.downloading = true;
+            }
+        });
+
+        // Progress is scripted through events; this attempt waits until it is
+        // cancelled, stopped, or completed at 100%.
+        loop {
+            match attempt.load(Ordering::SeqCst) {
+                DOWNLOAD_RUNNING => active = changed.wait(active).unwrap(),
+                DOWNLOAD_COMPLETED => return Ok(()),
+                _ => return Err(DOWNLOAD_CANCELLED_ERROR.into()),
+            }
+        }
     }
 
-    fn cancel_model_download(&self, _model_id: &str) -> CommandResult<()> {
+    fn cancel_model_download(&self, model_id: &str) -> CommandResult<()> {
         self.gate("cancel_model_download")?;
-
-        let (cancellations, cancelled) = &self.download_cancellations;
-        *cancellations.lock().unwrap() += 1;
-        cancelled.notify_all();
+        let (downloads, changed) = &self.downloads;
+        let stopped = {
+            let mut active = downloads.lock().unwrap();
+            let removed = active.remove(model_id);
+            if let Some(attempt) = &removed {
+                attempt.store(DOWNLOAD_CANCELLED, Ordering::SeqCst);
+            }
+            let was_downloading = self.with(|data| {
+                let mut found = false;
+                for model in &mut data.models {
+                    if model.id == model_id && model.downloading {
+                        model.downloading = false;
+                        found = true;
+                    }
+                }
+                found
+            });
+            changed.notify_all();
+            removed.is_some() || was_downloading
+        };
+        if !stopped {
+            return Err(format!("No download in progress for {model_id}"));
+        }
+        self.events.emit(AppEvent::ModelDownloadStopped {
+            model_id: model_id.to_string(),
+        });
         Ok(())
+    }
+
+    fn remove_model(&self, model_id: &str) -> CommandResult<u64> {
+        self.gate("remove_model")?;
+        let (downloads, _) = &self.downloads;
+        let active = downloads.lock().unwrap();
+        self.with(|data| {
+            let model = data
+                .models
+                .iter_mut()
+                .find(|model| model.id == model_id)
+                .ok_or_else(|| format!("Unknown model: {model_id}"))?;
+            if model.active {
+                return Err(format!(
+                    "Cannot remove {} while it is the active model. Select another model first.",
+                    model.name
+                ));
+            }
+            if active.contains_key(model_id) || model.downloading {
+                return Err(format!(
+                    "Cannot remove {} while it is downloading.",
+                    model.name
+                ));
+            }
+            model.downloaded = false;
+            model.has_files = false;
+            let freed = model.disk_size_bytes.replace(0).unwrap_or(0);
+            Ok(freed)
+        })
     }
 
     fn list_dictionary_words(&self) -> CommandResult<Vec<DictionaryWord>> {
@@ -744,7 +823,7 @@ pub fn services(
         update: data.update.clone(),
         download_events,
     };
-    let backend = std::sync::Arc::new(FixtureBackend::new(data));
+    let backend = std::sync::Arc::new(FixtureBackend::new(data, events.clone()));
     let scripted = backend.clone();
 
     std::thread::spawn(move || {
@@ -757,16 +836,86 @@ pub fn services(
             match serde_json::from_str::<Command>(&line) {
                 Ok(Command::Emit { event, payload }) => match parse_event(event, payload) {
                     Ok(event) => {
-                        // A scripted download that finishes leaves its model
-                        // on disk, as a real one does.
-                        if let AppEvent::ModelDownloadProgress(report) = &event
-                            && report.progress >= 100
-                        {
-                            scripted.with(|data| {
-                                for model in &mut data.models {
-                                    model.downloaded |= model.id == report.model_id;
+                        // Mirror model download/removal events into fixture
+                        // state so later `list_models` calls see partial files,
+                        // completed downloads, and removals like the real backend.
+                        match &event {
+                            AppEvent::ModelDownloadProgress(report) => {
+                                let (downloads, changed) = &scripted.downloads;
+                                let mut active = downloads.lock().unwrap();
+                                if report.progress >= 100
+                                    && let Some(attempt) = active.remove(&report.model_id)
+                                {
+                                    attempt.store(DOWNLOAD_COMPLETED, Ordering::SeqCst);
                                 }
-                            });
+                                scripted.with(|data| {
+                                    for model in &mut data.models {
+                                        if model.id == report.model_id {
+                                            if report.progress >= 100 {
+                                                model.downloaded = true;
+                                                model.has_files = true;
+                                                model.downloading = false;
+                                                let size = if report.total_bytes > 0 {
+                                                    report.total_bytes
+                                                } else {
+                                                    report.downloaded_bytes
+                                                };
+                                                if size > 0 {
+                                                    model.disk_size_bytes = Some(size);
+                                                }
+                                            } else {
+                                                model.downloading = true;
+                                                if report.downloaded_bytes > 0 {
+                                                    model.has_files = true;
+                                                    model.disk_size_bytes =
+                                                        Some(report.downloaded_bytes);
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+                                if report.progress >= 100 {
+                                    changed.notify_all();
+                                }
+                            }
+                            AppEvent::ModelVerifying { model_id } => {
+                                let (downloads, _) = &scripted.downloads;
+                                let _active = downloads.lock().unwrap();
+                                scripted.with(|data| {
+                                    for model in &mut data.models {
+                                        if model.id == *model_id {
+                                            model.downloading = true;
+                                        }
+                                    }
+                                });
+                            }
+                            AppEvent::ModelDownloadStopped { model_id } => {
+                                let (downloads, changed) = &scripted.downloads;
+                                let mut active = downloads.lock().unwrap();
+                                if let Some(attempt) = active.remove(model_id) {
+                                    attempt.store(DOWNLOAD_CANCELLED, Ordering::SeqCst);
+                                }
+                                scripted.with(|data| {
+                                    for model in &mut data.models {
+                                        if model.id == *model_id {
+                                            model.downloading = false;
+                                        }
+                                    }
+                                });
+                                changed.notify_all();
+                            }
+                            AppEvent::ModelRemoved { model_id, .. } => {
+                                scripted.with(|data| {
+                                    for model in &mut data.models {
+                                        if model.id == *model_id {
+                                            model.downloaded = false;
+                                            model.has_files = false;
+                                            model.disk_size_bytes = Some(0);
+                                        }
+                                    }
+                                });
+                            }
+                            _ => {}
                         }
                         events.emit(event);
                     }

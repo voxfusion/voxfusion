@@ -234,6 +234,10 @@ impl Backend for NativeBackend {
         models::cancel_model_download(model_id)
     }
 
+    fn remove_model(&self, model_id: &str) -> CommandResult<u64> {
+        models::remove_model(&self.active_model, model_id)
+    }
+
     fn list_dictionary_words(&self) -> CommandResult<Vec<DictionaryWord>> {
         db::list_dictionary_words(&self.db)
     }
