@@ -1,11 +1,12 @@
 //! The Home page: the history of transcriptions, grouped by day.
 
 use gpui_kit::{
-    ClickEvent, ClipboardItem, Context, IntoElement, ParentElement as _, Render, SharedString,
-    Styled as _, Subscription, Window, canvas, div, prelude::*, px,
+    ClickEvent, ClipboardItem, Context, IntoElement, MouseButton, ParentElement as _, Render,
+    SharedString, Styled as _, Subscription, Window, canvas, div, prelude::*, px,
 };
 use std::collections::HashSet;
 use std::time::Duration;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::analytics;
 use crate::backend::{self, AppEvent, Transcription, command_error};
@@ -17,10 +18,13 @@ use crate::ui::hotkeys::hotkey_display_name;
 use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
-use crate::ui::widgets::{icon, spinning};
+use crate::ui::widgets::focus::{focus_ring, focus_visible, keyed_focus_handle};
+use crate::ui::widgets::{icon, spinning, turning};
 use crate::ui::{locale, t, t_upper, t_with, upper};
 
 const PAGE_SIZE: i64 = 20;
+const PREVIEW_MAX_CHARS: usize = 150;
+const PREVIEW_MAX_LINES: usize = 3;
 /// How far below the visible area the end of the list may be before the next
 /// page is requested.
 const LOAD_MORE_MARGIN: f32 = 100.;
@@ -35,6 +39,7 @@ pub struct HomePage {
     hovered: Option<String>,
     retry_hovered: bool,
     copied: HashSet<String>,
+    expanded: HashSet<String>,
     /// Transcriptions deleted here. A list fetched before the deletion
     /// reached the database leaves them out.
     deleted: HashSet<String>,
@@ -61,6 +66,7 @@ impl HomePage {
                     this.transcriptions.clear();
                     this.deleted.clear();
                     this.copied.clear();
+                    this.expanded.clear();
                     this.hovered = None;
                     this.next_cursor = None;
                     this.has_more = false;
@@ -81,6 +87,7 @@ impl HomePage {
             hovered: None,
             retry_hovered: false,
             copied: HashSet::new(),
+            expanded: HashSet::new(),
             deleted: HashSet::new(),
             generation: 0,
             reload_pending: false,
@@ -138,6 +145,13 @@ impl HomePage {
                         } else {
                             this.transcriptions = listed.collect();
                         }
+                        if !this.has_more && !this.reload_pending {
+                            this.expanded.retain(|id| {
+                                this.transcriptions
+                                    .iter()
+                                    .any(|transcription| transcription.id == *id)
+                            });
+                        }
                     }
                     Err(error) => {
                         this.error = Some(command_error("list_transcriptions", &error).into());
@@ -192,11 +206,19 @@ impl HomePage {
         .detach();
     }
 
+    fn toggle_expanded(&mut self, id: &str, cx: &mut Context<Self>) {
+        if !self.expanded.remove(id) {
+            self.expanded.insert(id.to_string());
+        }
+        cx.notify();
+    }
+
     fn delete(&mut self, id: &str, cx: &mut Context<Self>) {
         analytics::capture(cx, "transcription_deleted", &[]);
         self.transcriptions
             .retain(|transcription| transcription.id != id);
         self.copied.remove(id);
+        let was_expanded = self.expanded.remove(id);
         self.deleted.insert(id.to_string());
         self.hovered = None;
         cx.notify();
@@ -206,6 +228,7 @@ impl HomePage {
             let id = id.clone();
             move |backend| backend.delete_transcription(&id)
         });
+        let generation = self.generation;
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
@@ -216,6 +239,9 @@ impl HomePage {
                 if let Err(error) = &result {
                     log::error!(target: "home", "delete_transcription_failed error={error}");
                     this.deleted.remove(&id);
+                    if was_expanded && generation == this.generation {
+                        this.expanded.insert(id.clone());
+                    }
                     this.fetch(None, cx);
                 } else if this.transcriptions.is_empty() && this.has_more {
                     this.fetch(None, cx);
@@ -262,20 +288,123 @@ impl HomePage {
         &self,
         index: usize,
         transcription: &Transcription,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let p = palette(cx);
         let id = transcription.id.clone();
         let hovered = self.hovered.as_deref() == Some(id.as_str());
         let copied = self.copied.contains(&id);
+        let preview = preview_text(&transcription.text, PREVIEW_MAX_CHARS, PREVIEW_MAX_LINES);
+        let expandable = preview.truncated;
+        let expanded = expandable && self.expanded.contains(&id);
+        let display_text = if expanded {
+            normalize_newlines(&transcription.text)
+        } else {
+            preview.text
+        };
         let time = datetime::parse(&transcription.created_at)
             .map(|time| format_time(&time, locale(cx)))
             .unwrap_or_default();
 
+        let toggle = expandable.then(|| {
+            let toggle_focus = keyed_focus_handle(
+                SharedString::from(format!("transcription-toggle-focus-{id}")),
+                window,
+                cx,
+            );
+            let toggle_label = t_upper(
+                cx,
+                if expanded {
+                    "transcription.showLess"
+                } else {
+                    "transcription.showMore"
+                },
+            );
+            let toggle_id = id.clone();
+
+            // Stop mouse down before the card body so clicking the button does
+            // not also arm the card's click handler.
+            div()
+                .flex_shrink_0()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(
+                    div()
+                        .id(SharedString::from(format!("transcription-toggle-{id}")))
+                        .transition_colors()
+                        .track_focus(&toggle_focus)
+                        .relative()
+                        .flex()
+                        .items_center()
+                        .gap_1()
+                        .cursor_pointer()
+                        .text_color(p.txt_secondary)
+                        .hover(|button| button.text_color(p.txt_primary))
+                        // Enter and Space on the focused toggle arrive as a click.
+                        .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            if event.click_count() == 1 {
+                                this.toggle_expanded(&toggle_id, cx);
+                            }
+                        }))
+                        .child(text(toggle_label).tracking_wider())
+                        .child(turning(expanded, icon("chevron-down").size_3p5()))
+                        .when(focus_visible(&toggle_focus, window), |button| {
+                            button.child(focus_ring(3., cx))
+                        }),
+                )
+        });
+
+        let body = div()
+            .p_3()
+            .child(
+                div()
+                    .mb_2()
+                    .type_sm()
+                    .leading_relaxed(14.)
+                    .text_color(p.txt_primary)
+                    .child(text(display_text).pre_wrap().break_words()),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_3()
+                    .type_xs()
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_3()
+                            .text_color(p.txt_muted)
+                            .child(text(time))
+                            .child(text(format_processing_time(
+                                transcription.processing_time_ms,
+                            ))),
+                    )
+                    .children(toggle),
+            );
+
+        let body = if expandable {
+            let body_id = id.clone();
+            body.id(SharedString::from(format!("transcription-body-{id}")))
+                .cursor_pointer()
+                .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
+                    // A double click on a long entry opens it once instead of
+                    // opening and immediately closing it.
+                    if event.click_count() == 1 {
+                        this.toggle_expanded(&body_id, cx);
+                    }
+                }))
+                .into_any_element()
+        } else {
+            body.into_any_element()
+        };
+
         div()
             .id(SharedString::from(format!("transcription-{id}")))
             .relative()
-            .p_3()
             .when(index > 0, |card| card.border_t_1().border_color(p.border))
             .hover(|card| card.bg(p.hover))
             .when(hovered, |card| card.child(above_grid(cx)))
@@ -290,26 +419,7 @@ impl HomePage {
                     cx.notify();
                 }
             }))
-            .child(
-                div()
-                    .mb_2()
-                    .type_sm()
-                    .leading_relaxed(14.)
-                    .text_color(p.txt_primary)
-                    .child(text(truncate_text(&transcription.text, 150))),
-            )
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .type_xs()
-                    .text_color(p.txt_muted)
-                    .child(text(time))
-                    .child(text(format_processing_time(
-                        transcription.processing_time_ms,
-                    ))),
-            )
+            .child(body)
             .when(hovered || copied, |card| {
                 let transcription = transcription.clone();
                 let button = |id: &'static str| {
@@ -320,6 +430,7 @@ impl HomePage {
                         .border_1()
                         .border_color(p.border_strong)
                         .transition_colors()
+                        .cursor_pointer()
                         .text_color(p.txt_secondary)
                 };
 
@@ -330,12 +441,14 @@ impl HomePage {
                         .right_2()
                         .flex()
                         .gap_1()
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .when(hovered, |buttons| {
                             buttons.child(
                                 button("delete")
                                     .hover(|button| button.border_color(p.ac).text_color(p.ac))
                                     .on_click(cx.listener(
                                         move |this, event: &ClickEvent, _, cx| {
+                                            cx.stop_propagation();
                                             // The next transcription moves up under the
                                             // pointer; a double click deletes only one.
                                             if event.click_count() == 1 {
@@ -350,6 +463,7 @@ impl HomePage {
                             button("copy")
                                 .hover(|button| button.border_color(p.ac))
                                 .on_click(cx.listener(move |this, _, _, cx| {
+                                    cx.stop_propagation();
                                     this.copy(&transcription, cx);
                                 }))
                                 .child(if copied {
@@ -362,7 +476,7 @@ impl HomePage {
             })
     }
 
-    fn render_list(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_list(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette(cx);
         let hotkey = hotkey_display_name(&SettingsStore::get(cx).hotkey);
         let has_items = !self.transcriptions.is_empty();
@@ -434,7 +548,7 @@ impl HomePage {
             for (label, items) in self.groups(cx) {
                 let mut cards = div().bg(p.surface).border_1().border_color(p.border);
                 for (index, transcription) in items.iter().enumerate() {
-                    cards = cards.child(self.render_card(index, transcription, cx));
+                    cards = cards.child(self.render_card(index, transcription, window, cx));
                 }
 
                 list = list.child(
@@ -533,19 +647,64 @@ impl Render for HomePage {
                                 &[("hotkey", &hotkey)],
                             ))),
                     )
-                    .child(self.render_list(cx)),
+                    .child(self.render_list(window, cx)),
             )
     }
 }
 
-/// The first `max_length` UTF-16 units of `text`, as the original measured.
-fn truncate_text(text: &str, max_length: usize) -> String {
-    let units: Vec<u16> = text.encode_utf16().collect();
-    if units.len() <= max_length {
-        return text.to_string();
+struct Preview {
+    text: String,
+    truncated: bool,
+}
+
+fn normalize_newlines(text: &str) -> String {
+    if text.contains('\r') {
+        text.replace("\r\n", "\n").replace('\r', "\n")
+    } else {
+        text.to_string()
+    }
+}
+
+/// Cuts `text` after `max_length` grapheme clusters or `max_lines` lines,
+/// whichever comes first, so long or tall dictations stay compact until
+/// expanded.
+fn preview_text(text: &str, max_length: usize, max_lines: usize) -> Preview {
+    let normalized = normalize_newlines(text);
+    let mut graphemes = 0usize;
+    let mut newlines = 0usize;
+    let mut cut_at = None;
+
+    for (index, grapheme) in UnicodeSegmentation::grapheme_indices(normalized.as_str(), true) {
+        if graphemes == max_length {
+            cut_at = Some(index);
+            break;
+        }
+        if grapheme == "\n" {
+            newlines += 1;
+            if max_lines > 0 && newlines == max_lines {
+                let rest = &normalized[index + grapheme.len()..];
+                if !rest.is_empty() {
+                    cut_at = Some(index);
+                    break;
+                }
+            }
+        }
+        graphemes += 1;
     }
 
-    format!("{}...", String::from_utf16_lossy(&units[..max_length]))
+    match cut_at {
+        Some(index) => {
+            let prefix = normalized[..index].trim_end_matches('\n');
+            Preview {
+                text: format!("{prefix}..."),
+                truncated: true,
+            }
+        }
+        None => Preview {
+            text: normalized,
+            truncated: false,
+        },
+    }
 }
 
 fn format_processing_time(milliseconds: i64) -> String {
@@ -575,10 +734,13 @@ mod tests {
     #[test]
     fn long_text_is_cut_at_150_units() {
         let long = "a".repeat(200);
-        let truncated = truncate_text(&long, 150);
+        let truncated = preview_text(&long, PREVIEW_MAX_CHARS, PREVIEW_MAX_LINES);
 
-        assert_eq!(truncated.len(), 153);
-        assert!(truncated.ends_with("..."));
-        assert_eq!(truncate_text("short", 150), "short");
+        assert!(truncated.truncated);
+        assert_eq!(truncated.text.len(), 153);
+        assert!(truncated.text.ends_with("..."));
+        let short = preview_text("short", PREVIEW_MAX_CHARS, PREVIEW_MAX_LINES);
+        assert!(!short.truncated);
+        assert_eq!(short.text, "short");
     }
 }

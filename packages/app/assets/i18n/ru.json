@@ -48,6 +48,8 @@
 	"settings.modelStylesWhisperOnly": "Стили работают только с моделями Whisper.",
 	"transcription.copy": "Копировать",
 	"transcription.copied": "Скопировано!",
+	"transcription.showMore": "Показать больше",
+	"transcription.showLess": "Показать меньше",
 	"transcriptionList.errorOccurred": "Произошла ошибка",
 	"transcriptionList.useCommandToRecord": "Используйте {{hotkey}}, чтобы начать запись и создать первую транскрипцию",
 	"transcriptionList.noMore": "Больше нет транскрипций",

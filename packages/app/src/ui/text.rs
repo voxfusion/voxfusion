@@ -32,6 +32,9 @@ enum Wrap {
     Truncate,
     /// Break between any two glyphs.
     BreakAll,
+    /// Break at Unicode line break opportunities, or mid-word when a single
+    /// token is wider than the available width.
+    BreakWord,
 }
 
 #[derive(Clone)]
@@ -122,6 +125,13 @@ impl Text {
     /// CSS `break-all`.
     pub fn break_all(mut self) -> Self {
         self.wrap = Wrap::BreakAll;
+        self
+    }
+
+    /// CSS `overflow-wrap: break-word`: wrap at line break opportunities and
+    /// break long tokens that would otherwise overflow the line.
+    pub fn break_words(mut self) -> Self {
+        self.wrap = Wrap::BreakWord;
         self
     }
 
@@ -228,7 +238,7 @@ impl Shaped {
             match wrap {
                 Wrap::Never => lines.push(whole(start, end)),
                 Wrap::Truncate => lines.push(self.truncated(start, end, limit)),
-                Wrap::Normal | Wrap::BreakAll => {
+                Wrap::Normal | Wrap::BreakAll | Wrap::BreakWord => {
                     let mut line_start = start;
                     let mut last_break = None;
                     let mut width = px(0.);
@@ -242,10 +252,18 @@ impl Shaped {
                             last_break = Some(index);
                         }
 
+                        let break_at = last_break.or_else(|| {
+                            (wrap == Wrap::BreakWord
+                                && index > line_start
+                                && glyph.advance > px(0.)
+                                && glyph.index != self.glyphs[index - 1].index)
+                                .then_some(index)
+                        });
+
                         // Spaces at the end of a line hang past its edge.
                         if !glyph.is_space
                             && width + glyph.advance > limit
-                            && let Some(at) = last_break
+                            && let Some(at) = break_at
                         {
                             lines.push(whole(line_start, self.trim_end(line_start, at)));
                             line_start = at;

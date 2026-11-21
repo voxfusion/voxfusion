@@ -48,6 +48,8 @@
 	"settings.modelStylesWhisperOnly": "Les styles ne s'appliquent qu'aux modèles Whisper.",
 	"transcription.copy": "Copier",
 	"transcription.copied": "Copié !",
+	"transcription.showMore": "Afficher plus",
+	"transcription.showLess": "Afficher moins",
 	"transcriptionList.errorOccurred": "Une erreur est survenue",
 	"transcriptionList.useCommandToRecord": "Utilisez {{hotkey}} pour démarrer l'enregistrement et créer votre première transcription",
 	"transcriptionList.noMore": "Plus de transcriptions",

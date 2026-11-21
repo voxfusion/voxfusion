@@ -48,6 +48,8 @@
 	"settings.modelStylesWhisperOnly": "风格仅适用于 Whisper 模型。",
 	"transcription.copy": "复制",
 	"transcription.copied": "已复制！",
+	"transcription.showMore": "显示更多",
+	"transcription.showLess": "收起",
 	"transcriptionList.errorOccurred": "发生错误",
 	"transcriptionList.useCommandToRecord": "使用 {{hotkey}} 开始录音并创建你的第一个转录",
 	"transcriptionList.noMore": "没有更多转录",
