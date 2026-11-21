@@ -10,12 +10,12 @@ use gpui_kit::{
     Modifiers, ModifiersChangedEvent, SharedString, Subscription,
 };
 
-use crate::backend::{self, AppEvent, SystemKey, command_error};
+use crate::backend::{self, AppEvent, SystemKey};
 use crate::events;
 use crate::settings::SettingsStore;
 use crate::ui::hotkeys::{
-    hotkey_display_name, system_hotkey_from_keys, validate_hands_free_hotkey,
-    validate_hold_to_speak_hotkey,
+    HotkeyValidationError, hotkey_display_name, hotkey_display_name_for_locale,
+    system_hotkey_from_keys, validate_hands_free_hotkey, validate_hold_to_speak_hotkey,
 };
 
 /// Which of the two dictation hotkeys a recorder sets.
@@ -26,7 +26,7 @@ pub enum HotkeyKind {
 }
 
 impl HotkeyKind {
-    fn validate(self, hotkey: &str) -> Option<&'static str> {
+    fn validate(self, hotkey: &str) -> Option<HotkeyValidationError> {
         match self {
             HotkeyKind::HandsFree => validate_hands_free_hotkey(hotkey),
             HotkeyKind::HoldToSpeak => validate_hold_to_speak_hotkey(hotkey),
@@ -134,6 +134,9 @@ fn combination(held: Modifiers, key: &str) -> String {
 struct Capture {
     /// What the recorder shows: the modifiers held, or the combination pressed.
     pending: String,
+    /// Whether `pending` currently represents `system_hotkey` rather than a
+    /// regular key combination.
+    pending_is_system: bool,
     /// The modifiers pressed since recording started. A combination takes
     /// its modifiers from here, so one held from before does not count.
     held: Modifiers,
@@ -157,6 +160,7 @@ impl Capture {
 
     fn key_pressed(&mut self, key: &str) {
         self.pending = combination(self.held, &hotkey_key(key));
+        self.pending_is_system = false;
     }
 
     /// The combination to save now that a regular key was released.
@@ -167,6 +171,7 @@ impl Capture {
     fn system_keys_pressed(&mut self, keys: &[SystemKey]) {
         self.system_hotkey = system_hotkey_from_keys(keys);
         self.pending = hotkey_display_name(&self.system_hotkey);
+        self.pending_is_system = true;
     }
 
     /// The modifier-only hotkey to save now that every modifier was released.
@@ -179,7 +184,7 @@ pub struct HotkeyRecorder {
     kind: HotkeyKind,
     recording: bool,
     capture: Capture,
-    error: Option<SharedString>,
+    error: Option<&'static str>,
     /// The modifiers as of the latest change, to tell presses from releases.
     modifiers: Modifiers,
     starting_watcher: bool,
@@ -216,12 +221,25 @@ impl HotkeyRecorder {
 
     /// What has been pressed so far, as shown while recording. Empty until
     /// the first key.
-    pub fn pending_hotkey(&self) -> &str {
-        &self.capture.pending
+    pub fn pending_hotkey(&self, cx: &App) -> String {
+        let raw = if self.capture.pending_is_system {
+            &self.capture.system_hotkey
+        } else {
+            &self.capture.pending
+        };
+        if raw.is_empty() {
+            String::new()
+        } else {
+            hotkey_display_name_for_locale(raw, crate::ui::locale(cx))
+        }
     }
 
-    pub fn error(&self) -> Option<SharedString> {
-        self.error.clone()
+    pub fn has_error(&self) -> bool {
+        self.error.is_some()
+    }
+
+    pub fn error(&self, cx: &App) -> Option<SharedString> {
+        self.error.map(|key| crate::ui::t(cx, key))
     }
 
     pub fn toggle_recording(&mut self, cx: &mut Context<Self>) {
@@ -236,8 +254,7 @@ impl HotkeyRecorder {
     fn start_recording(&mut self, cx: &mut Context<Self>) {
         let recorder = cx.entity_id();
         if !cx.default_global::<ActiveRecorder>().is_free_for(recorder) {
-            self.error =
-                Some("Another hotkey is being recorded. Please finish or cancel it first.".into());
+            self.error = Some("settings.hotkeyAnotherRecording");
             cx.notify();
             return;
         }
@@ -254,7 +271,8 @@ impl HotkeyRecorder {
                 this.starting_watcher = false;
 
                 if let Err(error) = started {
-                    this.error = Some(command_error("start_system_key_watcher", &error).into());
+                    log::error!(target: "hotkeys", "start_system_key_watcher_failed error={error}");
+                    this.error = Some("settings.hotkeyRecorderFailed");
                     cx.notify();
                     return;
                 }
@@ -288,7 +306,7 @@ impl HotkeyRecorder {
     /// allowed: then the reason is shown and recording goes on.
     fn save(&mut self, hotkey: String, cx: &mut Context<Self>) {
         if let Some(reason) = self.kind.validate(&hotkey) {
-            self.error = Some(reason.into());
+            self.error = Some(reason.translation_key());
             cx.notify();
             return;
         }
@@ -494,13 +512,13 @@ mod tests {
     fn fn_alone_is_refused_for_hold_to_speak_only() {
         assert_eq!(
             HotkeyKind::HoldToSpeak.validate("Fn"),
-            Some("FN cannot be used as hold-to-speak hotkey")
+            Some(HotkeyValidationError::FnNotAllowedForHoldToSpeak)
         );
         assert_eq!(HotkeyKind::HandsFree.validate("Fn"), None);
         assert_eq!(HotkeyKind::HoldToSpeak.validate("RightCommand"), None);
         assert_eq!(
             HotkeyKind::HandsFree.validate("Command++"),
-            Some("Use modifier keys plus one regular key.")
+            Some(HotkeyValidationError::InvalidCombination)
         );
     }
 

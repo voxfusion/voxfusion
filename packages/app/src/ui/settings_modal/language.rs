@@ -5,16 +5,16 @@ use gpui_kit::{App, Div, ParentElement as _, SharedString, Styled as _, Window, 
 use crate::analytics;
 use crate::i18n::Locale;
 use crate::settings::SettingsStore;
-use crate::ui::locale;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::select::{SelectOption, select};
+use crate::ui::{locale, t_upper};
 
 /// Each language under its own name, as its speakers look for it.
 fn language_name(locale: Locale) -> &'static str {
     match locale {
         Locale::En => "ENGLISH",
-        Locale::Ru => "RUSSIAN",
+        Locale::Ru => "РУССКИЙ",
         Locale::Es => "ESPAÑOL",
         Locale::Zh => "中文",
         Locale::De => "DEUTSCH",
@@ -35,7 +35,7 @@ pub(super) fn render(window: &mut Window, cx: &mut App) -> Div {
                 .mb_3()
                 .type_xs()
                 .text_color(p.txt_secondary)
-                .child(text("INTERFACE_LANGUAGE").tracking_wider()),
+                .child(text(t_upper(cx, "settings.interfaceLanguage")).tracking_wider()),
         )
         .child(select(
             "language",

@@ -8,11 +8,11 @@ use gpui_kit::{
 use super::SettingsModal;
 use crate::settings::SettingsStore;
 use crate::ui::hotkey_recorder::HotkeyRecorder;
-use crate::ui::hotkeys::hotkey_display_name;
+use crate::ui::hotkeys::hotkey_display_name_for_locale;
 use crate::ui::motion::Transitions as _;
-use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::{locale, t, t_upper};
 
 impl SettingsModal {
     pub(super) fn render_hotkeys(&self, cx: &mut Context<Self>) -> Div {
@@ -23,7 +23,8 @@ impl SettingsModal {
             .flex_col()
             .gap_6()
             .child(render_hotkey(
-                "HANDS_FREE_TRIGGER",
+                "hands-free-trigger",
+                t_upper(cx, "settings.handsFreeTrigger"),
                 &settings.hotkey,
                 t(cx, "settings.hotkeyDescription"),
                 &self.hands_free_recorder,
@@ -31,7 +32,8 @@ impl SettingsModal {
                 cx,
             ))
             .child(render_hotkey(
-                "HOLD_TO_SPEAK_TRIGGER",
+                "hold-to-speak-trigger",
+                t_upper(cx, "settings.holdToSpeakTrigger"),
                 &settings.hold_to_speak_hotkey,
                 t(cx, "settings.holdToSpeakHotkeyDescription"),
                 &self.hold_to_speak_recorder,
@@ -45,7 +47,8 @@ impl SettingsModal {
 /// a new one. The button is off while the `other` hotkey is being recorded
 /// or has a problem to show.
 fn render_hotkey(
-    label: &'static str,
+    id: &'static str,
+    label: SharedString,
     hotkey: &str,
     description: SharedString,
     recorder: &Entity<HotkeyRecorder>,
@@ -55,17 +58,20 @@ fn render_hotkey(
     let p = palette(cx);
     let state = recorder.read(cx);
     let recording = state.is_recording();
-    let error = state.error();
+    let error = state.error(cx);
 
     let other = other.read(cx);
-    let disabled = other.error().is_some() || (other.is_recording() && !recording);
+    let disabled = other.has_error() || (other.is_recording() && !recording);
 
     let shown = if !recording {
-        hotkey_display_name(hotkey)
-    } else if state.pending_hotkey().is_empty() {
-        "_ WAITING FOR INPUT _".to_string()
+        hotkey_display_name_for_locale(hotkey, locale(cx))
     } else {
-        state.pending_hotkey().to_string()
+        let pending = state.pending_hotkey(cx);
+        if pending.is_empty() {
+            format!("_ {} _", t_upper(cx, "settings.waitingForInput"))
+        } else {
+            pending
+        }
     };
 
     let (background, hover_background, label_color) = if recording {
@@ -85,10 +91,22 @@ fn render_hotkey(
         (background, hover_background, label_color)
     };
 
+    let button_label = format!(
+        "[{}]",
+        t_upper(
+            cx,
+            if recording {
+                "settings.cancel"
+            } else {
+                "settings.change"
+            }
+        )
+    );
     let recorder = recorder.clone();
     let button = div()
-        .id(label)
+        .id(id)
         .transition_colors()
+        .flex_shrink_0()
         .px_4()
         .py_3()
         .type_xs()
@@ -100,7 +118,7 @@ fn render_hotkey(
                 recorder.update(cx, |recorder, cx| recorder.toggle_recording(cx));
             })
         })
-        .child(text(if recording { "[CANCEL]" } else { "[CHANGE]" }).tracking_wider());
+        .child(text(button_label).tracking_wider().nowrap());
 
     div()
         .child(
@@ -118,6 +136,7 @@ fn render_hotkey(
                 .child(
                     div()
                         .flex_1()
+                        .min_w_0()
                         .px_4()
                         .py_3()
                         .border_1()

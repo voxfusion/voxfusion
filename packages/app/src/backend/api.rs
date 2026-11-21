@@ -144,6 +144,7 @@ pub struct ModelDownloadProgress {
 pub const DEFAULT_MODEL_ID: &str = "whisper-large-v3-turbo";
 pub const DOWNLOAD_IN_PROGRESS_ERROR: &str = "download already in progress";
 pub const DOWNLOAD_CANCELLED_ERROR: &str = "Download cancelled";
+pub const CHECKSUM_MISMATCH_ERROR: &str = "Checksum mismatch";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

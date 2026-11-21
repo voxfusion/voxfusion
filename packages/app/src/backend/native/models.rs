@@ -7,8 +7,8 @@ use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use crate::backend::{
-    AppEvent, DEFAULT_MODEL_ID, DOWNLOAD_CANCELLED_ERROR, DOWNLOAD_IN_PROGRESS_ERROR, EventSender,
-    ModelDownloadProgress, ModelInfo,
+    AppEvent, CHECKSUM_MISMATCH_ERROR, DEFAULT_MODEL_ID, DOWNLOAD_CANCELLED_ERROR,
+    DOWNLOAD_IN_PROGRESS_ERROR, EventSender, ModelDownloadProgress, ModelInfo,
 };
 
 /// Speech-to-text engine that backs a model. Each engine has its own
@@ -177,8 +177,6 @@ const STALL_TIMEOUT: Duration = Duration::from_secs(60);
 /// How often the download loop wakes up to check the cancellation flag while
 /// waiting for the next chunk.
 const CANCEL_POLL_INTERVAL: Duration = Duration::from_millis(250);
-/// How a failed checksum verification's error starts.
-const CHECKSUM_MISMATCH_ERROR: &str = "Checksum mismatch";
 /// How much of the file is hashed between two checks of the cancellation
 /// flag during verification.
 const HASH_CHUNK_SIZE: usize = 1024 * 1024;

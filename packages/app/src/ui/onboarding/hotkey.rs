@@ -9,12 +9,12 @@ use gpui_kit::{
 use super::parts::{button_label, card, description, faded, icon_box, step_column, title};
 use crate::settings::SettingsStore;
 use crate::ui::hotkey_recorder::{HotkeyKind, HotkeyRecorder, route_keys};
-use crate::ui::hotkeys::hotkey_display_name;
+use crate::ui::hotkeys::hotkey_display_name_for_locale;
 use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::icon;
-use crate::ui::{t, upper};
+use crate::ui::{locale, t, upper};
 
 pub struct HotkeyStep {
     hands_free: Entity<HotkeyRecorder>,
@@ -63,17 +63,20 @@ impl HotkeyStep {
         let p = palette(cx);
         let state = recorder.read(cx);
         let recording = state.is_recording();
-        let error = state.error();
+        let error = state.error(cx);
         let shown: SharedString = if !recording {
-            hotkey_display_name(hotkey).into()
-        } else if state.pending_hotkey().is_empty() {
-            t(cx, "onboarding.pressKeys")
+            hotkey_display_name_for_locale(hotkey, locale(cx)).into()
         } else {
-            state.pending_hotkey().to_string().into()
+            let pending = state.pending_hotkey(cx);
+            if pending.is_empty() {
+                t(cx, "onboarding.pressKeys")
+            } else {
+                pending.into()
+            }
         };
 
         let other = other.read(cx);
-        let disabled = other.error().is_some() || (other.is_recording() && !recording);
+        let disabled = other.has_error() || (other.is_recording() && !recording);
         // A disabled button is the whole button at half strength over the card.
         let shade = move |color| {
             if disabled {

@@ -13,7 +13,7 @@ use crate::events;
 use crate::settings::SettingsStore;
 use crate::ui::datetime::{self, format_long_date, format_time, same_day};
 use crate::ui::grid::above_grid;
-use crate::ui::hotkeys::hotkey_display_name;
+use crate::ui::hotkeys::hotkey_display_name_for_locale;
 use crate::ui::motion::Transitions as _;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -364,7 +364,7 @@ impl HomePage {
 
     fn render_list(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette(cx);
-        let hotkey = hotkey_display_name(&SettingsStore::get(cx).hotkey);
+        let hotkey = hotkey_display_name_for_locale(&SettingsStore::get(cx).hotkey, locale(cx));
         let has_items = !self.transcriptions.is_empty();
 
         let mut list = div().flex().flex_col().gap_6();
@@ -494,7 +494,7 @@ impl HomePage {
 impl Render for HomePage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette(cx);
-        let hotkey = hotkey_display_name(&SettingsStore::get(cx).hotkey);
+        let hotkey = hotkey_display_name_for_locale(&SettingsStore::get(cx).hotkey, locale(cx));
 
         div()
             .min_h(window.viewport_size().height)

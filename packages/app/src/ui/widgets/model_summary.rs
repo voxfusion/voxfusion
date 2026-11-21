@@ -9,6 +9,14 @@ use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::{t, t_upper, upper};
 
+fn model_languages(model: &ModelInfo, cx: &App) -> SharedString {
+    match model.languages.as_str() {
+        "99 languages" => t(cx, "settings.modelLanguages99"),
+        "25 European languages" => t(cx, "settings.modelLanguages25European"),
+        other => other.to_string().into(),
+    }
+}
+
 pub fn model_summary(model: &ModelInfo, cx: &App) -> Div {
     let p = palette(cx);
 
@@ -46,7 +54,7 @@ pub fn model_summary(model: &ModelInfo, cx: &App) -> Div {
         .min_w_0()
         .child(name)
         .child(details(
-            format!("{} · {}", model.size_label, model.languages).into(),
+            format!("{} · {}", model.size_label, model_languages(model, cx)).into(),
         ))
         // Styles are prompts, which only Whisper takes.
         .when(model.engine != "whisper", |summary| {

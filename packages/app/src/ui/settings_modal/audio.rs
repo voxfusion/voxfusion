@@ -13,12 +13,12 @@ use crate::analytics;
 use crate::backend::{self, AudioDevice};
 use crate::settings::{self, SettingsStore};
 use crate::ui::motion::Transitions as _;
-use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::select::{SelectOption, select};
 use crate::ui::widgets::toggle::toggle_option;
 use crate::ui::widgets::{animations_frozen, icon};
+use crate::ui::{t, t_upper};
 
 /// One turn of the refresh icon.
 const REFRESH_ANIMATION: Duration = Duration::from_millis(600);
@@ -136,17 +136,20 @@ impl SettingsModal {
                     .flex()
                     .items_center()
                     .justify_between()
+                    .gap_3()
                     .mb_3()
                     .child(
                         div()
+                            .min_w_0()
                             .type_xs()
                             .text_color(p.txt_secondary)
-                            .child(text("INPUT_DEVICE").tracking_wider()),
+                            .child(text(t_upper(cx, "settings.inputDevice")).tracking_wider()),
                     )
                     .child(
                         div()
                             .id("refresh-devices")
                             .transition_colors()
+                            .flex_shrink_0()
                             .p_1p5()
                             .text_color(p.txt_muted)
                             .hover(|button| button.text_color(p.ac))

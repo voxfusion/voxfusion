@@ -8,14 +8,15 @@ use gpui_kit::{
 use crate::analytics;
 use crate::settings::{SettingsStore, ThemeMode};
 use crate::ui::motion::{Faded, Transitions as _};
+use crate::ui::t_upper;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::focus::{focus_ring, focus_visible, keyed_focus_handle};
 
 const THEMES: [(ThemeMode, &str); 3] = [
-    (ThemeMode::Light, "LIGHT"),
-    (ThemeMode::Dark, "DARK"),
-    (ThemeMode::System, "SYSTEM"),
+    (ThemeMode::Light, "settings.themeLight"),
+    (ThemeMode::Dark, "settings.themeDark"),
+    (ThemeMode::System, "settings.themeSystem"),
 ];
 
 /// The name analytics knows a theme by.
@@ -45,10 +46,16 @@ fn preview(dark: bool, bar_width: f32) -> Div {
         .child(div().w(px(bar_width)).h_1p5().bg(bar))
 }
 
-fn theme_option(theme: ThemeMode, label: &'static str, window: &mut Window, cx: &mut App) -> Faded {
+fn theme_option(
+    theme: ThemeMode,
+    label_key: &'static str,
+    window: &mut Window,
+    cx: &mut App,
+) -> Faded {
     let p = palette(cx);
+    let id = theme_name(theme);
     let selected = SettingsStore::get(cx).theme == theme;
-    let focus_handle = keyed_focus_handle(label, window, cx);
+    let focus_handle = keyed_focus_handle(id, window, cx);
 
     let picture = match theme {
         ThemeMode::Light => preview(false, 32.).border_1(),
@@ -73,7 +80,7 @@ fn theme_option(theme: ThemeMode, label: &'static str, window: &mut Window, cx: 
     };
 
     div()
-        .id(label)
+        .id(id)
         .transition_all()
         .track_focus(&focus_handle)
         .relative()
@@ -103,11 +110,11 @@ fn theme_option(theme: ThemeMode, label: &'static str, window: &mut Window, cx: 
         // baseline of that font.
         .child(
             div()
-                .h_6()
+                .min_h_6()
                 .pt(px(7.))
                 .type_xs()
                 .text_color(if selected { p.ac } else { p.txt_secondary })
-                .child(text(label).tracking_wider().center()),
+                .child(text(t_upper(cx, label_key)).tracking_wider().center()),
         )
         .when(selected, |option| {
             option.child(
@@ -134,13 +141,11 @@ pub(super) fn render(window: &mut Window, cx: &mut App) -> Div {
                 .mb_4()
                 .type_xs()
                 .text_color(p.txt_secondary)
-                .child(text("THEME_MODE").tracking_wider()),
+                .child(text(t_upper(cx, "settings.themeMode")).tracking_wider()),
         )
         .child(
-            div()
-                .grid()
-                .grid_cols(3)
-                .gap_4()
-                .children(THEMES.map(|(theme, label)| theme_option(theme, label, window, cx))),
+            div().grid().grid_cols(3).gap_4().children(
+                THEMES.map(|(theme, label_key)| theme_option(theme, label_key, window, cx)),
+            ),
         )
 }

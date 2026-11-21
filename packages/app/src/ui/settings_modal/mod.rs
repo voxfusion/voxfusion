@@ -27,6 +27,7 @@ use crate::ui::theme::palette;
 use crate::ui::widgets::focus::{focus_ring, focus_visible};
 
 use crate::ui::motion::Transitions as _;
+use crate::ui::t_upper;
 use audio::AudioState;
 use model::ModelSettings;
 
@@ -51,14 +52,14 @@ impl Section {
         Section::Privacy,
     ];
 
-    fn title(self) -> &'static str {
+    fn title_key(self) -> &'static str {
         match self {
-            Section::Audio => "// AUDIO_CONFIG",
-            Section::Model => "// MODEL_CONFIG",
-            Section::Hotkey => "// HOTKEY_CONFIG",
-            Section::Appearance => "// APPEARANCE_CONFIG",
-            Section::Language => "// LANGUAGE_CONFIG",
-            Section::Privacy => "// PRIVACY_CONFIG",
+            Section::Audio => "settings.sectionAudio",
+            Section::Model => "settings.sectionModels",
+            Section::Hotkey => "settings.sectionHotkeys",
+            Section::Appearance => "settings.sectionAppearance",
+            Section::Language => "settings.sectionLanguage",
+            Section::Privacy => "settings.sectionPrivacy",
         }
     }
 }
@@ -205,22 +206,22 @@ impl Render for SettingsModal {
             .flex()
             .items_center()
             .justify_between()
+            .gap_4()
             .px_6()
             .py_4()
             .border_b_1()
             .border_color(p.border)
             .type_sm()
-            .child(
-                div()
-                    .text_color(p.txt_primary)
-                    .child(text(self.section.title()).tracking_wider()),
-            )
+            .child(div().min_w_0().text_color(p.txt_primary).child(
+                text(format!("// {}", t_upper(cx, self.section.title_key()))).tracking_wider(),
+            ))
             .child(
                 div()
                     .id("close")
                     .transition_colors()
                     .track_focus(&self.close_focus)
                     .relative()
+                    .flex_shrink_0()
                     .text_color(p.txt_muted)
                     .hover(|button| button.text_color(p.ac))
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(DismissEvent)))
@@ -235,7 +236,7 @@ impl Render for SettingsModal {
             .border_color(p.border)
             .type_px(10.)
             .text_color(p.txt_hint)
-            .child(text("ESC TO CLOSE | CHANGES SAVED AUTOMATICALLY"));
+            .child(text(t_upper(cx, "settings.footerHint")));
 
         let main = div()
             .flex_1()

@@ -11,8 +11,8 @@ use std::time::Instant;
 
 use crate::analytics;
 use crate::backend::{
-    self, AppEvent, DOWNLOAD_CANCELLED_ERROR, DOWNLOAD_IN_PROGRESS_ERROR, ModelDownloadProgress,
-    ModelInfo, command_error,
+    self, AppEvent, CHECKSUM_MISMATCH_ERROR, DOWNLOAD_CANCELLED_ERROR, DOWNLOAD_IN_PROGRESS_ERROR,
+    ModelDownloadProgress, ModelInfo,
 };
 use crate::events;
 use crate::ui::download_format::{format_eta, format_mb};
@@ -86,13 +86,41 @@ fn eta_seconds(
     (remaining_bytes > 0).then(|| remaining_bytes as f64 / bytes_per_second)
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ModelError {
+    Load,
+    Download,
+    DownloadCorrupted,
+    CancelDownload,
+    Switch,
+}
+
+impl ModelError {
+    fn title_key(self) -> &'static str {
+        match self {
+            Self::Load => "settings.modelLoadFailed",
+            Self::Download | Self::DownloadCorrupted => "settings.modelDownloadFailed",
+            Self::CancelDownload => "settings.modelCancelFailed",
+            Self::Switch => "settings.modelSwitchFailed",
+        }
+    }
+
+    fn detail_key(self) -> Option<&'static str> {
+        match self {
+            Self::DownloadCorrupted => Some("settings.modelDownloadCorrupted"),
+            Self::Download => Some("settings.modelDownloadRetryHint"),
+            Self::Load | Self::CancelDownload | Self::Switch => None,
+        }
+    }
+}
+
 pub(super) struct ModelSettings {
     models: Vec<ModelInfo>,
     download_stats: HashMap<String, DownloadStats>,
     downloading: Option<Download>,
     /// The model being made the active one.
     busy_id: Option<String>,
-    error: Option<SharedString>,
+    error: Option<ModelError>,
     last_samples: HashMap<String, Sample>,
     cancel_requested: HashSet<String>,
     _subscription: Subscription,
@@ -129,7 +157,10 @@ impl ModelSettings {
             this.update(cx, |this, cx| {
                 match models {
                     Ok(models) => this.models = models,
-                    Err(error) => this.error = Some(command_error("list_models", &error).into()),
+                    Err(error) => {
+                        log::error!(target: "settings", "list_models_failed error={error}");
+                        this.error = Some(ModelError::Load);
+                    }
                 }
                 cx.notify();
             })
@@ -264,16 +295,23 @@ impl ModelSettings {
                 let was_cancelled = this.cancel_requested.remove(&model_id);
 
                 if let Err(error) = result {
-                    let message = command_error("download_model", &error);
-                    if message.contains(DOWNLOAD_IN_PROGRESS_ERROR) {
+                    if error.contains(DOWNLOAD_IN_PROGRESS_ERROR) {
                         // The same download is already running; its progress
                         // stays on screen.
                         return;
                     }
 
                     this.hide_download(&model_id);
-                    if !was_cancelled && !message.contains(DOWNLOAD_CANCELLED_ERROR) {
-                        this.error = Some(message.into());
+                    if !was_cancelled && !error.contains(DOWNLOAD_CANCELLED_ERROR) {
+                        log::error!(
+                            target: "settings",
+                            "download_model_failed model={model_id} error={error}"
+                        );
+                        this.error = Some(if error.contains(CHECKSUM_MISMATCH_ERROR) {
+                            ModelError::DownloadCorrupted
+                        } else {
+                            ModelError::Download
+                        });
                     }
                 } else {
                     this.hide_download(&model_id);
@@ -302,7 +340,11 @@ impl ModelSettings {
 
             this.update(cx, |this, cx| {
                 this.cancel_requested.remove(&model_id);
-                this.error = Some(command_error("cancel_model_download", &error).into());
+                log::error!(
+                    target: "settings",
+                    "cancel_model_download_failed model={model_id} error={error}"
+                );
+                this.error = Some(ModelError::CancelDownload);
                 cx.notify();
             })
             .ok();
@@ -334,7 +376,11 @@ impl ModelSettings {
                 cx.notify();
 
                 if let Err(error) = result {
-                    this.error = Some(command_error("set_active_model", &error).into());
+                    log::error!(
+                        target: "settings",
+                        "set_active_model_failed model={model_id} error={error}"
+                    );
+                    this.error = Some(ModelError::Switch);
                     return;
                 }
 
@@ -588,7 +634,7 @@ impl Render for ModelSettings {
             .map(|model| self.render_model(model, cx))
             .collect();
 
-        let error = self.error.clone().map(|error| {
+        let error = self.error.map(|error| {
             div()
                 .flex()
                 .flex_col()
@@ -600,17 +646,15 @@ impl Render for ModelSettings {
                         .gap_2()
                         .type_xs()
                         .text_color(p.ac)
-                        .child(icon("alert-circle").size_4())
-                        .child(text(t(cx, "settings.modelDownloadFailed"))),
+                        .child(icon("alert-circle").size_4().flex_shrink_0())
+                        .child(text(t(cx, error.title_key()))),
                 )
-                .when(!error.is_empty(), |block| {
-                    block.child(
-                        div()
-                            .type_px(11.)
-                            .text_color(p.txt_hint)
-                            .child(text(error).break_all()),
-                    )
-                })
+                .children(error.detail_key().map(|detail_key| {
+                    div()
+                        .type_px(11.)
+                        .text_color(p.txt_hint)
+                        .child(text(t(cx, detail_key)))
+                }))
         });
 
         div()

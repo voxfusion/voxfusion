@@ -3,7 +3,7 @@
 
 use gpui_kit::{
     App, AsyncApp, ClickEvent, Div, Entity, InteractiveElement as _, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, prelude::*,
+    StatefulInteractiveElement as _, Styled as _, Window, div, prelude::*,
 };
 
 use crate::analytics;
@@ -26,7 +26,7 @@ enum ClearHistory {
     Confirming,
     Clearing,
     Cleared,
-    Failed(SharedString),
+    Failed,
 }
 
 pub(super) fn render(window: &mut Window, cx: &mut App) -> Div {
@@ -82,6 +82,7 @@ fn clear_history(window: &mut Window, cx: &mut App) -> Div {
         .child(
             div()
                 .flex_1()
+                .min_w_0()
                 .child(
                     div()
                         .mb_1()
@@ -198,12 +199,11 @@ fn clear_history(window: &mut Window, cx: &mut App) -> Div {
                 .child(icon("check").size_3p5())
                 .child(text(t_upper(cx, "settings.historyCleared")).tracking_wider()),
         ),
-        ClearHistory::Failed(error) => Some(
-            div()
-                .type_xs()
-                .text_color(p.ac)
-                .child(text(format!("[ERROR] {error}"))),
-        ),
+        ClearHistory::Failed => Some(div().type_xs().text_color(p.ac).child(text(format!(
+            "[{}] {}",
+            t_upper(cx, "settings.error"),
+            t(cx, "settings.clearHistoryFailed")
+        )))),
         _ => None,
     };
 
@@ -241,7 +241,7 @@ fn clear(state: &Entity<ClearHistory>, cx: &mut App) {
                 }
                 Err(error) => {
                     log::error!(target: "settings", "clear_transcriptions_failed error={error}");
-                    ClearHistory::Failed(error.into())
+                    ClearHistory::Failed
                 }
             };
 
