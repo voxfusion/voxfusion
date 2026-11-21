@@ -126,6 +126,8 @@ impl ModelDownloadStep {
         let events = cx.subscribe(&events::hub(cx), |this, _, event, cx| match event {
             AppEvent::ModelDownloadProgress(report) => this.handle_progress(report, cx),
             AppEvent::ModelVerifying { model_id } => this.handle_verifying(model_id, cx),
+            AppEvent::ModelDownloadStopped { model_id } => this.handle_download_stopped(model_id, cx),
+            AppEvent::ModelRemoved { model_id, .. } => this.handle_removed(model_id, cx),
             _ => {}
         });
 
@@ -343,6 +345,37 @@ impl ModelDownloadStep {
         self.set_progress(100);
         self.downloading = true;
         self.verifying = true;
+        cx.notify();
+    }
+
+    fn handle_download_stopped(&mut self, model_id: &str, cx: &mut Context<Self>) {
+        if let Some(model) = self.models.iter_mut().find(|model| model.id == model_id) {
+            model.downloading = false;
+        }
+        if self.selected.as_deref() == Some(model_id) && self.downloading {
+            self.downloading = false;
+            self.verifying = false;
+            self.cancel_requested = false;
+            cx.notify();
+        }
+    }
+
+    fn handle_removed(&mut self, model_id: &str, cx: &mut Context<Self>) {
+        if let Some(model) = self.models.iter_mut().find(|model| model.id == model_id) {
+            model.downloaded = false;
+            model.has_files = false;
+            model.disk_size_bytes = Some(0);
+        }
+        if self.selected.as_deref() == Some(model_id) && !self.downloading {
+            self.progress = 0;
+            self.transferred = None;
+            self.meter = DownloadMeter::default();
+            self.verifying = false;
+            self.bar.jump_to(0.);
+            if self.ready {
+                self.set_ready(false, cx);
+            }
+        }
         cx.notify();
     }
 

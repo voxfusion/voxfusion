@@ -1,5 +1,5 @@
 use futures_util::StreamExt;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -111,6 +111,73 @@ pub fn model_path(model: &ModelSpec) -> Result<PathBuf, String> {
     Ok(get_models_dir()?.join(model.filename))
 }
 
+fn temp_model_path(destination: &Path) -> PathBuf {
+    destination.with_extension("download.tmp")
+}
+
+/// Every file on disk belonging to `model`: its partial `.download.tmp` file
+/// first, then its final model file. Removing the temp file first keeps an
+/// installed model intact if deleting the temp file fails.
+fn model_files(model: &ModelSpec) -> Result<Vec<PathBuf>, String> {
+    let destination = model_path(model)?;
+    let temp_path = temp_model_path(&destination);
+    let mut files = Vec::with_capacity(2);
+    if temp_path != destination {
+        files.push(temp_path);
+    }
+    files.push(destination);
+    Ok(files)
+}
+
+/// Bytes reclaimed on disk by unlinking a path with metadata `meta` (from
+/// `symlink_metadata`). Returns 0 for non-regular files (such as symlinks) and
+/// hard-linked files (`nlink > 1`), and caps logical length by allocated
+/// 512-byte blocks so sparse files do not overstate freed space.
+fn reclaimable_file_size(meta: &fs::Metadata) -> u64 {
+    if !meta.is_file() {
+        return 0;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if meta.nlink() > 1 {
+            return 0;
+        }
+        let allocated = meta.blocks().saturating_mul(512);
+        meta.len().min(allocated)
+    }
+    #[cfg(not(unix))]
+    {
+        meta.len()
+    }
+}
+
+/// Reclaimable bytes on disk for `path` without dereferencing symlinks.
+fn reclaimable_path_size(path: &Path) -> u64 {
+    match fs::symlink_metadata(path) {
+        Ok(meta) => reclaimable_file_size(&meta),
+        Err(_) => 0,
+    }
+}
+
+/// Total reclaimable bytes occupied on disk by `model`'s files (final file and
+/// any partial `.download.tmp`).
+pub fn disk_size_bytes(model: &ModelSpec) -> u64 {
+    let Ok(files) = model_files(model) else {
+        return 0;
+    };
+    files.iter().map(|path| reclaimable_path_size(path)).sum()
+}
+
+/// Whether any file belonging to `model` (final file or partial `.download.tmp`)
+/// exists on disk, including symlinks, sparse files, and hard-linked files.
+pub fn has_model_files(model: &ModelSpec) -> bool {
+    let Ok(files) = model_files(model) else {
+        return false;
+    };
+    files.iter().any(|path| fs::symlink_metadata(path).is_ok())
+}
+
 /// Whether the model's file exists on disk and matches its expected size
 /// (when known). Models without a known size are considered present when the
 /// file is non-empty.
@@ -128,12 +195,69 @@ pub fn is_downloaded(model: &ModelSpec) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Active model selection
+// Active model selection and in-flight transcription tracking
 // ---------------------------------------------------------------------------
+
+// Lock ordering across model state (never invert):
+// 1. `ActiveModel.0`
+// 2. `TRANSCRIBING_MODELS`
+// 3. `ACTIVE_DOWNLOADS`
 
 /// The transcription model currently in use. Mirrored to `<models>/active-model.txt`
 /// so the choice survives restarts and is readable from the transcription path.
 pub struct ActiveModel(pub Mutex<String>);
+
+/// Refcount of in-flight transcriptions per model id. Prevents removing a
+/// model file that a transcription started before the user switched models.
+static TRANSCRIBING_MODELS: LazyLock<Mutex<HashMap<String, usize>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Holds a model registered as in-use for the lifetime of one transcription.
+pub struct TranscriptionGuard {
+    model_id: String,
+}
+
+impl Drop for TranscriptionGuard {
+    fn drop(&mut self) {
+        if let Ok(mut in_use) = TRANSCRIBING_MODELS.lock()
+            && let Some(count) = in_use.get_mut(&self.model_id)
+        {
+            if *count <= 1 {
+                in_use.remove(&self.model_id);
+            } else {
+                *count -= 1;
+            }
+        }
+    }
+}
+
+/// Resolves the active model and marks it as in-use for transcription under
+/// the active-model lock, so another thread cannot switch models and remove
+/// its file before transcription opens it.
+pub fn begin_transcription(
+    active: &ActiveModel,
+) -> Result<(&'static ModelSpec, PathBuf, TranscriptionGuard), String> {
+    let (model, guard) = {
+        let active_guard = active.0.lock().map_err(|e| e.to_string())?;
+        let active_id = active_guard.clone();
+        let model =
+            find_model(&active_id).ok_or_else(|| format!("Unknown active model: {}", active_id))?;
+
+        let mut in_use = TRANSCRIBING_MODELS.lock().map_err(|e| e.to_string())?;
+        *in_use.entry(model.id.to_string()).or_insert(0) += 1;
+        let guard = TranscriptionGuard {
+            model_id: model.id.to_string(),
+        };
+        (model, guard)
+    };
+
+    let path = model_path(model)?;
+    if !path.exists() {
+        return Err("Model not found. Please download it first.".to_string());
+    }
+
+    Ok((model, path, guard))
+}
 
 fn active_model_file() -> Result<PathBuf, String> {
     Ok(get_models_dir()?.join("active-model.txt"))
@@ -189,9 +313,18 @@ static ACTIVE_DOWNLOADS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Removes the model from [`ACTIVE_DOWNLOADS`] when the download completes,
-/// fails, or is cancelled.
+/// fails, or is cancelled, and emits [`AppEvent::ModelDownloadStopped`] if it
+/// did not finish so every open view clears its downloading state.
 struct DownloadGuard {
     model_id: String,
+    events: EventSender,
+    finished: bool,
+}
+
+impl DownloadGuard {
+    fn mark_finished(mut self) {
+        self.finished = true;
+    }
 }
 
 impl Drop for DownloadGuard {
@@ -199,13 +332,21 @@ impl Drop for DownloadGuard {
         if let Ok(mut active) = ACTIVE_DOWNLOADS.lock() {
             active.remove(&self.model_id);
         }
+        if !self.finished {
+            self.events.emit(AppEvent::ModelDownloadStopped {
+                model_id: self.model_id.clone(),
+            });
+        }
     }
 }
 
 /// Registers a download as in-flight, failing if one is already running for
 /// this model. Returns the guard (hold it for the download's lifetime) and
 /// the cancellation flag [`cancel_model_download`] sets.
-fn begin_download(model_id: &str) -> Result<(DownloadGuard, Arc<AtomicBool>), String> {
+fn begin_download(
+    events: &EventSender,
+    model_id: &str,
+) -> Result<(DownloadGuard, Arc<AtomicBool>), String> {
     let mut active = ACTIVE_DOWNLOADS.lock().map_err(|e| e.to_string())?;
     if active.contains_key(model_id) {
         return Err(DOWNLOAD_IN_PROGRESS_ERROR.to_string());
@@ -215,6 +356,8 @@ fn begin_download(model_id: &str) -> Result<(DownloadGuard, Arc<AtomicBool>), St
     Ok((
         DownloadGuard {
             model_id: model_id.to_string(),
+            events: events.clone(),
+            finished: false,
         },
         cancel,
     ))
@@ -245,22 +388,23 @@ fn emit_progress(
 pub async fn download_model_file(events: &EventSender, model: &ModelSpec) -> Result<(), String> {
     let destination = model_path(model)?;
 
+    // Guard against concurrent downloads or removal of the same model. Dropped
+    // (and the model unregistered) on every exit path below.
+    let (guard, cancel) = begin_download(events, model.id)?;
+
     if is_downloaded(model) {
         let size = fs::metadata(&destination).map(|m| m.len()).unwrap_or(0);
+        guard.mark_finished();
         emit_progress(events, model.id, 100, size, size);
         return Ok(());
     }
-
-    // Guard against concurrent downloads of the same model. Dropped (and the
-    // model unregistered) on every exit path below.
-    let (_guard, cancel) = begin_download(model.id)?;
 
     // Drop a mismatched previous final file (wrong size — see is_downloaded).
     if destination.exists() {
         let _ = fs::remove_file(&destination);
     }
 
-    let temp_path = destination.with_extension("download.tmp");
+    let temp_path = temp_model_path(&destination);
 
     // Resume from a previous partial download when possible.
     let mut existing_len = tokio::fs::metadata(&temp_path)
@@ -300,6 +444,9 @@ pub async fn download_model_file(events: &EventSender, model: &ModelSpec) -> Res
         .await
         .map_err(|e| format!("Failed to finalize model: {}", e))?;
 
+    // Unregister before notifying listeners so a `list_models` triggered by the
+    // 100% progress event sees `downloading == false`.
+    guard.mark_finished();
     emit_progress(events, model.id, 100, actual_size, actual_size);
 
     Ok(())
@@ -509,6 +656,10 @@ async fn verify_checksum(
 /// Every model with its runtime state, for the interface.
 pub fn list_models(active: &ActiveModel) -> Vec<ModelInfo> {
     let active_id = active_model_id(active);
+    let active_downloads: HashSet<String> = ACTIVE_DOWNLOADS
+        .lock()
+        .map(|downloads| downloads.keys().cloned().collect())
+        .unwrap_or_default();
     MODELS
         .iter()
         .map(|model| ModelInfo {
@@ -522,6 +673,9 @@ pub fn list_models(active: &ActiveModel) -> Vec<ModelInfo> {
             available: model.engine.is_available(),
             downloaded: is_downloaded(model),
             active: model.id == active_id,
+            has_files: has_model_files(model),
+            disk_size_bytes: Some(disk_size_bytes(model)),
+            downloading: active_downloads.contains(model.id),
         })
         .collect()
 }
@@ -535,9 +689,6 @@ pub fn set_active_model(active: &ActiveModel, model_id: &str) -> Result<(), Stri
             model.name
         ));
     }
-    if !is_downloaded(model) {
-        return Err(format!("{} is not downloaded yet.", model.name));
-    }
     // A Parakeet model is only usable when the crispasr engine is present
     // (bundled in release builds); fail here rather than on every transcription.
     if !model.engine.is_available() {
@@ -547,14 +698,74 @@ pub fn set_active_model(active: &ActiveModel, model_id: &str) -> Result<(), Stri
         ));
     }
 
-    {
-        let mut guard = active.0.lock().map_err(|e| e.to_string())?;
-        *guard = model.id.to_string();
+    let mut guard = active.0.lock().map_err(|e| e.to_string())?;
+    if !is_downloaded(model) {
+        return Err(format!("{} is not downloaded yet.", model.name));
     }
 
     let file = active_model_file()?;
     fs::write(&file, model.id).map_err(|e| format!("Failed to persist model selection: {}", e))?;
+    *guard = model.id.to_string();
     Ok(())
+}
+
+/// Deletes every file on disk belonging to `model_id` (both its partial
+/// `.download.tmp` and final file) and returns the exact number of bytes freed.
+/// Refuses while the model is active, downloading, or used by a running
+/// transcription.
+pub fn remove_model(active: &ActiveModel, model_id: &str) -> Result<u64, String> {
+    let model = find_model(model_id).ok_or_else(|| format!("Unknown model: {}", model_id))?;
+    let files = model_files(model)?;
+
+    let freed = {
+        let active_guard = active.0.lock().map_err(|e| e.to_string())?;
+        if *active_guard == model.id {
+            return Err(format!(
+                "Cannot remove {} while it is the active model. Select another model first.",
+                model.name
+            ));
+        }
+
+        let transcribing = TRANSCRIBING_MODELS.lock().map_err(|e| e.to_string())?;
+        if transcribing.get(model.id).copied().unwrap_or(0) > 0 {
+            return Err(format!(
+                "Cannot remove {} while a transcription is using it.",
+                model.name
+            ));
+        }
+
+        let downloads = ACTIVE_DOWNLOADS.lock().map_err(|e| e.to_string())?;
+        if downloads.contains_key(model.id) {
+            return Err(format!(
+                "Cannot remove {} while it is downloading.",
+                model.name
+            ));
+        }
+
+        let mut freed: u64 = 0;
+        for path in &files {
+            let meta = match fs::symlink_metadata(path) {
+                Ok(meta) => meta,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(format!("Failed to inspect {}: {}", model.name, e)),
+            };
+            let size = reclaimable_file_size(&meta);
+            match fs::remove_file(path) {
+                Ok(()) => freed = freed.saturating_add(size),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(format!("Failed to remove {}: {}", model.name, e)),
+            }
+        }
+        freed
+    };
+
+    log::info!(
+        target: "models",
+        "model_removed model_id={} freed_bytes={}",
+        model.id,
+        freed
+    );
+    Ok(freed)
 }
 
 pub async fn download_model(events: &EventSender, model_id: &str) -> Result<(), String> {

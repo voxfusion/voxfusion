@@ -122,14 +122,7 @@ pub fn transcribe_audio(
     fallback_style: &str,
 ) -> Result<TranscriptionResult, String> {
     let _transcribing = audio::transcribing(audio_path);
-    let active_id = models::active_model_id(active);
-    let model = models::find_model(&active_id)
-        .ok_or_else(|| format!("Unknown active model: {}", active_id))?;
-    let model_path = models::model_path(model)?;
-
-    if !model_path.exists() {
-        return Err("Model not found. Please download it first.".to_string());
-    }
+    let (model, model_path, _model_use) = models::begin_transcription(active)?;
 
     let start = std::time::Instant::now();
 
