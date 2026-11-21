@@ -287,6 +287,50 @@ pub fn add_dictionary_word(state: &DbState, word: &str) -> Result<DictionaryWord
     })
 }
 
+pub fn restore_dictionary_word(
+    state: &DbState,
+    word: &DictionaryWord,
+) -> Result<DictionaryWord, String> {
+    let text = word.word.trim();
+    if text.is_empty() || text.chars().count() > MAX_WORD_CHARS {
+        return Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ));
+    }
+
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let now = Utc::now().to_rfc3339();
+    let id = if word.id.trim().is_empty() {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        word.id.clone()
+    };
+    let created_at = if word.created_at.trim().is_empty() {
+        now.clone()
+    } else {
+        word.created_at.clone()
+    };
+    let updated_at = if word.updated_at.trim().is_empty() {
+        created_at.clone()
+    } else {
+        word.updated_at.clone()
+    };
+
+    conn.execute(
+        "INSERT OR REPLACE INTO dictionary_words (id, word, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4)",
+        params![id, text, created_at, updated_at],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(DictionaryWord {
+        id,
+        word: text.to_string(),
+        created_at,
+        updated_at,
+    })
+}
+
 pub fn update_dictionary_word(
     state: &DbState,
     id: &str,
@@ -321,11 +365,26 @@ pub fn update_dictionary_word(
     })
 }
 
-pub fn delete_dictionary_word(state: &DbState, id: &str) -> Result<(), String> {
+pub fn delete_dictionary_word(state: &DbState, id: &str) -> Result<Option<DictionaryWord>, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let existing = conn
+        .query_row(
+            "SELECT id, word, created_at, updated_at FROM dictionary_words WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(DictionaryWord {
+                    id: row.get(0)?,
+                    word: row.get(1)?,
+                    created_at: row.get(2)?,
+                    updated_at: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM dictionary_words WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(existing)
 }
 
 #[cfg(test)]

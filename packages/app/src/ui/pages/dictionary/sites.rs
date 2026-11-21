@@ -73,6 +73,7 @@ impl Render for SiteDictionaries {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let groups = self.groups.read(cx);
         let count = groups.len();
+        let has_undos = groups.has_undos(cx);
         let load_error = groups.load_error();
         let count_label = (count > 0 && load_error.is_none())
             .then(|| t_with(cx, "dictionary.siteCount", &[("count", &count.to_string())]));
@@ -86,13 +87,25 @@ impl Render for SiteDictionaries {
             .child(self.form.clone())
             .when(!self.loading, |page| {
                 if let Some(error) = load_error {
-                    page.child(load_failed(
+                    let failed = load_failed(
                         t(cx, "dictionary.sitesLoadFailed"),
                         error,
                         cx.listener(|this, _, _, cx| this.load(cx)),
                         cx,
-                    ))
-                } else if count == 0 {
+                    );
+                    if has_undos {
+                        page.child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap_4()
+                                .child(self.groups.clone())
+                                .child(failed),
+                        )
+                    } else {
+                        page.child(failed)
+                    }
+                } else if count == 0 && !has_undos {
                     page.child(empty_state(
                         "NO_SITES_CONFIGURED",
                         t(cx, "dictionary.sitesEmptyState"),

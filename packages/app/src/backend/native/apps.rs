@@ -1,6 +1,6 @@
 use base64::Engine;
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{OptionalExtension as _, params};
 use std::collections::HashSet;
 use std::fs;
 use std::io::BufReader;
@@ -565,6 +565,57 @@ pub fn add_app_dictionary_word(
     })
 }
 
+pub fn restore_app_dictionary_word(
+    state: &DbState,
+    bundle_id: &str,
+    app_name: &str,
+    word: &DictionaryWord,
+) -> Result<DictionaryWord, String> {
+    let bundle_id = bundle_id.trim().to_string();
+    let app_name = app_name.trim().to_string();
+    let text = word.word.trim();
+    if bundle_id.is_empty() || app_name.is_empty() {
+        return Err("bundle_id and app_name are required".to_string());
+    }
+    if text.is_empty() || text.chars().count() > MAX_WORD_CHARS {
+        return Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ));
+    }
+
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let now = Utc::now().to_rfc3339();
+    let id = if word.id.trim().is_empty() {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        word.id.clone()
+    };
+    let created_at = if word.created_at.trim().is_empty() {
+        now.clone()
+    } else {
+        word.created_at.clone()
+    };
+    let updated_at = if word.updated_at.trim().is_empty() {
+        created_at.clone()
+    } else {
+        word.updated_at.clone()
+    };
+
+    conn.execute(
+        "INSERT OR REPLACE INTO app_dictionary_words (id, bundle_id, app_name, word, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, bundle_id, app_name, text, created_at, updated_at],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(DictionaryWord {
+        id,
+        word: text.to_string(),
+        created_at,
+        updated_at,
+    })
+}
+
 pub fn update_app_dictionary_word(
     state: &DbState,
     id: &str,
@@ -595,14 +646,32 @@ pub fn update_app_dictionary_word(
     })
 }
 
-pub fn delete_app_dictionary_word(state: &DbState, id: &str) -> Result<(), String> {
+pub fn delete_app_dictionary_word(
+    state: &DbState,
+    id: &str,
+) -> Result<Option<DictionaryWord>, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let existing = conn
+        .query_row(
+            "SELECT id, word, created_at, updated_at FROM app_dictionary_words WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(DictionaryWord {
+                    id: row.get(0)?,
+                    word: row.get(1)?,
+                    created_at: row.get(2)?,
+                    updated_at: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
     conn.execute(
         "DELETE FROM app_dictionary_words WHERE id = ?1",
         params![id],
     )
     .map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(existing)
 }
 
 pub fn delete_app_dictionary(state: &DbState, bundle_id: &str) -> Result<(), String> {

@@ -183,6 +183,62 @@ impl FixtureBackend {
         }
     }
 
+    fn restored_word(&self, word: &DictionaryWord) -> CommandResult<DictionaryWord> {
+        let text = word.word.trim();
+        if text.is_empty() || text.chars().count() > MAX_WORD_CHARS {
+            return Err(format!(
+                "Word must be between 1 and {MAX_WORD_CHARS} characters"
+            ));
+        }
+
+        let id = if word.id.trim().is_empty() {
+            let mut next_id = self.next_id.lock().unwrap();
+            *next_id += 1;
+            format!("mock-{}", *next_id)
+        } else {
+            word.id.clone()
+        };
+        let now = Utc::now().to_rfc3339();
+        let created_at = if word.created_at.trim().is_empty() {
+            now
+        } else {
+            word.created_at.clone()
+        };
+        let updated_at = if word.updated_at.trim().is_empty() {
+            created_at.clone()
+        } else {
+            word.updated_at.clone()
+        };
+
+        Ok(DictionaryWord {
+            id,
+            word: text.to_string(),
+            created_at,
+            updated_at,
+        })
+    }
+
+    fn insert_restored_word(words: &mut Vec<DictionaryWord>, word: DictionaryWord) {
+        if let Some(existing) = words.iter_mut().find(|entry| entry.id == word.id) {
+            *existing = word;
+            return;
+        }
+
+        let position = if !word.created_at.is_empty()
+            && words.iter().any(|entry| !entry.created_at.is_empty())
+        {
+            words
+                .iter()
+                .position(|entry| {
+                    !entry.created_at.is_empty() && entry.created_at < word.created_at
+                })
+                .unwrap_or(words.len())
+        } else {
+            0
+        };
+        words.insert(position, word);
+    }
+
     fn with<T>(&self, change: impl FnOnce(&mut FixtureData) -> T) -> T {
         change(&mut self.data.lock().unwrap())
     }
@@ -392,6 +448,13 @@ impl Backend for FixtureBackend {
         Ok(word)
     }
 
+    fn restore_dictionary_word(&self, word: &DictionaryWord) -> CommandResult<DictionaryWord> {
+        self.gate("restore_dictionary_word")?;
+        let word = self.restored_word(word)?;
+        self.with(|data| Self::insert_restored_word(&mut data.dictionary_words, word.clone()));
+        Ok(word)
+    }
+
     fn update_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_dictionary_word")?;
         self.with(|data| {
@@ -405,10 +468,14 @@ impl Backend for FixtureBackend {
         })
     }
 
-    fn delete_dictionary_word(&self, id: &str) -> CommandResult<()> {
+    fn delete_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>> {
         self.gate("delete_dictionary_word")?;
-        self.with(|data| data.dictionary_words.retain(|entry| entry.id != id));
-        Ok(())
+        Ok(self.with(|data| {
+            data.dictionary_words
+                .iter()
+                .position(|entry| entry.id == id)
+                .map(|index| data.dictionary_words.remove(index))
+        }))
     }
 
     fn list_app_dictionaries(&self) -> CommandResult<Vec<AppDictionary>> {
@@ -442,6 +509,37 @@ impl Backend for FixtureBackend {
         Ok(word)
     }
 
+    fn restore_app_dictionary_word(
+        &self,
+        bundle_id: &str,
+        app_name: &str,
+        word: &DictionaryWord,
+    ) -> CommandResult<DictionaryWord> {
+        self.gate("restore_app_dictionary_word")?;
+        let bundle_id = bundle_id.trim();
+        let app_name = app_name.trim();
+        if bundle_id.is_empty() || app_name.is_empty() {
+            return Err("bundle_id and app_name are required".to_string());
+        }
+        let word = self.restored_word(word)?;
+        self.with(|data| {
+            let position = data
+                .app_dictionaries
+                .iter()
+                .position(|group| group.bundle_id == bundle_id)
+                .unwrap_or_else(|| {
+                    data.app_dictionaries.push(AppDictionary {
+                        bundle_id: bundle_id.to_string(),
+                        app_name: app_name.to_string(),
+                        words: Vec::new(),
+                    });
+                    data.app_dictionaries.len() - 1
+                });
+            Self::insert_restored_word(&mut data.app_dictionaries[position].words, word.clone());
+        });
+        Ok(word)
+    }
+
     fn update_app_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_app_dictionary_word")?;
         self.with(|data| {
@@ -456,14 +554,16 @@ impl Backend for FixtureBackend {
         })
     }
 
-    fn delete_app_dictionary_word(&self, id: &str) -> CommandResult<()> {
+    fn delete_app_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>> {
         self.gate("delete_app_dictionary_word")?;
-        self.with(|data| {
+        Ok(self.with(|data| {
             for group in &mut data.app_dictionaries {
-                group.words.retain(|entry| entry.id != id);
+                if let Some(index) = group.words.iter().position(|entry| entry.id == id) {
+                    return Some(group.words.remove(index));
+                }
             }
-        });
-        Ok(())
+            None
+        }))
     }
 
     fn delete_app_dictionary(&self, bundle_id: &str) -> CommandResult<()> {
@@ -500,6 +600,34 @@ impl Backend for FixtureBackend {
         Ok(word)
     }
 
+    fn restore_site_dictionary_word(
+        &self,
+        domain: &str,
+        word: &DictionaryWord,
+    ) -> CommandResult<DictionaryWord> {
+        self.gate("restore_site_dictionary_word")?;
+        let domain = domain.trim();
+        if domain.is_empty() {
+            return Err("Invalid domain".to_string());
+        }
+        let word = self.restored_word(word)?;
+        self.with(|data| {
+            let position = data
+                .site_dictionaries
+                .iter()
+                .position(|group| group.domain == domain)
+                .unwrap_or_else(|| {
+                    data.site_dictionaries.push(SiteDictionary {
+                        domain: domain.to_string(),
+                        words: Vec::new(),
+                    });
+                    data.site_dictionaries.len() - 1
+                });
+            Self::insert_restored_word(&mut data.site_dictionaries[position].words, word.clone());
+        });
+        Ok(word)
+    }
+
     fn update_site_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_site_dictionary_word")?;
         self.with(|data| {
@@ -514,14 +642,16 @@ impl Backend for FixtureBackend {
         })
     }
 
-    fn delete_site_dictionary_word(&self, id: &str) -> CommandResult<()> {
+    fn delete_site_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>> {
         self.gate("delete_site_dictionary_word")?;
-        self.with(|data| {
+        Ok(self.with(|data| {
             for group in &mut data.site_dictionaries {
-                group.words.retain(|entry| entry.id != id);
+                if let Some(index) = group.words.iter().position(|entry| entry.id == id) {
+                    return Some(group.words.remove(index));
+                }
             }
-        });
-        Ok(())
+            None
+        }))
     }
 
     fn delete_site_dictionary(&self, domain: &str) -> CommandResult<()> {

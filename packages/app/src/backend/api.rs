@@ -299,8 +299,9 @@ pub trait Backend: Send + Sync + 'static {
     // ---- dictionary ----
     fn list_dictionary_words(&self) -> CommandResult<Vec<DictionaryWord>>;
     fn add_dictionary_word(&self, word: &str) -> CommandResult<DictionaryWord>;
+    fn restore_dictionary_word(&self, word: &DictionaryWord) -> CommandResult<DictionaryWord>;
     fn update_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord>;
-    fn delete_dictionary_word(&self, id: &str) -> CommandResult<()>;
+    fn delete_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>>;
 
     fn list_app_dictionaries(&self) -> CommandResult<Vec<AppDictionary>>;
     fn add_app_dictionary_word(
@@ -309,14 +310,25 @@ pub trait Backend: Send + Sync + 'static {
         app_name: &str,
         word: &str,
     ) -> CommandResult<DictionaryWord>;
+    fn restore_app_dictionary_word(
+        &self,
+        bundle_id: &str,
+        app_name: &str,
+        word: &DictionaryWord,
+    ) -> CommandResult<DictionaryWord>;
     fn update_app_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord>;
-    fn delete_app_dictionary_word(&self, id: &str) -> CommandResult<()>;
+    fn delete_app_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>>;
     fn delete_app_dictionary(&self, bundle_id: &str) -> CommandResult<()>;
 
     fn list_site_dictionaries(&self) -> CommandResult<Vec<SiteDictionary>>;
     fn add_site_dictionary_word(&self, domain: &str, word: &str) -> CommandResult<DictionaryWord>;
+    fn restore_site_dictionary_word(
+        &self,
+        domain: &str,
+        word: &DictionaryWord,
+    ) -> CommandResult<DictionaryWord>;
     fn update_site_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord>;
-    fn delete_site_dictionary_word(&self, id: &str) -> CommandResult<()>;
+    fn delete_site_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>>;
     fn delete_site_dictionary(&self, domain: &str) -> CommandResult<()>;
 
     // ---- styles ----

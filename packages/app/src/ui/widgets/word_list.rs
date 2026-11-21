@@ -2,23 +2,28 @@
 //! its actions, and the editor for words grouped by app or by site.
 
 use gpui_kit::{
-    App, AppContext as _, ClickEvent, Context, Div, Entity, EventEmitter, FocusHandle,
-    Focusable as _, Image, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, Window, div,
-    prelude::*, px,
+    AnyElement, App, AppContext as _, ClickEvent, Context, Div, ElementId, Entity, EventEmitter,
+    FocusHandle, Focusable as _, Image, InteractiveElement as _, IntoElement, KeyDownEvent,
+    ParentElement as _, Render, SharedString, Stateful, StatefulInteractiveElement as _,
+    Styled as _, Subscription, Window, div, prelude::*, px,
 };
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::backend::{DictionaryWord, MAX_WORD_CHARS};
 use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::app_icon::{app_icon, site_icon};
+use crate::ui::widgets::focus::{focus_ring, focus_visible, keyed_focus_handle};
 use crate::ui::widgets::text_field::{TextField, TextFieldEvent, field_box};
-use crate::ui::widgets::{icon, turning};
-use crate::ui::{t, t_with, upper};
+use crate::ui::widgets::{icon, spinning, turning};
+use crate::ui::{t, t_upper, t_with, upper};
+
+/// How long an Undo row stays visible after a word is deleted.
+pub const UNDO_DURATION: Duration = Duration::from_secs(8);
 
 /// Where a form or a row is shown: on the page itself, or inside a group of
 /// the grouped editor, where everything is a size smaller.
@@ -210,7 +215,220 @@ pub enum WordAction {
     StartEdit,
     SaveEdit,
     CancelEdit,
-    Delete,
+    Delete { from_keyboard: bool },
+}
+
+/// What an Undo row shows for a word that was just deleted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UndoBanner {
+    pub word: SharedString,
+    /// Whether restoring the word is currently running.
+    pub restoring: bool,
+    /// Why restoring the word was refused, if it was.
+    pub error: Option<Notice>,
+}
+
+/// What the buttons of an Undo row ask for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UndoAction {
+    Undo,
+    Dismiss,
+}
+
+/// How keyboard focus should update when the visible Undo rows change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UndoFocus {
+    /// Leave focus where it is unless a removed Undo row held it.
+    Keep,
+    /// Focus the dictionary container so Escape dismisses the banner after a
+    /// mouse deletion without drawing a keyboard focus ring (skipped while an
+    /// inline edit is active).
+    Container,
+    /// Move focus to the Undo button for `token` after a keyboard deletion.
+    Button(u64),
+}
+
+/// The Undo row shown inside a group of [`WordListEditor`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupUndo {
+    pub key: SharedString,
+    pub token: u64,
+    pub index: usize,
+    pub banner: UndoBanner,
+}
+
+/// The error shown inside an Undo row when restoring a deleted word fails.
+/// Uses `txt_primary` and `txt_hint` so contrast stays >= 4.5:1 on `ac_bg`.
+fn undo_notice(notice: &Notice, cx: &App) -> Div {
+    let p = palette(cx);
+
+    div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .type_xs()
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .text_color(p.txt_primary)
+                .child(icon("alert-circle").size_4().text_color(p.ac))
+                .child(text(notice.title.clone())),
+        )
+        .when(!notice.error.is_empty(), |block| {
+            block.child(
+                div()
+                    .pl_6()
+                    .text_color(p.txt_hint)
+                    .child(text(notice.error.clone()).break_all()),
+            )
+        })
+}
+
+/// The brief Undo row shown in place of a deleted word, with keyboard-focusable
+/// Undo and Dismiss buttons. Enter and Space trigger `on_click` once; Escape
+/// dismisses the row.
+pub fn undo_row(
+    variant: Variant,
+    id: impl Into<ElementId>,
+    banner: &UndoBanner,
+    undo_focus: &FocusHandle,
+    dismiss_focus: &FocusHandle,
+    on_action: impl Fn(&UndoAction, &mut Window, &mut App) + 'static,
+    window: &Window,
+    cx: &App,
+) -> Stateful<Div> {
+    let p = palette(cx);
+    let on_action = Rc::new(on_action);
+    let undo_focused = focus_visible(undo_focus, window);
+    let dismiss_focused = focus_visible(dismiss_focus, window);
+
+    let message = t_with(
+        cx,
+        "dictionary.wordDeleted",
+        &[("word", banner.word.as_ref())],
+    );
+
+    let undo_button = div()
+        .id("undo")
+        .transition_colors()
+        .track_focus(undo_focus)
+        .relative()
+        .flex()
+        .items_center()
+        .gap_1p5()
+        .px_2p5()
+        .py_1()
+        .type_xs()
+        .border_1()
+        .border_color(p.ac)
+        .bg(p.ac)
+        .text_color(p.ac_on)
+        .on_key_down({
+            let on_action = on_action.clone();
+            let restoring = banner.restoring;
+            move |event: &KeyDownEvent, window, cx| {
+                if !restoring && event.keystroke.key == "escape" {
+                    on_action(&UndoAction::Dismiss, window, cx);
+                    cx.stop_propagation();
+                }
+            }
+        })
+        .map(|button| {
+            if banner.restoring {
+                button
+                    .opacity(0.5)
+                    .child(spinning("undo-spinner", icon("loader").size_3()))
+            } else {
+                let on_action = on_action.clone();
+                button
+                    .hover(|button| button.bg(p.ac_hover).border_color(p.ac_hover))
+                    .on_click(move |event, window, cx| {
+                        if event.click_count() == 1 {
+                            on_action(&UndoAction::Undo, window, cx);
+                        }
+                    })
+            }
+        })
+        .child(
+            text(t_upper(cx, "dictionary.undo"))
+                .tracking_wider()
+                .nowrap(),
+        )
+        .when(undo_focused, |button| button.child(focus_ring(3., cx)));
+
+    let dismiss_button = div()
+        .id("dismiss-undo")
+        .transition_colors()
+        .track_focus(dismiss_focus)
+        .relative()
+        .p_1()
+        .text_color(p.txt_secondary)
+        .map(|button| {
+            if banner.restoring {
+                button.opacity(0.5)
+            } else {
+                let on_key = on_action.clone();
+                let on_click = on_action.clone();
+                button
+                    .hover(|button| button.text_color(p.txt_primary))
+                    .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                        if event.keystroke.key == "escape" {
+                            on_key(&UndoAction::Dismiss, window, cx);
+                            cx.stop_propagation();
+                        }
+                    })
+                    .on_click(move |event, window, cx| {
+                        if event.click_count() == 1 {
+                            on_click(&UndoAction::Dismiss, window, cx);
+                        }
+                    })
+            }
+        })
+        .child(icon("x").size_3p5())
+        .when(dismiss_focused, |button| button.child(focus_ring(3., cx)));
+
+    let line = div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_3()
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .map(|label| match variant {
+                    Variant::Page => label.type_sm(),
+                    Variant::Nested => label.type_xs(),
+                })
+                .text_color(p.txt_primary)
+                .child(text(message).truncate()),
+        )
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .flex_shrink_0()
+                .child(undo_button)
+                .child(dismiss_button),
+        );
+
+    div()
+        .id(id)
+        .flex()
+        .flex_col()
+        .gap_2()
+        .border_1()
+        .border_color(p.ac)
+        .bg(p.ac_bg)
+        .map(|row| match variant {
+            Variant::Page => row.px_4().py_2p5(),
+            Variant::Nested => row.px_3().py_1p5(),
+        })
+        .child(line)
+        .children(banner.error.as_ref().map(|error| undo_notice(error, cx)))
 }
 
 /// A word with its edit and delete buttons, or, while it is being edited,
@@ -222,29 +440,68 @@ pub fn word_row(
     editing: Option<&Entity<TextField>>,
     error: Option<&Notice>,
     on_action: impl Fn(&WordAction, &mut Window, &mut App) + 'static,
-    window: &Window,
-    cx: &App,
+    window: &mut Window,
+    cx: &mut App,
 ) -> Faded {
     let p = palette(cx);
     let on_action = Rc::new(on_action);
 
-    let button = |label: &'static str, action: WordAction| {
+    let edit_button = |label: &'static str,
+                       focus_id: SharedString,
+                       action: WordAction,
+                       window: &mut Window,
+                       cx: &mut App| {
         let on_action = on_action.clone();
+        let focus_handle = keyed_focus_handle(focus_id, window, cx);
+        let focused = focus_visible(&focus_handle, window);
 
         div()
             .id(label)
-            .on_click(move |_, window, cx| on_action(&action, window, cx))
+            .transition_all()
+            .track_focus(&focus_handle)
+            .relative()
+            .on_click(move |event, window, cx| {
+                if event.click_count() == 1 {
+                    on_action(&action, window, cx);
+                }
+            })
             .child(text(label).tracking_wider())
+            .when(focused, |button| button.child(focus_ring(3., cx)))
     };
 
-    // Shown only while the pointer is over the row.
-    let hover_button = |label: &'static str, action: WordAction| {
-        button(label, action)
+    // Shown while the pointer is over the row, or while focused by keyboard.
+    let hover_button = |label: &'static str,
+                        focus_id: SharedString,
+                        is_delete: bool,
+                        window: &mut Window,
+                        cx: &mut App| {
+        let on_action = on_action.clone();
+        let focus_handle = keyed_focus_handle(focus_id, window, cx);
+        let focused = focus_visible(&focus_handle, window);
+
+        div()
+            .id(label)
             .transition_all()
-            .text_color(p.txt_muted)
-            .opacity(0.)
+            .track_focus(&focus_handle)
+            .relative()
+            .text_color(if focused { p.ac } else { p.txt_muted })
+            .opacity(if focused { 1. } else { 0. })
             .group_hover("word", |button| button.opacity(1.))
             .hover(|button| button.text_color(p.ac))
+            .on_click(move |event, window, cx| {
+                if event.click_count() == 1 {
+                    let action = if is_delete {
+                        WordAction::Delete {
+                            from_keyboard: event.is_keyboard(),
+                        }
+                    } else {
+                        WordAction::StartEdit
+                    };
+                    on_action(&action, window, cx);
+                }
+            })
+            .child(text(label).tracking_wider())
+            .when(focused, |button| button.child(focus_ring(3., cx)))
     };
 
     let content = match editing {
@@ -293,19 +550,43 @@ pub fn word_row(
             if editing.is_some() {
                 actions
                     .child(
-                        button("[SAVE]", WordAction::SaveEdit)
-                            .text_color(p.success)
-                            .hover(|button| button.opacity(0.8)),
+                        edit_button(
+                            "[SAVE]",
+                            SharedString::from(format!("word-save-{}", word.id)),
+                            WordAction::SaveEdit,
+                            window,
+                            cx,
+                        )
+                        .text_color(p.success)
+                        .hover(|button| button.opacity(0.8)),
                     )
                     .child(
-                        button("[CANCEL]", WordAction::CancelEdit)
-                            .text_color(p.txt_muted)
-                            .hover(|button| button.text_color(p.txt_secondary)),
+                        edit_button(
+                            "[CANCEL]",
+                            SharedString::from(format!("word-cancel-{}", word.id)),
+                            WordAction::CancelEdit,
+                            window,
+                            cx,
+                        )
+                        .text_color(p.txt_muted)
+                        .hover(|button| button.text_color(p.txt_secondary)),
                     )
             } else {
                 actions
-                    .child(hover_button("[EDIT]", WordAction::StartEdit))
-                    .child(hover_button("[DEL]", WordAction::Delete))
+                    .child(hover_button(
+                        "[EDIT]",
+                        SharedString::from(format!("word-edit-{}", word.id)),
+                        false,
+                        window,
+                        cx,
+                    ))
+                    .child(hover_button(
+                        "[DEL]",
+                        SharedString::from(format!("word-del-{}", word.id)),
+                        true,
+                        window,
+                        cx,
+                    ))
             }
         });
 
@@ -382,8 +663,12 @@ pub enum WordListEvent {
         word: String,
     },
     DeleteWord {
+        key: SharedString,
         word_id: String,
+        from_keyboard: bool,
     },
+    UndoDelete(u64),
+    DismissUndo(u64),
 }
 
 struct NewWord {
@@ -401,6 +686,10 @@ struct Editing {
 /// a form to add a word and a row for every word it has.
 pub struct WordListEditor {
     groups: Vec<WordGroup>,
+    /// When true, only active Undo rows are rendered (used alongside a list
+    /// load-error card so stale groups are hidden while Undo feedback stays
+    /// visible).
+    list_hidden: bool,
     expanded: HashSet<SharedString>,
     new_words: HashMap<SharedString, NewWord>,
     adding: HashSet<SharedString>,
@@ -408,7 +697,12 @@ pub struct WordListEditor {
     group_errors: HashMap<SharedString, Notice>,
     /// Why a change to a word was refused, by the word's id.
     word_errors: HashMap<String, Notice>,
+    undos: Vec<GroupUndo>,
+    undo_focus: HashMap<u64, (FocusHandle, FocusHandle)>,
     editing: Option<Editing>,
+    /// Set for the duration of an Escape keypress that cancelled an active
+    /// inline edit so the bubbled keydown does not also dismiss an Undo row.
+    escape_cancelled_edit: bool,
     focus_handle: FocusHandle,
 }
 
@@ -418,13 +712,24 @@ impl WordListEditor {
     pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
             groups: Vec::new(),
+            list_hidden: false,
             expanded: HashSet::new(),
             new_words: HashMap::new(),
             adding: HashSet::new(),
             group_errors: HashMap::new(),
             word_errors: HashMap::new(),
+            undos: Vec::new(),
+            undo_focus: HashMap::new(),
             editing: None,
+            escape_cancelled_edit: false,
             focus_handle: cx.focus_handle(),
+        }
+    }
+
+    pub fn set_list_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if self.list_hidden != hidden {
+            self.list_hidden = hidden;
+            cx.notify();
         }
     }
 
@@ -440,6 +745,54 @@ impl WordListEditor {
         }
 
         self.groups = groups;
+        cx.notify();
+    }
+
+    /// Updates the Undo rows shown for deleted words, moving keyboard focus
+    /// cleanly when requested or when a focused banner disappears.
+    pub fn set_undos(
+        &mut self,
+        undos: Vec<GroupUndo>,
+        focus: UndoFocus,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let mut removed_had_focus = false;
+        self.undo_focus
+            .retain(|token, (undo_focus, dismiss_focus)| {
+                let keep = undos.iter().any(|undo| undo.token == *token);
+                if !keep && (undo_focus.is_focused(window) || dismiss_focus.is_focused(window)) {
+                    removed_had_focus = true;
+                }
+                keep
+            });
+        for undo in &undos {
+            self.undo_focus.entry(undo.token).or_insert_with(|| {
+                (
+                    cx.focus_handle().tab_stop(true),
+                    cx.focus_handle().tab_stop(true),
+                )
+            });
+        }
+        self.undos = undos;
+
+        match focus {
+            UndoFocus::Button(token) => {
+                if let Some((undo_focus, _)) = self.undo_focus.get(&token) {
+                    window.focus(undo_focus, cx);
+                }
+            }
+            UndoFocus::Container => {
+                if self.editing.is_none() {
+                    window.focus(&self.focus_handle, cx);
+                }
+            }
+            UndoFocus::Keep => {
+                if removed_had_focus {
+                    window.focus(&self.focus_handle, cx);
+                }
+            }
+        }
         cx.notify();
     }
 
@@ -535,6 +888,13 @@ impl WordListEditor {
         cx.notify();
     }
 
+    /// Clears any refused-change notice shown for `word_id`.
+    pub fn clear_word_error(&mut self, word_id: &str, cx: &mut Context<Self>) {
+        if self.word_errors.remove(word_id).is_some() {
+            cx.notify();
+        }
+    }
+
     /// Says, in the group, why it could not be removed. The group is opened,
     /// so that the notice shows once it is back.
     pub fn fail_group(&mut self, key: SharedString, error: Notice, cx: &mut Context<Self>) {
@@ -556,7 +916,16 @@ impl WordListEditor {
             move |this, _, event, window, cx| match event {
                 TextFieldEvent::Change => cx.notify(),
                 TextFieldEvent::Enter => this.save_edit(&word_id, window, cx),
-                TextFieldEvent::Escape => this.cancel_edit(window, cx),
+                TextFieldEvent::Escape => {
+                    this.escape_cancelled_edit = true;
+                    let entity = cx.entity().downgrade();
+                    window.defer(cx, move |_, cx| {
+                        entity
+                            .update(cx, |this, _| this.escape_cancelled_edit = false)
+                            .ok();
+                    });
+                    this.cancel_edit(window, cx);
+                }
                 _ => {}
             }
         });
@@ -596,6 +965,7 @@ impl WordListEditor {
 
     fn handle_word_action(
         &mut self,
+        key: &SharedString,
         word: &DictionaryWord,
         action: WordAction,
         window: &mut Window,
@@ -605,13 +975,73 @@ impl WordListEditor {
             WordAction::StartEdit => self.start_edit(word, window, cx),
             WordAction::SaveEdit => self.save_edit(&word.id, window, cx),
             WordAction::CancelEdit => self.cancel_edit(window, cx),
-            WordAction::Delete => {
+            WordAction::Delete { from_keyboard } => {
+                if self
+                    .editing
+                    .as_ref()
+                    .is_some_and(|editing| editing.word_id == word.id)
+                {
+                    self.editing = None;
+                }
                 self.word_errors.remove(&word.id);
                 cx.emit(WordListEvent::DeleteWord {
+                    key: key.clone(),
                     word_id: word.id.clone(),
+                    from_keyboard,
                 });
             }
         }
+    }
+
+    fn handle_undo_action(&mut self, token: u64, action: UndoAction, cx: &mut Context<Self>) {
+        match action {
+            UndoAction::Undo => cx.emit(WordListEvent::UndoDelete(token)),
+            UndoAction::Dismiss => cx.emit(WordListEvent::DismissUndo(token)),
+        }
+    }
+
+    fn handle_key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if event.keystroke.key != "escape" {
+            return;
+        }
+        if self.escape_cancelled_edit {
+            self.escape_cancelled_edit = false;
+            return;
+        }
+        if self.editing.is_some() {
+            return;
+        }
+        if let Some(undo) = self.undos.iter().rev().find(|undo| !undo.banner.restoring) {
+            cx.emit(WordListEvent::DismissUndo(undo.token));
+            cx.stop_propagation();
+        }
+    }
+
+    fn render_undo(
+        &self,
+        variant: Variant,
+        undo: &GroupUndo,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let token = undo.token;
+        let Some((undo_focus, dismiss_focus)) = self.undo_focus.get(&token) else {
+            return div().into_any_element();
+        };
+        let on_action = cx.listener(move |this, action: &UndoAction, _, cx| {
+            this.handle_undo_action(token, *action, cx);
+        });
+        undo_row(
+            variant,
+            SharedString::from(format!("group-undo-{token}")),
+            &undo.banner,
+            undo_focus,
+            dismiss_focus,
+            on_action,
+            window,
+            cx,
+        )
+        .into_any_element()
     }
 
     fn render_header(
@@ -701,7 +1131,7 @@ impl WordListEditor {
     fn render_words(
         &self,
         group: &WordGroup,
-        window: &Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<impl IntoElement + use<>> {
         let p = palette(cx);
@@ -718,28 +1148,48 @@ impl WordListEditor {
             cx,
         );
 
-        let rows = group.words.iter().map(|word| {
-            let editing = self
-                .editing
-                .as_ref()
-                .filter(|editing| editing.word_id == word.id)
-                .map(|editing| &editing.field);
+        let group_undos: Vec<&GroupUndo> = self
+            .undos
+            .iter()
+            .filter(|undo| undo.key == group.key)
+            .collect();
+        let has_rows = !group.words.is_empty() || !group_undos.is_empty();
 
-            word_row(
-                Variant::Nested,
-                word,
-                editing,
-                self.word_errors.get(&word.id),
-                cx.listener({
+        let mut rows: Vec<AnyElement> = Vec::with_capacity(group.words.len() + group_undos.len());
+        for pos in 0..=group.words.len() {
+            for undo in &group_undos {
+                if undo.index.min(group.words.len()) == pos {
+                    rows.push(self.render_undo(Variant::Nested, undo, window, cx));
+                }
+            }
+            if let Some(word) = group.words.get(pos) {
+                let editing = self
+                    .editing
+                    .as_ref()
+                    .filter(|editing| editing.word_id == word.id)
+                    .map(|editing| &editing.field);
+                let on_action = cx.listener({
+                    let key = group.key.clone();
                     let word = word.clone();
                     move |this, action: &WordAction, window, cx| {
-                        this.handle_word_action(&word, *action, window, cx);
+                        this.handle_word_action(&key, &word, *action, window, cx);
                     }
-                }),
-                window,
-                cx,
-            )
-        });
+                });
+
+                rows.push(
+                    word_row(
+                        Variant::Nested,
+                        word,
+                        editing,
+                        self.word_errors.get(&word.id),
+                        on_action,
+                        window,
+                        cx,
+                    )
+                    .into_any_element(),
+                );
+            }
+        }
 
         Some(
             div()
@@ -751,7 +1201,7 @@ impl WordListEditor {
                 .flex_col()
                 .gap_2()
                 .child(form)
-                .when(!group.words.is_empty(), |content| {
+                .when(has_rows, |content| {
                     content.child(div().pt_1().flex().flex_col().gap_1().children(rows))
                 }),
         )
@@ -760,6 +1210,22 @@ impl WordListEditor {
 
 impl Render for WordListEditor {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.list_hidden {
+            let banners: Vec<AnyElement> = self
+                .undos
+                .iter()
+                .map(|undo| self.render_undo(Variant::Page, undo, window, cx))
+                .collect();
+
+            return div()
+                .track_focus(&self.focus_handle)
+                .on_key_down(cx.listener(Self::handle_key_down))
+                .flex()
+                .flex_col()
+                .gap_1()
+                .children(banners);
+        }
+
         let p = palette(cx);
 
         let open_keys: Vec<SharedString> = self
@@ -772,14 +1238,22 @@ impl Render for WordListEditor {
             self.ensure_new_word(key, window, cx);
         }
 
-        div()
-            .track_focus(&self.focus_handle)
-            .flex()
-            .flex_col()
-            .gap_1()
-            .children(self.groups.iter().map(|group| {
-                let open = self.expanded.contains(&group.key);
+        let mut cards = Vec::with_capacity(self.groups.len());
+        for group in &self.groups {
+            let open = self.expanded.contains(&group.key);
+            let header = self.render_header(group, open, cx);
+            let words = open.then(|| self.render_words(group, window, cx)).flatten();
+            let collapsed_undos: Vec<AnyElement> = if open {
+                Vec::new()
+            } else {
+                self.undos
+                    .iter()
+                    .filter(|undo| undo.key == group.key)
+                    .map(|undo| self.render_undo(Variant::Nested, undo, window, cx))
+                    .collect()
+            };
 
+            cards.push(
                 div()
                     .id(group.key.clone())
                     .group("word-group")
@@ -788,11 +1262,31 @@ impl Render for WordListEditor {
                     .border_1()
                     .border_color(p.border)
                     .hover(|group| group.border_color(p.border_strong))
-                    .child(self.render_header(group, open, cx))
-                    .when(open, |card| {
-                        card.children(self.render_words(group, window, cx))
-                    })
-            }))
+                    .child(header)
+                    .children(words)
+                    .when(!collapsed_undos.is_empty(), |card| {
+                        card.child(
+                            div()
+                                .px_4()
+                                .py_2()
+                                .border_t_1()
+                                .border_color(p.border)
+                                .flex()
+                                .flex_col()
+                                .gap_1()
+                                .children(collapsed_undos),
+                        )
+                    }),
+            );
+        }
+
+        div()
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(Self::handle_key_down))
+            .flex()
+            .flex_col()
+            .gap_1()
+            .children(cards)
     }
 }
 

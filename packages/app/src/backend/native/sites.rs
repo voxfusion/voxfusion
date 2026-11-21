@@ -1,5 +1,5 @@
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{OptionalExtension as _, params};
 
 use super::apps::normalize_style;
 use super::browser::normalize_domain;
@@ -132,6 +132,47 @@ pub fn add_site_dictionary_word(
     })
 }
 
+pub fn restore_site_dictionary_word(
+    state: &DbState,
+    domain: &str,
+    word: &DictionaryWord,
+) -> Result<DictionaryWord, String> {
+    let domain = validate_domain(domain)?;
+    let text = validate_word(&word.word)?;
+
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let now = Utc::now().to_rfc3339();
+    let id = if word.id.trim().is_empty() {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        word.id.clone()
+    };
+    let created_at = if word.created_at.trim().is_empty() {
+        now.clone()
+    } else {
+        word.created_at.clone()
+    };
+    let updated_at = if word.updated_at.trim().is_empty() {
+        created_at.clone()
+    } else {
+        word.updated_at.clone()
+    };
+
+    conn.execute(
+        "INSERT OR REPLACE INTO site_dictionary_words (id, domain, word, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![id, domain, text, created_at, updated_at],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(DictionaryWord {
+        id,
+        word: text.to_string(),
+        created_at,
+        updated_at,
+    })
+}
+
 pub fn update_site_dictionary_word(
     state: &DbState,
     id: &str,
@@ -157,14 +198,32 @@ pub fn update_site_dictionary_word(
     })
 }
 
-pub fn delete_site_dictionary_word(state: &DbState, id: &str) -> Result<(), String> {
+pub fn delete_site_dictionary_word(
+    state: &DbState,
+    id: &str,
+) -> Result<Option<DictionaryWord>, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let existing = conn
+        .query_row(
+            "SELECT id, word, created_at, updated_at FROM site_dictionary_words WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(DictionaryWord {
+                    id: row.get(0)?,
+                    word: row.get(1)?,
+                    created_at: row.get(2)?,
+                    updated_at: row.get(3)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
     conn.execute(
         "DELETE FROM site_dictionary_words WHERE id = ?1",
         params![id],
     )
     .map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(existing)
 }
 
 pub fn delete_site_dictionary(state: &DbState, domain: &str) -> Result<(), String> {

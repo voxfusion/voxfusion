@@ -242,11 +242,15 @@ impl Backend for NativeBackend {
         db::add_dictionary_word(&self.db, word)
     }
 
+    fn restore_dictionary_word(&self, word: &DictionaryWord) -> CommandResult<DictionaryWord> {
+        db::restore_dictionary_word(&self.db, word)
+    }
+
     fn update_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         db::update_dictionary_word(&self.db, id, word)
     }
 
-    fn delete_dictionary_word(&self, id: &str) -> CommandResult<()> {
+    fn delete_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>> {
         db::delete_dictionary_word(&self.db, id)
     }
 
@@ -263,11 +267,20 @@ impl Backend for NativeBackend {
         apps::add_app_dictionary_word(&self.db, bundle_id, app_name, word)
     }
 
+    fn restore_app_dictionary_word(
+        &self,
+        bundle_id: &str,
+        app_name: &str,
+        word: &DictionaryWord,
+    ) -> CommandResult<DictionaryWord> {
+        apps::restore_app_dictionary_word(&self.db, bundle_id, app_name, word)
+    }
+
     fn update_app_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         apps::update_app_dictionary_word(&self.db, id, word)
     }
 
-    fn delete_app_dictionary_word(&self, id: &str) -> CommandResult<()> {
+    fn delete_app_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>> {
         apps::delete_app_dictionary_word(&self.db, id)
     }
 
@@ -283,11 +296,19 @@ impl Backend for NativeBackend {
         sites::add_site_dictionary_word(&self.db, domain, word)
     }
 
+    fn restore_site_dictionary_word(
+        &self,
+        domain: &str,
+        word: &DictionaryWord,
+    ) -> CommandResult<DictionaryWord> {
+        sites::restore_site_dictionary_word(&self.db, domain, word)
+    }
+
     fn update_site_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         sites::update_site_dictionary_word(&self.db, id, word)
     }
 
-    fn delete_site_dictionary_word(&self, id: &str) -> CommandResult<()> {
+    fn delete_site_dictionary_word(&self, id: &str) -> CommandResult<Option<DictionaryWord>> {
         sites::delete_site_dictionary_word(&self.db, id)
     }
 

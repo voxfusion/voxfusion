@@ -2,6 +2,7 @@
 
 mod default;
 mod groups;
+mod ops;
 mod per_app;
 mod sites;
 

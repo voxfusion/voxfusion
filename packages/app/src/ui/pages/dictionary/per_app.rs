@@ -131,6 +131,7 @@ impl Render for AppDictionaries {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let groups = self.groups.read(cx);
         let count = groups.len();
+        let has_undos = groups.has_undos(cx);
         let load_error = groups.load_error();
         let count_label = (count > 0 && load_error.is_none()).then(|| {
             t_with(
@@ -151,14 +152,24 @@ impl Render for AppDictionaries {
                 )
                 .into_any_element()
         } else if let Some(error) = load_error {
-            load_failed(
+            let failed = load_failed(
                 t(cx, "dictionary.perAppLoadFailed"),
                 error,
                 cx.listener(|this, _, _, cx| this.reload(cx)),
                 cx,
-            )
-            .into_any_element()
-        } else if count == 0 {
+            );
+            if has_undos {
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_4()
+                    .child(self.groups.clone())
+                    .child(failed)
+                    .into_any_element()
+            } else {
+                failed.into_any_element()
+            }
+        } else if count == 0 && !has_undos {
             empty_state(
                 "NO_APPS_CONFIGURED",
                 t(cx, "dictionary.perAppEmptyState"),
