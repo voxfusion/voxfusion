@@ -131,8 +131,8 @@ impl Backend for NativeBackend {
         audio::list_audio_devices()
     }
 
-    fn start_recording(&self, device_name: Option<String>) -> CommandResult<()> {
-        audio::start_recording_with_device(&self.events, device_name)
+    fn start_recording(&self, device_name: Option<String>, recording_id: u64) -> CommandResult<()> {
+        audio::start_recording_with_device(&self.events, device_name, recording_id)
     }
 
     fn stop_recording(&self) -> CommandResult<PathBuf> {

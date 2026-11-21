@@ -60,7 +60,6 @@ struct InputClock {
 }
 
 static RECORDING: Mutex<Option<Recording>> = Mutex::new(None);
-static NEXT_RECORDING_ID: AtomicU64 = AtomicU64::new(1);
 
 /// How long a newly opened input may take to deliver its first samples.
 /// Bluetooth microphones switch profiles when opened and can take seconds.
@@ -166,6 +165,7 @@ fn chosen_input_device(
 pub fn start_recording_with_device(
     events: &EventSender,
     device_name: Option<String>,
+    id: u64,
 ) -> Result<(), String> {
     let mut active = RECORDING.lock().map_err(|err| err.to_string())?;
     if active.is_some() {
@@ -191,7 +191,6 @@ pub fn start_recording_with_device(
     let writer = WavWriter::create(&save_path, spec).map_err(|err| err.to_string())?;
     let writer: WavWriterHandle = Arc::new(Mutex::new(Some(writer)));
 
-    let id = NEXT_RECORDING_ID.fetch_add(1, Ordering::Relaxed);
     let sink = Sink {
         id,
         writer,
@@ -446,7 +445,10 @@ fn fail_recording(id: u64, events: &EventSender, message: String) {
     log::error!(target: "audio", "recording stream error id={id}: {message}");
     discard_recording_file(&recording.sink.writer, &recording.save_path);
     close_stream(recording.input.stream);
-    events.emit(AppEvent::RecordingError { message });
+    events.emit(AppEvent::RecordingError {
+        message,
+        recording_id: Some(id),
+    });
 }
 
 /// Pauses and drops a capture stream on a detached thread. CoreAudio teardown

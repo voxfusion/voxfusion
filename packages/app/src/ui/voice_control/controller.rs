@@ -57,8 +57,36 @@ fn media_quiet_delay(cue_started_at: Option<Instant>, now: Instant) -> Duration 
     })
 }
 
+/// Where an in-flight recording start is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StartPhase {
+    /// Looking up the frontmost app; the microphone has not been touched yet.
+    Frontmost,
+    /// Opening the microphone stream on the backend.
+    OpeningMic,
+    /// The start was cancelled while opening the microphone; waiting for the
+    /// backend call to return so the stream can be closed cleanly.
+    CancellingMic,
+}
+
+/// Ownership and phase of an in-flight recording start.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ActiveStart {
+    id: u64,
+    mode: RecordingMode,
+    phase: StartPhase,
+}
+
 pub struct VoiceController {
     dictation: Dictation,
+    /// The in-flight recording start, if any. Async completions check `id`
+    /// before mutating controller state so stale starts never interfere with a
+    /// newer one.
+    active_start: Option<ActiveStart>,
+    /// The id of the currently running recording, used to reject late errors
+    /// emitted by an earlier recording stream.
+    active_recording_id: Option<u64>,
+    next_start_id: u64,
     audio_level: f32,
     wave_offset: usize,
     /// Where the running recording will be typed.
@@ -90,7 +118,7 @@ impl VoiceController {
         let hotkeys = cx.new(Hotkeys::new);
         if onboarding_complete {
             hotkeys.update(cx, |hotkeys, cx| {
-                hotkeys.register_dictation(toggle, hold, cx)
+                hotkeys.register_dictation(toggle, hold, true, cx)
             });
         }
 
@@ -108,6 +136,9 @@ impl VoiceController {
 
         Self {
             dictation: Dictation::default(),
+            active_start: None,
+            active_recording_id: None,
+            next_start_id: 0,
             audio_level: 0.,
             wave_offset: 0,
             target: Target::default(),
@@ -155,8 +186,10 @@ impl VoiceController {
         if let Err(error) = backend.restore_media_after_recording() {
             log::error!(target: "voice", "restore_media_on_exit_failed error={error}");
         }
-        if self.dictation.recording.is_some() || self.dictation.starting {
-            let _ = backend.stop_recording();
+        if (self.dictation.recording.is_some() || self.dictation.starting)
+            && let Ok(audio_path) = backend.stop_recording()
+        {
+            let _ = std::fs::remove_file(audio_path);
         }
     }
 
@@ -182,7 +215,10 @@ impl VoiceController {
             // The default output may have moved; the next cue must not play
             // into a device that is gone.
             AppEvent::AudioDevicesChanged => sounds::reset_output(),
-            AppEvent::RecordingError { message } => self.recording_failed(message, cx),
+            AppEvent::RecordingError {
+                message,
+                recording_id,
+            } => self.recording_failed(message, *recording_id, cx),
             _ => {}
         }
     }
@@ -192,7 +228,10 @@ impl VoiceController {
             HotkeyEvent::Escape => Some(self.dictation.escape_pressed()),
             _ if !self.hotkeys_live() => None,
             HotkeyEvent::Pressed(HotkeyRole::Toggle) => self.dictation.toggle_pressed(),
-            HotkeyEvent::Pressed(HotkeyRole::Hold) => self.dictation.hold_pressed(),
+            HotkeyEvent::Pressed(HotkeyRole::Hold) if Self::hold_enabled(cx) => {
+                self.dictation.hold_pressed()
+            }
+            HotkeyEvent::Pressed(HotkeyRole::Hold) => None,
             HotkeyEvent::Released(HotkeyRole::Hold) => self.dictation.hold_released(),
             HotkeyEvent::Released(HotkeyRole::Toggle) => None,
         };
@@ -217,6 +256,14 @@ impl VoiceController {
         self.onboarding_complete || self.learning_active
     }
 
+    fn hold_enabled(cx: &App) -> bool {
+        dictation_hotkeys(SettingsStore::get(cx)).1.is_some()
+    }
+
+    fn mode_allowed(&self, mode: RecordingMode, cx: &App) -> bool {
+        self.hotkeys_live() && (mode != RecordingMode::Hold || Self::hold_enabled(cx))
+    }
+
     fn settings_changed(&mut self, cx: &mut Context<Self>) {
         let now_complete = SettingsStore::get(cx).onboarding_complete;
         let finished_onboarding = !self.onboarding_complete && now_complete;
@@ -227,6 +274,7 @@ impl VoiceController {
             finished_onboarding,
             cx,
         );
+        self.cancel_unstoppable_recording(cx);
     }
 
     /// Brings the registered hotkeys in line with the settings.
@@ -235,13 +283,15 @@ impl VoiceController {
         let plan = hotkey_plan(
             live,
             &toggle,
-            &hold,
+            hold.as_deref(),
             self.hotkeys.read(cx).registered(),
             force,
         );
 
         self.hotkeys.update(cx, |hotkeys, cx| match plan {
-            HotkeyPlan::Register { toggle, hold } => hotkeys.register_dictation(toggle, hold, cx),
+            HotkeyPlan::Register { toggle, hold } => {
+                hotkeys.register_dictation(toggle, hold, force, cx)
+            }
             HotkeyPlan::Unregister => hotkeys.unregister_dictation(cx),
             HotkeyPlan::Keep => {}
         });
@@ -339,6 +389,13 @@ impl VoiceController {
         }
 
         self.dictation.starting = true;
+        self.next_start_id += 1;
+        let start_id = self.next_start_id;
+        self.active_start = Some(ActiveStart {
+            id: start_id,
+            mode,
+            phase: StartPhase::Frontmost,
+        });
         self.clear_error_state();
         self.cancel_pending_media_quiet();
         cx.notify();
@@ -357,7 +414,23 @@ impl VoiceController {
         cx.spawn(async move |this, cx| {
             let frontmost = frontmost.await;
 
-            let (start, has_selected_microphone) = this.update(cx, |this, cx| {
+            let Some((start, has_selected_microphone)) = this.update(cx, |this, cx| {
+                let active = this.active_start.filter(|start| start.id == start_id)?;
+                if !this.dictation.starting
+                    || active.phase != StartPhase::Frontmost
+                    || !this.mode_allowed(mode, cx)
+                {
+                    this.dictation.starting = false;
+                    this.active_start = None;
+                    this.target = Target::default();
+                    cx.notify();
+                    return None;
+                }
+
+                this.active_start = Some(ActiveStart {
+                    phase: StartPhase::OpeningMic,
+                    ..active
+                });
                 if let Ok(frontmost) = frontmost {
                     this.target = Target::of(frontmost);
                 }
@@ -376,29 +449,69 @@ impl VoiceController {
                     .filter(|device| device != "default");
                 let has_selected_microphone = device.is_some();
 
-                (
-                    backend::call(cx, move |backend| backend.start_recording(device)),
+                Some((
+                    backend::call(cx, move |backend| {
+                        backend.start_recording(device, start_id)
+                    }),
                     has_selected_microphone,
-                )
-            })?;
+                ))
+            })?
+            else {
+                return Ok(());
+            };
 
             if let Err(error) = start.await {
+                let show_error = this.update(cx, |this, cx| {
+                    let Some(active) = this.active_start.filter(|start| start.id == start_id)
+                    else {
+                        return false;
+                    };
+                    this.dictation.starting = false;
+                    this.active_start = None;
+                    if active.phase == StartPhase::CancellingMic {
+                        this.target = Target::default();
+                        if this.dictation.recording.is_none()
+                            && !this.dictation.loading
+                            && this.dictation.error.is_none()
+                        {
+                            this.window.visible = false;
+                        }
+                        cx.notify();
+                        return false;
+                    }
+                    true
+                })?;
+                if !show_error {
+                    return Ok(());
+                }
                 log::error!(
                     target: "voice",
                     "start_recording_failed error={error} has_selected_microphone={has_selected_microphone}"
                 );
-                this.update(cx, |this, _| this.dictation.starting = false)?;
                 return Self::show_error(&this, cx, RECORDING_FAILED, RECORDING_ERROR_HIDE, None)
                     .await;
             }
 
-            this.update(cx, |this, cx| {
-                // The input has failed already, and that failure was reported.
-                if !this.dictation.starting {
-                    return;
+            let orphaned = this.update(cx, |this, cx| {
+                // Only mutate state if this request still owns the start.
+                let Some(active) = this.active_start.filter(|start| start.id == start_id) else {
+                    return false;
+                };
+                this.dictation.starting = false;
+                this.active_start = None;
+
+                if active.phase == StartPhase::CancellingMic || !this.mode_allowed(mode, cx) {
+                    // The start was cancelled while the mic was opening: keep
+                    // `stopping` set while tearing down the stream so a new
+                    // recording cannot collide with it.
+                    this.dictation.stopping = true;
+                    this.target = Target::default();
+                    this.window.width = WINDOW_WIDTH_COMPACT;
+                    cx.notify();
+                    return true;
                 }
 
-                this.dictation.starting = false;
+                this.active_recording_id = Some(start_id);
                 this.set_recording(Some(mode), cx);
                 this.schedule_media_quiet(media_quiet_delay(cue_started_at, Instant::now()), cx);
                 this.set_escape(true, cx);
@@ -409,17 +522,72 @@ impl VoiceController {
                     this.target.bundle_id.is_some(),
                     this.target.domain.is_some(),
                 );
-                this.cancel_unstoppable_recording(cx);
-            })
+                false
+            })?;
+
+            if orphaned {
+                let stop = cx.update(|cx| backend::call(cx, |backend| backend.stop_recording()));
+                if let Ok(audio_path) = stop.await {
+                    cx.background_spawn(async move {
+                        let _ = std::fs::remove_file(audio_path);
+                    })
+                    .detach();
+                }
+                this.update(cx, |this, cx| {
+                    this.dictation.stopping = false;
+                    if this.dictation.recording.is_none()
+                        && !this.dictation.loading
+                        && this.dictation.error.is_none()
+                    {
+                        this.window.visible = false;
+                    }
+                    cx.notify();
+                })?;
+            }
+
+            Ok(())
         })
         .detach();
     }
 
-    /// Cancels a trial dictation whose onboarding step went away (the user
-    /// moved on, or closed the window): its hotkeys went with the step, so
-    /// they could no longer stop it.
+    /// Cancels a recording (or invalidates an in-flight start) whose hotkey
+    /// went away (the onboarding trial step closed, or the optional
+    /// hold-to-speak shortcut was disabled): its hotkey could no longer stop it.
     fn cancel_unstoppable_recording(&mut self, cx: &mut Context<Self>) {
-        if !self.hotkeys_live() {
+        if let Some(active) = self.active_start
+            && !self.mode_allowed(active.mode, cx)
+        {
+            match active.phase {
+                StartPhase::Frontmost => {
+                    // Before the microphone is opened, release `starting` at once.
+                    self.active_start = None;
+                    self.dictation.starting = false;
+                    self.target = Target::default();
+                }
+                StartPhase::OpeningMic => {
+                    // Once `backend.start_recording` is in flight, keep `starting`
+                    // set until it returns and closes the stream so a new start
+                    // cannot collide.
+                    self.active_start = Some(ActiveStart {
+                        phase: StartPhase::CancellingMic,
+                        ..active
+                    });
+                    self.target = Target::default();
+                }
+                StartPhase::CancellingMic => {}
+            }
+            if self.dictation.recording.is_none()
+                && !self.dictation.loading
+                && self.dictation.error.is_none()
+            {
+                self.window.visible = false;
+            }
+            cx.notify();
+        }
+
+        if let Some(mode) = self.dictation.recording
+            && !self.mode_allowed(mode, cx)
+        {
             self.cancel_recording(cx);
         }
     }
@@ -435,6 +603,7 @@ impl VoiceController {
         log::info!(target: "voice", "stop_recording_started mode={}", mode.name());
         self.cancel_pending_media_quiet();
         self.dictation.stopping = true;
+        self.active_recording_id = None;
         self.set_recording(None, cx);
         self.set_escape(false, cx);
         self.window.width = WINDOW_WIDTH_COMPACT;
@@ -488,6 +657,7 @@ impl VoiceController {
         log::warn!(target: "voice", "recording_cancelled mode={}", mode.name());
         self.cancel_pending_media_quiet();
         self.dictation.stopping = true;
+        self.active_recording_id = None;
         self.set_recording(None, cx);
         self.target = Target::default();
         self.set_escape(false, cx);
@@ -499,7 +669,12 @@ impl VoiceController {
             restore.await;
 
             let stop = cx.update(|cx| backend::call(cx, |backend| backend.stop_recording()));
-            let _ = stop.await;
+            if let Ok(audio_path) = stop.await {
+                cx.background_spawn(async move {
+                    let _ = std::fs::remove_file(audio_path);
+                })
+                .detach();
+            }
 
             this.update(cx, |this, cx| {
                 this.dictation.stopping = false;
@@ -513,15 +688,42 @@ impl VoiceController {
     /// The microphone stream died. The recorder has reset itself already;
     /// this resets the state here, so the next press of a hotkey starts
     /// afresh, and reports the failure.
-    fn recording_failed(&mut self, message: &str, cx: &mut Context<Self>) {
-        log::error!(target: "voice", "recording_error_event message={message}");
-        if self.dictation.recording.is_none() && !self.dictation.starting {
-            return;
+    fn recording_failed(
+        &mut self,
+        message: &str,
+        recording_id: Option<u64>,
+        cx: &mut Context<Self>,
+    ) {
+        log::error!(
+            target: "voice",
+            "recording_error_event recording_id={recording_id:?} message={message}"
+        );
+        if let Some(id) = recording_id {
+            let matches_recording = self.active_recording_id == Some(id);
+            let matches_live_start = self
+                .active_start
+                .is_some_and(|start| start.id == id && start.phase == StartPhase::OpeningMic);
+            if !matches_recording && !matches_live_start {
+                return;
+            }
+        } else {
+            if self
+                .active_start
+                .is_some_and(|start| start.phase != StartPhase::OpeningMic)
+                && self.dictation.recording.is_none()
+            {
+                return;
+            }
+            if self.dictation.recording.is_none() && !self.dictation.starting {
+                return;
+            }
         }
 
+        self.active_recording_id = None;
         self.set_recording(None, cx);
         self.target = Target::default();
         self.dictation.starting = false;
+        self.active_start = None;
         self.dictation.stopping = false;
         self.dictation.loading = false;
 

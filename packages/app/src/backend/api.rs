@@ -243,8 +243,11 @@ pub enum AppEvent {
     /// Another model was made the one that transcribes.
     ActiveModelChanged,
     AudioLevel(f32),
+    #[serde(rename_all = "camelCase")]
     RecordingError {
         message: String,
+        #[serde(default)]
+        recording_id: Option<u64>,
     },
     AudioDevicesChanged,
     AccessibilityChanged,
@@ -309,7 +312,7 @@ pub trait Backend: Send + Sync + 'static {
 
     // ---- recording ----
     fn list_audio_devices(&self) -> CommandResult<Vec<AudioDevice>>;
-    fn start_recording(&self, device_name: Option<String>) -> CommandResult<()>;
+    fn start_recording(&self, device_name: Option<String>, recording_id: u64) -> CommandResult<()>;
     fn stop_recording(&self) -> CommandResult<PathBuf>;
     fn mute_media_for_recording(&self) -> CommandResult<()>;
     fn muffle_media_for_recording(&self);

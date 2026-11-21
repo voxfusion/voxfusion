@@ -40,6 +40,7 @@ impl EventEmitter<TranscriptionTried> for LearningStep {}
 fn hotkey_parts(hotkey: &str) -> Vec<SharedString> {
     hotkey
         .split('+')
+        .filter(|part| !part.is_empty())
         .map(|part| {
             match part {
                 "Command" => "\u{2318}",
@@ -226,7 +227,11 @@ impl Render for LearningStep {
         let input = self.input(window, cx);
         let settings = SettingsStore::get(cx);
         let toggle_keys = hotkey_parts(&settings.hotkey);
-        let hold_keys = hotkey_parts(&settings.hold_to_speak_hotkey);
+        let hold_keys = settings
+            .hold_to_speak_hotkey
+            .as_deref()
+            .map(hotkey_parts)
+            .filter(|parts| !parts.is_empty());
 
         let manual = div()
             .border_1()
@@ -260,13 +265,15 @@ impl Render for LearningStep {
                 t(cx, "onboarding.learningStep4"),
                 cx,
             ))
-            .child(Self::render_keys_row(
-                "5.",
-                t(cx, "onboarding.learningHoldToSpeakPrefix"),
-                &hold_keys,
-                t(cx, "onboarding.learningHoldToSpeakSuffix"),
-                cx,
-            ));
+            .children(hold_keys.map(|hold_keys| {
+                Self::render_keys_row(
+                    "5.",
+                    t(cx, "onboarding.learningHoldToSpeakPrefix"),
+                    &hold_keys,
+                    t(cx, "onboarding.learningHoldToSpeakSuffix"),
+                    cx,
+                )
+            }));
 
         let messages = if self.messages.is_empty() {
             div()

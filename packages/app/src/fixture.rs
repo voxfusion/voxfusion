@@ -252,7 +252,11 @@ impl Backend for FixtureBackend {
         Ok(self.with(|data| data.audio_devices.clone()))
     }
 
-    fn start_recording(&self, _device_name: Option<String>) -> CommandResult<()> {
+    fn start_recording(
+        &self,
+        _device_name: Option<String>,
+        _recording_id: u64,
+    ) -> CommandResult<()> {
         self.gate("start_recording_with_device")
     }
 
