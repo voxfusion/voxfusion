@@ -8440,6 +8440,7 @@ dependencies = [
  "gpui-kit",
  "hound",
  "icns",
+ "idna",
  "log",
  "minisign",
  "minisign-verify",
@@ -8463,6 +8464,7 @@ dependencies = [
  "tray-icon",
  "unicode-linebreak",
  "unicode-segmentation",
+ "url",
  "uuid",
  "whisper-rs",
 ]

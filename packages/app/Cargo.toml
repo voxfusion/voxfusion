@@ -44,6 +44,8 @@ tar = "0.4"
 flate2 = "1"
 async-channel = "2"
 raw-window-handle = "0.6"
+idna = "1"
+url = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }

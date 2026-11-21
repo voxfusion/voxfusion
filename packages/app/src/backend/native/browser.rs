@@ -54,39 +54,8 @@ fn applescript_for_bundle(bundle_id: &str) -> Option<String> {
     None
 }
 
-pub fn normalize_domain(input: &str) -> Option<String> {
-    let trimmed = input.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    let without_scheme = match trimmed.find("://") {
-        Some(idx) => &trimmed[idx + 3..],
-        None => trimmed,
-    };
-
-    let host_part = without_scheme
-        .split('/')
-        .next()
-        .unwrap_or(without_scheme)
-        .split('?')
-        .next()
-        .unwrap_or(without_scheme)
-        .split('#')
-        .next()
-        .unwrap_or(without_scheme);
-
-    let host_part = host_part.rsplit('@').next().unwrap_or(host_part);
-    let host_part = host_part.split(':').next().unwrap_or(host_part);
-
-    let host = host_part.trim_matches('.').to_lowercase();
-    if host.is_empty() {
-        return None;
-    }
-
-    let host = host.strip_prefix("www.").unwrap_or(&host).to_string();
-    if host.is_empty() { None } else { Some(host) }
-}
+#[cfg(test)]
+use crate::backend::normalize_domain;
 
 #[cfg(target_os = "macos")]
 pub fn get_frontmost_browser_url(bundle_id: &str, _pid: i32) -> Option<String> {
