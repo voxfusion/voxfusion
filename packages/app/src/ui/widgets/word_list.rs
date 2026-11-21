@@ -16,6 +16,7 @@ use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
 use crate::ui::widgets::app_icon::{app_icon, site_icon};
+use crate::ui::widgets::bulk_add::{BulkAddEvent, BulkAddPanel, bulk_add_trigger};
 use crate::ui::widgets::text_field::{TextField, TextFieldEvent, field_box};
 use crate::ui::widgets::{icon, turning};
 use crate::ui::{t, t_with, upper};
@@ -48,7 +49,7 @@ impl Notice {
 
 /// The notice under a form or a word: an alert with what failed, and the
 /// error under it.
-fn notice(notice: &Notice, cx: &App) -> Div {
+pub fn notice(notice: &Notice, cx: &App) -> Div {
     let p = palette(cx);
 
     div()
@@ -377,6 +378,12 @@ pub enum WordListEvent {
         key: SharedString,
         word: String,
     },
+    /// Answer with [`WordListEditor::finish_bulk_adding`] once the words are
+    /// stored or have been refused.
+    BulkAddWords {
+        key: SharedString,
+        words: Vec<String>,
+    },
     EditWord {
         word_id: String,
         word: String,
@@ -388,6 +395,12 @@ pub enum WordListEvent {
 
 struct NewWord {
     field: Entity<TextField>,
+    bulk_trigger_focus: FocusHandle,
+    _subscription: Subscription,
+}
+
+struct BulkAdd {
+    panel: Entity<BulkAddPanel>,
     _subscription: Subscription,
 }
 
@@ -403,6 +416,8 @@ pub struct WordListEditor {
     groups: Vec<WordGroup>,
     expanded: HashSet<SharedString>,
     new_words: HashMap<SharedString, NewWord>,
+    bulk_adds: HashMap<SharedString, BulkAdd>,
+    bulk_submit_blocked: bool,
     adding: HashSet<SharedString>,
     /// Why a word could not be added to a group, or the group removed.
     group_errors: HashMap<SharedString, Notice>,
@@ -420,6 +435,8 @@ impl WordListEditor {
             groups: Vec::new(),
             expanded: HashSet::new(),
             new_words: HashMap::new(),
+            bulk_adds: HashMap::new(),
+            bulk_submit_blocked: false,
             adding: HashSet::new(),
             group_errors: HashMap::new(),
             word_errors: HashMap::new(),
@@ -435,11 +452,37 @@ impl WordListEditor {
     pub fn set_groups(&mut self, groups: Vec<WordGroup>, cx: &mut Context<Self>) {
         if groups.is_empty() {
             self.new_words.clear();
+            self.bulk_adds.clear();
             self.adding.clear();
             self.editing = None;
+        } else {
+            self.bulk_adds
+                .retain(|key, _| groups.iter().any(|group| group.key == *key));
+            for (key, bulk) in &self.bulk_adds {
+                if let Some(group) = groups.iter().find(|group| group.key == *key) {
+                    let existing: Vec<String> =
+                        group.words.iter().map(|w| w.word.clone()).collect();
+                    bulk.panel
+                        .update(cx, |panel, cx| panel.set_existing_words(existing, cx));
+                }
+            }
         }
 
         self.groups = groups;
+        cx.notify();
+    }
+
+    /// Blocks bulk-add panels from submitting while earlier optimistic edits,
+    /// deletions, or rollback refreshes are still settling.
+    pub fn set_bulk_submit_blocked(&mut self, blocked: bool, cx: &mut Context<Self>) {
+        if self.bulk_submit_blocked == blocked {
+            return;
+        }
+        self.bulk_submit_blocked = blocked;
+        for bulk in self.bulk_adds.values() {
+            bulk.panel
+                .update(cx, |panel, cx| panel.set_submit_blocked(blocked, cx));
+        }
         cx.notify();
     }
 
@@ -479,15 +522,132 @@ impl WordListEditor {
             key.clone(),
             NewWord {
                 field,
+                bulk_trigger_focus: cx.focus_handle().tab_stop(true),
                 _subscription: subscription,
             },
         );
     }
 
     fn remove_group(&mut self, key: SharedString, cx: &mut Context<Self>) {
+        if self.adding.contains(&key) {
+            return;
+        }
         self.expanded.remove(&key);
         self.group_errors.remove(&key);
+        self.bulk_adds.remove(&key);
         cx.emit(WordListEvent::RemoveGroup(key));
+        cx.notify();
+    }
+
+    fn open_bulk_add(&mut self, key: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        if self.adding.contains(&key) || self.bulk_adds.contains_key(&key) {
+            return;
+        }
+        let Some(group) = self.groups.iter().find(|group| group.key == key) else {
+            return;
+        };
+
+        let existing: Vec<String> = group.words.iter().map(|w| w.word.clone()).collect();
+        let submit_blocked = self.bulk_submit_blocked;
+        let panel = cx.new(|cx| {
+            let mut panel = BulkAddPanel::new(Variant::Nested, existing, window, cx);
+            panel.set_submit_blocked(submit_blocked, cx);
+            panel
+        });
+        let subscription = cx.subscribe_in(&panel, window, {
+            let key = key.clone();
+            move |this, _, event, window, cx| match event {
+                BulkAddEvent::Submit(words) => this.bulk_add_words(&key, words.clone(), cx),
+                BulkAddEvent::Cancel => this.close_bulk_add(&key, window, cx),
+            }
+        });
+
+        self.group_errors.remove(&key);
+        self.bulk_adds.insert(
+            key,
+            BulkAdd {
+                panel,
+                _subscription: subscription,
+            },
+        );
+        cx.notify();
+    }
+
+    fn close_bulk_add(&mut self, key: &SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        if self.adding.contains(key) {
+            return;
+        }
+        let restore_focus = self
+            .bulk_adds
+            .remove(key)
+            .is_some_and(|bulk| bulk.panel.read(cx).contains_focus(window, cx));
+        if restore_focus {
+            if let Some(new_word) = self.new_words.get(key) {
+                new_word
+                    .field
+                    .update(cx, |field, cx| field.focus(window, cx));
+            } else {
+                window.focus(&self.focus_handle, cx);
+            }
+        }
+        cx.notify();
+    }
+
+    fn bulk_add_words(&mut self, key: &SharedString, words: Vec<String>, cx: &mut Context<Self>) {
+        if words.is_empty() || self.adding.contains(key) || self.bulk_submit_blocked {
+            return;
+        }
+
+        self.group_errors.remove(key);
+        self.adding.insert(key.clone());
+        if let Some(bulk) = self.bulk_adds.get(key) {
+            bulk.panel.update(cx, |panel, cx| {
+                panel.set_error(None, cx);
+                panel.set_saving(true, cx);
+            });
+        }
+        cx.emit(WordListEvent::BulkAddWords {
+            key: key.clone(),
+            words,
+        });
+        cx.notify();
+    }
+
+    /// Finishes a bulk add for `key`. Without an error, the bulk panel closes;
+    /// with an error, the pasted text stays open alongside the notice.
+    pub fn finish_bulk_adding(
+        &mut self,
+        key: &str,
+        error: Option<Notice>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.adding.remove(key);
+        match error {
+            None => {
+                if let Some(bulk) = self.bulk_adds.remove(key)
+                    && bulk.panel.read(cx).contains_focus(window, cx)
+                {
+                    if let Some(new_word) = self.new_words.get(key) {
+                        new_word
+                            .field
+                            .update(cx, |field, cx| field.focus(window, cx));
+                    } else {
+                        window.focus(&self.focus_handle, cx);
+                    }
+                }
+            }
+            Some(notice) => {
+                if let Some(bulk) = self.bulk_adds.get(key) {
+                    bulk.panel.update(cx, |panel, cx| {
+                        panel.set_saving(false, cx);
+                        panel.set_error(Some(notice), cx);
+                    });
+                } else {
+                    self.group_errors.insert(key.to_string().into(), notice);
+                }
+            }
+        }
         cx.notify();
     }
 
@@ -629,6 +789,28 @@ impl WordListEditor {
             GroupIcon::Site => site_icon(Some(&group.title), px(32.), cx).into_any_element(),
         };
 
+        let adding = self.adding.contains(&group.key);
+        let remove_button = div()
+            .id("remove")
+            .transition_all()
+            .px_3()
+            .flex()
+            .items_center()
+            .flex_shrink_0()
+            .type_xs()
+            .text_right()
+            .text_color(p.txt_muted)
+            .opacity(0.)
+            .when(!adding, |button| {
+                button
+                    .group_hover("word-group", |button| button.opacity(1.))
+                    .hover(|button| button.text_color(p.ac))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.remove_group(key.clone(), cx);
+                    }))
+            })
+            .child(text("[DEL]").tracking_wider());
+
         div()
             .flex()
             .child(
@@ -642,7 +824,7 @@ impl WordListEditor {
                     .items_center()
                     .gap_3()
                     .on_click(cx.listener({
-                        let key = key.clone();
+                        let key = group.key.clone();
                         move |this, _, _, cx| this.toggle(key.clone(), cx)
                     }))
                     .child(icon_element)
@@ -677,25 +859,7 @@ impl WordListEditor {
                         icon("chevron-down").size_4().text_color(p.txt_muted),
                     )),
             )
-            .child(
-                div()
-                    .id("remove")
-                    .transition_all()
-                    .px_3()
-                    .flex()
-                    .items_center()
-                    .flex_shrink_0()
-                    .type_xs()
-                    .text_right()
-                    .text_color(p.txt_muted)
-                    .opacity(0.)
-                    .group_hover("word-group", |button| button.opacity(1.))
-                    .hover(|button| button.text_color(p.ac))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.remove_group(key.clone(), cx);
-                    }))
-                    .child(text("[DEL]").tracking_wider()),
-            )
+            .child(remove_button)
     }
 
     fn render_words(
@@ -708,15 +872,40 @@ impl WordListEditor {
         let new_word = self.new_words.get(&group.key)?;
         let key = group.key.clone();
 
-        let form = add_word_form(
-            Variant::Nested,
-            &new_word.field,
-            self.adding.contains(&group.key),
-            self.group_errors.get(&group.key),
-            cx.listener(move |this, _, _, cx| this.add_word(&key, cx)),
-            window,
-            cx,
-        );
+        let entry = match self.bulk_adds.get(&group.key) {
+            Some(bulk) => bulk.panel.clone().into_any_element(),
+            None => {
+                let add_key = key.clone();
+                let open_key = key.clone();
+                let form = add_word_form(
+                    Variant::Nested,
+                    &new_word.field,
+                    self.adding.contains(&group.key),
+                    self.group_errors.get(&group.key),
+                    cx.listener(move |this, _, _, cx| this.add_word(&add_key, cx)),
+                    window,
+                    cx,
+                );
+                let trigger = bulk_add_trigger(
+                    Variant::Nested,
+                    &new_word.bulk_trigger_focus,
+                    self.adding.contains(&group.key),
+                    cx.listener(move |this, _, window, cx| {
+                        this.open_bulk_add(open_key.clone(), window, cx)
+                    }),
+                    window,
+                    cx,
+                );
+
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(form)
+                    .child(trigger)
+                    .into_any_element()
+            }
+        };
 
         let rows = group.words.iter().map(|word| {
             let editing = self
@@ -750,7 +939,7 @@ impl WordListEditor {
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(form)
+                .child(entry)
                 .when(!group.words.is_empty(), |content| {
                     content.child(div().pt_1().flex().flex_col().gap_1().children(rows))
                 }),

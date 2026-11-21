@@ -1,10 +1,13 @@
-use chrono::Utc;
-use rusqlite::params;
+use chrono::{Duration, SecondsFormat, Utc};
+use rusqlite::{TransactionBehavior, params};
 
 use super::apps::normalize_style;
 use super::browser::normalize_domain;
 use super::db::DbState;
-use crate::backend::{DictionaryWord, MAX_WORD_CHARS, SiteDictionary, SiteStyle};
+use crate::backend::{
+    DictionaryWord, SiteDictionary, SiteStyle, prepare_dictionary_word_batch,
+    validate_dictionary_word,
+};
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute_batch(
@@ -53,14 +56,7 @@ fn validate_domain(input: &str) -> Result<String, String> {
 }
 
 fn validate_word(input: &str) -> Result<&str, String> {
-    let word = input.trim();
-    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
-        Err(format!(
-            "Word must be between 1 and {MAX_WORD_CHARS} characters"
-        ))
-    } else {
-        Ok(word)
-    }
+    validate_dictionary_word(input).map_err(|e| e.to_string())
 }
 
 pub fn list_site_dictionaries(state: &DbState) -> Result<Vec<SiteDictionary>, String> {
@@ -130,6 +126,70 @@ pub fn add_site_dictionary_word(
         created_at: now.clone(),
         updated_at: now,
     })
+}
+
+pub fn add_site_dictionary_words(
+    state: &DbState,
+    domain: &str,
+    words: &[String],
+) -> Result<Vec<DictionaryWord>, String> {
+    let domain = validate_domain(domain)?;
+    for word in words {
+        validate_word(word)?;
+    }
+    if words.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+
+    let existing = {
+        let mut stmt = tx
+            .prepare("SELECT word FROM site_dictionary_words WHERE domain = ?1")
+            .map_err(|e| e.to_string())?;
+        stmt.query_map(params![domain], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+
+    let to_insert = prepare_dictionary_word_batch(words, existing)?;
+    if to_insert.is_empty() {
+        tx.commit().map_err(|e| e.to_string())?;
+        return Ok(Vec::new());
+    }
+
+    let base = Utc::now();
+    let count = to_insert.len();
+    let mut inserted = Vec::with_capacity(count);
+    {
+        let mut stmt = tx
+            .prepare(
+                "INSERT INTO site_dictionary_words (id, domain, word, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )
+            .map_err(|e| e.to_string())?;
+
+        for (index, word) in to_insert.into_iter().enumerate() {
+            let id = uuid::Uuid::new_v4().to_string();
+            let now = (base + Duration::nanoseconds((count - 1 - index) as i64))
+                .to_rfc3339_opts(SecondsFormat::Nanos, false);
+            stmt.execute(params![id, domain, word, now, now])
+                .map_err(|e| e.to_string())?;
+            inserted.push(DictionaryWord {
+                id,
+                word: word.to_string(),
+                created_at: now.clone(),
+                updated_at: now,
+            });
+        }
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(inserted)
 }
 
 pub fn update_site_dictionary_word(

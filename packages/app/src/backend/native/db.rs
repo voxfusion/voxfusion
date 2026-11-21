@@ -1,10 +1,11 @@
-use chrono::Utc;
-use rusqlite::{Connection, OptionalExtension as _, params};
+use chrono::{Duration, SecondsFormat, Utc};
+use rusqlite::{Connection, OptionalExtension as _, TransactionBehavior, params};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 use crate::backend::{
-    DictionaryWord, MAX_WORD_CHARS, Transcription, TranscriptionPage, TranscriptionResult,
+    DictionaryWord, Transcription, TranscriptionPage, TranscriptionResult,
+    prepare_dictionary_word_batch, validate_dictionary_word,
 };
 
 pub struct DbState {
@@ -262,12 +263,7 @@ pub fn list_dictionary_words(state: &DbState) -> Result<Vec<DictionaryWord>, Str
 }
 
 pub fn add_dictionary_word(state: &DbState, word: &str) -> Result<DictionaryWord, String> {
-    let word = word.trim();
-    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
-        return Err(format!(
-            "Word must be between 1 and {MAX_WORD_CHARS} characters"
-        ));
-    }
+    let word = validate_dictionary_word(word).map_err(|e| e.to_string())?;
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
@@ -287,17 +283,74 @@ pub fn add_dictionary_word(state: &DbState, word: &str) -> Result<DictionaryWord
     })
 }
 
+pub fn add_dictionary_words(
+    state: &DbState,
+    words: &[String],
+) -> Result<Vec<DictionaryWord>, String> {
+    for word in words {
+        validate_dictionary_word(word).map_err(|e| e.to_string())?;
+    }
+    if words.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+
+    let existing = {
+        let mut stmt = tx
+            .prepare("SELECT word FROM dictionary_words")
+            .map_err(|e| e.to_string())?;
+        stmt.query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+
+    let to_insert = prepare_dictionary_word_batch(words, existing)?;
+    if to_insert.is_empty() {
+        tx.commit().map_err(|e| e.to_string())?;
+        return Ok(Vec::new());
+    }
+
+    let base = Utc::now();
+    let count = to_insert.len();
+    let mut inserted = Vec::with_capacity(count);
+    {
+        let mut stmt = tx
+            .prepare(
+                "INSERT INTO dictionary_words (id, word, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4)",
+            )
+            .map_err(|e| e.to_string())?;
+
+        for (index, word) in to_insert.into_iter().enumerate() {
+            let id = uuid::Uuid::new_v4().to_string();
+            let now = (base + Duration::nanoseconds((count - 1 - index) as i64))
+                .to_rfc3339_opts(SecondsFormat::Nanos, false);
+            stmt.execute(params![id, word, now, now])
+                .map_err(|e| e.to_string())?;
+            inserted.push(DictionaryWord {
+                id,
+                word: word.to_string(),
+                created_at: now.clone(),
+                updated_at: now,
+            });
+        }
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(inserted)
+}
+
 pub fn update_dictionary_word(
     state: &DbState,
     id: &str,
     word: &str,
 ) -> Result<DictionaryWord, String> {
-    let word = word.trim();
-    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
-        return Err(format!(
-            "Word must be between 1 and {MAX_WORD_CHARS} characters"
-        ));
-    }
+    let word = validate_dictionary_word(word).map_err(|e| e.to_string())?;
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().to_rfc3339();

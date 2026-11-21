@@ -11,6 +11,7 @@ use crate::backend::{self, Backend, CommandResult, DictionaryWord};
 use crate::ui::pages::section::{empty_state, list_header, load_failed};
 use crate::ui::t;
 use crate::ui::theme::palette;
+use crate::ui::widgets::bulk_add::{BulkAddEvent, BulkAddPanel, bulk_add_trigger};
 use crate::ui::widgets::text_field::{TextField, TextFieldEvent};
 use crate::ui::widgets::word_list::{
     Notice, Variant, WordAction, add_word_form, new_word_field, too_long, word_count_label,
@@ -23,6 +24,11 @@ struct Editing {
     _subscription: Subscription,
 }
 
+struct BulkAdd {
+    panel: Entity<BulkAddPanel>,
+    _subscription: Subscription,
+}
+
 pub struct DefaultDictionary {
     words: Vec<DictionaryWord>,
     /// Whether the words are on their way.
@@ -31,7 +37,27 @@ pub struct DefaultDictionary {
     /// would look empty, or out of date.
     load_error: Option<SharedString>,
     new_word: Entity<TextField>,
+    bulk_add: Option<BulkAdd>,
+    bulk_trigger_focus: FocusHandle,
     adding: bool,
+    /// Chains dictionary writes in user-action order so a bulk save cannot
+    /// overtake an earlier delete or edit on another thread.
+    write_tail: Option<async_channel::Receiver<()>>,
+    /// Incremented on every local write so an earlier `fetch_words` snapshot
+    /// cannot overwrite newer additions, edits, or deletions.
+    fetch_generation: u64,
+    /// Monotonic id of the latest `fetch_words` started, so an older slow
+    /// refresh never overwrites a newer refresh.
+    latest_fetch_id: u64,
+    /// Number of backend writes still in flight.
+    pending_writes: usize,
+    /// Number of optimistic edits or deletions awaiting backend confirmation.
+    pending_optimistic_writes: usize,
+    /// Whether a failed optimistic write is waiting for a refresh to restore
+    /// confirmed backend state before bulk submit can proceed.
+    reconciling_after_failure: bool,
+    /// Whether a fetch needs to run once `pending_writes` reaches zero.
+    refetch_after_writes: bool,
     /// Why the last word could not be added.
     add_error: Option<Notice>,
     /// Why a change to a word was refused, by the word's id.
@@ -60,12 +86,21 @@ impl DefaultDictionary {
                 },
             );
 
-        let page = Self {
+        let mut page = Self {
             words: Vec::new(),
             loading: true,
             load_error: None,
             new_word,
+            bulk_add: None,
+            bulk_trigger_focus: cx.focus_handle().tab_stop(true),
             adding: false,
+            write_tail: None,
+            fetch_generation: 0,
+            latest_fetch_id: 0,
+            pending_writes: 0,
+            pending_optimistic_writes: 0,
+            reconciling_after_failure: false,
+            refetch_after_writes: false,
             add_error: None,
             word_errors: HashMap::new(),
             editing: None,
@@ -76,18 +111,204 @@ impl DefaultDictionary {
         page
     }
 
-    fn fetch_words(&self, cx: &mut Context<Self>) -> Task<()> {
+    fn enqueue_write(
+        &mut self,
+    ) -> (
+        Option<async_channel::Receiver<()>>,
+        async_channel::Sender<()>,
+    ) {
+        let prev = self.write_tail.take();
+        let (done_tx, done_rx) = async_channel::bounded(1);
+        self.write_tail = Some(done_rx);
+        (prev, done_tx)
+    }
+
+    fn has_unconfirmed_changes(&self) -> bool {
+        self.pending_optimistic_writes > 0 || self.reconciling_after_failure
+    }
+
+    fn sync_bulk_submit_blocked(&self, cx: &mut Context<Self>) {
+        if let Some(bulk) = &self.bulk_add {
+            let blocked = self.has_unconfirmed_changes();
+            bulk.panel
+                .update(cx, |panel, cx| panel.set_submit_blocked(blocked, cx));
+        }
+    }
+
+    fn sync_bulk_existing_words(&self, cx: &mut Context<Self>) {
+        if let Some(bulk) = &self.bulk_add {
+            let existing: Vec<String> = self.words.iter().map(|w| w.word.clone()).collect();
+            bulk.panel
+                .update(cx, |panel, cx| panel.set_existing_words(existing, cx));
+        }
+    }
+
+    fn open_bulk_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.loading || self.load_error.is_some() || self.adding || self.bulk_add.is_some() {
+            return;
+        }
+
+        let existing: Vec<String> = self.words.iter().map(|w| w.word.clone()).collect();
+        let submit_blocked = self.has_unconfirmed_changes();
+        let panel = cx.new(|cx| {
+            let mut panel = BulkAddPanel::new(Variant::Page, existing, window, cx);
+            panel.set_submit_blocked(submit_blocked, cx);
+            panel
+        });
+        let subscription =
+            cx.subscribe_in(&panel, window, |this, _, event, window, cx| match event {
+                BulkAddEvent::Submit(words) => this.bulk_add_words(words.clone(), window, cx),
+                BulkAddEvent::Cancel => this.close_bulk_add(window, cx),
+            });
+
+        self.add_error = None;
+        self.bulk_add = Some(BulkAdd {
+            panel,
+            _subscription: subscription,
+        });
+        cx.notify();
+    }
+
+    fn close_bulk_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.adding {
+            return;
+        }
+        let restore_focus = self
+            .bulk_add
+            .take()
+            .is_some_and(|bulk| bulk.panel.read(cx).contains_focus(window, cx));
+        if restore_focus {
+            self.new_word
+                .update(cx, |field, cx| field.focus(window, cx));
+        }
+        cx.notify();
+    }
+
+    fn bulk_add_words(&mut self, words: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+        if words.is_empty() || self.adding || self.has_unconfirmed_changes() {
+            return;
+        }
+
+        self.adding = true;
+        if let Some(bulk) = &self.bulk_add {
+            bulk.panel.update(cx, |panel, cx| {
+                panel.set_error(None, cx);
+                panel.set_saving(true, cx);
+            });
+        }
+        cx.notify();
+
+        self.fetch_generation += 1;
+        self.pending_writes += 1;
+        let (prev, done_tx) = self.enqueue_write();
+
+        cx.spawn_in(window, async move |this, cx| {
+            if let Some(prev) = prev {
+                let _ = prev.recv().await;
+            }
+            let request = cx.update(|_, cx| {
+                backend::call(cx, move |backend| backend.add_dictionary_words(&words))
+            });
+            let result = match request {
+                Ok(request) => request.await,
+                Err(_) => {
+                    drop(done_tx);
+                    return;
+                }
+            };
+
+            let fetch = this.update_in(cx, |this, window, cx| {
+                this.pending_writes = this.pending_writes.saturating_sub(1);
+                this.adding = false;
+
+                let fetch = match result {
+                    Ok(added) => {
+                        if !added.is_empty() {
+                            analytics::capture(
+                                cx,
+                                "dictionary_words_bulk_added",
+                                &[("count", (added.len() as i64).into())],
+                            );
+                            this.words.splice(0..0, added);
+                        }
+                        let restore_focus = this
+                            .bulk_add
+                            .take()
+                            .is_some_and(|bulk| bulk.panel.read(cx).contains_focus(window, cx));
+                        if restore_focus {
+                            this.new_word
+                                .update(cx, |field, cx| field.focus(window, cx));
+                        }
+                        if this.pending_writes == 0 {
+                            this.refetch_after_writes = false;
+                            Some(this.fetch_words(cx))
+                        } else {
+                            this.refetch_after_writes = true;
+                            None
+                        }
+                    }
+                    Err(error) => {
+                        log::error!(target: "dictionary", "bulk_add_failed scope=Default error={error}");
+                        let notice = Notice::new("dictionary.bulkAddFailed", error, cx);
+                        if let Some(bulk) = &this.bulk_add {
+                            bulk.panel.update(cx, |panel, cx| {
+                                panel.set_saving(false, cx);
+                                panel.set_error(Some(notice), cx);
+                            });
+                        } else {
+                            this.add_error = Some(notice);
+                        }
+                        if this.pending_writes == 0
+                            && std::mem::take(&mut this.refetch_after_writes)
+                        {
+                            Some(this.fetch_words(cx))
+                        } else {
+                            None
+                        }
+                    }
+                };
+                cx.notify();
+                fetch
+            });
+            drop(done_tx);
+
+            if let Ok(Some(fetch)) = fetch {
+                fetch.await;
+            }
+        })
+        .detach();
+    }
+
+    fn fetch_words(&mut self, cx: &mut Context<Self>) -> Task<()> {
+        self.latest_fetch_id += 1;
+        let fetch_id = self.latest_fetch_id;
+        let generation = self.fetch_generation;
         let request = backend::call(cx, |backend| backend.list_dictionary_words());
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
             this.update(cx, |this, cx| {
+                if fetch_id != this.latest_fetch_id {
+                    return;
+                }
+                if generation != this.fetch_generation || this.pending_writes > 0 {
+                    if this.pending_writes > 0 {
+                        this.refetch_after_writes = true;
+                    } else {
+                        this.fetch_words(cx).detach();
+                    }
+                    return;
+                }
+
                 this.loading = false;
                 match result {
                     Ok(words) => {
                         this.words = words;
                         this.load_error = None;
+                        this.reconciling_after_failure = false;
+                        this.sync_bulk_existing_words(cx);
+                        this.sync_bulk_submit_blocked(cx);
                     }
                     Err(error) => {
                         log::error!(target: "dictionary", "list_failed scope=Default error={error}");
@@ -119,41 +340,66 @@ impl DefaultDictionary {
         self.add_error = None;
         cx.notify();
 
-        let request = backend::call(cx, move |backend| backend.add_dictionary_word(&word));
+        self.fetch_generation += 1;
+        self.pending_writes += 1;
+        let (prev, done_tx) = self.enqueue_write();
 
         cx.spawn_in(window, async move |this, cx| {
-            match request.await {
-                Ok(_) => {
-                    let fetch = this.update(cx, |this, cx| {
-                        analytics::capture(cx, "dictionary_word_added", &[]);
-                        this.fetch_words(cx)
-                    });
-                    if let Ok(fetch) = fetch {
-                        fetch.await;
-                    }
+            if let Some(prev) = prev {
+                let _ = prev.recv().await;
+            }
+            let request = cx.update(|_, cx| {
+                backend::call(cx, move |backend| backend.add_dictionary_word(&word))
+            });
+            let result = match request {
+                Ok(request) => request.await,
+                Err(_) => {
+                    drop(done_tx);
+                    return;
+                }
+            };
 
-                    this.update_in(cx, |this, window, cx| {
+            let fetch = this.update_in(cx, |this, window, cx| {
+                this.pending_writes = this.pending_writes.saturating_sub(1);
+                this.adding = false;
+
+                let fetch = match result {
+                    Ok(added) => {
+                        analytics::capture(cx, "dictionary_word_added", &[]);
+                        this.words.insert(0, added);
+                        this.sync_bulk_existing_words(cx);
                         this.new_word
                             .update(cx, |field, cx| field.set_value("", window, cx));
-                    })
-                    .ok();
-                }
-                // What was typed stays in the field, to be corrected or sent
-                // again.
-                Err(error) => {
-                    log::error!(target: "dictionary", "add_failed scope=Default error={error}");
-                    this.update(cx, |this, cx| {
+                        if this.pending_writes == 0 {
+                            this.refetch_after_writes = false;
+                            Some(this.fetch_words(cx))
+                        } else {
+                            this.refetch_after_writes = true;
+                            None
+                        }
+                    }
+                    // What was typed stays in the field, to be corrected or sent
+                    // again.
+                    Err(error) => {
+                        log::error!(target: "dictionary", "add_failed scope=Default error={error}");
                         this.add_error = Some(Notice::new("dictionary.addFailed", error, cx));
-                    })
-                    .ok();
-                }
-            }
-
-            this.update(cx, |this, cx| {
-                this.adding = false;
+                        if this.pending_writes == 0
+                            && std::mem::take(&mut this.refetch_after_writes)
+                        {
+                            Some(this.fetch_words(cx))
+                        } else {
+                            None
+                        }
+                    }
+                };
                 cx.notify();
-            })
-            .ok();
+                fetch
+            });
+            drop(done_tx);
+
+            if let Ok(Some(fetch)) = fetch {
+                fetch.await;
+            }
         })
         .detach();
     }
@@ -162,25 +408,57 @@ impl DefaultDictionary {
     /// is refused, the stored words are fetched again, and the word says why
     /// with the notice titled by `failure`.
     fn persist<T: Send + 'static>(
-        &self,
+        &mut self,
         id: String,
         failure: &'static str,
         change: impl FnOnce(&dyn Backend) -> CommandResult<T> + Send + 'static,
         cx: &mut Context<Self>,
     ) {
-        let request = backend::call(cx, change);
+        self.fetch_generation += 1;
+        self.pending_writes += 1;
+        self.pending_optimistic_writes += 1;
+        self.sync_bulk_submit_blocked(cx);
+        let (prev, done_tx) = self.enqueue_write();
 
         cx.spawn(async move |this, cx| {
-            let Err(error) = request.await else {
-                return;
-            };
-            log::error!(target: "dictionary", "change_failed scope=Default error={error}");
+            if let Some(prev) = prev {
+                let _ = prev.recv().await;
+            }
+            let request = cx.update(|cx| backend::call(cx, change));
+            let result = request.await;
 
             let fetch = this.update(cx, |this, cx| {
-                this.word_errors.insert(id, Notice::new(failure, error, cx));
-                this.fetch_words(cx)
+                this.pending_writes = this.pending_writes.saturating_sub(1);
+                this.pending_optimistic_writes = this.pending_optimistic_writes.saturating_sub(1);
+                let fetch = match result {
+                    Ok(_) => {
+                        if this.pending_writes == 0
+                            && std::mem::take(&mut this.refetch_after_writes)
+                        {
+                            Some(this.fetch_words(cx))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(error) => {
+                        log::error!(target: "dictionary", "change_failed scope=Default error={error}");
+                        this.reconciling_after_failure = true;
+                        this.word_errors.insert(id, Notice::new(failure, error, cx));
+                        if this.pending_writes == 0 {
+                            this.refetch_after_writes = false;
+                            Some(this.fetch_words(cx))
+                        } else {
+                            this.refetch_after_writes = true;
+                            None
+                        }
+                    }
+                };
+                this.sync_bulk_submit_blocked(cx);
+                fetch
             });
-            if let Ok(fetch) = fetch {
+            drop(done_tx);
+
+            if let Ok(Some(fetch)) = fetch {
                 fetch.await;
             }
         })
@@ -191,6 +469,7 @@ impl DefaultDictionary {
         analytics::capture(cx, "dictionary_word_deleted", &[]);
         self.words.retain(|word| word.id != id);
         self.word_errors.remove(id);
+        self.sync_bulk_existing_words(cx);
         cx.notify();
 
         let id = id.to_string();
@@ -249,6 +528,7 @@ impl DefaultDictionary {
         if let Some(word) = self.words.iter_mut().find(|word| word.id == id) {
             word.word = text.clone();
         }
+        self.sync_bulk_existing_words(cx);
         self.cancel_edit(window, cx);
 
         let id = id.to_string();
@@ -283,15 +563,30 @@ impl Render for DefaultDictionary {
         let count =
             (loaded && !self.words.is_empty()).then(|| word_count_label(self.words.len(), cx));
 
-        let form = add_word_form(
-            Variant::Page,
-            &self.new_word,
-            self.adding,
-            self.add_error.as_ref(),
-            cx.listener(|this, _, window, cx| this.add(window, cx)),
-            window,
-            cx,
-        );
+        let entry_card = match &self.bulk_add {
+            Some(bulk) => bulk.panel.clone().into_any_element(),
+            None => {
+                let form = add_word_form(
+                    Variant::Page,
+                    &self.new_word,
+                    self.adding,
+                    self.add_error.as_ref(),
+                    cx.listener(|this, _, window, cx| this.add(window, cx)),
+                    window,
+                    cx,
+                );
+                let trigger = bulk_add_trigger(
+                    Variant::Page,
+                    &self.bulk_trigger_focus,
+                    !loaded || self.adding,
+                    cx.listener(|this, _, window, cx| this.open_bulk_add(window, cx)),
+                    window,
+                    cx,
+                );
+
+                div().child(form).child(trigger).into_any_element()
+            }
+        };
 
         let list = if self.loading {
             // Nothing yet, rather than an empty list the words then replace.
@@ -360,7 +655,7 @@ impl Render for DefaultDictionary {
                     .bg(p.surface)
                     .border_1()
                     .border_color(p.border)
-                    .child(form),
+                    .child(entry_card),
             )
             .children(list)
     }

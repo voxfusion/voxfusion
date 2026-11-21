@@ -4,6 +4,7 @@
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, Render, SharedString, Subscription, Task, Window,
 };
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::analytics;
@@ -76,6 +77,22 @@ impl Scope {
         }
     }
 
+    fn add_words(
+        self,
+        backend: &dyn Backend,
+        group: &Group,
+        words: &[String],
+    ) -> CommandResult<Vec<DictionaryWord>> {
+        match self {
+            Scope::Apps => backend.add_app_dictionary_words(
+                &group.key,
+                group.name.as_deref().unwrap_or_default(),
+                words,
+            ),
+            Scope::Sites => backend.add_site_dictionary_words(&group.key, words),
+        }
+    }
+
     fn update_word(
         self,
         backend: &dyn Backend,
@@ -123,6 +140,13 @@ impl Scope {
         }
     }
 
+    fn words_bulk_added_event(self) -> &'static str {
+        match self {
+            Scope::Apps => "app_dictionary_words_bulk_added",
+            Scope::Sites => "site_dictionary_words_bulk_added",
+        }
+    }
+
     fn word_edited_event(self) -> &'static str {
         match self {
             Scope::Apps => "app_dictionary_word_edited",
@@ -152,6 +176,29 @@ pub struct DictionaryGroups {
     /// Apps or sites added here that have no words yet. A dictionary is
     /// stored from its first word on.
     pending: Vec<Group>,
+    /// Keys with an in-flight word or bulk-word add; removal is refused while
+    /// a write is running so a deleted pending group cannot reappear.
+    adding_groups: HashSet<String>,
+    /// Chains dictionary writes in user-action order so a bulk save cannot
+    /// overtake an earlier delete or edit on another thread.
+    write_tail: Option<async_channel::Receiver<()>>,
+    /// Incremented on every local write so an earlier `fetch` snapshot cannot
+    /// overwrite newer additions, edits, or deletions.
+    fetch_generation: u64,
+    /// Monotonic id of the latest `fetch` started, so an older slow refresh
+    /// never overwrites a newer refresh.
+    latest_fetch_id: u64,
+    /// Number of backend writes still in flight (adds, bulk adds, edits,
+    /// deletes, and group removals).
+    pending_writes: usize,
+    /// Number of optimistic edits, deletions, or removals awaiting backend
+    /// confirmation.
+    pending_optimistic_writes: usize,
+    /// Whether a failed optimistic write is waiting for a refresh to restore
+    /// confirmed backend state before bulk submit can proceed.
+    reconciling_after_failure: bool,
+    /// Whether a fetch should run once `pending_writes` reaches zero.
+    refetch_after_writes: bool,
     icons: Rc<AppIcons>,
     editor: Entity<WordListEditor>,
     _subscription: Subscription,
@@ -167,9 +214,64 @@ impl DictionaryGroups {
             stored: Vec::new(),
             load_error: None,
             pending: Vec::new(),
+            adding_groups: HashSet::new(),
+            write_tail: None,
+            fetch_generation: 0,
+            latest_fetch_id: 0,
+            pending_writes: 0,
+            pending_optimistic_writes: 0,
+            reconciling_after_failure: false,
+            refetch_after_writes: false,
             icons: Rc::default(),
             editor,
             _subscription: subscription,
+        }
+    }
+
+    fn has_unconfirmed_changes(&self) -> bool {
+        self.pending_optimistic_writes > 0 || self.reconciling_after_failure
+    }
+
+    fn sync_bulk_submit_blocked(&self, cx: &mut Context<Self>) {
+        let blocked = self.has_unconfirmed_changes();
+        self.editor
+            .update(cx, |editor, cx| editor.set_bulk_submit_blocked(blocked, cx));
+    }
+
+    fn enqueue_write(
+        &mut self,
+    ) -> (
+        Option<async_channel::Receiver<()>>,
+        async_channel::Sender<()>,
+    ) {
+        let prev = self.write_tail.take();
+        let (done_tx, done_rx) = async_channel::bounded(1);
+        self.write_tail = Some(done_rx);
+        (prev, done_tx)
+    }
+
+    /// Merges newly persisted words into `self.stored` immediately so a
+    /// pending group is recognized as stored even if a full refresh waits
+    /// behind another in-flight write.
+    fn record_stored_words(&mut self, group: &Group, added: Vec<DictionaryWord>) {
+        if added.is_empty() {
+            return;
+        }
+        self.pending.retain(|pending| pending.key != group.key);
+        if let Some(existing) = self
+            .stored
+            .iter_mut()
+            .find(|stored| stored.key == group.key)
+        {
+            existing.words.splice(0..0, added);
+        } else {
+            self.stored.push(Group {
+                key: group.key.clone(),
+                name: group.name.clone(),
+                words: added,
+            });
+            self.stored
+                .sort_by_key(|entry| entry.name.as_deref().unwrap_or(&entry.key).to_lowercase());
         }
     }
 
@@ -224,18 +326,38 @@ impl DictionaryGroups {
     }
 
     /// Fetches the stored dictionaries.
-    pub fn fetch(&self, cx: &mut Context<Self>) -> Task<()> {
+    pub fn fetch(&mut self, cx: &mut Context<Self>) -> Task<()> {
         let scope = self.scope;
+        self.latest_fetch_id += 1;
+        let fetch_id = self.latest_fetch_id;
+        let generation = self.fetch_generation;
         let request = backend::call(cx, move |backend| scope.list(backend));
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
             this.update(cx, |this, cx| {
+                if fetch_id != this.latest_fetch_id {
+                    return;
+                }
+                if generation != this.fetch_generation || this.pending_writes > 0 {
+                    if this.pending_writes > 0 {
+                        this.refetch_after_writes = true;
+                    } else {
+                        this.fetch(cx).detach();
+                    }
+                    return;
+                }
+
                 match result {
                     Ok(stored) => {
+                        // Any pending group that now exists in storage moves
+                        // out of `pending` atomically when `stored` updates.
+                        this.pending
+                            .retain(|pending| !stored.iter().any(|s| s.key == pending.key));
                         this.stored = stored;
                         this.load_error = None;
+                        this.reconciling_after_failure = false;
                     }
                     Err(error) => {
                         log::error!(target: "dictionary", "list_failed scope={scope:?} error={error}");
@@ -243,6 +365,7 @@ impl DictionaryGroups {
                     }
                 }
                 this.changed(cx);
+                this.sync_bulk_submit_blocked(cx);
             })
             .ok();
         })
@@ -252,30 +375,62 @@ impl DictionaryGroups {
     /// dictionaries are fetched again, and what was `changed` says why with
     /// the notice titled by `failure`.
     fn persist<T: Send + 'static>(
-        &self,
+        &mut self,
         changed: Changed,
         failure: &'static str,
         change: impl FnOnce(&dyn Backend) -> CommandResult<T> + Send + 'static,
         cx: &mut Context<Self>,
     ) {
         let scope = self.scope;
-        let request = backend::call(cx, change);
+        self.fetch_generation += 1;
+        self.pending_writes += 1;
+        self.pending_optimistic_writes += 1;
+        self.sync_bulk_submit_blocked(cx);
+        let (prev, done_tx) = self.enqueue_write();
 
         cx.spawn(async move |this, cx| {
-            let Err(error) = request.await else {
-                return;
-            };
-            log::error!(target: "dictionary", "change_failed scope={scope:?} error={error}");
+            if let Some(prev) = prev {
+                let _ = prev.recv().await;
+            }
+            let request = cx.update(|cx| backend::call(cx, change));
+            let result = request.await;
 
             let fetch = this.update(cx, |this, cx| {
-                let notice = Notice::new(failure, error, cx);
-                this.editor.update(cx, |editor, cx| match changed {
-                    Changed::Word(word_id) => editor.fail_word(word_id, notice, cx),
-                    Changed::Group(key) => editor.fail_group(key, notice, cx),
-                });
-                this.fetch(cx)
+                this.pending_writes = this.pending_writes.saturating_sub(1);
+                this.pending_optimistic_writes = this.pending_optimistic_writes.saturating_sub(1);
+                let fetch = match result {
+                    Ok(_) => {
+                        if this.pending_writes == 0
+                            && std::mem::take(&mut this.refetch_after_writes)
+                        {
+                            Some(this.fetch(cx))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(error) => {
+                        log::error!(target: "dictionary", "change_failed scope={scope:?} error={error}");
+                        this.reconciling_after_failure = true;
+                        let notice = Notice::new(failure, error, cx);
+                        this.editor.update(cx, |editor, cx| match changed {
+                            Changed::Word(word_id) => editor.fail_word(word_id, notice, cx),
+                            Changed::Group(key) => editor.fail_group(key, notice, cx),
+                        });
+                        if this.pending_writes == 0 {
+                            this.refetch_after_writes = false;
+                            Some(this.fetch(cx))
+                        } else {
+                            this.refetch_after_writes = true;
+                            None
+                        }
+                    }
+                };
+                this.sync_bulk_submit_blocked(cx);
+                fetch
             });
-            if let Ok(fetch) = fetch {
+            drop(done_tx);
+
+            if let Ok(Some(fetch)) = fetch {
                 fetch.await;
             }
         })
@@ -322,10 +477,104 @@ impl DictionaryGroups {
     ) {
         match event.clone() {
             WordListEvent::AddWord { key, word } => self.add_word(key, word, window, cx),
+            WordListEvent::BulkAddWords { key, words } => self.add_words(key, words, window, cx),
             WordListEvent::EditWord { word_id, word } => self.edit_word(word_id, word, cx),
             WordListEvent::DeleteWord { word_id } => self.delete_word(word_id, cx),
             WordListEvent::RemoveGroup(key) => self.remove_group(&key, cx),
         }
+    }
+
+    fn add_words(
+        &mut self,
+        key: SharedString,
+        words: Vec<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let scope = self.scope;
+        let Some(group) = self
+            .groups()
+            .find(|group| group.key == key.as_ref())
+            .cloned()
+        else {
+            self.editor.update(cx, |editor, cx| {
+                editor.finish_bulk_adding(&key, None, window, cx)
+            });
+            return;
+        };
+        self.adding_groups.insert(key.to_string());
+        self.fetch_generation += 1;
+        self.pending_writes += 1;
+        let (prev, done_tx) = self.enqueue_write();
+        let saved_group = group.clone();
+
+        cx.spawn_in(window, async move |this, cx| {
+            if let Some(prev) = prev {
+                let _ = prev.recv().await;
+            }
+            let request = cx.update(|_, cx| {
+                backend::call(cx, move |backend| scope.add_words(backend, &group, &words))
+            });
+            let result = match request {
+                Ok(request) => request.await,
+                Err(_) => {
+                    drop(done_tx);
+                    return;
+                }
+            };
+
+            let fetch = this.update_in(cx, |this, window, cx| {
+                this.pending_writes = this.pending_writes.saturating_sub(1);
+                this.adding_groups.remove(key.as_ref());
+
+                match result {
+                    Ok(added) => {
+                        let has_added = !added.is_empty();
+                        if has_added {
+                            analytics::capture(
+                                cx,
+                                scope.words_bulk_added_event(),
+                                &[("count", (added.len() as i64).into())],
+                            );
+                            this.record_stored_words(&saved_group, added);
+                        }
+                        this.editor.update(cx, |editor, cx| {
+                            editor.finish_bulk_adding(&key, None, window, cx)
+                        });
+                        if has_added {
+                            this.changed(cx);
+                        }
+                        if this.pending_writes == 0 {
+                            this.refetch_after_writes = false;
+                            Some(this.fetch(cx))
+                        } else {
+                            this.refetch_after_writes = true;
+                            None
+                        }
+                    }
+                    Err(error) => {
+                        log::error!(target: "dictionary", "bulk_add_failed scope={scope:?} error={error}");
+                        let notice = Notice::new("dictionary.bulkAddFailed", error, cx);
+                        this.editor.update(cx, |editor, cx| {
+                            editor.finish_bulk_adding(&key, Some(notice), window, cx)
+                        });
+                        if this.pending_writes == 0
+                            && std::mem::take(&mut this.refetch_after_writes)
+                        {
+                            Some(this.fetch(cx))
+                        } else {
+                            None
+                        }
+                    }
+                }
+            });
+            drop(done_tx);
+
+            if let Ok(Some(fetch)) = fetch {
+                fetch.await;
+            }
+        })
+        .detach();
     }
 
     fn add_word(
@@ -345,38 +594,68 @@ impl DictionaryGroups {
                 .update(cx, |editor, cx| editor.finish_adding(&key, None, cx));
             return;
         };
-        let request = backend::call(cx, move |backend| scope.add_word(backend, &group, &word));
+        self.adding_groups.insert(key.to_string());
+        self.fetch_generation += 1;
+        self.pending_writes += 1;
+        let (prev, done_tx) = self.enqueue_write();
+        let saved_group = group.clone();
 
         cx.spawn_in(window, async move |this, cx| {
-            let result = request.await;
-
-            if result.is_ok() {
-                let fetch = this.update_in(cx, |this, window, cx| {
-                    this.editor
-                        .update(cx, |editor, cx| editor.clear_new_word(&key, window, cx));
-                    analytics::capture(cx, scope.word_added_event(), &[]);
-
-                    // With its first word the dictionary is a stored one. It
-                    // stays on screen until the stored ones have been fetched.
-                    this.pending.retain(|pending| pending.key != key.as_ref());
-                    this.fetch(cx)
-                });
-                if let Ok(fetch) = fetch {
-                    fetch.await;
-                }
+            if let Some(prev) = prev {
+                let _ = prev.recv().await;
             }
+            let request = cx.update(|_, cx| {
+                backend::call(cx, move |backend| scope.add_word(backend, &group, &word))
+            });
+            let result = match request {
+                Ok(request) => request.await,
+                Err(_) => {
+                    drop(done_tx);
+                    return;
+                }
+            };
 
-            this.update(cx, |this, cx| {
-                // What was typed stays in the field, to be corrected or sent
-                // again.
-                let error = result.err().map(|error| {
-                    log::error!(target: "dictionary", "add_failed scope={scope:?} error={error}");
-                    Notice::new("dictionary.addFailed", error, cx)
-                });
-                this.editor
-                    .update(cx, |editor, cx| editor.finish_adding(&key, error, cx));
-            })
-            .ok();
+            let fetch = this.update_in(cx, |this, window, cx| {
+                this.pending_writes = this.pending_writes.saturating_sub(1);
+                this.adding_groups.remove(key.as_ref());
+
+                match result {
+                    Ok(added) => {
+                        this.editor
+                            .update(cx, |editor, cx| editor.clear_new_word(&key, window, cx));
+                        analytics::capture(cx, scope.word_added_event(), &[]);
+                        this.record_stored_words(&saved_group, vec![added]);
+                        this.changed(cx);
+                        this.editor
+                            .update(cx, |editor, cx| editor.finish_adding(&key, None, cx));
+                        if this.pending_writes == 0 {
+                            this.refetch_after_writes = false;
+                            Some(this.fetch(cx))
+                        } else {
+                            this.refetch_after_writes = true;
+                            None
+                        }
+                    }
+                    Err(error) => {
+                        log::error!(target: "dictionary", "add_failed scope={scope:?} error={error}");
+                        let notice = Notice::new("dictionary.addFailed", error, cx);
+                        this.editor
+                            .update(cx, |editor, cx| editor.finish_adding(&key, Some(notice), cx));
+                        if this.pending_writes == 0
+                            && std::mem::take(&mut this.refetch_after_writes)
+                        {
+                            Some(this.fetch(cx))
+                        } else {
+                            None
+                        }
+                    }
+                }
+            });
+            drop(done_tx);
+
+            if let Ok(Some(fetch)) = fetch {
+                fetch.await;
+            }
         })
         .detach();
     }
@@ -417,6 +696,9 @@ impl DictionaryGroups {
     }
 
     fn remove_group(&mut self, key: &str, cx: &mut Context<Self>) {
+        if self.adding_groups.contains(key) {
+            return;
+        }
         let scope = self.scope;
         analytics::capture(cx, scope.group_removed_event(), &[]);
 
@@ -437,6 +719,8 @@ impl DictionaryGroups {
                 move |backend| scope.delete_group(backend, &key),
                 cx,
             );
+        } else {
+            self.fetch_generation += 1;
         }
     }
 }

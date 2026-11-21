@@ -242,6 +242,10 @@ impl Backend for NativeBackend {
         db::add_dictionary_word(&self.db, word)
     }
 
+    fn add_dictionary_words(&self, words: &[String]) -> CommandResult<Vec<DictionaryWord>> {
+        db::add_dictionary_words(&self.db, words)
+    }
+
     fn update_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         db::update_dictionary_word(&self.db, id, word)
     }
@@ -263,6 +267,15 @@ impl Backend for NativeBackend {
         apps::add_app_dictionary_word(&self.db, bundle_id, app_name, word)
     }
 
+    fn add_app_dictionary_words(
+        &self,
+        bundle_id: &str,
+        app_name: &str,
+        words: &[String],
+    ) -> CommandResult<Vec<DictionaryWord>> {
+        apps::add_app_dictionary_words(&self.db, bundle_id, app_name, words)
+    }
+
     fn update_app_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         apps::update_app_dictionary_word(&self.db, id, word)
     }
@@ -281,6 +294,14 @@ impl Backend for NativeBackend {
 
     fn add_site_dictionary_word(&self, domain: &str, word: &str) -> CommandResult<DictionaryWord> {
         sites::add_site_dictionary_word(&self.db, domain, word)
+    }
+
+    fn add_site_dictionary_words(
+        &self,
+        domain: &str,
+        words: &[String],
+    ) -> CommandResult<Vec<DictionaryWord>> {
+        sites::add_site_dictionary_words(&self.db, domain, words)
     }
 
     fn update_site_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {

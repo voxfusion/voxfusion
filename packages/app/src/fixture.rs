@@ -387,13 +387,40 @@ impl Backend for FixtureBackend {
 
     fn add_dictionary_word(&self, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("add_dictionary_word")?;
+        let word = validate_dictionary_word(word).map_err(|err| err.to_string())?;
         let word = self.new_word(word);
         self.with(|data| data.dictionary_words.insert(0, word.clone()));
         Ok(word)
     }
 
+    fn add_dictionary_words(&self, words: &[String]) -> CommandResult<Vec<DictionaryWord>> {
+        self.gate("add_dictionary_words")?;
+        for word in words {
+            validate_dictionary_word(word).map_err(|err| err.to_string())?;
+        }
+        if words.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.with(|data| {
+            let existing = data
+                .dictionary_words
+                .iter()
+                .map(|entry| entry.word.clone())
+                .collect::<Vec<_>>();
+            let to_insert = prepare_dictionary_word_batch(words, existing)?;
+            let inserted: Vec<DictionaryWord> = to_insert
+                .into_iter()
+                .map(|word| self.new_word(word))
+                .collect();
+            data.dictionary_words.splice(0..0, inserted.iter().cloned());
+            Ok(inserted)
+        })
+    }
+
     fn update_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_dictionary_word")?;
+        let word = validate_dictionary_word(word).map_err(|err| err.to_string())?;
         self.with(|data| {
             let entry = data
                 .dictionary_words
@@ -423,6 +450,12 @@ impl Backend for FixtureBackend {
         word: &str,
     ) -> CommandResult<DictionaryWord> {
         self.gate("add_app_dictionary_word")?;
+        let bundle_id = bundle_id.trim();
+        let app_name = app_name.trim();
+        if bundle_id.is_empty() || app_name.is_empty() {
+            return Err("bundle_id and app_name are required".to_string());
+        }
+        let word = validate_dictionary_word(word).map_err(|err| err.to_string())?;
         let word = self.new_word(word);
         self.with(|data| {
             let position = data
@@ -442,8 +475,68 @@ impl Backend for FixtureBackend {
         Ok(word)
     }
 
+    fn add_app_dictionary_words(
+        &self,
+        bundle_id: &str,
+        app_name: &str,
+        words: &[String],
+    ) -> CommandResult<Vec<DictionaryWord>> {
+        self.gate("add_app_dictionary_words")?;
+        let bundle_id = bundle_id.trim();
+        let app_name = app_name.trim();
+        if bundle_id.is_empty() || app_name.is_empty() {
+            return Err("bundle_id and app_name are required".to_string());
+        }
+        for word in words {
+            validate_dictionary_word(word).map_err(|err| err.to_string())?;
+        }
+        if words.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.with(|data| {
+            let existing = data
+                .app_dictionaries
+                .iter()
+                .find(|group| group.bundle_id == bundle_id)
+                .map(|group| {
+                    group
+                        .words
+                        .iter()
+                        .map(|entry| entry.word.clone())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let to_insert = prepare_dictionary_word_batch(words, existing)?;
+            if to_insert.is_empty() {
+                return Ok(Vec::new());
+            }
+            let inserted: Vec<DictionaryWord> = to_insert
+                .into_iter()
+                .map(|word| self.new_word(word))
+                .collect();
+            let position = data
+                .app_dictionaries
+                .iter()
+                .position(|group| group.bundle_id == bundle_id)
+                .unwrap_or_else(|| {
+                    data.app_dictionaries.push(AppDictionary {
+                        bundle_id: bundle_id.to_string(),
+                        app_name: app_name.to_string(),
+                        words: Vec::new(),
+                    });
+                    data.app_dictionaries.len() - 1
+                });
+            data.app_dictionaries[position]
+                .words
+                .splice(0..0, inserted.iter().cloned());
+            Ok(inserted)
+        })
+    }
+
     fn update_app_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_app_dictionary_word")?;
+        let word = validate_dictionary_word(word).map_err(|err| err.to_string())?;
         self.with(|data| {
             let entry = data
                 .app_dictionaries
@@ -482,15 +575,19 @@ impl Backend for FixtureBackend {
 
     fn add_site_dictionary_word(&self, domain: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("add_site_dictionary_word")?;
+        let domain = normalize_domain(domain).ok_or_else(|| "Invalid domain".to_string())?;
+        let word = validate_dictionary_word(word).map_err(|err| err.to_string())?;
         let word = self.new_word(word);
         self.with(|data| {
             let position = data
                 .site_dictionaries
                 .iter()
-                .position(|group| group.domain == domain)
+                .position(|group| {
+                    normalize_domain(&group.domain).as_deref() == Some(domain.as_str())
+                })
                 .unwrap_or_else(|| {
                     data.site_dictionaries.push(SiteDictionary {
-                        domain: domain.to_string(),
+                        domain: domain.clone(),
                         words: Vec::new(),
                     });
                     data.site_dictionaries.len() - 1
@@ -500,8 +597,64 @@ impl Backend for FixtureBackend {
         Ok(word)
     }
 
+    fn add_site_dictionary_words(
+        &self,
+        domain: &str,
+        words: &[String],
+    ) -> CommandResult<Vec<DictionaryWord>> {
+        self.gate("add_site_dictionary_words")?;
+        let domain = normalize_domain(domain).ok_or_else(|| "Invalid domain".to_string())?;
+        for word in words {
+            validate_dictionary_word(word).map_err(|err| err.to_string())?;
+        }
+        if words.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        self.with(|data| {
+            let existing = data
+                .site_dictionaries
+                .iter()
+                .find(|group| normalize_domain(&group.domain).as_deref() == Some(domain.as_str()))
+                .map(|group| {
+                    group
+                        .words
+                        .iter()
+                        .map(|entry| entry.word.clone())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let to_insert = prepare_dictionary_word_batch(words, existing)?;
+            if to_insert.is_empty() {
+                return Ok(Vec::new());
+            }
+            let inserted: Vec<DictionaryWord> = to_insert
+                .into_iter()
+                .map(|word| self.new_word(word))
+                .collect();
+            let position = data
+                .site_dictionaries
+                .iter()
+                .position(|group| {
+                    normalize_domain(&group.domain).as_deref() == Some(domain.as_str())
+                })
+                .unwrap_or_else(|| {
+                    data.site_dictionaries.push(SiteDictionary {
+                        domain: domain.clone(),
+                        words: Vec::new(),
+                    });
+                    data.site_dictionaries.len() - 1
+                });
+            data.site_dictionaries[position]
+                .words
+                .splice(0..0, inserted.iter().cloned());
+            Ok(inserted)
+        })
+    }
+
     fn update_site_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_site_dictionary_word")?;
+        let word = validate_dictionary_word(word).map_err(|err| err.to_string())?;
         self.with(|data| {
             let entry = data
                 .site_dictionaries
@@ -526,9 +679,10 @@ impl Backend for FixtureBackend {
 
     fn delete_site_dictionary(&self, domain: &str) -> CommandResult<()> {
         self.gate("delete_site_dictionary")?;
+        let domain = normalize_domain(domain).ok_or_else(|| "Invalid domain".to_string())?;
         self.with(|data| {
             data.site_dictionaries
-                .retain(|group| group.domain != domain)
+                .retain(|group| normalize_domain(&group.domain).as_deref() != Some(domain.as_str()))
         });
         Ok(())
     }

@@ -1,6 +1,6 @@
 use base64::Engine;
-use chrono::Utc;
-use rusqlite::params;
+use chrono::{Duration, SecondsFormat, Utc};
+use rusqlite::{TransactionBehavior, params};
 use std::collections::HashSet;
 use std::fs;
 use std::io::BufReader;
@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 
 use super::db::DbState;
 use crate::backend::{
-    AppDictionary, AppInstruction, DictionaryWord, FrontmostApp, InstalledApp, MAX_WORD_CHARS,
+    AppDictionary, AppInstruction, DictionaryWord, FrontmostApp, InstalledApp,
+    prepare_dictionary_word_batch, validate_dictionary_word,
 };
 
 pub struct StyleDef {
@@ -536,15 +537,10 @@ pub fn add_app_dictionary_word(
 ) -> Result<DictionaryWord, String> {
     let bundle_id = bundle_id.trim().to_string();
     let app_name = app_name.trim().to_string();
-    let word = word.trim();
     if bundle_id.is_empty() || app_name.is_empty() {
         return Err("bundle_id and app_name are required".to_string());
     }
-    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
-        return Err(format!(
-            "Word must be between 1 and {MAX_WORD_CHARS} characters"
-        ));
-    }
+    let word = validate_dictionary_word(word).map_err(|e| e.to_string())?;
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let id = uuid::Uuid::new_v4().to_string();
@@ -565,17 +561,81 @@ pub fn add_app_dictionary_word(
     })
 }
 
+pub fn add_app_dictionary_words(
+    state: &DbState,
+    bundle_id: &str,
+    app_name: &str,
+    words: &[String],
+) -> Result<Vec<DictionaryWord>, String> {
+    let bundle_id = bundle_id.trim().to_string();
+    let app_name = app_name.trim().to_string();
+    if bundle_id.is_empty() || app_name.is_empty() {
+        return Err("bundle_id and app_name are required".to_string());
+    }
+    for word in words {
+        validate_dictionary_word(word).map_err(|e| e.to_string())?;
+    }
+    if words.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+
+    let existing = {
+        let mut stmt = tx
+            .prepare("SELECT word FROM app_dictionary_words WHERE bundle_id = ?1")
+            .map_err(|e| e.to_string())?;
+        stmt.query_map(params![bundle_id], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+
+    let to_insert = prepare_dictionary_word_batch(words, existing)?;
+    if to_insert.is_empty() {
+        tx.commit().map_err(|e| e.to_string())?;
+        return Ok(Vec::new());
+    }
+
+    let base = Utc::now();
+    let count = to_insert.len();
+    let mut inserted = Vec::with_capacity(count);
+    {
+        let mut stmt = tx
+            .prepare(
+                "INSERT INTO app_dictionary_words (id, bundle_id, app_name, word, created_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            )
+            .map_err(|e| e.to_string())?;
+
+        for (index, word) in to_insert.into_iter().enumerate() {
+            let id = uuid::Uuid::new_v4().to_string();
+            let now = (base + Duration::nanoseconds((count - 1 - index) as i64))
+                .to_rfc3339_opts(SecondsFormat::Nanos, false);
+            stmt.execute(params![id, bundle_id, app_name, word, now, now])
+                .map_err(|e| e.to_string())?;
+            inserted.push(DictionaryWord {
+                id,
+                word: word.to_string(),
+                created_at: now.clone(),
+                updated_at: now,
+            });
+        }
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(inserted)
+}
+
 pub fn update_app_dictionary_word(
     state: &DbState,
     id: &str,
     word: &str,
 ) -> Result<DictionaryWord, String> {
-    let word = word.trim();
-    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
-        return Err(format!(
-            "Word must be between 1 and {MAX_WORD_CHARS} characters"
-        ));
-    }
+    let word = validate_dictionary_word(word).map_err(|e| e.to_string())?;
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let now = Utc::now().to_rfc3339();
     let rows_affected = conn

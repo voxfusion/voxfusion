@@ -3,6 +3,8 @@
 //! that both the native services and the fixture stand-in implement.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -45,9 +47,246 @@ pub struct DictionaryWord {
     pub updated_at: String,
 }
 
+/// Normalizes a site input or URL to a canonical lowercase domain without
+/// scheme, credentials, port, path, or leading `www.`.
+pub fn normalize_domain(input: &str) -> Option<String> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let without_scheme = match trimmed.find("://") {
+        Some(idx) => &trimmed[idx + 3..],
+        None => trimmed,
+    };
+
+    let host_part = without_scheme
+        .split('/')
+        .next()
+        .unwrap_or(without_scheme)
+        .split('?')
+        .next()
+        .unwrap_or(without_scheme)
+        .split('#')
+        .next()
+        .unwrap_or(without_scheme);
+
+    let host_part = host_part.rsplit('@').next().unwrap_or(host_part);
+    let host_part = host_part.split(':').next().unwrap_or(host_part);
+
+    let host = host_part.trim_matches('.').to_lowercase();
+    if host.is_empty() {
+        return None;
+    }
+
+    let host = host.strip_prefix("www.").unwrap_or(&host).to_string();
+    if host.is_empty() { None } else { Some(host) }
+}
+
 /// The most characters a dictionary word may have. The services refuse a
 /// longer one, and the forms say so before it is sent.
 pub const MAX_WORD_CHARS: usize = 100;
+
+/// Why a dictionary term is refused before storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WordValidationError {
+    Empty,
+    TooLong { count: usize },
+    ControlCharacters,
+}
+
+impl fmt::Display for WordValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WordValidationError::Empty | WordValidationError::TooLong { .. } => {
+                write!(f, "Word must be between 1 and {MAX_WORD_CHARS} characters")
+            }
+            WordValidationError::ControlCharacters => {
+                write!(f, "Word cannot contain control characters")
+            }
+        }
+    }
+}
+
+/// Validates and trims a single dictionary term.
+pub fn validate_dictionary_word(input: &str) -> Result<&str, WordValidationError> {
+    let word = input.trim();
+    if word.is_empty() {
+        return Err(WordValidationError::Empty);
+    }
+    let count = word.chars().count();
+    if count > MAX_WORD_CHARS {
+        return Err(WordValidationError::TooLong { count });
+    }
+    if word.chars().any(char::is_control) {
+        return Err(WordValidationError::ControlCharacters);
+    }
+    Ok(word)
+}
+
+/// Canonical case-insensitive key for duplicate detection across dictionaries.
+pub fn dictionary_word_key(word: &str) -> String {
+    word.trim().to_lowercase()
+}
+
+/// Validates every term in `words`, then returns the trimmed terms that are
+/// neither already in `existing_words` nor repeated earlier in `words`.
+pub fn prepare_dictionary_word_batch(
+    words: &[String],
+    existing_words: impl IntoIterator<Item = String>,
+) -> Result<Vec<&str>, String> {
+    let mut validated = Vec::with_capacity(words.len());
+    for raw in words {
+        validated.push(validate_dictionary_word(raw).map_err(|err| err.to_string())?);
+    }
+
+    let mut seen: HashSet<String> = existing_words
+        .into_iter()
+        .map(|word| dictionary_word_key(&word))
+        .filter(|key| !key.is_empty())
+        .collect();
+
+    let mut to_insert = Vec::with_capacity(validated.len());
+    for word in validated {
+        if seen.insert(dictionary_word_key(word)) {
+            to_insert.push(word);
+        }
+    }
+
+    Ok(to_insert)
+}
+
+/// Why a line in a bulk-entry list cannot be saved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BulkInvalidReason {
+    TooLong { count: usize },
+    ControlCharacters,
+}
+
+/// Classification of one non-blank line in a bulk-entry list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BulkWordStatus {
+    /// Valid new term that will be added.
+    Valid,
+    /// Matches a term already stored in the target dictionary.
+    DuplicateExisting,
+    /// Repeats an earlier term in the same input.
+    DuplicateInInput,
+    /// Fails dictionary validation.
+    Invalid(BulkInvalidReason),
+}
+
+/// One non-blank line parsed from bulk dictionary input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BulkWordEntry {
+    /// 1-based line number in the input text.
+    pub line: usize,
+    /// Trimmed term text.
+    pub term: String,
+    pub status: BulkWordStatus,
+}
+
+/// Result of parsing a multiline bulk-entry list against existing dictionary
+/// terms.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BulkWordPreview {
+    pub entries: Vec<BulkWordEntry>,
+    pub valid_terms: Vec<String>,
+    pub duplicate_existing_count: usize,
+    pub duplicate_input_count: usize,
+    pub invalid_count: usize,
+}
+
+/// Splits `input` into lines on `\r\n`, `\n`, or standalone `\r`, preserving
+/// exact 1-based line indices and stripping a leading UTF-8 BOM.
+fn split_bulk_lines(input: &str) -> Vec<&str> {
+    let input = input.strip_prefix('\u{FEFF}').unwrap_or(input);
+    let bytes = input.as_bytes();
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut i = 0;
+
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\n' => {
+                lines.push(&input[start..i]);
+                i += 1;
+                start = i;
+            }
+            b'\r' => {
+                lines.push(&input[start..i]);
+                i += 1;
+                if i < bytes.len() && bytes[i] == b'\n' {
+                    i += 1;
+                }
+                start = i;
+            }
+            _ => i += 1,
+        }
+    }
+
+    if start < bytes.len() {
+        lines.push(&input[start..]);
+    }
+
+    lines
+}
+
+/// Parses one-term-per-line bulk input against `existing_words`, reporting
+/// valid new terms, existing duplicates, in-input duplicates, and invalid
+/// entries before saving.
+pub fn parse_bulk_dictionary_words<'a>(
+    input: &str,
+    existing_words: impl IntoIterator<Item = &'a str>,
+) -> BulkWordPreview {
+    let existing: HashSet<String> = existing_words
+        .into_iter()
+        .map(dictionary_word_key)
+        .filter(|key| !key.is_empty())
+        .collect();
+    let mut seen_in_input: HashSet<String> = HashSet::new();
+    let mut preview = BulkWordPreview::default();
+
+    for (index, raw_line) in split_bulk_lines(input).into_iter().enumerate() {
+        let trimmed = raw_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let status = match validate_dictionary_word(trimmed) {
+            Err(WordValidationError::TooLong { count }) => {
+                preview.invalid_count += 1;
+                BulkWordStatus::Invalid(BulkInvalidReason::TooLong { count })
+            }
+            Err(WordValidationError::ControlCharacters) => {
+                preview.invalid_count += 1;
+                BulkWordStatus::Invalid(BulkInvalidReason::ControlCharacters)
+            }
+            Err(WordValidationError::Empty) => continue,
+            Ok(valid) => {
+                let key = dictionary_word_key(valid);
+                if existing.contains(&key) {
+                    preview.duplicate_existing_count += 1;
+                    BulkWordStatus::DuplicateExisting
+                } else if !seen_in_input.insert(key) {
+                    preview.duplicate_input_count += 1;
+                    BulkWordStatus::DuplicateInInput
+                } else {
+                    preview.valid_terms.push(valid.to_string());
+                    BulkWordStatus::Valid
+                }
+            }
+        };
+
+        preview.entries.push(BulkWordEntry {
+            line: index + 1,
+            term: trimmed.to_string(),
+            status,
+        });
+    }
+
+    preview
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppDictionary {
@@ -299,6 +538,7 @@ pub trait Backend: Send + Sync + 'static {
     // ---- dictionary ----
     fn list_dictionary_words(&self) -> CommandResult<Vec<DictionaryWord>>;
     fn add_dictionary_word(&self, word: &str) -> CommandResult<DictionaryWord>;
+    fn add_dictionary_words(&self, words: &[String]) -> CommandResult<Vec<DictionaryWord>>;
     fn update_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord>;
     fn delete_dictionary_word(&self, id: &str) -> CommandResult<()>;
 
@@ -309,12 +549,23 @@ pub trait Backend: Send + Sync + 'static {
         app_name: &str,
         word: &str,
     ) -> CommandResult<DictionaryWord>;
+    fn add_app_dictionary_words(
+        &self,
+        bundle_id: &str,
+        app_name: &str,
+        words: &[String],
+    ) -> CommandResult<Vec<DictionaryWord>>;
     fn update_app_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord>;
     fn delete_app_dictionary_word(&self, id: &str) -> CommandResult<()>;
     fn delete_app_dictionary(&self, bundle_id: &str) -> CommandResult<()>;
 
     fn list_site_dictionaries(&self) -> CommandResult<Vec<SiteDictionary>>;
     fn add_site_dictionary_word(&self, domain: &str, word: &str) -> CommandResult<DictionaryWord>;
+    fn add_site_dictionary_words(
+        &self,
+        domain: &str,
+        words: &[String],
+    ) -> CommandResult<Vec<DictionaryWord>>;
     fn update_site_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord>;
     fn delete_site_dictionary_word(&self, id: &str) -> CommandResult<()>;
     fn delete_site_dictionary(&self, domain: &str) -> CommandResult<()>;

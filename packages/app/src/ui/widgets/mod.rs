@@ -3,6 +3,7 @@
 pub mod add_site_form;
 pub mod app_icon;
 pub mod app_search;
+pub mod bulk_add;
 pub mod focus;
 mod icon;
 pub mod model_summary;
