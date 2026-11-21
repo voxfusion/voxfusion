@@ -164,7 +164,7 @@ pub fn list_header(
             }
         })
         .type_xs()
-        .text_color(p.txt_muted)
+        .text_color(p.txt_hint)
         .children(description.map(|description| div().flex_1().min_w_0().child(text(description))))
         .children(count.map(|count| div().flex_shrink_0().child(text(upper(&count)).nowrap())))
 }
