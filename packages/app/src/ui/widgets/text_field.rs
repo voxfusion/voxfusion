@@ -17,9 +17,9 @@
 
 use gpui_kit::component::input::{Escape, Input, InputEvent, InputState};
 use gpui_kit::{
-    App, AppContext as _, Context, Div, Entity, EventEmitter, FocusHandle, Focusable,
-    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, SharedString,
-    Styled, Subscription, Window, div,
+    App, AppContext as _, Context, Div, Entity, EntityInputHandler as _, EventEmitter, FocusHandle,
+    Focusable, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render,
+    SharedString, Styled, Subscription, Window, div,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,14 +44,28 @@ impl TextField {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let input = cx.new(|cx| InputState::new(window, cx));
 
-        let subscription = cx.subscribe(&input, |_, _, event: &InputEvent, cx| {
-            cx.emit(match event {
-                InputEvent::Change => TextFieldEvent::Change,
-                InputEvent::PressEnter { .. } => TextFieldEvent::Enter,
-                InputEvent::Focus => TextFieldEvent::Focus,
-                InputEvent::Blur => TextFieldEvent::Blur,
-            });
-        });
+        let subscription = cx.subscribe_in(
+            &input,
+            window,
+            |_, input, event: &InputEvent, window, cx| {
+                let event = match event {
+                    InputEvent::Change => TextFieldEvent::Change,
+                    InputEvent::PressEnter { .. } => {
+                        // Do not submit while an IME composition is still active.
+                        if input
+                            .update(cx, |input, cx| input.marked_text_range(window, cx))
+                            .is_some()
+                        {
+                            return;
+                        }
+                        TextFieldEvent::Enter
+                    }
+                    InputEvent::Focus => TextFieldEvent::Focus,
+                    InputEvent::Blur => TextFieldEvent::Blur,
+                };
+                cx.emit(event);
+            },
+        );
 
         Self {
             input,

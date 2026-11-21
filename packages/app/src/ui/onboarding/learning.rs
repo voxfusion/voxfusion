@@ -107,15 +107,17 @@ impl LearningStep {
         });
         input.update(cx, |input, cx| input.focus(window, cx));
 
-        self._subscriptions
-            .push(cx.subscribe(&input, |_, _, event: &TextFieldEvent, cx| {
-                if matches!(
-                    event,
-                    TextFieldEvent::Change | TextFieldEvent::Focus | TextFieldEvent::Blur
-                ) {
+        self._subscriptions.push(cx.subscribe_in(
+            &input,
+            window,
+            |this, _, event: &TextFieldEvent, window, cx| match event {
+                TextFieldEvent::Change | TextFieldEvent::Focus | TextFieldEvent::Blur => {
                     cx.notify();
                 }
-            }));
+                TextFieldEvent::Enter => this.add_message(window, cx),
+                TextFieldEvent::Escape => {}
+            },
+        ));
 
         self.input = Some(input.clone());
         input
