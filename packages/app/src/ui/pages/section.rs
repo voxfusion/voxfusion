@@ -154,7 +154,8 @@ pub fn list_header(
     div()
         .mb_4()
         .flex()
-        .items_center()
+        .items_start()
+        .gap_4()
         .map(|header| {
             if description.is_some() {
                 header.justify_between()
@@ -164,8 +165,8 @@ pub fn list_header(
         })
         .type_xs()
         .text_color(p.txt_muted)
-        .children(description.map(text))
-        .children(count.map(|count| text(upper(&count))))
+        .children(description.map(|description| div().flex_1().min_w_0().child(text(description))))
+        .children(count.map(|count| div().flex_shrink_0().child(text(upper(&count)).nowrap())))
 }
 
 /// The card shown in place of an empty list. `code` is the machine-style
