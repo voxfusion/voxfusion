@@ -9,7 +9,7 @@ export const downloads = {
 		"To find your Mac chip, open the Apple menu and select About This Mac. Read the Chip or Processor line.",
 	"downloads.macos.title": "macOS",
 	"downloads.macos.latest": "Apple Silicon",
-	"downloads.macos.latest.description": "Use this build on Macs with Apple Silicon (M1 or later).",
+	"downloads.macos.latest.description": "Use this build on Macs with an Apple M-series chip.",
 	"downloads.macos.intel": "Intel",
 	"downloads.macos.intel.description": "Use this build on Macs with an Intel processor.",
 } as const;
