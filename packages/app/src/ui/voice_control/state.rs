@@ -3,6 +3,7 @@
 
 use gpui_kit::SharedString;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, Weak};
 
 use crate::backend::FrontmostApp;
 use crate::paths::APP_IDENTIFIER;
@@ -45,11 +46,44 @@ impl Target {
     }
 }
 
+/// Tracks whether an in-flight or retryable dictation may still be saved to
+/// history. Synchronized with a mutex so opting out cannot overlap with the
+/// final storage commit.
+#[derive(Debug, Clone)]
+pub struct HistoryRetention(Arc<Mutex<bool>>);
+
+impl HistoryRetention {
+    pub fn new(allowed: bool) -> Self {
+        Self(Arc::new(Mutex::new(allowed)))
+    }
+
+    pub fn allowed(&self) -> bool {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    pub fn lock_flag(&self) -> &Mutex<bool> {
+        &self.0
+    }
+
+    pub fn downgrade(&self) -> Weak<Mutex<bool>> {
+        Arc::downgrade(&self.0)
+    }
+}
+
+impl PartialEq for HistoryRetention {
+    fn eq(&self, other: &Self) -> bool {
+        self.allowed() == other.allowed()
+    }
+}
+
 /// A recording whose transcription failed and can be tried again.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Retry {
     pub audio_path: PathBuf,
     pub target: Target,
+    /// Shared with the settings observer so opting out at any point (including
+    /// while preparing or displaying the retry prompt) disables saving.
+    pub retention: HistoryRetention,
 }
 
 #[derive(Debug, Clone, PartialEq)]

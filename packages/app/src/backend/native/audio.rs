@@ -60,6 +60,47 @@ struct InputClock {
 }
 
 static RECORDING: Mutex<Option<Recording>> = Mutex::new(None);
+/// Gates creating temporary recordings or Parakeet scratch WAVs against app
+/// shutdown so a background worker cannot create a new file after shutdown
+/// starts cleaning up pending recordings.
+static SHUTDOWN_GATE: Mutex<bool> = Mutex::new(false);
+/// Discarded recording paths whose initial deletion failed (for example, when
+/// finalizing a WAV failed during stop or cancel), retried on shutdown.
+static UNDELETED_DISCARDS: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+
+fn record_failed_discard(path: &Path) {
+    let mut discards = UNDELETED_DISCARDS.lock().unwrap_or_else(|e| e.into_inner());
+    if !discards.iter().any(|tracked| tracked == path) {
+        discards.push(path.to_path_buf());
+    }
+}
+
+/// Prevents new recordings or temporary transcription scratch WAVs from being
+/// created once application shutdown starts, and retries any previously failed
+/// recording deletions.
+pub fn begin_shutdown() {
+    {
+        let mut shutting_down = SHUTDOWN_GATE.lock().unwrap_or_else(|e| e.into_inner());
+        *shutting_down = true;
+    }
+
+    let leftover =
+        std::mem::take(&mut *UNDELETED_DISCARDS.lock().unwrap_or_else(|e| e.into_inner()));
+    for path in leftover {
+        let _ = discard_recording(&path);
+    }
+}
+
+/// Runs `f` while holding the shutdown gate so shutdown cannot run cleanup
+/// concurrently with file creation. Returns an error without running `f` if
+/// shutdown has already started.
+pub fn while_not_shutting_down<T>(f: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+    let shutting_down = SHUTDOWN_GATE.lock().unwrap_or_else(|e| e.into_inner());
+    if *shutting_down {
+        return Err("Application is shutting down.".to_string());
+    }
+    f()
+}
 
 /// How long a newly opened input may take to deliver its first samples.
 /// Bluetooth microphones switch profiles when opened and can take seconds.
@@ -187,8 +228,11 @@ pub fn start_recording_with_device(
         bits_per_sample: 32,
         sample_format: SampleFormat::Float,
     };
-    let save_path = get_save_path()?;
-    let writer = WavWriter::create(&save_path, spec).map_err(|err| err.to_string())?;
+    let (save_path, writer) = while_not_shutting_down(|| {
+        let save_path = get_save_path(id)?;
+        let writer = WavWriter::create(&save_path, spec).map_err(|err| err.to_string())?;
+        Ok((save_path, writer))
+    })?;
     let writer: WavWriterHandle = Arc::new(Mutex::new(Some(writer)));
 
     let sink = Sink {
@@ -419,7 +463,18 @@ pub fn stop_recording_with_device() -> Result<PathBuf, String> {
     close_stream(recording.input.stream);
 
     if let Some(writer) = writer {
-        writer.finalize().map_err(|err| err.to_string())?;
+        if let Err(err) = writer.finalize() {
+            if let Err(remove_err) = std::fs::remove_file(&recording.save_path)
+                && remove_err.kind() != std::io::ErrorKind::NotFound
+            {
+                log::warn!(
+                    target: "audio",
+                    "failed to delete discarded recording: {remove_err}"
+                );
+                record_failed_discard(&recording.save_path);
+            }
+            return Err(err.to_string());
+        }
     }
 
     Ok(recording.save_path)
@@ -470,12 +525,11 @@ fn discard_recording_file(writer: &WavWriterHandle, save_path: &Path) {
     if let Ok(mut writer) = writer.lock() {
         writer.take();
     }
-    if let Err(err) = std::fs::remove_file(save_path) {
-        log::warn!(
-            target: "audio",
-            "failed to delete discarded recording {}: {err}",
-            save_path.display()
-        );
+    if let Err(err) = std::fs::remove_file(save_path)
+        && err.kind() != std::io::ErrorKind::NotFound
+    {
+        log::warn!(target: "audio", "failed to delete discarded recording: {err}");
+        record_failed_discard(save_path);
     }
 }
 
@@ -517,15 +571,25 @@ fn recordings_dir() -> PathBuf {
     crate::paths::data_dir().join("recordings")
 }
 
-fn get_save_path() -> Result<PathBuf, String> {
+fn get_save_path(id: u64) -> Result<PathBuf, String> {
     let save_dir = recordings_dir();
 
     create_dir_all(&save_dir).map_err(|err| err.to_string())?;
 
     let timestamp = Local::now().format("%Y%m%d%H%M%S").to_string();
     let save_path = save_dir.join(format!("{timestamp}.wav"));
+    if !save_path.exists() {
+        return Ok(save_path);
+    }
 
-    Ok(save_path)
+    let mut suffix = id;
+    loop {
+        let candidate = save_dir.join(format!("{timestamp}-{suffix}.wav"));
+        if !candidate.exists() {
+            return Ok(candidate);
+        }
+        suffix = suffix.wrapping_add(1);
+    }
 }
 
 /// The `.wav` files in the recordings directory, with when each was last
@@ -545,9 +609,10 @@ fn recordings() -> std::io::Result<Vec<(SystemTime, PathBuf)>> {
 }
 
 /// Prunes the recordings directory down to the `keep` newest `.wav` files by
-/// modification time. Called after each successful transcription so dictation
-/// audio is not retained forever. IO failures are logged and otherwise
-/// ignored — cleanup must never fail a transcription.
+/// modification time, skipping any recording currently being captured or
+/// transcribed. Called after each saved transcription so dictation audio is
+/// not retained forever. IO failures are logged and otherwise ignored —
+/// cleanup must never fail a transcription.
 pub fn cleanup_old_recordings(keep: usize) {
     let mut recordings = match recordings() {
         Ok(recordings) => recordings,
@@ -557,6 +622,17 @@ pub fn cleanup_old_recordings(keep: usize) {
         }
     };
 
+    let mut in_flight: Vec<PathBuf> = RECORDING
+        .lock()
+        .ok()
+        .and_then(|active| Some(active.as_ref()?.save_path.clone()))
+        .into_iter()
+        .collect();
+    if let Ok(transcribing) = TRANSCRIBING.lock() {
+        in_flight.extend(transcribing.iter().cloned());
+    }
+    recordings.retain(|(_, path)| !in_flight.iter().any(|source| made_from(path, source)));
+
     if recordings.len() <= keep {
         return;
     }
@@ -564,12 +640,10 @@ pub fn cleanup_old_recordings(keep: usize) {
     // Newest first; everything past `keep` gets deleted.
     recordings.sort_by(|a, b| b.0.cmp(&a.0));
     for (_, path) in recordings.drain(keep..) {
-        if let Err(err) = std::fs::remove_file(&path) {
-            log::warn!(
-                target: "audio",
-                "failed to delete old recording {}: {err}",
-                path.display()
-            );
+        if let Err(err) = std::fs::remove_file(&path)
+            && err.kind() != std::io::ErrorKind::NotFound
+        {
+            log::warn!(target: "audio", "failed to delete old recording: {err}");
         }
     }
 }
@@ -593,16 +667,50 @@ pub fn recording_finished_between(from: SystemTime, to: SystemTime) -> Option<St
         .and_then(|(_, path)| recording_name(&path))
 }
 
+/// Deletes a temporary recording at `path` (and any derived Parakeet scratch
+/// WAV beside it) when it lives inside the recordings directory. Missing files
+/// are ignored so cleanup is idempotent.
+pub fn discard_recording(path: &Path) -> Result<(), String> {
+    let Some(name) = recording_name(path) else {
+        return Ok(());
+    };
+    if Path::new(&name).extension().and_then(|ext| ext.to_str()) != Some("wav") {
+        return Ok(());
+    }
+
+    let full_path = recordings_dir().join(&name);
+    let parakeet_temp = full_path.with_extension("parakeet16k.wav");
+    let scratch_err = match std::fs::remove_file(&parakeet_temp) {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => Some(err),
+        _ => None,
+    };
+    let source_err = match std::fs::remove_file(&full_path) {
+        Err(err) if err.kind() != std::io::ErrorKind::NotFound => Some(err),
+        _ => None,
+    };
+
+    match (source_err, scratch_err) {
+        (None, None) => Ok(()),
+        (Some(err), None) => Err(format!("Failed to delete recording: {err}")),
+        (None, Some(err)) => Err(format!(
+            "Failed to delete temporary parakeet recording: {err}"
+        )),
+        (Some(source), Some(scratch)) => Err(format!(
+            "Failed to delete recording ({source}) and temporary parakeet recording ({scratch})"
+        )),
+    }
+}
+
 /// Deletes the recording called `name`, if it is still kept.
 pub fn delete_recording(name: &str) -> Result<(), String> {
     // A bare file name only, so nothing outside the directory is reached.
     if Path::new(name).file_name() != Some(name.as_ref()) {
-        return Err(format!("Not a recording: {name}"));
+        return Err("Not a recording".to_string());
     }
 
     match std::fs::remove_file(recordings_dir().join(name)) {
         Err(err) if err.kind() != std::io::ErrorKind::NotFound => {
-            Err(format!("Failed to delete recording {name}: {err}"))
+            Err(format!("Failed to delete recording: {err}"))
         }
         _ => Ok(()),
     }
@@ -674,12 +782,10 @@ pub fn delete_recordings() -> Result<(), String> {
         {
             continue;
         }
-        if let Err(err) = std::fs::remove_file(&path) {
-            log::warn!(
-                target: "audio",
-                "failed to delete recording {}: {err}",
-                path.display()
-            );
+        if let Err(err) = std::fs::remove_file(&path)
+            && err.kind() != std::io::ErrorKind::NotFound
+        {
+            log::warn!(target: "audio", "failed to delete recording: {err}");
             failed += 1;
         }
     }

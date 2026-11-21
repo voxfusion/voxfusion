@@ -5,7 +5,8 @@
 use gpui_kit::{
     App, AppContext as _, AsyncApp, Context, Entity, Result, Subscription, Task, WeakEntity,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, Instant};
 
 use crate::backend::{self, AppEvent};
@@ -19,7 +20,9 @@ use super::bars::{NUM_BARS, WAVE_STEP, bar_heights, next_wave_offset};
 use super::hotkeys::{
     HotkeyEvent, HotkeyPlan, HotkeyRole, Hotkeys, dictation_hotkeys, hotkey_plan,
 };
-use super::state::{Command, Dictation, DictationError, Pill, RecordingMode, Retry, Target};
+use super::state::{
+    Command, Dictation, DictationError, HistoryRetention, Pill, RecordingMode, Retry, Target,
+};
 
 pub const WINDOW_WIDTH_COMPACT: f32 = 100.;
 const WINDOW_WIDTH_HANDS_FREE: f32 = 140.;
@@ -77,6 +80,33 @@ struct ActiveStart {
     phase: StartPhase,
 }
 
+/// Recordings on disk that have not been saved to history or discarded yet.
+/// Shared with worker threads and app shutdown so a quit during stop or
+/// transcription never leaves a temporary recording behind.
+#[derive(Default)]
+struct PendingRecordings {
+    shutting_down: bool,
+    paths: Vec<PathBuf>,
+}
+
+impl PendingRecordings {
+    /// Tracks `path` unless shutdown has started (in which case the caller
+    /// must discard it immediately).
+    fn track(&mut self, path: PathBuf) -> bool {
+        if self.shutting_down {
+            return false;
+        }
+        if !self.paths.contains(&path) {
+            self.paths.push(path);
+        }
+        true
+    }
+
+    fn untrack(&mut self, path: &Path) {
+        self.paths.retain(|tracked| tracked != path);
+    }
+}
+
 pub struct VoiceController {
     dictation: Dictation,
     /// The in-flight recording start, if any. Async completions check `id`
@@ -91,6 +121,18 @@ pub struct VoiceController {
     wave_offset: usize,
     /// Where the running recording will be typed.
     target: Target,
+    /// Whether saving transcription history has stayed enabled since the
+    /// running recording started. Once turned off, stays false until the next
+    /// recording starts.
+    recording_save_history: bool,
+    /// Per-transcription opt-in locks for in-flight transcriptions. Turning
+    /// history off locks and clears every live flag so opt-out cannot overlap
+    /// with the final storage commit, and even a brief opt-out discards it.
+    active_transcriptions: Vec<Weak<Mutex<bool>>>,
+    /// Serializes recording start/stop/cancel transitions with app shutdown.
+    lifecycle: Arc<Mutex<()>>,
+    /// Unsaved recordings owned by active dictations, cleaned up on shutdown.
+    pending: Arc<Mutex<PendingRecordings>>,
     /// The onboarding step that lets dictation be tried is showing.
     learning_active: bool,
     onboarding_complete: bool,
@@ -142,6 +184,10 @@ impl VoiceController {
             audio_level: 0.,
             wave_offset: 0,
             target: Target::default(),
+            recording_save_history: true,
+            active_transcriptions: Vec::new(),
+            lifecycle: Arc::new(Mutex::new(())),
+            pending: Arc::new(Mutex::new(PendingRecordings::default())),
             learning_active: false,
             onboarding_complete,
             window: WindowRequest {
@@ -179,17 +225,32 @@ impl VoiceController {
     }
 
     /// Leaves nothing behind when the app exits: media gets its volume back
-    /// and a running recording is dropped.
+    /// and any running, stopping, or unsaved recording is dropped.
     pub fn shut_down(&mut self, cx: &App) {
         let backend = backend::backend(cx);
 
         if let Err(error) = backend.restore_media_after_recording() {
             log::error!(target: "voice", "restore_media_on_exit_failed error={error}");
         }
-        if (self.dictation.recording.is_some() || self.dictation.starting)
-            && let Ok(audio_path) = backend.stop_recording()
+        let _lifecycle = self.lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+        let paths_to_discard = {
+            let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
+            pending.shutting_down = true;
+            std::mem::take(&mut pending.paths)
+        };
+        // Block new recordings and Parakeet scratch WAVs before deleting any
+        // files so a worker thread cannot create a scratch WAV afterward.
+        backend.begin_shutdown();
+
+        if self.dictation.recording.is_some() || self.dictation.starting || self.dictation.stopping
         {
-            let _ = std::fs::remove_file(audio_path);
+            if let Ok(audio_path) = backend.stop_recording() {
+                let _ = backend.discard_recording(&audio_path);
+            }
+        }
+
+        for path in paths_to_discard {
+            let _ = backend.discard_recording(&path);
         }
     }
 
@@ -265,9 +326,31 @@ impl VoiceController {
     }
 
     fn settings_changed(&mut self, cx: &mut Context<Self>) {
-        let now_complete = SettingsStore::get(cx).onboarding_complete;
+        let settings = SettingsStore::get(cx);
+        let now_complete = settings.onboarding_complete;
+        let save_history = settings.save_transcription_history;
         let finished_onboarding = !self.onboarding_complete && now_complete;
         self.onboarding_complete = now_complete;
+
+        if !save_history {
+            self.recording_save_history = false;
+            self.active_transcriptions.retain(|flag| {
+                let Some(flag) = flag.upgrade() else {
+                    return false;
+                };
+                *flag.lock().unwrap_or_else(|e| e.into_inner()) = false;
+                true
+            });
+            if let Some(retry) = self
+                .dictation
+                .error
+                .as_mut()
+                .and_then(|error| error.retry.take())
+            {
+                self.discard_pending_async(retry.audio_path, cx);
+                cx.notify();
+            }
+        }
 
         self.plan_hotkeys(
             now_complete || self.learning_active,
@@ -325,9 +408,41 @@ impl VoiceController {
             .update(cx, |hotkeys, cx| hotkeys.set_escape(enabled, cx));
     }
 
-    fn clear_error_state(&mut self) {
+    /// Deletes `audio_path` in the background and untracks it from `pending`
+    /// only after deletion succeeds, so a failed deletion or an immediate quit
+    /// still cleans it up during shutdown.
+    fn discard_pending_async(&self, audio_path: PathBuf, cx: &App) {
+        let lifecycle = self.lifecycle.clone();
+        let pending = self.pending.clone();
+        backend::call(cx, move |backend| {
+            let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+            match backend.discard_recording(&audio_path) {
+                Ok(()) => {
+                    pending
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .untrack(&audio_path);
+                }
+                Err(error) => {
+                    log::warn!(target: "voice", "discard_recording_failed error={error}");
+                }
+            }
+        })
+        .detach();
+    }
+
+    fn clear_error_state(&mut self, cx: &App) {
         self.error_hide_timer = None;
-        self.dictation.error = None;
+        if let Some(retry) = self.dictation.error.take().and_then(|error| error.retry) {
+            if !retry.retention.allowed() || !SettingsStore::get(cx).save_transcription_history {
+                self.discard_pending_async(retry.audio_path, cx);
+            } else {
+                self.pending
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .untrack(&retry.audio_path);
+            }
+        }
     }
 
     fn cancel_pending_media_quiet(&mut self) {
@@ -396,7 +511,8 @@ impl VoiceController {
             mode,
             phase: StartPhase::Frontmost,
         });
-        self.clear_error_state();
+        self.recording_save_history = SettingsStore::get(cx).save_transcription_history;
+        self.clear_error_state(cx);
         self.cancel_pending_media_quiet();
         cx.notify();
         log::info!(target: "voice", "start_recording_started mode={}", mode.name());
@@ -409,6 +525,8 @@ impl VoiceController {
         });
 
         self.target = Target::default();
+        let lifecycle = self.lifecycle.clone();
+        let pending = self.pending.clone();
         let frontmost = backend::call(cx, |backend| backend.get_frontmost_app());
 
         cx.spawn(async move |this, cx| {
@@ -448,9 +566,19 @@ impl VoiceController {
                     .clone()
                     .filter(|device| device != "default");
                 let has_selected_microphone = device.is_some();
+                let lifecycle = lifecycle.clone();
+                let pending = pending.clone();
 
                 Some((
                     backend::call(cx, move |backend| {
+                        let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+                        if pending
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .shutting_down
+                        {
+                            return Err("shutting down".to_string());
+                        }
                         backend.start_recording(device, start_id)
                     }),
                     has_selected_microphone,
@@ -461,6 +589,13 @@ impl VoiceController {
             };
 
             if let Err(error) = start.await {
+                if pending
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .shutting_down
+                {
+                    return Ok(());
+                }
                 let show_error = this.update(cx, |this, cx| {
                     let Some(active) = this.active_start.filter(|start| start.id == start_id)
                     else {
@@ -523,28 +658,81 @@ impl VoiceController {
                     this.target.domain.is_some(),
                 );
                 false
-            })?;
+            });
 
-            if orphaned {
-                let stop = cx.update(|cx| backend::call(cx, |backend| backend.stop_recording()));
-                if let Ok(audio_path) = stop.await {
-                    cx.background_spawn(async move {
-                        let _ = std::fs::remove_file(audio_path);
-                    })
-                    .detach();
+            match orphaned {
+                Ok(false) => {}
+                Ok(true) => {
+                    let cleanup = cx.update(|cx| {
+                        let lifecycle = lifecycle.clone();
+                        let pending = pending.clone();
+                        backend::call(cx, move |backend| {
+                            let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+                            if let Ok(audio_path) = backend.stop_recording() {
+                                let tracked = pending
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner())
+                                    .track(audio_path.clone());
+                                match backend.discard_recording(&audio_path) {
+                                    Ok(()) if tracked => {
+                                        pending
+                                            .lock()
+                                            .unwrap_or_else(|e| e.into_inner())
+                                            .untrack(&audio_path);
+                                    }
+                                    Ok(()) => {}
+                                    Err(error) => {
+                                        log::warn!(
+                                            target: "voice",
+                                            "discard_recording_failed error={error}"
+                                        );
+                                    }
+                                }
+                            }
+                        })
+                    });
+                    cleanup.await;
+                    this.update(cx, |this, cx| {
+                        this.dictation.stopping = false;
+                        if this.dictation.recording.is_none()
+                            && !this.dictation.loading
+                            && this.dictation.error.is_none()
+                        {
+                            this.window.visible = false;
+                        }
+                        cx.notify();
+                    })?;
                 }
-                this.update(cx, |this, cx| {
-                    this.dictation.stopping = false;
-                    if this.dictation.recording.is_none()
-                        && !this.dictation.loading
-                        && this.dictation.error.is_none()
-                    {
-                        this.window.visible = false;
-                    }
-                    cx.notify();
-                })?;
+                Err(_) => {
+                    let cleanup = cx.update(|cx| {
+                        backend::call(cx, move |backend| {
+                            let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+                            if let Ok(audio_path) = backend.stop_recording() {
+                                let tracked = pending
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner())
+                                    .track(audio_path.clone());
+                                match backend.discard_recording(&audio_path) {
+                                    Ok(()) if tracked => {
+                                        pending
+                                            .lock()
+                                            .unwrap_or_else(|e| e.into_inner())
+                                            .untrack(&audio_path);
+                                    }
+                                    Ok(()) => {}
+                                    Err(error) => {
+                                        log::warn!(
+                                            target: "voice",
+                                            "discard_recording_failed error={error}"
+                                        );
+                                    }
+                                }
+                            }
+                        })
+                    });
+                    cleanup.await;
+                }
             }
-
             Ok(())
         })
         .detach();
@@ -611,24 +799,57 @@ impl VoiceController {
         // Media is restored before the recorder is touched, so that a failed
         // stop cannot leave the output muted or muffled.
         let restore = Self::restore_media(cx);
+        let lifecycle = self.lifecycle.clone();
+        let pending = self.pending.clone();
 
         cx.spawn(async move |this, cx| {
             restore.await;
 
-            let stop = cx.update(|cx| backend::call(cx, |backend| backend.stop_recording()));
+            let stop = cx.update(|cx| {
+                let lifecycle = lifecycle.clone();
+                let pending = pending.clone();
+                backend::call(cx, move |backend| {
+                    let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+                    let result = backend.stop_recording();
+                    if let Ok(path) = &result {
+                        let mut pending = pending.lock().unwrap_or_else(|e| e.into_inner());
+                        if !pending.track(path.clone()) {
+                            drop(pending);
+                            let _ = backend.discard_recording(path);
+                            return Err("shutting down".to_string());
+                        }
+                    }
+                    result
+                })
+            });
             match stop.await {
                 Ok(audio_path) => {
-                    let target = this.update(cx, |this, cx| {
+                    let Ok((target, retention)) = this.update(cx, |this, cx| {
                         this.dictation.loading = true;
                         cx.notify();
-                        std::mem::take(&mut this.target)
-                    })?;
-                    Self::transcribe_and_type(&this, cx, audio_path, target).await?;
+                        let save_history = this.recording_save_history
+                            && SettingsStore::get(cx).save_transcription_history;
+                        let retention = this.register_transcription(save_history);
+                        (std::mem::take(&mut this.target), retention)
+                    }) else {
+                        Self::discard_pending(cx, audio_path, &lifecycle, &pending).await;
+                        return Ok(());
+                    };
+                    Self::transcribe_and_type(
+                        &this, cx, audio_path, target, retention, &lifecycle, &pending,
+                    )
+                    .await?;
                 }
                 Err(error) => {
-                    log::error!(target: "voice", "stop_recording_failed error={error}");
-                    Self::show_error(&this, cx, RECORDING_FAILED, RECORDING_ERROR_HIDE, None)
-                        .await?;
+                    if !pending
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .shutting_down
+                    {
+                        log::error!(target: "voice", "stop_recording_failed error={error}");
+                        Self::show_error(&this, cx, RECORDING_FAILED, RECORDING_ERROR_HIDE, None)
+                            .await?;
+                    }
                 }
             }
 
@@ -664,17 +885,39 @@ impl VoiceController {
         self.window.width = WINDOW_WIDTH_COMPACT;
 
         let restore = Self::restore_media(cx);
+        let lifecycle = self.lifecycle.clone();
+        let pending = self.pending.clone();
 
         cx.spawn(async move |this, cx| {
             restore.await;
 
-            let stop = cx.update(|cx| backend::call(cx, |backend| backend.stop_recording()));
-            if let Ok(audio_path) = stop.await {
-                cx.background_spawn(async move {
-                    let _ = std::fs::remove_file(audio_path);
+            let stop_and_discard = cx.update(|cx| {
+                backend::call(cx, move |backend| {
+                    let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Ok(audio_path) = backend.stop_recording() {
+                        let tracked = pending
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .track(audio_path.clone());
+                        match backend.discard_recording(&audio_path) {
+                            Ok(()) if tracked => {
+                                pending
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner())
+                                    .untrack(&audio_path);
+                            }
+                            Ok(()) => {}
+                            Err(error) => {
+                                log::warn!(
+                                    target: "voice",
+                                    "discard_recording_failed error={error}"
+                                );
+                            }
+                        }
+                    }
                 })
-                .detach();
-            }
+            });
+            stop_and_discard.await;
 
             this.update(cx, |this, cx| {
                 this.dictation.stopping = false;
@@ -736,19 +979,77 @@ impl VoiceController {
         .detach();
     }
 
+    /// Creates and tracks a retention flag for an in-flight dictation (and any
+    /// retry prompt it produces) so an opt-out at any point permanently marks
+    /// it for discard.
+    fn register_transcription(&mut self, initial: bool) -> HistoryRetention {
+        let retention = HistoryRetention::new(initial);
+        self.active_transcriptions
+            .retain(|flag| flag.strong_count() > 0);
+        self.active_transcriptions.push(retention.downgrade());
+        retention
+    }
+
+    /// Discards `audio_path` and untracks it from `pending` only if deletion
+    /// succeeds, so shutdown retries cleanup if deletion failed.
+    async fn discard_pending(
+        cx: &mut AsyncApp,
+        audio_path: PathBuf,
+        lifecycle: &Arc<Mutex<()>>,
+        pending: &Arc<Mutex<PendingRecordings>>,
+    ) {
+        let discard = cx.update(|cx| {
+            let lifecycle = lifecycle.clone();
+            let pending = pending.clone();
+            backend::call(cx, move |backend| {
+                let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+                match backend.discard_recording(&audio_path) {
+                    Ok(()) => {
+                        pending
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .untrack(&audio_path);
+                    }
+                    Err(error) => {
+                        log::warn!(target: "voice", "discard_recording_failed error={error}");
+                    }
+                }
+            })
+        });
+        discard.await;
+    }
+
     /// Transcribes the recording at `audio_path`, saves the result to the
-    /// history and types it.
+    /// history while `retention` remains allowed, and types it.
     async fn transcribe_and_type(
         this: &WeakEntity<Self>,
         cx: &mut AsyncApp,
         audio_path: PathBuf,
         target: Target,
+        retention: HistoryRetention,
+        lifecycle: &Arc<Mutex<()>>,
+        pending: &Arc<Mutex<PendingRecordings>>,
     ) -> Result<()> {
+        let retain_recording = retention.allowed();
         let style = cx.update(|cx| SettingsStore::get(cx).default_style.clone());
         let transcription = cx.update(|cx| {
             let (audio_path, target, style) = (audio_path.clone(), target.clone(), style.clone());
+            let pending = pending.clone();
             backend::call(cx, move |backend| {
-                backend.transcribe_audio(audio_path, target.bundle_id, target.domain, style)
+                let result = backend.transcribe_audio(
+                    audio_path.clone(),
+                    target.bundle_id,
+                    target.domain,
+                    style,
+                    retain_recording,
+                );
+                if !retain_recording && backend.discard_recording(&audio_path).is_ok() {
+                    pending
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .untrack(&audio_path);
+                }
+                result
             })
         });
 
@@ -756,25 +1057,79 @@ impl VoiceController {
             Ok(result) => result,
             Err(error) => {
                 log::error!(target: "voice", "transcription_failed error={error}");
+                let keep_for_retry = retention.allowed()
+                    && cx.update(|cx| SettingsStore::get(cx).save_transcription_history);
+                let retry = if keep_for_retry {
+                    Some(Retry {
+                        audio_path,
+                        target,
+                        retention,
+                    })
+                } else {
+                    if retain_recording {
+                        Self::discard_pending(cx, audio_path, lifecycle, pending).await;
+                    }
+                    None
+                };
                 return Self::show_error(
                     this,
                     cx,
                     TRANSCRIPTION_FAILED,
                     TRANSCRIPTION_ERROR_HIDE,
-                    Some(Retry { audio_path, target }),
+                    retry,
                 )
                 .await;
             }
         };
 
-        let saved = cx.update(|cx| {
-            let result = result.clone();
-            backend::call(cx, move |backend| {
-                backend.save_transcription(&result, &audio_path)
-            })
-        });
-        if let Err(error) = saved.await {
-            log::error!(target: "voice", "save_transcription_failed error={error}");
+        let save_history = retention.allowed()
+            && cx.update(|cx| SettingsStore::get(cx).save_transcription_history);
+        if save_history {
+            let saved = cx.update(|cx| {
+                let result = result.clone();
+                let audio_path = audio_path.clone();
+                let retention = retention.clone();
+                let lifecycle = lifecycle.clone();
+                let pending = pending.clone();
+                backend::call(cx, move |backend| -> backend::CommandResult<()> {
+                    let _lifecycle = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+                    if pending
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .shutting_down
+                    {
+                        return Ok(());
+                    }
+                    if !retention.allowed() {
+                        match backend.discard_recording(&audio_path) {
+                            Ok(()) => {
+                                pending
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner())
+                                    .untrack(&audio_path);
+                            }
+                            Err(error) => {
+                                log::warn!(
+                                    target: "voice",
+                                    "discard_recording_failed error={error}"
+                                );
+                            }
+                        }
+                        return Ok(());
+                    }
+                    backend.save_transcription(&result, &audio_path, retention.lock_flag())?;
+                    pending
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .untrack(&audio_path);
+                    Ok(())
+                })
+            });
+            if let Err(error) = saved.await {
+                log::error!(target: "voice", "save_transcription_failed error={error}");
+            }
+        } else if retain_recording {
+            Self::discard_pending(cx, audio_path, lifecycle, pending).await;
         }
         log::info!(
             target: "voice",
@@ -824,15 +1179,26 @@ impl VoiceController {
     }
 
     pub fn retry_transcription(&mut self, cx: &mut Context<Self>) {
-        let Some(retry) = self.error().and_then(|error| error.retry.clone()) else {
+        if self.dictation.stopping || self.dictation.loading {
+            return;
+        }
+        let Some(retry) = self
+            .dictation
+            .error
+            .as_mut()
+            .and_then(|error| error.retry.take())
+        else {
             return;
         };
-        if self.dictation.stopping || self.dictation.loading {
+
+        if !retry.retention.allowed() || !SettingsStore::get(cx).save_transcription_history {
+            self.discard_pending_async(retry.audio_path, cx);
+            cx.notify();
             return;
         }
 
         log::info!(target: "voice", "transcription_retry_requested");
-        self.clear_error_state();
+        self.clear_error_state(cx);
         self.dictation.loading = true;
         self.window = WindowRequest {
             visible: true,
@@ -840,8 +1206,20 @@ impl VoiceController {
         };
         cx.notify();
 
+        let retention = self.register_transcription(true);
+        let lifecycle = self.lifecycle.clone();
+        let pending = self.pending.clone();
         cx.spawn(async move |this, cx| {
-            Self::transcribe_and_type(&this, cx, retry.audio_path, retry.target).await?;
+            Self::transcribe_and_type(
+                &this,
+                cx,
+                retry.audio_path,
+                retry.target,
+                retention,
+                &lifecycle,
+                &pending,
+            )
+            .await?;
 
             this.update(cx, |this, cx| {
                 this.dictation.loading = false;
@@ -865,7 +1243,7 @@ impl VoiceController {
         retry: Option<Retry>,
     ) -> Result<()> {
         let restore = this.update(cx, |this, cx| {
-            this.clear_error_state();
+            this.clear_error_state(cx);
             this.cancel_pending_media_quiet();
             cx.notify();
             Self::restore_media(cx)
@@ -876,6 +1254,17 @@ impl VoiceController {
             if SettingsStore::get(cx).recording_sounds_enabled {
                 sounds::play(Cue::Error);
             }
+
+            let retry = match retry {
+                Some(retry)
+                    if !retry.retention.allowed()
+                        || !SettingsStore::get(cx).save_transcription_history =>
+                {
+                    this.discard_pending_async(retry.audio_path, cx);
+                    None
+                }
+                other => other,
+            };
 
             this.dictation.error = Some(DictationError {
                 message: t(cx, message),
@@ -901,7 +1290,7 @@ impl VoiceController {
             return;
         }
 
-        self.clear_error_state();
+        self.clear_error_state(cx);
         self.set_escape(false, cx);
         if self.dictation.recording.is_none() && !self.dictation.loading {
             self.window.visible = false;

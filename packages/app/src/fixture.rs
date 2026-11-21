@@ -283,6 +283,7 @@ impl Backend for FixtureBackend {
         _bundle_id: Option<String>,
         _domain: Option<String>,
         _fallback_style: String,
+        _retain_recording: bool,
     ) -> CommandResult<TranscriptionResult> {
         self.gate("transcribe_audio")?;
         Ok(TranscriptionResult {
@@ -293,20 +294,34 @@ impl Backend for FixtureBackend {
         })
     }
 
+    fn discard_recording(&self, _audio_path: &Path) -> CommandResult<()> {
+        self.gate("discard_recording")
+    }
+
     fn save_transcription(
         &self,
         result: &TranscriptionResult,
         _audio_path: &Path,
-    ) -> CommandResult<Transcription> {
+        may_save: &Mutex<bool>,
+    ) -> CommandResult<Option<Transcription>> {
+        self.gate("save_transcription")?;
         let word = self.new_word("");
-        Ok(Transcription {
+        let transcription = Transcription {
             id: word.id,
             text: result.text.clone(),
             word_count: result.word_count,
             processing_time_ms: result.processing_time_ms,
             audio_duration_ms: result.audio_duration_ms,
             created_at: word.created_at,
-        })
+        };
+        Ok(self.with(|data| {
+            let allowed = may_save.lock().unwrap_or_else(|e| e.into_inner());
+            if !*allowed {
+                return None;
+            }
+            data.transcriptions.insert(0, transcription.clone());
+            Some(transcription)
+        }))
     }
 
     fn list_transcriptions(
