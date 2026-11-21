@@ -7,7 +7,9 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::*, px,
     relative,
 };
-use std::time::Duration;
+use std::cell::Cell;
+use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::parts::faded;
 use crate::backend::AppEvent;
@@ -21,16 +23,16 @@ use crate::ui::widgets::icon;
 use crate::ui::widgets::text_field::{TextField, TextFieldEvent, field_box};
 use crate::ui::{t, upper};
 
-/// How long after a transcription its text is given to arrive in the input.
-const TYPING_SETTLE: Duration = Duration::from_millis(100);
+static NEXT_PRACTICE_SESSION: AtomicU64 = AtomicU64::new(1);
 
-/// Raised when a message was sent, which is what lets the wizard move on.
+/// Raised when a message was sent, which enables Next on the wizard.
 pub struct TranscriptionTried;
 
 pub struct LearningStep {
+    session: u64,
+    ended: Rc<Cell<bool>>,
     messages: Vec<SharedString>,
-    /// Created with the first render, which is when there is a window.
-    input: Option<Entity<TextField>>,
+    input: Entity<TextField>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -61,91 +63,98 @@ fn hotkey_parts(hotkey: &str) -> Vec<SharedString> {
 }
 
 impl LearningStep {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let session = NEXT_PRACTICE_SESSION.fetch_add(1, Ordering::Relaxed);
+        let ended = Rc::new(Cell::new(false));
+
         // While this step is shown the dictation hotkeys work, though
         // onboarding is not finished.
-        events::emit(cx, AppEvent::LearningStepActive(true));
-        cx.on_release(|_, cx| events::emit(cx, AppEvent::LearningStepActive(false)))
-            .detach();
-
-        let subscriptions = vec![
-            cx.subscribe(&events::hub(cx), |_, _, event, cx| {
-                if matches!(event, AppEvent::TranscriptionCreated) {
-                    // The text is typed into the input like any other app's;
-                    // give the last characters time to arrive.
-                    cx.spawn(async move |this, cx| {
-                        cx.background_executor().timer(TYPING_SETTLE).await;
-
-                        let Some(window) = cx.update(|cx| cx.windows().first().copied()) else {
-                            return;
-                        };
-                        let _ = window.update(cx, |_, window, cx| {
-                            this.update(cx, |this, cx| this.transcription_arrived(window, cx))
-                                .ok();
-                        });
-                    })
-                    .detach();
-                }
-            }),
-            cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
-        ];
-
-        Self {
-            messages: Vec::new(),
-            input: None,
-            _subscriptions: subscriptions,
-        }
-    }
-
-    fn input(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Entity<TextField> {
-        if let Some(input) = &self.input {
-            return input.clone();
-        }
+        events::emit(cx, AppEvent::LearningStepStarted { session });
+        let release_ended = ended.clone();
+        cx.on_release(move |_, cx| {
+            if !release_ended.replace(true) {
+                events::emit(cx, AppEvent::LearningStepEnded { session });
+            }
+        })
+        .detach();
 
         let input = cx.new(|cx| {
             TextField::new(window, cx).placeholder(|cx| t(cx, "onboarding.learningPlaceholder"))
         });
         input.update(cx, |input, cx| input.focus(window, cx));
 
-        self._subscriptions
-            .push(cx.subscribe(&input, |_, _, event: &TextFieldEvent, cx| {
+        let subscriptions = vec![
+            cx.subscribe_in(&events::hub(cx), window, |this, _, event, window, cx| {
+                if let AppEvent::PracticeTranscription { session, text } = event
+                    && !this.ended.get()
+                    && *session == this.session
+                {
+                    this.receive_transcription(text, window, cx);
+                }
+            }),
+            cx.subscribe(&input, |_, _, event: &TextFieldEvent, cx| {
                 if matches!(
                     event,
                     TextFieldEvent::Change | TextFieldEvent::Focus | TextFieldEvent::Blur
                 ) {
                     cx.notify();
                 }
-            }));
+            }),
+            cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
+        ];
 
-        self.input = Some(input.clone());
-        input
+        Self {
+            session,
+            ended,
+            messages: Vec::new(),
+            input,
+            _subscriptions: subscriptions,
+        }
+    }
+
+    /// Ends this practice session immediately when the wizard starts leaving
+    /// step 7, before the fade-out drops the entity.
+    pub fn deactivate(&mut self, cx: &mut Context<Self>) {
+        if !self.ended.replace(true) {
+            events::emit(
+                cx,
+                AppEvent::LearningStepEnded {
+                    session: self.session,
+                },
+            );
+        }
     }
 
     /// Moves what is in the input into the conversation.
     fn add_message(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(input) = self.input.clone() else {
-            return;
-        };
-
-        let message = input.read(cx).value(cx).trim().to_string();
+        let message = self.input.read(cx).value(cx).trim().to_string();
         if message.is_empty() {
             return;
         }
 
         self.messages.push(message.into());
-        input.update(cx, |input, cx| input.set_value("", window, cx));
+        self.input
+            .update(cx, |input, cx| input.set_value("", window, cx));
         cx.emit(TranscriptionTried);
         cx.notify();
     }
 
-    /// A dictation ended: what it typed into the input becomes a message,
-    /// and the input is ready for the next one.
-    fn transcription_arrived(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.add_message(window, cx);
-
-        if let Some(input) = self.input.clone() {
-            input.update(cx, |input, cx| input.focus(window, cx));
+    /// A practice dictation finished in this session: append it directly to
+    /// the conversation and keep the input focused for another try.
+    fn receive_transcription(
+        &mut self,
+        transcript: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let message = transcript.trim();
+        if !message.is_empty() {
+            self.messages.push(message.to_string().into());
+            cx.emit(TranscriptionTried);
+            cx.notify();
         }
+
+        self.input.update(cx, |input, cx| input.focus(window, cx));
     }
 
     fn render_row(number: &str, content: impl IntoElement, cx: &Context<Self>) -> Div {
@@ -221,7 +230,7 @@ impl LearningStep {
 impl Render for LearningStep {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette(cx);
-        let input = self.input(window, cx);
+        let input = self.input.clone();
         let settings = SettingsStore::get(cx);
         let toggle_keys = hotkey_parts(&settings.hotkey);
         let hold_keys = hotkey_parts(&settings.hold_to_speak_hotkey);

@@ -63,8 +63,19 @@ pub struct VoiceController {
     wave_offset: usize,
     /// Where the running recording will be typed.
     target: Target,
-    /// The onboarding step that lets dictation be tried is showing.
-    learning_active: bool,
+    /// The active onboarding step 7 practice session, if step 7 is showing.
+    learning_session: Option<u64>,
+    /// The practice session the current recording started in, if any.
+    recording_session: Option<u64>,
+    /// The active transcription token and the practice session it belongs to.
+    active_loading: Option<(u64, Option<u64>)>,
+    /// The loading token currently holding `dictation.stopping`, so an
+    /// invalidated practice transcription can release the controls once the
+    /// microphone has stopped without affecting normal dictation sequencing.
+    stopping_loading_token: Option<u64>,
+    next_loading_token: u64,
+    /// The practice session the shown error belongs to, if any.
+    error_session: Option<u64>,
     onboarding_complete: bool,
     window: WindowRequest,
     hotkeys: Entity<Hotkeys>,
@@ -111,7 +122,12 @@ impl VoiceController {
             audio_level: 0.,
             wave_offset: 0,
             target: Target::default(),
-            learning_active: false,
+            learning_session: None,
+            recording_session: None,
+            active_loading: None,
+            stopping_loading_token: None,
+            next_loading_token: 0,
+            error_session: None,
             onboarding_complete,
             window: WindowRequest {
                 visible: false,
@@ -166,10 +182,19 @@ impl VoiceController {
                 self.audio_level = *level;
                 cx.notify();
             }
-            AppEvent::LearningStepActive(active) => {
-                self.learning_active = *active;
-                self.plan_hotkeys(*active || self.onboarding_complete, false, cx);
+            AppEvent::LearningStepStarted { session } => {
+                self.learning_session = Some(*session);
+                self.plan_hotkeys(true, false, cx);
                 self.cancel_unstoppable_recording(cx);
+                self.invalidate_practice_state(cx);
+            }
+            AppEvent::LearningStepEnded { session } => {
+                if self.learning_session == Some(*session) {
+                    self.learning_session = None;
+                }
+                self.plan_hotkeys(self.hotkeys_live(), false, cx);
+                self.cancel_unstoppable_recording(cx);
+                self.invalidate_practice_state(cx);
             }
             AppEvent::KeyboardKeyPressed { key_code } => {
                 if *key_code == ESCAPE_KEY_CODE || !self.hotkeys_live() {
@@ -214,7 +239,70 @@ impl VoiceController {
     /// Dictation can be started once onboarding is done, and while its step
     /// for trying dictation is showing.
     fn hotkeys_live(&self) -> bool {
-        self.onboarding_complete || self.learning_active
+        self.onboarding_complete || self.learning_session.is_some()
+    }
+
+    /// Identifies the active onboarding practice session, or `None` for normal
+    /// dictation outside step 7.
+    fn current_practice_session(&self) -> Option<u64> {
+        self.learning_session
+    }
+
+    /// Whether a dictation started in `session` is still allowed to deliver
+    /// its result. Normal dictations (`None`) are always active; practice ones
+    /// expire as soon as the user leaves step 7.
+    fn session_active(&self, session: Option<u64>) -> bool {
+        session.is_none_or(|id| self.learning_session == Some(id))
+    }
+
+    fn begin_loading(&mut self, session: Option<u64>, hold_stopping: bool) -> u64 {
+        self.next_loading_token = self.next_loading_token.wrapping_add(1);
+        let token = self.next_loading_token;
+        self.dictation.loading = true;
+        self.active_loading = Some((token, session));
+        if hold_stopping {
+            self.stopping_loading_token = Some(token);
+        }
+        token
+    }
+
+    fn is_loading_token(&self, token: u64) -> bool {
+        self.active_loading.is_some_and(|(id, _)| id == token)
+    }
+
+    /// Ends loading (and any stop lock held for this transcription) if `token`
+    /// is still the active transcription.
+    fn finish_loading(&mut self, token: u64) -> bool {
+        if self.stopping_loading_token == Some(token) {
+            self.stopping_loading_token = None;
+            self.dictation.stopping = false;
+        }
+        if self.is_loading_token(token) {
+            self.active_loading = None;
+            self.dictation.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Drops any loading pill, stop lock, or error from an ended onboarding
+    /// practice session; any in-flight transcription checks `session_active`
+    /// and discards its practice delivery when it returns.
+    fn invalidate_practice_state(&mut self, cx: &mut Context<Self>) {
+        if let Some((token, session)) = self.active_loading
+            && !self.session_active(session)
+        {
+            self.finish_loading(token);
+            if self.dictation.recording.is_none() && self.dictation.error.is_none() {
+                self.window.visible = false;
+            }
+            cx.notify();
+        }
+
+        if self.dictation.error.is_some() && !self.session_active(self.error_session) {
+            self.dismiss_error(cx);
+        }
     }
 
     fn settings_changed(&mut self, cx: &mut Context<Self>) {
@@ -222,11 +310,7 @@ impl VoiceController {
         let finished_onboarding = !self.onboarding_complete && now_complete;
         self.onboarding_complete = now_complete;
 
-        self.plan_hotkeys(
-            now_complete || self.learning_active,
-            finished_onboarding,
-            cx,
-        );
+        self.plan_hotkeys(self.hotkeys_live(), finished_onboarding, cx);
     }
 
     /// Brings the registered hotkeys in line with the settings.
@@ -278,6 +362,7 @@ impl VoiceController {
     fn clear_error_state(&mut self) {
         self.error_hide_timer = None;
         self.dictation.error = None;
+        self.error_session = None;
     }
 
     fn cancel_pending_media_quiet(&mut self) {
@@ -339,6 +424,8 @@ impl VoiceController {
         }
 
         self.dictation.starting = true;
+        let session = self.current_practice_session();
+        self.recording_session = session;
         self.clear_error_state();
         self.cancel_pending_media_quiet();
         cx.notify();
@@ -357,7 +444,14 @@ impl VoiceController {
         cx.spawn(async move |this, cx| {
             let frontmost = frontmost.await;
 
-            let (start, has_selected_microphone) = this.update(cx, |this, cx| {
+            let start_request = this.update(cx, |this, cx| {
+                if !this.session_active(session) {
+                    this.dictation.starting = false;
+                    this.recording_session = None;
+                    cx.notify();
+                    return None;
+                }
+
                 if let Ok(frontmost) = frontmost {
                     this.target = Target::of(frontmost);
                 }
@@ -376,20 +470,47 @@ impl VoiceController {
                     .filter(|device| device != "default");
                 let has_selected_microphone = device.is_some();
 
-                (
+                Some((
                     backend::call(cx, move |backend| backend.start_recording(device)),
                     has_selected_microphone,
-                )
+                ))
             })?;
+            let Some((start, has_selected_microphone)) = start_request else {
+                return Ok(());
+            };
 
             if let Err(error) = start.await {
                 log::error!(
                     target: "voice",
                     "start_recording_failed error={error} has_selected_microphone={has_selected_microphone}"
                 );
-                this.update(cx, |this, _| this.dictation.starting = false)?;
-                return Self::show_error(&this, cx, RECORDING_FAILED, RECORDING_ERROR_HIDE, None)
+                let active = this.update(cx, |this, cx| {
+                    this.dictation.starting = false;
+                    this.recording_session = None;
+                    let active = this.session_active(session);
+                    if !active
+                        && this.dictation.recording.is_none()
+                        && !this.dictation.loading
+                        && this.dictation.error.is_none()
+                    {
+                        this.window.visible = false;
+                        cx.notify();
+                    }
+                    active
+                })?;
+                if active {
+                    return Self::show_error(
+                        &this,
+                        cx,
+                        RECORDING_FAILED,
+                        RECORDING_ERROR_HIDE,
+                        None,
+                        session,
+                        None,
+                    )
                     .await;
+                }
+                return Ok(());
             }
 
             this.update(cx, |this, cx| {
@@ -419,7 +540,7 @@ impl VoiceController {
     /// moved on, or closed the window): its hotkeys went with the step, so
     /// they could no longer stop it.
     fn cancel_unstoppable_recording(&mut self, cx: &mut Context<Self>) {
-        if !self.hotkeys_live() {
+        if !self.hotkeys_live() || !self.session_active(self.recording_session) {
             self.cancel_recording(cx);
         }
     }
@@ -433,6 +554,7 @@ impl VoiceController {
         };
 
         log::info!(target: "voice", "stop_recording_started mode={}", mode.name());
+        let session = self.recording_session.take();
         self.cancel_pending_media_quiet();
         self.dictation.stopping = true;
         self.set_recording(None, cx);
@@ -443,36 +565,134 @@ impl VoiceController {
         // stop cannot leave the output muted or muffled.
         let restore = Self::restore_media(cx);
 
+        enum StopOutcome {
+            Transcribe {
+                audio_path: PathBuf,
+                target: Target,
+                loading_token: u64,
+            },
+            Discarded,
+            Failed {
+                error: String,
+                active: bool,
+            },
+        }
+
         cx.spawn(async move |this, cx| {
             restore.await;
 
             let stop = cx.update(|cx| backend::call(cx, |backend| backend.stop_recording()));
-            match stop.await {
-                Ok(audio_path) => {
-                    let target = this.update(cx, |this, cx| {
-                        this.dictation.loading = true;
+            let stop_result = stop.await;
+            // Finish restoring media before releasing `stopping`, so a new
+            // recording cannot start and have its media unmuted by this stop.
+            cx.update(|cx| Self::restore_media(cx)).await;
+
+            let outcome = this.update(cx, |this, cx| {
+                let target = std::mem::take(&mut this.target);
+
+                match stop_result {
+                    Ok(audio_path) if this.session_active(session) => {
+                        // Keep `stopping` held until this transcription ends
+                        // (or its practice session is invalidated), preserving
+                        // normal dictation sequencing while allowing an ended
+                        // practice session to release controls immediately.
+                        let loading_token = this.begin_loading(session, true);
                         cx.notify();
-                        std::mem::take(&mut this.target)
-                    })?;
-                    Self::transcribe_and_type(&this, cx, audio_path, target).await?;
+                        StopOutcome::Transcribe {
+                            audio_path,
+                            target,
+                            loading_token,
+                        }
+                    }
+                    Ok(_) => {
+                        this.dictation.stopping = false;
+                        if this.dictation.recording.is_none()
+                            && !this.dictation.loading
+                            && this.dictation.error.is_none()
+                        {
+                            this.window.visible = false;
+                        }
+                        cx.notify();
+                        StopOutcome::Discarded
+                    }
+                    Err(error) => {
+                        let active = this.session_active(session);
+                        if !active {
+                            this.dictation.stopping = false;
+                            if this.dictation.recording.is_none()
+                                && !this.dictation.loading
+                                && this.dictation.error.is_none()
+                            {
+                                this.window.visible = false;
+                            }
+                            cx.notify();
+                        }
+                        StopOutcome::Failed { error, active }
+                    }
                 }
-                Err(error) => {
+            })?;
+
+            match outcome {
+                StopOutcome::Transcribe {
+                    audio_path,
+                    target,
+                    loading_token,
+                } => {
+                    Self::transcribe_and_type(
+                        &this,
+                        cx,
+                        audio_path,
+                        target,
+                        session,
+                        loading_token,
+                    )
+                    .await?;
+
+                    this.update(cx, |this, cx| {
+                        if this.finish_loading(loading_token)
+                            && this.dictation.recording.is_none()
+                            && this.dictation.error.is_none()
+                        {
+                            this.window.visible = false;
+                        }
+                        cx.notify();
+                        log::info!(target: "voice", "stop_recording_completed");
+                    })
+                }
+                StopOutcome::Discarded => {
+                    log::info!(target: "voice", "practice_transcription_discarded");
+                    log::info!(target: "voice", "stop_recording_completed");
+                    Ok(())
+                }
+                StopOutcome::Failed { error, active } => {
                     log::error!(target: "voice", "stop_recording_failed error={error}");
-                    Self::show_error(&this, cx, RECORDING_FAILED, RECORDING_ERROR_HIDE, None)
+                    if active {
+                        Self::show_error(
+                            &this,
+                            cx,
+                            RECORDING_FAILED,
+                            RECORDING_ERROR_HIDE,
+                            None,
+                            session,
+                            None,
+                        )
                         .await?;
+                        return this.update(cx, |this, cx| {
+                            this.dictation.stopping = false;
+                            if this.dictation.recording.is_none()
+                                && !this.dictation.loading
+                                && this.dictation.error.is_none()
+                            {
+                                this.window.visible = false;
+                            }
+                            cx.notify();
+                            log::info!(target: "voice", "stop_recording_completed");
+                        });
+                    }
+                    log::info!(target: "voice", "stop_recording_completed");
+                    Ok(())
                 }
             }
-
-            cx.update(|cx| Self::restore_media(cx)).await;
-            this.update(cx, |this, cx| {
-                this.dictation.loading = false;
-                this.dictation.stopping = false;
-                if this.dictation.error.is_none() {
-                    this.window.visible = false;
-                }
-                cx.notify();
-                log::info!(target: "voice", "stop_recording_completed");
-            })
         })
         .detach();
     }
@@ -486,6 +706,7 @@ impl VoiceController {
         };
 
         log::warn!(target: "voice", "recording_cancelled mode={}", mode.name());
+        self.recording_session = None;
         self.cancel_pending_media_quiet();
         self.dictation.stopping = true;
         self.set_recording(None, cx);
@@ -503,7 +724,9 @@ impl VoiceController {
 
             this.update(cx, |this, cx| {
                 this.dictation.stopping = false;
-                this.window.visible = false;
+                if !this.dictation.loading && this.dictation.error.is_none() {
+                    this.window.visible = false;
+                }
                 cx.notify();
             })
         })
@@ -519,28 +742,55 @@ impl VoiceController {
             return;
         }
 
+        let session = self.recording_session.take();
         self.set_recording(None, cx);
         self.target = Target::default();
         self.dictation.starting = false;
         self.dictation.stopping = false;
-        self.dictation.loading = false;
 
         let restore = Self::restore_media(cx);
 
         cx.spawn(async move |this, cx| {
             restore.await;
-            Self::show_error(&this, cx, RECORDING_FAILED, RECORDING_ERROR_HIDE, None).await
+            let active = this.read_with(cx, |this, _| this.session_active(session))?;
+            if active {
+                Self::show_error(
+                    &this,
+                    cx,
+                    RECORDING_FAILED,
+                    RECORDING_ERROR_HIDE,
+                    None,
+                    session,
+                    None,
+                )
+                .await
+            } else {
+                this.update(cx, |this, cx| {
+                    if this.dictation.recording.is_none()
+                        && !this.dictation.loading
+                        && this.dictation.error.is_none()
+                    {
+                        this.window.visible = false;
+                    }
+                    cx.notify();
+                })
+            }
         })
         .detach();
     }
 
     /// Transcribes the recording at `audio_path`, saves the result to the
-    /// history and types it.
+    /// history and delivers it. When `session` is `Some`, the transcription
+    /// belongs to an onboarding practice session: its text is routed directly
+    /// to that step 7 session on the UI thread and discarded if the user left
+    /// step 7 before delivery.
     async fn transcribe_and_type(
         this: &WeakEntity<Self>,
         cx: &mut AsyncApp,
         audio_path: PathBuf,
         target: Target,
+        session: Option<u64>,
+        loading_token: u64,
     ) -> Result<()> {
         let style = cx.update(|cx| SettingsStore::get(cx).default_style.clone());
         let transcription = cx.update(|cx| {
@@ -560,10 +810,17 @@ impl VoiceController {
                     TRANSCRIPTION_FAILED,
                     TRANSCRIPTION_ERROR_HIDE,
                     Some(Retry { audio_path, target }),
+                    session,
+                    Some(loading_token),
                 )
                 .await;
             }
         };
+
+        if !this.read_with(cx, |this, _| this.session_active(session))? {
+            log::info!(target: "voice", "practice_transcription_discarded");
+            return Ok(());
+        }
 
         let saved = cx.update(|cx| {
             let result = result.clone();
@@ -571,9 +828,13 @@ impl VoiceController {
                 backend.save_transcription(&result, &audio_path)
             })
         });
-        if let Err(error) = saved.await {
-            log::error!(target: "voice", "save_transcription_failed error={error}");
-        }
+        let saved_ok = match saved.await {
+            Ok(_) => true,
+            Err(error) => {
+                log::error!(target: "voice", "save_transcription_failed error={error}");
+                false
+            }
+        };
         log::info!(
             target: "voice",
             "transcription_completed word_count={} processing_time_ms={} audio_duration_ms={:?} has_app_context={} has_site_context={} style={style}",
@@ -583,6 +844,39 @@ impl VoiceController {
             target.bundle_id.is_some(),
             target.domain.is_some(),
         );
+
+        // Practice dictations are validated and delivered synchronously on the
+        // UI thread so they can never type into another app or a later step
+        // after Skip, Back, Next or closing the window.
+        if let Some(practice_session) = session {
+            // Refresh Home whenever the row was persisted, even if the user
+            // left step 7 while the database write was in flight.
+            if saved_ok {
+                Self::emit_transcription_created(cx);
+            }
+
+            let delivered = this.update(cx, |this, cx| {
+                if !this.session_active(Some(practice_session)) {
+                    return false;
+                }
+                if SettingsStore::get(cx).recording_sounds_enabled {
+                    sounds::play(Cue::Bloom);
+                }
+                events::emit(
+                    cx,
+                    AppEvent::PracticeTranscription {
+                        session: practice_session,
+                        text: result.text.clone(),
+                    },
+                );
+                true
+            })?;
+
+            if !delivered {
+                log::info!(target: "voice", "practice_transcription_discarded");
+            }
+            return Ok(());
+        }
 
         let character_count = result.text.encode_utf16().count();
         let typed =
@@ -603,13 +897,37 @@ impl VoiceController {
                 if !accessible.await {
                     // The permission was revoked after onboarding. The main
                     // window opens the settings for it.
-                    cx.update(|cx| events::emit(cx, AppEvent::AccessibilityPermissionNeeded));
+                    let still_active = this.update(cx, |this, cx| {
+                        if this.session_active(session) {
+                            events::emit(cx, AppEvent::AccessibilityPermissionNeeded);
+                            true
+                        } else {
+                            false
+                        }
+                    })?;
+                    if !still_active {
+                        return Ok(());
+                    }
                 }
 
-                Self::show_error(this, cx, TYPING_FAILED, RECORDING_ERROR_HIDE, None).await?;
+                Self::show_error(
+                    this,
+                    cx,
+                    TYPING_FAILED,
+                    RECORDING_ERROR_HIDE,
+                    None,
+                    session,
+                    Some(loading_token),
+                )
+                .await?;
             }
         }
 
+        Self::emit_transcription_created(cx);
+        Ok(())
+    }
+
+    fn emit_transcription_created(cx: &mut AsyncApp) {
         cx.spawn(async move |cx| {
             cx.background_executor()
                 .timer(TRANSCRIPTION_CREATED_DELAY)
@@ -617,8 +935,6 @@ impl VoiceController {
             cx.update(|cx| events::emit(cx, AppEvent::TranscriptionCreated));
         })
         .detach();
-
-        Ok(())
     }
 
     pub fn retry_transcription(&mut self, cx: &mut Context<Self>) {
@@ -629,9 +945,15 @@ impl VoiceController {
             return;
         }
 
+        let session = self.error_session;
+        if !self.session_active(session) {
+            self.dismiss_error(cx);
+            return;
+        }
+
         log::info!(target: "voice", "transcription_retry_requested");
         self.clear_error_state();
-        self.dictation.loading = true;
+        let loading_token = self.begin_loading(session, false);
         self.window = WindowRequest {
             visible: true,
             width: WINDOW_WIDTH_COMPACT,
@@ -639,11 +961,21 @@ impl VoiceController {
         cx.notify();
 
         cx.spawn(async move |this, cx| {
-            Self::transcribe_and_type(&this, cx, retry.audio_path, retry.target).await?;
+            Self::transcribe_and_type(
+                &this,
+                cx,
+                retry.audio_path,
+                retry.target,
+                session,
+                loading_token,
+            )
+            .await?;
 
             this.update(cx, |this, cx| {
-                this.dictation.loading = false;
-                if this.dictation.error.is_none() {
+                if this.finish_loading(loading_token)
+                    && this.dictation.error.is_none()
+                    && this.dictation.recording.is_none()
+                {
                     this.set_escape(false, cx);
                     this.window.visible = false;
                 }
@@ -661,16 +993,42 @@ impl VoiceController {
         message: &'static str,
         auto_hide: Duration,
         retry: Option<Retry>,
+        session: Option<u64>,
+        loading_token: Option<u64>,
     ) -> Result<()> {
         let restore = this.update(cx, |this, cx| {
+            let recording_active = this.dictation.recording.is_some() || this.dictation.starting;
+            if !this.session_active(session)
+                || loading_token
+                    .is_some_and(|token| !this.is_loading_token(token) || recording_active)
+            {
+                return None;
+            }
             this.clear_error_state();
-            this.cancel_pending_media_quiet();
+            let restore = if !recording_active {
+                this.cancel_pending_media_quiet();
+                Some(Self::restore_media(cx))
+            } else {
+                None
+            };
             cx.notify();
-            Self::restore_media(cx)
+            Some(restore)
         })?;
-        restore.await;
+        let Some(restore) = restore else {
+            return Ok(());
+        };
+        if let Some(restore) = restore {
+            restore.await;
+        }
 
         this.update(cx, |this, cx| {
+            let recording_active = this.dictation.recording.is_some() || this.dictation.starting;
+            if !this.session_active(session)
+                || loading_token
+                    .is_some_and(|token| !this.is_loading_token(token) || recording_active)
+            {
+                return;
+            }
             if SettingsStore::get(cx).recording_sounds_enabled {
                 sounds::play(Cue::Error);
             }
@@ -679,14 +1037,17 @@ impl VoiceController {
                 message: t(cx, message),
                 retry,
             });
-            this.window = WindowRequest {
-                visible: true,
-                width: WINDOW_WIDTH_ERROR,
-            };
+            this.error_session = session;
+            if !recording_active {
+                this.window = WindowRequest {
+                    visible: true,
+                    width: WINDOW_WIDTH_ERROR,
+                };
+                // Escape dismisses the error.
+                this.set_escape(true, cx);
+            }
             cx.notify();
 
-            // Escape dismisses the error.
-            this.set_escape(true, cx);
             this.error_hide_timer = Some(cx.spawn(async move |this, cx| {
                 cx.background_executor().timer(auto_hide).await;
                 this.update(cx, |this, cx| this.dismiss_error(cx)).ok();
@@ -700,9 +1061,11 @@ impl VoiceController {
         }
 
         self.clear_error_state();
-        self.set_escape(false, cx);
-        if self.dictation.recording.is_none() && !self.dictation.loading {
-            self.window.visible = false;
+        if self.dictation.recording.is_none() {
+            self.set_escape(false, cx);
+            if !self.dictation.loading {
+                self.window.visible = false;
+            }
         }
         cx.notify();
     }

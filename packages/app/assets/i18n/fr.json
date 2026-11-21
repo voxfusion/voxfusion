@@ -120,6 +120,7 @@
 	"dictionary.retry": "Réessayer",
 	"onboarding.next": "Suivant",
 	"onboarding.back": "Retour",
+	"onboarding.skipForNow": "Passer pour l'instant",
 	"onboarding.getStarted": "Commencer",
 	"onboarding.microphoneTitle": "Sélectionnez votre microphone",
 	"onboarding.microphoneDescription": "Choisissez le microphone que VoxFusion utilisera pour l'enregistrement vocal. Vous pourrez le modifier plus tard dans les Paramètres.",

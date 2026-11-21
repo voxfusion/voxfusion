@@ -11,9 +11,9 @@ actions!(
         CloseWindow,
         Quit,
         CheckForUpdates,
-        /// Moves the keyboard focus to the next control in the settings.
+        /// Moves the keyboard focus to the next control in the settings or onboarding.
         NextControl,
-        /// Moves the keyboard focus to the previous control in the settings.
+        /// Moves the keyboard focus to the previous control in the settings or onboarding.
         PreviousControl,
     ]
 );
@@ -25,6 +25,8 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("cmd-q", Quit, None),
         KeyBinding::new("tab", NextControl, Some("Settings")),
         KeyBinding::new("shift-tab", PreviousControl, Some("Settings")),
+        KeyBinding::new("tab", NextControl, Some("Onboarding")),
+        KeyBinding::new("shift-tab", PreviousControl, Some("Onboarding")),
         // While a hotkey is being recorded the recorder gets Tab, which then
         // moves the focus nowhere.
         KeyBinding::new("tab", NoAction, Some("HotkeyRecorder")),

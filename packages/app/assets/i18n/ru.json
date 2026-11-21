@@ -120,6 +120,7 @@
 	"dictionary.retry": "Повторить",
 	"onboarding.next": "Далее",
 	"onboarding.back": "Назад",
+	"onboarding.skipForNow": "Пока пропустить",
 	"onboarding.getStarted": "Начать",
 	"onboarding.microphoneTitle": "Выберите микрофон",
 	"onboarding.microphoneDescription": "Выберите микрофон, который VoxFusion будет использовать для записи голоса. Вы можете изменить это позже в Настройках.",

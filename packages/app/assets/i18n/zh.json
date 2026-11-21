@@ -120,6 +120,7 @@
 	"dictionary.retry": "重试",
 	"onboarding.next": "下一步",
 	"onboarding.back": "返回",
+	"onboarding.skipForNow": "暂时跳过",
 	"onboarding.getStarted": "开始使用",
 	"onboarding.microphoneTitle": "选择你的麦克风",
 	"onboarding.microphoneDescription": "选择 VoxFusion 用于语音录制的麦克风。你可以稍后在设置中更改。",

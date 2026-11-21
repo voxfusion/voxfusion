@@ -187,8 +187,8 @@ impl MainView {
                 let step = SettingsStore::get(cx).onboarding_step;
                 self.onboarding = Some(cx.new(|cx| OnboardingWizard::new(step, window, cx)));
             }
-        } else {
-            self.onboarding = None;
+        } else if self.onboarding.take().is_some() {
+            window.focus(&self.focus_handle, cx);
         }
     }
 

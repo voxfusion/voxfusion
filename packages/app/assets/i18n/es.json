@@ -120,6 +120,7 @@
 	"dictionary.retry": "Reintentar",
 	"onboarding.next": "Siguiente",
 	"onboarding.back": "Atrás",
+	"onboarding.skipForNow": "Omitir por ahora",
 	"onboarding.getStarted": "Comenzar",
 	"onboarding.microphoneTitle": "Selecciona tu micrófono",
 	"onboarding.microphoneDescription": "Elige qué micrófono usará VoxFusion para la grabación de voz. Puedes cambiarlo después en Configuración.",

@@ -14,9 +14,10 @@ mod step_indicator;
 mod transition;
 
 use gpui_kit::{
-    AnimationExt as _, AppContext as _, Context, Div, Entity, IntoElement, ParentElement as _,
-    Render, StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::*,
-    px, relative,
+    AnimationExt as _, App, AppContext as _, Context, Div, Entity, FocusHandle,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Window, div, prelude::*, px,
+    relative,
 };
 use std::time::Duration;
 
@@ -31,12 +32,14 @@ use self::parts::{PermissionChanged, accent_button, button_label};
 use self::privacy::privacy_step;
 use self::step_indicator::{format_step, step_indicator};
 use self::transition::Tween;
+use crate::actions::{NextControl, PreviousControl};
 use crate::analytics;
 use crate::settings::{self, MODEL_DOWNLOAD_STEP, ONBOARDING_STEP_COUNT, SettingsStore};
-use crate::ui::motion::Transitions as _;
+use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::t;
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
+use crate::ui::widgets::focus::{focus_ring, focus_visible};
 
 /// How long a step takes to fade out, and the next one to fade in.
 const STEP_FADE: Duration = Duration::from_millis(200);
@@ -85,11 +88,16 @@ pub struct OnboardingWizard {
     accessibility_permission_granted: bool,
     model_ready: bool,
     learning_completed: bool,
+    /// Holds focus during step transitions so outgoing controls do not stay focused.
+    focus_handle: FocusHandle,
+    back_focus: FocusHandle,
+    skip_focus: FocusHandle,
+    forward_focus: FocusHandle,
     step_events: Option<Subscription>,
 }
 
 impl OnboardingWizard {
-    pub fn new(initial_step: u32, _window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(initial_step: u32, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut wizard = Self {
             current_step: initial_step,
             step: StepView::Completion,
@@ -101,15 +109,45 @@ impl OnboardingWizard {
             accessibility_permission_granted: false,
             model_ready: false,
             learning_completed: false,
+            focus_handle: cx.focus_handle(),
+            back_focus: cx.focus_handle().tab_stop(true),
+            skip_focus: cx.focus_handle().tab_stop(true),
+            forward_focus: cx.focus_handle().tab_stop(true),
             step_events: None,
         };
-        wizard.mount_step(cx);
+        window.focus(&wizard.focus_handle, cx);
+        wizard.mount_step(window, cx);
         wizard
+    }
+
+    /// Moves the keyboard focus to the next control in the wizard, or the
+    /// previous one.
+    fn move_focus(&self, forward: bool, window: &mut Window, cx: &mut App) {
+        let mut first_outside = None;
+        loop {
+            if forward {
+                window.focus_next(cx);
+            } else {
+                window.focus_prev(cx);
+            }
+
+            let Some(focused) = window.focused(cx) else {
+                return;
+            };
+            if self.focus_handle.contains_focused(window, cx) {
+                return;
+            }
+            match &first_outside {
+                Some(first) if *first == focused => return,
+                Some(_) => {}
+                None => first_outside = Some(focused),
+            }
+        }
     }
 
     /// Replaces the step shown with the one for the current step number: a
     /// fresh one, except the model step, which keeps its download going.
-    fn mount_step(&mut self, cx: &mut Context<Self>) {
+    fn mount_step(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.step_events = None;
 
         self.step = match self.current_step {
@@ -147,7 +185,7 @@ impl OnboardingWizard {
                 StepView::ModelDownload(step)
             }
             LEARNING_STEP => {
-                let step = cx.new(LearningStep::new);
+                let step = cx.new(|cx| LearningStep::new(window, cx));
                 self.step_events =
                     Some(cx.subscribe(&step, |this, _, _: &TranscriptionTried, cx| {
                         this.learning_completed = true;
@@ -170,7 +208,7 @@ impl OnboardingWizard {
         }
     }
 
-    fn go_to_next(&mut self, cx: &mut Context<Self>) {
+    fn go_to_next(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.animating || self.current_step >= ONBOARDING_STEP_COUNT {
             return;
         }
@@ -180,21 +218,44 @@ impl OnboardingWizard {
             "onboarding_step_completed",
             &[("step", self.current_step.into())],
         );
-        self.change_step(Direction::Forward, cx);
+        self.change_step(Direction::Forward, window, cx);
     }
 
-    fn go_to_previous(&mut self, cx: &mut Context<Self>) {
+    fn skip_learning(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.animating || self.current_step != LEARNING_STEP {
+            return;
+        }
+
+        analytics::capture(
+            cx,
+            "onboarding_step_skipped",
+            &[("step", self.current_step.into())],
+        );
+        self.change_step(Direction::Forward, window, cx);
+    }
+
+    fn go_to_previous(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.animating || self.current_step <= 1 {
             return;
         }
 
-        self.change_step(Direction::Backward, cx);
+        self.change_step(Direction::Backward, window, cx);
     }
 
     /// Fades the current step out towards `direction`, then brings the
     /// neighbouring step in from the same side.
-    fn change_step(&mut self, direction: Direction, cx: &mut Context<Self>) {
+    fn change_step(&mut self, direction: Direction, window: &mut Window, cx: &mut Context<Self>) {
         self.animating = true;
+        // Stop trial dictation hotkeys and ignore late practice events as soon
+        // as the user leaves step 7, before the fade-out finishes dropping the
+        // step entity.
+        if let StepView::Learning(step) = &self.step {
+            self.step_events = None;
+            step.update(cx, |step, cx| step.deactivate(cx));
+        }
+        // Take focus off outgoing controls so typing or repeated Enter during
+        // the transition does not act on them.
+        window.focus(&self.focus_handle, cx);
         self.opacity.retarget(0.);
         self.offset.retarget(match direction {
             Direction::Forward => SLIDE_DISTANCE,
@@ -202,15 +263,16 @@ impl OnboardingWizard {
         });
         cx.notify();
 
-        cx.spawn(async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(STEP_FADE).await;
 
-            this.update(cx, |this, cx| {
+            this.update_in(cx, |this, window, cx| {
                 this.current_step = match direction {
                     Direction::Forward => this.current_step + 1,
                     Direction::Backward => this.current_step - 1,
                 };
-                this.mount_step(cx);
+                window.focus(&this.focus_handle, cx);
+                this.mount_step(window, cx);
 
                 this.animating = false;
                 this.opacity.retarget(1.);
@@ -227,45 +289,105 @@ impl OnboardingWizard {
     }
 
     fn complete(&mut self, cx: &mut Context<Self>) {
+        if self.animating {
+            return;
+        }
         analytics::capture(cx, "onboarding_completed", &[]);
         ModelDownloadStep::release(cx);
         settings::mark_onboarding_complete(cx);
     }
 
-    fn render_navigation(&self, cx: &mut Context<Self>) -> Div {
+    fn render_secondary_button(
+        &self,
+        id: &'static str,
+        label: &str,
+        focus_handle: &FocusHandle,
+        on_click: fn(&mut Self, &mut Window, &mut Context<Self>),
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Faded {
         let p = palette(cx);
 
+        div()
+            .id(id)
+            .transition_colors()
+            .track_focus(focus_handle)
+            .relative()
+            .px_6()
+            .py_3()
+            .type_sm()
+            .border_1()
+            .border_color(p.border_strong)
+            .text_color(p.txt_secondary)
+            .hover(|button| button.text_color(p.txt_primary).border_color(p.ac))
+            .on_click(cx.listener(move |this, _, window, cx| on_click(this, window, cx)))
+            .child(button_label(label))
+            .when(focus_visible(focus_handle, window), |button| {
+                button.child(focus_ring(4., cx))
+            })
+    }
+
+    fn render_navigation(&self, window: &Window, cx: &mut Context<Self>) -> Div {
+        let p = palette(cx);
+        let show_skip = self.current_step == LEARNING_STEP && !self.learning_completed;
+
         let back = (self.current_step > 1).then(|| {
-            div()
-                .id("back")
-                .transition_colors()
-                .px_6()
-                .py_3()
-                .type_sm()
-                .border_1()
-                .border_color(p.border_strong)
-                .text_color(p.txt_secondary)
-                .hover(|button| button.text_color(p.txt_primary).border_color(p.ac))
-                .on_click(cx.listener(|this, _, _, cx| this.go_to_previous(cx)))
-                .child(button_label(&t(cx, "onboarding.back")))
+            self.render_secondary_button(
+                "back",
+                &t(cx, "onboarding.back"),
+                &self.back_focus,
+                Self::go_to_previous,
+                window,
+                cx,
+            )
         });
 
-        // Neither button is positioned, so the grid runs over both.
+        let skip = show_skip.then(|| {
+            self.render_secondary_button(
+                "skip-learning",
+                &t(cx, "onboarding.skipForNow"),
+                &self.skip_focus,
+                Self::skip_learning,
+                window,
+                cx,
+            )
+        });
+
+        // None of the navigation buttons call `above_grid`, so the grid runs over them.
         let forward = if self.current_step < ONBOARDING_STEP_COUNT {
             let enabled = self.can_proceed();
 
             accent_button("next", enabled, p.base, cx)
-                .px_8()
                 .when(enabled, |button| {
-                    button.on_click(cx.listener(|this, _, _, cx| this.go_to_next(cx)))
+                    button
+                        .track_focus(&self.forward_focus)
+                        .on_click(cx.listener(|this, _, window, cx| this.go_to_next(window, cx)))
                 })
+                .relative()
+                .px_8()
                 .child(button_label(&t(cx, "onboarding.next")))
+                .when(
+                    enabled && focus_visible(&self.forward_focus, window),
+                    |button| button.child(focus_ring(4., cx)),
+                )
         } else {
             accent_button("get-started", true, p.base, cx)
+                .track_focus(&self.forward_focus)
+                .relative()
                 .px_8()
                 .on_click(cx.listener(|this, _, _, cx| this.complete(cx)))
                 .child(button_label(&t(cx, "onboarding.getStarted")))
+                .when(focus_visible(&self.forward_focus, window), |button| {
+                    button.child(focus_ring(4., cx))
+                })
         };
+
+        let actions = div()
+            .flex()
+            .items_center()
+            .gap_3()
+            .children(skip)
+            .child(forward);
 
         div()
             .flex()
@@ -277,12 +399,12 @@ impl OnboardingWizard {
                 Some(back) => back.into_any_element(),
                 None => div().into_any_element(),
             })
-            .child(forward)
+            .child(actions)
     }
 }
 
 impl Render for OnboardingWizard {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let p = palette(cx);
         let (opacity, offset, max_width) = (self.opacity, self.offset, self.max_width);
 
@@ -336,7 +458,7 @@ impl Render for OnboardingWizard {
                 move |area, progress| area.max_w(px(max_width.frame(progress))),
             );
 
-        let navigation = self.render_navigation(cx).with_animation(
+        let navigation = self.render_navigation(window, cx).with_animation(
             max_width.animation_id("navigation-width"),
             max_width.animation(),
             move |navigation, progress| navigation.max_w(px(max_width.frame(progress))),
@@ -344,6 +466,14 @@ impl Render for OnboardingWizard {
 
         div()
             .relative()
+            .key_context("Onboarding")
+            .track_focus(&self.focus_handle)
+            .on_action(cx.listener(|this, _: &NextControl, window, cx| {
+                this.move_focus(true, window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &PreviousControl, window, cx| {
+                this.move_focus(false, window, cx);
+            }))
             .size_full()
             .flex()
             .flex_col()

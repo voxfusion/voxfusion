@@ -196,13 +196,18 @@ impl Render for HotkeyStep {
             .child(hotkeys);
 
         let recorders = [self.hands_free.clone(), self.hold_to_speak.clone()];
+        let recording = recorders
+            .iter()
+            .any(|recorder| recorder.read(cx).is_recording());
 
         // Clicking a record button gives the step the focus, and with it the
-        // keys that follow.
+        // keys that follow. While recording, `HotkeyRecorder` keeps Tab from
+        // moving focus away.
         route_keys(
             step_column("[STEP_04] > HOTKEY_CONFIG", p.ac)
                 .id("hotkey-step")
-                .track_focus(&self.focus_handle),
+                .track_focus(&self.focus_handle)
+                .when(recording, |step| step.key_context("HotkeyRecorder")),
             &recorders,
         )
         .child(card(content, cx))

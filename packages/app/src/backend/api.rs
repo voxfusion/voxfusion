@@ -217,7 +217,19 @@ pub enum AppEvent {
     SelectMicrophone(String),
     CheckForUpdates,
     AccessibilityPermissionNeeded,
-    LearningStepActive(bool),
+    /// Onboarding step 7 (practice) opened with a unique session identifier.
+    LearningStepStarted {
+        session: u64,
+    },
+    /// Onboarding step 7 (practice) closed or was navigated away from.
+    LearningStepEnded {
+        session: u64,
+    },
+    /// A practice dictation finished and is routed directly to its step 7 session.
+    PracticeTranscription {
+        session: u64,
+        text: String,
+    },
     HotkeyRecorderActive {
         active: bool,
     },
