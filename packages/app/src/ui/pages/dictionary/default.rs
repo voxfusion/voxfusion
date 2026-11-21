@@ -1,13 +1,16 @@
 //! The default dictionary: the words used everywhere.
 
 use gpui_kit::{
-    AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
+    App, AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, Styled as _, Subscription, Task, Window, div,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::analytics;
-use crate::backend::{self, Backend, CommandResult, DictionaryWord};
+use crate::backend::{
+    self, Backend, CommandResult, DUPLICATE_WORD_ERROR, DictionaryQueue, DictionaryWord,
+    dictionary_words_match, has_duplicate_dictionary_word,
+};
 use crate::ui::pages::section::{empty_state, list_header, load_failed};
 use crate::ui::t;
 use crate::ui::theme::palette;
@@ -20,6 +23,7 @@ use crate::ui::widgets::word_list::{
 struct Editing {
     word_id: String,
     field: Entity<TextField>,
+    saving: Option<u64>,
     _subscription: Subscription,
 }
 
@@ -37,6 +41,13 @@ pub struct DefaultDictionary {
     /// Why a change to a word was refused, by the word's id.
     word_errors: HashMap<String, Notice>,
     editing: Option<Editing>,
+    /// Word ids whose edit save is currently in flight, across editor sessions.
+    saving_words: HashSet<String>,
+    next_save_id: u64,
+    /// Monotonic counter bumped on every local change and every fetch start so
+    /// a stale read snapshot never overwrites newer state.
+    revision: u64,
+    latest_fetch_rev: u64,
     focus_handle: FocusHandle,
     _subscription: Subscription,
 }
@@ -60,7 +71,7 @@ impl DefaultDictionary {
                 },
             );
 
-        let page = Self {
+        let mut page = Self {
             words: Vec::new(),
             loading: true,
             load_error: None,
@@ -69,6 +80,10 @@ impl DefaultDictionary {
             add_error: None,
             word_errors: HashMap::new(),
             editing: None,
+            saving_words: HashSet::new(),
+            next_save_id: 1,
+            revision: 0,
+            latest_fetch_rev: 0,
             focus_handle: cx.focus_handle(),
             _subscription: subscription,
         };
@@ -76,18 +91,28 @@ impl DefaultDictionary {
         page
     }
 
-    fn fetch_words(&self, cx: &mut Context<Self>) -> Task<()> {
-        let request = backend::call(cx, |backend| backend.list_dictionary_words());
+    fn fetch_words(&mut self, cx: &mut Context<Self>) -> Task<()> {
+        self.revision += 1;
+        let fetch_rev = self.revision;
+        self.latest_fetch_rev = fetch_rev;
+        let request = backend::call_dictionary(cx, DictionaryQueue::Default, |backend| {
+            backend.list_dictionary_words()
+        });
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
-            this.update(cx, |this, cx| {
+            let retry = this.update(cx, |this, cx| {
+                if this.revision != fetch_rev {
+                    return (this.latest_fetch_rev == fetch_rev).then(|| this.fetch_words(cx));
+                }
+
                 this.loading = false;
                 match result {
                     Ok(words) => {
                         this.words = words;
                         this.load_error = None;
+                        this.reconcile_duplicate_notices(cx);
                     }
                     Err(error) => {
                         log::error!(target: "dictionary", "list_failed scope=Default error={error}");
@@ -95,8 +120,11 @@ impl DefaultDictionary {
                     }
                 }
                 cx.notify();
-            })
-            .ok();
+                None
+            });
+            if let Ok(Some(retry)) = retry {
+                retry.await;
+            }
         })
     }
 
@@ -108,10 +136,38 @@ impl DefaultDictionary {
         self.fetch_words(cx).detach();
     }
 
+    /// Clears inline duplicate notices whose input no longer duplicates a word
+    /// in this dictionary (for example, after deleting or renaming the other entry).
+    fn reconcile_duplicate_notices(&mut self, cx: &App) {
+        if self.add_error.as_ref().is_some_and(Notice::is_duplicate) {
+            let value = self.new_word.read(cx).value(cx);
+            if !has_duplicate_dictionary_word(&self.words, &value, None) {
+                self.add_error = None;
+            }
+        }
+
+        if let Some(editing) = &self.editing
+            && self
+                .word_errors
+                .get(&editing.word_id)
+                .is_some_and(Notice::is_duplicate)
+        {
+            let value = editing.field.read(cx).value(cx);
+            if !has_duplicate_dictionary_word(&self.words, &value, Some(&editing.word_id)) {
+                self.word_errors.remove(&editing.word_id);
+            }
+        }
+    }
+
     fn add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let word = self.new_word.read(cx).value(cx).trim().to_string();
         // A word that is too long has its warning under the field already.
         if word.is_empty() || too_long(&word) || self.adding {
+            return;
+        }
+        if self.saving_words.is_empty() && has_duplicate_dictionary_word(&self.words, &word, None) {
+            self.add_error = Some(Notice::duplicate(cx));
+            cx.notify();
             return;
         }
 
@@ -119,31 +175,45 @@ impl DefaultDictionary {
         self.add_error = None;
         cx.notify();
 
-        let request = backend::call(cx, move |backend| backend.add_dictionary_word(&word));
+        let submitted = word.clone();
+        let request = backend::call_dictionary(cx, DictionaryQueue::Default, move |backend| {
+            backend.add_dictionary_word(&word)
+        });
 
         cx.spawn_in(window, async move |this, cx| {
             match request.await {
-                Ok(_) => {
-                    let fetch = this.update(cx, |this, cx| {
+                Ok(added) => {
+                    let fetch = this.update_in(cx, |this, window, cx| {
                         analytics::capture(cx, "dictionary_word_added", &[]);
+                        if !this.words.iter().any(|word| word.id == added.id) {
+                            this.words.insert(0, added);
+                        }
+                        this.revision += 1;
+                        if this.new_word.read(cx).value(cx).trim() == submitted {
+                            this.new_word
+                                .update(cx, |field, cx| field.set_value("", window, cx));
+                        }
+                        this.reconcile_duplicate_notices(cx);
+                        cx.notify();
                         this.fetch_words(cx)
                     });
                     if let Ok(fetch) = fetch {
                         fetch.await;
                     }
-
-                    this.update_in(cx, |this, window, cx| {
-                        this.new_word
-                            .update(cx, |field, cx| field.set_value("", window, cx));
-                    })
-                    .ok();
                 }
                 // What was typed stays in the field, to be corrected or sent
-                // again.
+                // again. A late duplicate notice is skipped if the user has
+                // already edited the field to a different word.
                 Err(error) => {
-                    log::error!(target: "dictionary", "add_failed scope=Default error={error}");
+                    if error != DUPLICATE_WORD_ERROR {
+                        log::error!(target: "dictionary", "add_failed scope=Default error={error}");
+                    }
                     this.update(cx, |this, cx| {
-                        this.add_error = Some(Notice::new("dictionary.addFailed", error, cx));
+                        let notice = Notice::from_backend("dictionary.addFailed", error, cx);
+                        let current = this.new_word.read(cx).value(cx);
+                        if !notice.is_duplicate() || dictionary_words_match(&current, &submitted) {
+                            this.add_error = Some(notice);
+                        }
                     })
                     .ok();
                 }
@@ -168,7 +238,7 @@ impl DefaultDictionary {
         change: impl FnOnce(&dyn Backend) -> CommandResult<T> + Send + 'static,
         cx: &mut Context<Self>,
     ) {
-        let request = backend::call(cx, change);
+        let request = backend::call_dictionary(cx, DictionaryQueue::Default, change);
 
         cx.spawn(async move |this, cx| {
             let Err(error) = request.await else {
@@ -191,6 +261,8 @@ impl DefaultDictionary {
         analytics::capture(cx, "dictionary_word_deleted", &[]);
         self.words.retain(|word| word.id != id);
         self.word_errors.remove(id);
+        self.revision += 1;
+        self.reconcile_duplicate_notices(cx);
         cx.notify();
 
         let id = id.to_string();
@@ -203,6 +275,10 @@ impl DefaultDictionary {
     }
 
     fn start_edit(&mut self, word: &DictionaryWord, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(previous) = self.editing.take() {
+            self.word_errors.remove(&previous.word_id);
+        }
+
         let field = cx.new(|cx| {
             let mut field = TextField::new(window, cx);
             field.set_value(word.word.clone(), window, cx);
@@ -213,7 +289,10 @@ impl DefaultDictionary {
         let subscription = cx.subscribe_in(&field, window, {
             let word_id = word.id.clone();
             move |this, _, event, window, cx| match event {
-                TextFieldEvent::Change => cx.notify(),
+                TextFieldEvent::Change => {
+                    this.word_errors.remove(&word_id);
+                    cx.notify();
+                }
                 TextFieldEvent::Enter => this.save_edit(&word_id, window, cx),
                 TextFieldEvent::Escape => this.cancel_edit(window, cx),
                 _ => {}
@@ -224,13 +303,16 @@ impl DefaultDictionary {
         self.editing = Some(Editing {
             word_id: word.id.clone(),
             field,
+            saving: None,
             _subscription: subscription,
         });
         cx.notify();
     }
 
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.editing = None;
+        if let Some(editing) = self.editing.take() {
+            self.word_errors.remove(&editing.word_id);
+        }
         // The field that held the keyboard focus is gone.
         window.focus(&self.focus_handle, cx);
         cx.notify();
@@ -240,24 +322,99 @@ impl DefaultDictionary {
         let Some(editing) = &self.editing else {
             return;
         };
+        if editing.word_id != id || editing.saving.is_some() || self.saving_words.contains(id) {
+            return;
+        }
         let text = editing.field.read(cx).value(cx).trim().to_string();
         if text.is_empty() || too_long(&text) {
             return;
         }
-
-        analytics::capture(cx, "dictionary_word_edited", &[]);
-        if let Some(word) = self.words.iter_mut().find(|word| word.id == id) {
-            word.word = text.clone();
+        if self.saving_words.is_empty()
+            && has_duplicate_dictionary_word(&self.words, &text, Some(id))
+        {
+            self.word_errors
+                .insert(id.to_string(), Notice::duplicate(cx));
+            cx.notify();
+            return;
         }
-        self.cancel_edit(window, cx);
+
+        self.word_errors.remove(id);
+        self.saving_words.insert(id.to_string());
+        let save_id = self.next_save_id;
+        self.next_save_id += 1;
+        if let Some(editing) = &mut self.editing {
+            editing.saving = Some(save_id);
+        }
+        cx.notify();
 
         let id = id.to_string();
-        self.persist(
-            id.clone(),
-            "dictionary.saveFailed",
-            move |backend| backend.update_dictionary_word(&id, &text),
-            cx,
-        );
+        let submitted = text.clone();
+        let request = backend::call_dictionary(cx, DictionaryQueue::Default, {
+            let id = id.clone();
+            move |backend| backend.update_dictionary_word(&id, &text)
+        });
+
+        cx.spawn_in(window, async move |this, cx| match request.await {
+            Ok(updated) => {
+                this.update_in(cx, |this, window, cx| {
+                    this.saving_words.remove(&id);
+                    analytics::capture(cx, "dictionary_word_edited", &[]);
+                    if let Some(word) = this.words.iter_mut().find(|word| word.id == id) {
+                        word.word = updated.word;
+                    }
+                    this.revision += 1;
+                    let active = this.editing.as_ref().is_some_and(|editing| {
+                        editing.word_id == id && editing.saving == Some(save_id)
+                    });
+                    if active {
+                        let unchanged = this.editing.as_ref().is_some_and(|editing| {
+                            editing.field.read(cx).value(cx).trim() == submitted
+                        });
+                        if unchanged {
+                            this.cancel_edit(window, cx);
+                        } else if let Some(editing) = &mut this.editing {
+                            editing.saving = None;
+                        }
+                    }
+                    this.reconcile_duplicate_notices(cx);
+                    cx.notify();
+                })
+                .ok();
+            }
+            Err(error) => {
+                if error != DUPLICATE_WORD_ERROR {
+                    log::error!(target: "dictionary", "change_failed scope=Default error={error}");
+                }
+
+                let fetch = this.update(cx, |this, cx| {
+                    this.saving_words.remove(&id);
+                    let notice = Notice::from_backend("dictionary.saveFailed", error, cx);
+                    let active = this.editing.as_ref().is_some_and(|editing| {
+                        editing.word_id == id && editing.saving == Some(save_id)
+                    });
+                    if active {
+                        if let Some(editing) = &mut this.editing {
+                            editing.saving = None;
+                            let current = editing.field.read(cx).value(cx);
+                            if !notice.is_duplicate()
+                                || dictionary_words_match(&current, &submitted)
+                            {
+                                this.word_errors.insert(id.clone(), notice);
+                            }
+                        }
+                    } else if !notice.is_duplicate() && this.words.iter().any(|word| word.id == id)
+                    {
+                        this.word_errors.insert(id.clone(), notice);
+                    }
+                    cx.notify();
+                    this.fetch_words(cx)
+                });
+                if let Ok(fetch) = fetch {
+                    fetch.await;
+                }
+            }
+        })
+        .detach();
     }
 
     fn handle_word_action(
@@ -322,7 +479,12 @@ impl Render for DefaultDictionary {
                     .editing
                     .as_ref()
                     .filter(|editing| editing.word_id == word.id)
-                    .map(|editing| &editing.field);
+                    .map(|editing| {
+                        (
+                            &editing.field,
+                            editing.saving.is_some() || self.saving_words.contains(&word.id),
+                        )
+                    });
 
                 word_row(
                     Variant::Page,

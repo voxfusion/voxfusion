@@ -25,6 +25,8 @@ use crate::backend::{
     Transcription, TranscriptionPage, TranscriptionResult,
 };
 
+#[cfg(feature = "fixture")]
+pub(crate) use browser::normalize_domain;
 pub use hotkeys::resynchronize_system_keys;
 pub use media::{
     muffle_permission, restore_media_on_exit, run_permission_request_if_asked,

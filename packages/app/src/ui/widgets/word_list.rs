@@ -11,7 +11,10 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::backend::{DictionaryWord, MAX_WORD_CHARS};
+use crate::backend::{
+    DUPLICATE_WORD_ERROR, DictionaryWord, MAX_WORD_CHARS, dictionary_words_match,
+    has_duplicate_dictionary_word,
+};
 use crate::ui::motion::{Faded, Transitions as _};
 use crate::ui::text::{TypeScale as _, text};
 use crate::ui::theme::palette;
@@ -34,6 +37,7 @@ pub enum Variant {
 pub struct Notice {
     pub title: SharedString,
     pub error: SharedString,
+    duplicate: bool,
 }
 
 impl Notice {
@@ -42,7 +46,31 @@ impl Notice {
         Self {
             title: t(cx, key),
             error: error.into(),
+            duplicate: false,
         }
+    }
+
+    /// A notice saying the word is already in this dictionary.
+    pub fn duplicate(cx: &App) -> Self {
+        Self {
+            title: t(cx, "dictionary.alreadyInDictionary"),
+            error: SharedString::default(),
+            duplicate: true,
+        }
+    }
+
+    /// Maps a backend error to the localized duplicate notice, or a general
+    /// failure notice titled by `failure_key`.
+    pub fn from_backend(failure_key: &str, error: String, cx: &App) -> Self {
+        if error == DUPLICATE_WORD_ERROR {
+            Self::duplicate(cx)
+        } else {
+            Self::new(failure_key, error, cx)
+        }
+    }
+
+    pub fn is_duplicate(&self) -> bool {
+        self.duplicate
     }
 }
 
@@ -214,12 +242,13 @@ pub enum WordAction {
 }
 
 /// A word with its edit and delete buttons, or, while it is being edited,
-/// `editing` with save and cancel and a warning while the word is too long.
-/// `error` says why the last change to the word was refused.
+/// `editing` (the field and whether a save is in flight) with save and cancel
+/// and a warning while the word is too long. `error` says why the last change
+/// to the word was refused.
 pub fn word_row(
     variant: Variant,
     word: &DictionaryWord,
-    editing: Option<&Entity<TextField>>,
+    editing: Option<(&Entity<TextField>, bool)>,
     error: Option<&Notice>,
     on_action: impl Fn(&WordAction, &mut Window, &mut App) + 'static,
     window: &Window,
@@ -248,7 +277,7 @@ pub fn word_row(
     };
 
     let content = match editing {
-        Some(field) => {
+        Some((field, _)) => {
             let focused = field.focus_handle(cx).is_focused(window);
 
             field_box(field, cx)
@@ -290,18 +319,25 @@ pub fn word_row(
             actions.flex_shrink_0()
         })
         .map(|actions| {
-            if editing.is_some() {
-                actions
-                    .child(
-                        button("[SAVE]", WordAction::SaveEdit)
-                            .text_color(p.success)
-                            .hover(|button| button.opacity(0.8)),
-                    )
-                    .child(
-                        button("[CANCEL]", WordAction::CancelEdit)
-                            .text_color(p.txt_muted)
-                            .hover(|button| button.text_color(p.txt_secondary)),
-                    )
+            if let Some((_, saving)) = editing {
+                let save = if saving {
+                    div()
+                        .id("[SAVE]")
+                        .text_color(p.success.opacity(0.5))
+                        .child(text("[SAVE]").tracking_wider())
+                        .into_any_element()
+                } else {
+                    button("[SAVE]", WordAction::SaveEdit)
+                        .text_color(p.success)
+                        .hover(|button| button.opacity(0.8))
+                        .into_any_element()
+                };
+
+                actions.child(save).child(
+                    button("[CANCEL]", WordAction::CancelEdit)
+                        .text_color(p.txt_muted)
+                        .hover(|button| button.text_color(p.txt_secondary)),
+                )
             } else {
                 actions
                     .child(hover_button("[EDIT]", WordAction::StartEdit))
@@ -316,7 +352,7 @@ pub fn word_row(
         .when(variant == Variant::Nested, |line| line.gap_2())
         .child(content)
         .child(actions);
-    let warning = editing.and_then(|field| length_warning(&field.read(cx).value(cx), cx));
+    let warning = editing.and_then(|(field, _)| length_warning(&field.read(cx).value(cx), cx));
 
     word_row_frame(variant, &word.id, cx)
         .child(line)
@@ -376,10 +412,14 @@ pub enum WordListEvent {
     AddWord {
         key: SharedString,
         word: String,
+        add_id: u64,
     },
+    /// Answer with [`WordListEditor::finish_editing`] once the change is stored
+    /// or has been refused.
     EditWord {
         word_id: String,
         word: String,
+        save_id: u64,
     },
     DeleteWord {
         word_id: String,
@@ -394,6 +434,7 @@ struct NewWord {
 struct Editing {
     word_id: String,
     field: Entity<TextField>,
+    saving: Option<u64>,
     _subscription: Subscription,
 }
 
@@ -403,12 +444,15 @@ pub struct WordListEditor {
     groups: Vec<WordGroup>,
     expanded: HashSet<SharedString>,
     new_words: HashMap<SharedString, NewWord>,
-    adding: HashSet<SharedString>,
+    adding: HashMap<SharedString, u64>,
     /// Why a word could not be added to a group, or the group removed.
     group_errors: HashMap<SharedString, Notice>,
     /// Why a change to a word was refused, by the word's id.
     word_errors: HashMap<String, Notice>,
     editing: Option<Editing>,
+    /// Word ids whose edit save is currently in flight, across editor sessions.
+    saving_words: HashSet<String>,
+    next_request_id: u64,
     focus_handle: FocusHandle,
 }
 
@@ -420,10 +464,12 @@ impl WordListEditor {
             groups: Vec::new(),
             expanded: HashSet::new(),
             new_words: HashMap::new(),
-            adding: HashSet::new(),
+            adding: HashMap::new(),
             group_errors: HashMap::new(),
             word_errors: HashMap::new(),
             editing: None,
+            saving_words: HashSet::new(),
+            next_request_id: 1,
             focus_handle: cx.focus_handle(),
         }
     }
@@ -436,11 +482,51 @@ impl WordListEditor {
         if groups.is_empty() {
             self.new_words.clear();
             self.adding.clear();
-            self.editing = None;
+            if let Some(editing) = self.editing.take() {
+                self.word_errors.remove(&editing.word_id);
+            }
         }
 
         self.groups = groups;
+        self.reconcile_duplicate_notices(cx);
         cx.notify();
+    }
+
+    /// Clears inline duplicate notices whose input no longer duplicates a word
+    /// in its group (for example, after deleting or renaming the other entry).
+    fn reconcile_duplicate_notices(&mut self, cx: &App) {
+        self.group_errors.retain(|key, notice| {
+            if !notice.is_duplicate() {
+                return true;
+            }
+            let Some(group) = self.groups.iter().find(|group| &group.key == key) else {
+                return false;
+            };
+            let Some(new_word) = self.new_words.get(key) else {
+                return false;
+            };
+            let value = new_word.field.read(cx).value(cx);
+            has_duplicate_dictionary_word(&group.words, &value, None)
+        });
+
+        if let Some(editing) = &self.editing
+            && self
+                .word_errors
+                .get(&editing.word_id)
+                .is_some_and(Notice::is_duplicate)
+        {
+            let still_duplicate = self
+                .groups
+                .iter()
+                .find(|group| group.words.iter().any(|word| word.id == editing.word_id))
+                .is_some_and(|group| {
+                    let value = editing.field.read(cx).value(cx);
+                    has_duplicate_dictionary_word(&group.words, &value, Some(&editing.word_id))
+                });
+            if !still_duplicate {
+                self.word_errors.remove(&editing.word_id);
+            }
+        }
     }
 
     pub fn expand(&mut self, key: SharedString, cx: &mut Context<Self>) {
@@ -486,7 +572,17 @@ impl WordListEditor {
 
     fn remove_group(&mut self, key: SharedString, cx: &mut Context<Self>) {
         self.expanded.remove(&key);
+        self.new_words.remove(&key);
+        self.adding.remove(&key);
         self.group_errors.remove(&key);
+        if let Some(editing) = &self.editing
+            && self.groups.iter().any(|group| {
+                group.key == key && group.words.iter().any(|word| word.id == editing.word_id)
+            })
+        {
+            let editing = self.editing.take().unwrap();
+            self.word_errors.remove(&editing.word_id);
+        }
         cx.emit(WordListEvent::RemoveGroup(key));
         cx.notify();
     }
@@ -497,22 +593,51 @@ impl WordListEditor {
         };
         let word = new_word.field.read(cx).value(cx).trim().to_string();
 
-        if word.is_empty() || too_long(&word) || self.adding.contains(key) {
+        if word.is_empty() || too_long(&word) || self.adding.contains_key(key) {
+            return;
+        }
+
+        if self
+            .groups
+            .iter()
+            .find(|group| &group.key == key)
+            .is_some_and(|group| {
+                !group
+                    .words
+                    .iter()
+                    .any(|existing| self.saving_words.contains(&existing.id))
+                    && has_duplicate_dictionary_word(&group.words, &word, None)
+            })
+        {
+            self.group_errors.insert(key.clone(), Notice::duplicate(cx));
+            cx.notify();
             return;
         }
 
         self.group_errors.remove(key);
-        self.adding.insert(key.clone());
+        let add_id = self.next_request_id;
+        self.next_request_id += 1;
+        self.adding.insert(key.clone(), add_id);
         cx.emit(WordListEvent::AddWord {
             key: key.clone(),
             word,
+            add_id,
         });
         cx.notify();
     }
 
-    /// Empties the group's field for the next word, once one has been stored.
-    pub fn clear_new_word(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(new_word) = self.new_words.get(key) {
+    /// Empties the group's field for the next word, once one has been stored,
+    /// provided the user has not already edited it to another word.
+    pub fn clear_new_word(
+        &mut self,
+        key: &str,
+        submitted: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(new_word) = self.new_words.get(key)
+            && new_word.field.read(cx).value(cx).trim() == submitted
+        {
             new_word
                 .field
                 .update(cx, |field, cx| field.set_value("", window, cx));
@@ -520,11 +645,87 @@ impl WordListEditor {
     }
 
     /// Lets the group take another word. `error` says why this one was
-    /// refused; what was typed stays in the field.
-    pub fn finish_adding(&mut self, key: &str, error: Option<Notice>, cx: &mut Context<Self>) {
+    /// refused; what was typed stays in the field. A late duplicate notice is
+    /// skipped if the user has already changed the field to a different word.
+    pub fn finish_adding(
+        &mut self,
+        key: &str,
+        add_id: u64,
+        submitted: &str,
+        error: Option<Notice>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.adding.get(key) != Some(&add_id) {
+            return;
+        }
         self.adding.remove(key);
         if let Some(error) = error {
-            self.group_errors.insert(key.to_string().into(), error);
+            let show = if error.is_duplicate() {
+                self.groups.iter().any(|group| group.key.as_ref() == key)
+                    && self.new_words.get(key).is_some_and(|new_word| {
+                        let current = new_word.field.read(cx).value(cx);
+                        dictionary_words_match(&current, submitted)
+                    })
+            } else {
+                true
+            };
+            if show {
+                self.group_errors.insert(key.to_string().into(), error);
+            }
+        }
+        cx.notify();
+    }
+
+    /// Lets an edited word close once its change is stored, or keeps the editor
+    /// open with `error` when the change was refused.
+    pub fn finish_editing(
+        &mut self,
+        word_id: &str,
+        save_id: u64,
+        submitted: &str,
+        error: Option<Notice>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.saving_words.remove(word_id);
+        let active = self
+            .editing
+            .as_ref()
+            .is_some_and(|editing| editing.word_id == word_id && editing.saving == Some(save_id));
+
+        match error {
+            None => {
+                if active {
+                    let unchanged = self.editing.as_ref().is_some_and(|editing| {
+                        editing.field.read(cx).value(cx).trim() == submitted
+                    });
+                    if unchanged {
+                        self.cancel_edit(window, cx);
+                        return;
+                    }
+                    if let Some(editing) = &mut self.editing {
+                        editing.saving = None;
+                    }
+                }
+            }
+            Some(error) => {
+                if active {
+                    if let Some(editing) = &mut self.editing {
+                        editing.saving = None;
+                        let current = editing.field.read(cx).value(cx);
+                        if !error.is_duplicate() || dictionary_words_match(&current, submitted) {
+                            self.word_errors.insert(word_id.to_string(), error);
+                        }
+                    }
+                } else if !error.is_duplicate()
+                    && self
+                        .groups
+                        .iter()
+                        .any(|group| group.words.iter().any(|word| word.id == word_id))
+                {
+                    self.word_errors.insert(word_id.to_string(), error);
+                }
+            }
         }
         cx.notify();
     }
@@ -544,6 +745,10 @@ impl WordListEditor {
     }
 
     fn start_edit(&mut self, word: &DictionaryWord, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(previous) = self.editing.take() {
+            self.word_errors.remove(&previous.word_id);
+        }
+
         let field = cx.new(|cx| {
             let mut field = TextField::new(window, cx);
             field.set_value(word.word.clone(), window, cx);
@@ -554,8 +759,11 @@ impl WordListEditor {
         let subscription = cx.subscribe_in(&field, window, {
             let word_id = word.id.clone();
             move |this, _, event, window, cx| match event {
-                TextFieldEvent::Change => cx.notify(),
-                TextFieldEvent::Enter => this.save_edit(&word_id, window, cx),
+                TextFieldEvent::Change => {
+                    this.word_errors.remove(&word_id);
+                    cx.notify();
+                }
+                TextFieldEvent::Enter => this.save_edit(&word_id, cx),
                 TextFieldEvent::Escape => this.cancel_edit(window, cx),
                 _ => {}
             }
@@ -565,33 +773,68 @@ impl WordListEditor {
         self.editing = Some(Editing {
             word_id: word.id.clone(),
             field,
+            saving: None,
             _subscription: subscription,
         });
         cx.notify();
     }
 
     fn cancel_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.editing = None;
+        if let Some(editing) = self.editing.take() {
+            self.word_errors.remove(&editing.word_id);
+        }
         // The field that held the keyboard focus is gone.
         window.focus(&self.focus_handle, cx);
         cx.notify();
     }
 
-    fn save_edit(&mut self, word_id: &str, window: &mut Window, cx: &mut Context<Self>) {
+    fn save_edit(&mut self, word_id: &str, cx: &mut Context<Self>) {
         let Some(editing) = &self.editing else {
             return;
         };
+        if editing.word_id != word_id
+            || editing.saving.is_some()
+            || self.saving_words.contains(word_id)
+        {
+            return;
+        }
         let word = editing.field.read(cx).value(cx).trim().to_string();
 
         if word.is_empty() || too_long(&word) {
             return;
         }
 
-        self.cancel_edit(window, cx);
+        if self
+            .groups
+            .iter()
+            .find(|group| group.words.iter().any(|existing| existing.id == word_id))
+            .is_some_and(|group| {
+                !group
+                    .words
+                    .iter()
+                    .any(|existing| self.saving_words.contains(&existing.id))
+                    && has_duplicate_dictionary_word(&group.words, &word, Some(word_id))
+            })
+        {
+            self.word_errors
+                .insert(word_id.to_string(), Notice::duplicate(cx));
+            cx.notify();
+            return;
+        }
+
+        self.word_errors.remove(word_id);
+        self.saving_words.insert(word_id.to_string());
+        let save_id = self.next_request_id;
+        self.next_request_id += 1;
+        if let Some(editing) = &mut self.editing {
+            editing.saving = Some(save_id);
+        }
         cx.emit(WordListEvent::EditWord {
             word_id: word_id.to_string(),
             word,
+            save_id,
         });
+        cx.notify();
     }
 
     fn handle_word_action(
@@ -603,7 +846,7 @@ impl WordListEditor {
     ) {
         match action {
             WordAction::StartEdit => self.start_edit(word, window, cx),
-            WordAction::SaveEdit => self.save_edit(&word.id, window, cx),
+            WordAction::SaveEdit => self.save_edit(&word.id, cx),
             WordAction::CancelEdit => self.cancel_edit(window, cx),
             WordAction::Delete => {
                 self.word_errors.remove(&word.id);
@@ -711,7 +954,7 @@ impl WordListEditor {
         let form = add_word_form(
             Variant::Nested,
             &new_word.field,
-            self.adding.contains(&group.key),
+            self.adding.contains_key(&group.key),
             self.group_errors.get(&group.key),
             cx.listener(move |this, _, _, cx| this.add_word(&key, cx)),
             window,
@@ -723,7 +966,12 @@ impl WordListEditor {
                 .editing
                 .as_ref()
                 .filter(|editing| editing.word_id == word.id)
-                .map(|editing| &editing.field);
+                .map(|editing| {
+                    (
+                        &editing.field,
+                        editing.saving.is_some() || self.saving_words.contains(&word.id),
+                    )
+                });
 
             word_row(
                 Variant::Nested,

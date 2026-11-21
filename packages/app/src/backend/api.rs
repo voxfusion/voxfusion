@@ -49,6 +49,35 @@ pub struct DictionaryWord {
 /// longer one, and the forms say so before it is sent.
 pub const MAX_WORD_CHARS: usize = 100;
 
+/// Error returned when a word already exists in the target dictionary.
+pub const DUPLICATE_WORD_ERROR: &str = "Already in dictionary";
+
+/// Whether two dictionary entries represent the same term after trimming and
+/// Unicode case folding (so surrounding spaces or case variants such as
+/// `VoxFusion`/`voxfusion`, `Straße`/`STRASSE`, or `ΟΣ`/`οσ` match).
+pub fn dictionary_words_match(left: &str, right: &str) -> bool {
+    unicase::eq(left.trim(), right.trim())
+}
+
+/// Whether `words` already contains `candidate`, ignoring the entry with
+/// `excluding_id` (used when renaming an existing word).
+pub fn has_duplicate_dictionary_word(
+    words: &[DictionaryWord],
+    candidate: &str,
+    excluding_id: Option<&str>,
+) -> bool {
+    let target = candidate.trim();
+    if target.is_empty() {
+        return false;
+    }
+
+    let target = unicase::UniCase::new(target);
+    words.iter().any(|entry| {
+        excluding_id != Some(entry.id.as_str())
+            && unicase::UniCase::new(entry.word.trim()) == target
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppDictionary {
     pub bundle_id: String,

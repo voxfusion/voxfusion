@@ -1,10 +1,12 @@
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{OptionalExtension as _, params};
 
 use super::apps::normalize_style;
 use super::browser::normalize_domain;
-use super::db::DbState;
-use crate::backend::{DictionaryWord, MAX_WORD_CHARS, SiteDictionary, SiteStyle};
+use super::db::{DbState, query_has_duplicate_word};
+use crate::backend::{
+    DUPLICATE_WORD_ERROR, DictionaryWord, MAX_WORD_CHARS, SiteDictionary, SiteStyle,
+};
 
 pub fn run_migrations(conn: &rusqlite::Connection) -> Result<(), String> {
     conn.execute_batch(
@@ -114,6 +116,15 @@ pub fn add_site_dictionary_word(
     let word = validate_word(word)?;
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    if query_has_duplicate_word(
+        &conn,
+        "SELECT word FROM site_dictionary_words WHERE domain = ?1",
+        params![domain],
+        word,
+    )? {
+        return Err(DUPLICATE_WORD_ERROR.to_string());
+    }
+
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
@@ -139,6 +150,27 @@ pub fn update_site_dictionary_word(
 ) -> Result<DictionaryWord, String> {
     let word = validate_word(word)?;
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let Some(domain): Option<String> = conn
+        .query_row(
+            "SELECT domain FROM site_dictionary_words WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+    else {
+        return Err("Word not found".to_string());
+    };
+
+    if query_has_duplicate_word(
+        &conn,
+        "SELECT word FROM site_dictionary_words WHERE domain = ?1 AND id != ?2",
+        params![domain, id],
+        word,
+    )? {
+        return Err(DUPLICATE_WORD_ERROR.to_string());
+    }
+
     let now = Utc::now().to_rfc3339();
     let rows_affected = conn
         .execute(

@@ -1,15 +1,16 @@
 use base64::Engine;
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{OptionalExtension as _, params};
 use std::collections::HashSet;
 use std::fs;
 use std::io::BufReader;
 use std::panic;
 use std::path::{Path, PathBuf};
 
-use super::db::DbState;
+use super::db::{DbState, query_has_duplicate_word};
 use crate::backend::{
-    AppDictionary, AppInstruction, DictionaryWord, FrontmostApp, InstalledApp, MAX_WORD_CHARS,
+    AppDictionary, AppInstruction, DUPLICATE_WORD_ERROR, DictionaryWord, FrontmostApp,
+    InstalledApp, MAX_WORD_CHARS,
 };
 
 pub struct StyleDef {
@@ -547,6 +548,15 @@ pub fn add_app_dictionary_word(
     }
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    if query_has_duplicate_word(
+        &conn,
+        "SELECT word FROM app_dictionary_words WHERE bundle_id = ?1",
+        params![bundle_id],
+        word,
+    )? {
+        return Err(DUPLICATE_WORD_ERROR.to_string());
+    }
+
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
@@ -577,6 +587,27 @@ pub fn update_app_dictionary_word(
         ));
     }
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let Some(bundle_id): Option<String> = conn
+        .query_row(
+            "SELECT bundle_id FROM app_dictionary_words WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+    else {
+        return Err("Word not found".to_string());
+    };
+
+    if query_has_duplicate_word(
+        &conn,
+        "SELECT word FROM app_dictionary_words WHERE bundle_id = ?1 AND id != ?2",
+        params![bundle_id, id],
+        word,
+    )? {
+        return Err(DUPLICATE_WORD_ERROR.to_string());
+    }
+
     let now = Utc::now().to_rfc3339();
     let rows_affected = conn
         .execute(

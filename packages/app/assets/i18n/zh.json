@@ -110,6 +110,7 @@
 	"dictionary.sitesInvalidDomain": "请输入有效的域名",
 	"dictionary.siteCount": "{count} 个网站",
 	"dictionary.wordTooLong": "太长：{count} 个字符（最多 {max} 个）",
+	"dictionary.alreadyInDictionary": "已在词典中",
 	"dictionary.addFailed": "无法添加词汇",
 	"dictionary.saveFailed": "无法保存更改",
 	"dictionary.deleteFailed": "无法删除词汇",

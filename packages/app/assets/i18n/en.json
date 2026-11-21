@@ -110,6 +110,7 @@
 	"dictionary.sitesInvalidDomain": "Enter a valid domain",
 	"dictionary.siteCount": "{count} sites",
 	"dictionary.wordTooLong": "Too long: {count} characters (max {max})",
+	"dictionary.alreadyInDictionary": "Already in dictionary",
 	"dictionary.addFailed": "Could not add the word",
 	"dictionary.saveFailed": "Could not save the change",
 	"dictionary.deleteFailed": "Could not delete the word",

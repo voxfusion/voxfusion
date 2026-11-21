@@ -4,7 +4,8 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use crate::backend::{
-    DictionaryWord, MAX_WORD_CHARS, Transcription, TranscriptionPage, TranscriptionResult,
+    DUPLICATE_WORD_ERROR, DictionaryWord, MAX_WORD_CHARS, Transcription, TranscriptionPage,
+    TranscriptionResult, dictionary_words_match,
 };
 
 pub struct DbState {
@@ -261,6 +262,25 @@ pub fn list_dictionary_words(state: &DbState) -> Result<Vec<DictionaryWord>, Str
     Ok(words)
 }
 
+/// Checks whether any word returned by `sql` matches `candidate` after
+/// trimming and Unicode case folding.
+pub(super) fn query_has_duplicate_word<P: rusqlite::Params>(
+    conn: &Connection,
+    sql: &str,
+    params: P,
+    candidate: &str,
+) -> Result<bool, String> {
+    let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+    let mut rows = stmt.query(params).map_err(|e| e.to_string())?;
+    while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let existing: String = row.get(0).map_err(|e| e.to_string())?;
+        if dictionary_words_match(&existing, candidate) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub fn add_dictionary_word(state: &DbState, word: &str) -> Result<DictionaryWord, String> {
     let word = word.trim();
     if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
@@ -270,6 +290,10 @@ pub fn add_dictionary_word(state: &DbState, word: &str) -> Result<DictionaryWord
     }
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    if query_has_duplicate_word(&conn, "SELECT word FROM dictionary_words", [], word)? {
+        return Err(DUPLICATE_WORD_ERROR.to_string());
+    }
+
     let id = uuid::Uuid::new_v4().to_string();
     let now = Utc::now().to_rfc3339();
 
@@ -300,6 +324,27 @@ pub fn update_dictionary_word(
     }
 
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let existing: Option<String> = conn
+        .query_row(
+            "SELECT id FROM dictionary_words WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    if existing.is_none() {
+        return Err("Word not found".to_string());
+    }
+
+    if query_has_duplicate_word(
+        &conn,
+        "SELECT word FROM dictionary_words WHERE id != ?1",
+        params![id],
+        word,
+    )? {
+        return Err(DUPLICATE_WORD_ERROR.to_string());
+    }
+
     let now = Utc::now().to_rfc3339();
 
     let rows_affected = conn

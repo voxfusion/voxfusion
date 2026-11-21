@@ -188,6 +188,17 @@ impl FixtureBackend {
     }
 }
 
+fn validate_word(input: &str) -> CommandResult<&str> {
+    let word = input.trim();
+    if word.is_empty() || word.chars().count() > MAX_WORD_CHARS {
+        Err(format!(
+            "Word must be between 1 and {MAX_WORD_CHARS} characters"
+        ))
+    } else {
+        Ok(word)
+    }
+}
+
 impl Backend for FixtureBackend {
     fn type_text(&self, _text: &str) -> CommandResult<()> {
         self.gate("type_text")
@@ -387,20 +398,32 @@ impl Backend for FixtureBackend {
 
     fn add_dictionary_word(&self, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("add_dictionary_word")?;
-        let word = self.new_word(word);
-        self.with(|data| data.dictionary_words.insert(0, word.clone()));
-        Ok(word)
+        let word = validate_word(word)?;
+        self.with(|data| {
+            if has_duplicate_dictionary_word(&data.dictionary_words, word, None) {
+                return Err(DUPLICATE_WORD_ERROR.into());
+            }
+            let entry = self.new_word(word);
+            data.dictionary_words.insert(0, entry.clone());
+            Ok(entry)
+        })
     }
 
     fn update_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_dictionary_word")?;
+        let word = validate_word(word)?;
         self.with(|data| {
-            let entry = data
+            let position = data
                 .dictionary_words
-                .iter_mut()
-                .find(|entry| entry.id == id)
+                .iter()
+                .position(|entry| entry.id == id)
                 .ok_or("Word not found")?;
+            if has_duplicate_dictionary_word(&data.dictionary_words, word, Some(id)) {
+                return Err(DUPLICATE_WORD_ERROR.into());
+            }
+            let entry = &mut data.dictionary_words[position];
             entry.word = word.to_string();
+            entry.updated_at = Utc::now().to_rfc3339();
             Ok(entry.clone())
         })
     }
@@ -423,35 +446,55 @@ impl Backend for FixtureBackend {
         word: &str,
     ) -> CommandResult<DictionaryWord> {
         self.gate("add_app_dictionary_word")?;
-        let word = self.new_word(word);
+        let bundle_id = bundle_id.trim();
+        let app_name = app_name.trim();
+        if bundle_id.is_empty() || app_name.is_empty() {
+            return Err("bundle_id and app_name are required".into());
+        }
+        let word = validate_word(word)?;
         self.with(|data| {
             let position = data
                 .app_dictionaries
                 .iter()
-                .position(|group| group.bundle_id == bundle_id)
-                .unwrap_or_else(|| {
-                    data.app_dictionaries.push(AppDictionary {
-                        bundle_id: bundle_id.to_string(),
-                        app_name: app_name.to_string(),
-                        words: Vec::new(),
-                    });
-                    data.app_dictionaries.len() - 1
+                .position(|group| group.bundle_id == bundle_id);
+            if let Some(position) = position
+                && has_duplicate_dictionary_word(&data.app_dictionaries[position].words, word, None)
+            {
+                return Err(DUPLICATE_WORD_ERROR.into());
+            }
+            let entry = self.new_word(word);
+            let position = position.unwrap_or_else(|| {
+                data.app_dictionaries.push(AppDictionary {
+                    bundle_id: bundle_id.to_string(),
+                    app_name: app_name.to_string(),
+                    words: Vec::new(),
                 });
-            data.app_dictionaries[position].words.push(word.clone());
-        });
-        Ok(word)
+                data.app_dictionaries.len() - 1
+            });
+            data.app_dictionaries[position].words.push(entry.clone());
+            Ok(entry)
+        })
     }
 
     fn update_app_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_app_dictionary_word")?;
+        let word = validate_word(word)?;
         self.with(|data| {
-            let entry = data
+            let group = data
                 .app_dictionaries
                 .iter_mut()
-                .flat_map(|group| group.words.iter_mut())
+                .find(|group| group.words.iter().any(|entry| entry.id == id))
+                .ok_or("Word not found")?;
+            if has_duplicate_dictionary_word(&group.words, word, Some(id)) {
+                return Err(DUPLICATE_WORD_ERROR.into());
+            }
+            let entry = group
+                .words
+                .iter_mut()
                 .find(|entry| entry.id == id)
                 .ok_or("Word not found")?;
             entry.word = word.to_string();
+            entry.updated_at = Utc::now().to_rfc3339();
             Ok(entry.clone())
         })
     }
@@ -482,34 +525,55 @@ impl Backend for FixtureBackend {
 
     fn add_site_dictionary_word(&self, domain: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("add_site_dictionary_word")?;
-        let word = self.new_word(word);
+        let domain = crate::backend::native::normalize_domain(domain)
+            .ok_or_else(|| "Invalid domain".to_string())?;
+        let word = validate_word(word)?;
         self.with(|data| {
             let position = data
                 .site_dictionaries
                 .iter()
-                .position(|group| group.domain == domain)
-                .unwrap_or_else(|| {
-                    data.site_dictionaries.push(SiteDictionary {
-                        domain: domain.to_string(),
-                        words: Vec::new(),
-                    });
-                    data.site_dictionaries.len() - 1
+                .position(|group| group.domain == domain);
+            if let Some(position) = position
+                && has_duplicate_dictionary_word(
+                    &data.site_dictionaries[position].words,
+                    word,
+                    None,
+                )
+            {
+                return Err(DUPLICATE_WORD_ERROR.into());
+            }
+            let entry = self.new_word(word);
+            let position = position.unwrap_or_else(|| {
+                data.site_dictionaries.push(SiteDictionary {
+                    domain: domain.clone(),
+                    words: Vec::new(),
                 });
-            data.site_dictionaries[position].words.push(word.clone());
-        });
-        Ok(word)
+                data.site_dictionaries.len() - 1
+            });
+            data.site_dictionaries[position].words.push(entry.clone());
+            Ok(entry)
+        })
     }
 
     fn update_site_dictionary_word(&self, id: &str, word: &str) -> CommandResult<DictionaryWord> {
         self.gate("update_site_dictionary_word")?;
+        let word = validate_word(word)?;
         self.with(|data| {
-            let entry = data
+            let group = data
                 .site_dictionaries
                 .iter_mut()
-                .flat_map(|group| group.words.iter_mut())
+                .find(|group| group.words.iter().any(|entry| entry.id == id))
+                .ok_or("Word not found")?;
+            if has_duplicate_dictionary_word(&group.words, word, Some(id)) {
+                return Err(DUPLICATE_WORD_ERROR.into());
+            }
+            let entry = group
+                .words
+                .iter_mut()
                 .find(|entry| entry.id == id)
                 .ok_or("Word not found")?;
             entry.word = word.to_string();
+            entry.updated_at = Utc::now().to_rfc3339();
             Ok(entry.clone())
         })
     }

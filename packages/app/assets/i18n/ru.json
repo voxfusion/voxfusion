@@ -110,6 +110,7 @@
 	"dictionary.sitesInvalidDomain": "Введите корректный домен",
 	"dictionary.siteCount": "{count} сайтов",
 	"dictionary.wordTooLong": "Слишком длинно: {count} симв. (максимум {max})",
+	"dictionary.alreadyInDictionary": "Уже в словаре",
 	"dictionary.addFailed": "Не удалось добавить слово",
 	"dictionary.saveFailed": "Не удалось сохранить изменение",
 	"dictionary.deleteFailed": "Не удалось удалить слово",

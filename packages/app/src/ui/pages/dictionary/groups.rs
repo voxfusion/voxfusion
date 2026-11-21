@@ -4,10 +4,14 @@
 use gpui_kit::{
     AppContext as _, Context, Entity, IntoElement, Render, SharedString, Subscription, Task, Window,
 };
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::analytics;
-use crate::backend::{self, AppDictionary, Backend, CommandResult, DictionaryWord, SiteDictionary};
+use crate::backend::{
+    self, AppDictionary, Backend, CommandResult, DUPLICATE_WORD_ERROR, DictionaryQueue,
+    DictionaryWord, SiteDictionary,
+};
 use crate::ui::widgets::app_icon::AppIcons;
 use crate::ui::widgets::word_list::{GroupIcon, Notice, WordGroup, WordListEditor, WordListEvent};
 
@@ -49,6 +53,13 @@ impl From<SiteDictionary> for Group {
 }
 
 impl Scope {
+    fn queue(self) -> DictionaryQueue {
+        match self {
+            Scope::Apps => DictionaryQueue::Apps,
+            Scope::Sites => DictionaryQueue::Sites,
+        }
+    }
+
     fn list(self, backend: &dyn Backend) -> CommandResult<Vec<Group>> {
         fn groups<T: Into<Group>>(dictionaries: Vec<T>) -> Vec<Group> {
             dictionaries.into_iter().map(Into::into).collect()
@@ -154,6 +165,16 @@ pub struct DictionaryGroups {
     pending: Vec<Group>,
     icons: Rc<AppIcons>,
     editor: Entity<WordListEditor>,
+    /// Monotonic counter bumped on every local change and every fetch start so
+    /// a stale read snapshot never overwrites newer state.
+    revision: u64,
+    latest_fetch_rev: u64,
+    /// Per-group generation bumped whenever a group is removed, so an earlier
+    /// in-flight word add cannot put a deleted group back on screen.
+    group_generations: HashMap<String, u64>,
+    /// Number of in-flight word adds per group key, so deleting a newly added
+    /// group still queues a backend delete behind its pending first word.
+    adding_groups: HashMap<String, usize>,
     _subscription: Subscription,
 }
 
@@ -169,7 +190,25 @@ impl DictionaryGroups {
             pending: Vec::new(),
             icons: Rc::default(),
             editor,
+            revision: 0,
+            latest_fetch_rev: 0,
+            group_generations: HashMap::new(),
+            adding_groups: HashMap::new(),
             _subscription: subscription,
+        }
+    }
+
+    fn group_generation(&self, key: &str) -> u64 {
+        self.group_generations.get(key).copied().unwrap_or(0)
+    }
+
+    fn finish_pending_add(&mut self, key: &str) {
+        if let Some(count) = self.adding_groups.get_mut(key) {
+            if *count <= 1 {
+                self.adding_groups.remove(key);
+            } else {
+                *count -= 1;
+            }
         }
     }
 
@@ -224,14 +263,22 @@ impl DictionaryGroups {
     }
 
     /// Fetches the stored dictionaries.
-    pub fn fetch(&self, cx: &mut Context<Self>) -> Task<()> {
+    pub fn fetch(&mut self, cx: &mut Context<Self>) -> Task<()> {
         let scope = self.scope;
-        let request = backend::call(cx, move |backend| scope.list(backend));
+        self.revision += 1;
+        let fetch_rev = self.revision;
+        self.latest_fetch_rev = fetch_rev;
+        let request =
+            backend::call_dictionary(cx, scope.queue(), move |backend| scope.list(backend));
 
         cx.spawn(async move |this, cx| {
             let result = request.await;
 
-            this.update(cx, |this, cx| {
+            let retry = this.update(cx, |this, cx| {
+                if this.revision != fetch_rev {
+                    return (this.latest_fetch_rev == fetch_rev).then(|| this.fetch(cx));
+                }
+
                 match result {
                     Ok(stored) => {
                         this.stored = stored;
@@ -243,8 +290,11 @@ impl DictionaryGroups {
                     }
                 }
                 this.changed(cx);
-            })
-            .ok();
+                None
+            });
+            if let Ok(Some(retry)) = retry {
+                retry.await;
+            }
         })
     }
 
@@ -259,7 +309,7 @@ impl DictionaryGroups {
         cx: &mut Context<Self>,
     ) {
         let scope = self.scope;
-        let request = backend::call(cx, change);
+        let request = backend::call_dictionary(cx, scope.queue(), change);
 
         cx.spawn(async move |this, cx| {
             let Err(error) = request.await else {
@@ -321,8 +371,14 @@ impl DictionaryGroups {
         cx: &mut Context<Self>,
     ) {
         match event.clone() {
-            WordListEvent::AddWord { key, word } => self.add_word(key, word, window, cx),
-            WordListEvent::EditWord { word_id, word } => self.edit_word(word_id, word, cx),
+            WordListEvent::AddWord { key, word, add_id } => {
+                self.add_word(key, word, add_id, window, cx)
+            }
+            WordListEvent::EditWord {
+                word_id,
+                word,
+                save_id,
+            } => self.edit_word(word_id, word, save_id, window, cx),
             WordListEvent::DeleteWord { word_id } => self.delete_word(word_id, cx),
             WordListEvent::RemoveGroup(key) => self.remove_group(&key, cx),
         }
@@ -332,71 +388,155 @@ impl DictionaryGroups {
         &mut self,
         key: SharedString,
         word: String,
+        add_id: u64,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let scope = self.scope;
+        let submitted = word.clone();
         let Some(group) = self
             .groups()
             .find(|group| group.key == key.as_ref())
             .cloned()
         else {
-            self.editor
-                .update(cx, |editor, cx| editor.finish_adding(&key, None, cx));
+            self.editor.update(cx, |editor, cx| {
+                editor.finish_adding(&key, add_id, &submitted, None, cx)
+            });
             return;
         };
-        let request = backend::call(cx, move |backend| scope.add_word(backend, &group, &word));
+        let group_key = group.key.clone();
+        let group_name = group.name.clone();
+        let group_gen = self.group_generation(key.as_ref());
+        *self.adding_groups.entry(key.to_string()).or_default() += 1;
+        let request = backend::call_dictionary(cx, scope.queue(), move |backend| {
+            scope.add_word(backend, &group, &word)
+        });
 
-        cx.spawn_in(window, async move |this, cx| {
-            let result = request.await;
-
-            if result.is_ok() {
+        cx.spawn_in(window, async move |this, cx| match request.await {
+            Ok(added) => {
                 let fetch = this.update_in(cx, |this, window, cx| {
-                    this.editor
-                        .update(cx, |editor, cx| editor.clear_new_word(&key, window, cx));
+                    this.finish_pending_add(key.as_ref());
+                    if this.group_generation(key.as_ref()) != group_gen {
+                        // The group was removed while this add was in flight;
+                        // a queued backend delete will remove the word from
+                        // storage, so do not put the group back on screen.
+                        this.editor.update(cx, |editor, cx| {
+                            editor.finish_adding(&key, add_id, &submitted, None, cx)
+                        });
+                        return None;
+                    }
+
+                    this.editor.update(cx, |editor, cx| {
+                        editor.clear_new_word(&key, &submitted, window, cx)
+                    });
                     analytics::capture(cx, scope.word_added_event(), &[]);
 
-                    // With its first word the dictionary is a stored one. It
-                    // stays on screen until the stored ones have been fetched.
+                    if let Some(existing) = this.stored.iter_mut().find(|g| g.key == key.as_ref()) {
+                        if !existing.words.iter().any(|word| word.id == added.id) {
+                            existing.words.insert(0, added);
+                        }
+                    } else {
+                        this.stored.push(Group {
+                            key: group_key,
+                            name: group_name,
+                            words: vec![added],
+                        });
+                    }
+                    // With its first word the dictionary is a stored one.
                     this.pending.retain(|pending| pending.key != key.as_ref());
+                    this.revision += 1;
+                    this.changed(cx);
+                    Some(this.fetch(cx))
+                });
+
+                if let Ok(Some(fetch)) = fetch {
+                    fetch.await;
+
+                    this.update(cx, |this, cx| {
+                        this.editor.update(cx, |editor, cx| {
+                            editor.finish_adding(&key, add_id, &submitted, None, cx)
+                        });
+                    })
+                    .ok();
+                }
+            }
+            Err(error) => {
+                // What was typed stays in the field, to be corrected or
+                // sent again.
+                if error != DUPLICATE_WORD_ERROR {
+                    log::error!(target: "dictionary", "add_failed scope={scope:?} error={error}");
+                }
+                this.update(cx, |this, cx| {
+                    this.finish_pending_add(key.as_ref());
+                    let notice = (this.group_generation(key.as_ref()) == group_gen)
+                        .then(|| Notice::from_backend("dictionary.addFailed", error, cx));
+                    this.editor.update(cx, |editor, cx| {
+                        editor.finish_adding(&key, add_id, &submitted, notice, cx)
+                    });
+                })
+                .ok();
+            }
+        })
+        .detach();
+    }
+
+    fn edit_word(
+        &mut self,
+        word_id: String,
+        word: String,
+        save_id: u64,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let scope = self.scope;
+        let submitted = word.clone();
+        let request = backend::call_dictionary(cx, scope.queue(), {
+            let word_id = word_id.clone();
+            move |backend| scope.update_word(backend, &word_id, &word)
+        });
+
+        cx.spawn_in(window, async move |this, cx| match request.await {
+            Ok(updated) => {
+                this.update_in(cx, |this, window, cx| {
+                    analytics::capture(cx, scope.word_edited_event(), &[]);
+                    let stored_words =
+                        this.stored.iter_mut().flat_map(|group| &mut group.words);
+                    for stored in stored_words.filter(|stored| stored.id == word_id) {
+                        stored.word = updated.word.clone();
+                    }
+                    this.revision += 1;
+                    this.changed(cx);
+                    this.editor.update(cx, |editor, cx| {
+                        editor.finish_editing(&word_id, save_id, &submitted, None, window, cx);
+                    });
+                })
+                .ok();
+            }
+            Err(error) => {
+                if error != DUPLICATE_WORD_ERROR {
+                    log::error!(target: "dictionary", "change_failed scope={scope:?} error={error}");
+                }
+
+                let fetch = this.update_in(cx, |this, window, cx| {
+                    let notice = Notice::from_backend("dictionary.saveFailed", error, cx);
+                    this.editor.update(cx, |editor, cx| {
+                        editor.finish_editing(
+                            &word_id,
+                            save_id,
+                            &submitted,
+                            Some(notice),
+                            window,
+                            cx,
+                        );
+                    });
                     this.fetch(cx)
                 });
                 if let Ok(fetch) = fetch {
                     fetch.await;
                 }
             }
-
-            this.update(cx, |this, cx| {
-                // What was typed stays in the field, to be corrected or sent
-                // again.
-                let error = result.err().map(|error| {
-                    log::error!(target: "dictionary", "add_failed scope={scope:?} error={error}");
-                    Notice::new("dictionary.addFailed", error, cx)
-                });
-                this.editor
-                    .update(cx, |editor, cx| editor.finish_adding(&key, error, cx));
-            })
-            .ok();
         })
         .detach();
-    }
-
-    fn edit_word(&mut self, word_id: String, word: String, cx: &mut Context<Self>) {
-        let scope = self.scope;
-        analytics::capture(cx, scope.word_edited_event(), &[]);
-
-        let stored_words = self.stored.iter_mut().flat_map(|group| &mut group.words);
-        for stored in stored_words.filter(|stored| stored.id == word_id) {
-            stored.word = word.clone();
-        }
-        self.changed(cx);
-
-        self.persist(
-            Changed::Word(word_id.clone()),
-            "dictionary.saveFailed",
-            move |backend| scope.update_word(backend, &word_id, &word),
-            cx,
-        );
     }
 
     fn delete_word(&mut self, word_id: String, cx: &mut Context<Self>) {
@@ -406,6 +546,7 @@ impl DictionaryGroups {
         for group in &mut self.stored {
             group.words.retain(|stored| stored.id != word_id);
         }
+        self.revision += 1;
         self.changed(cx);
 
         self.persist(
@@ -420,13 +561,17 @@ impl DictionaryGroups {
         let scope = self.scope;
         analytics::capture(cx, scope.group_removed_event(), &[]);
 
-        // A dictionary without words is not stored.
+        // A dictionary without stored words or an in-flight first word is not
+        // stored. If a word add is in flight, queue the delete behind it.
         let stored = self
             .groups()
-            .any(|group| group.key == key && !group.words.is_empty());
+            .any(|group| group.key == key && !group.words.is_empty())
+            || self.adding_groups.contains_key(key);
 
+        *self.group_generations.entry(key.to_string()).or_default() += 1;
         self.pending.retain(|group| group.key != key);
         self.stored.retain(|group| group.key != key);
+        self.revision += 1;
         self.changed(cx);
 
         if stored {
