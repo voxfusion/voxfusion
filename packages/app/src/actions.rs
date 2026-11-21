@@ -7,6 +7,8 @@ actions!(
     [
         /// Opens the settings.
         OpenSettings,
+        /// Focuses the transcription search field on Home.
+        FocusSearch,
         /// Closes the main window; the app keeps running in the menu bar.
         CloseWindow,
         Quit,
@@ -21,6 +23,7 @@ actions!(
 pub fn bind_keys(cx: &mut App) {
     cx.bind_keys([
         KeyBinding::new("cmd-,", OpenSettings, Some("MainWindow")),
+        KeyBinding::new("cmd-f", FocusSearch, Some("Home")),
         KeyBinding::new("cmd-w", CloseWindow, None),
         KeyBinding::new("cmd-q", Quit, None),
         KeyBinding::new("tab", NextControl, Some("Settings")),

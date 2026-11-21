@@ -8462,6 +8462,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tray-icon",
+ "unicase",
  "unicode-linebreak",
  "unicode-segmentation",
  "url",

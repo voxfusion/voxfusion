@@ -1,10 +1,12 @@
 use chrono::Utc;
-use rusqlite::{Connection, OptionalExtension as _, params};
+use rusqlite::functions::FunctionFlags;
+use rusqlite::{Connection, OptionalExtension as _, Row, params};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 use crate::backend::{
-    DictionaryWord, MAX_WORD_CHARS, Transcription, TranscriptionPage, TranscriptionResult,
+    DictionaryWord, MAX_WORD_CHARS, Transcription, TranscriptionCursor, TranscriptionPage,
+    TranscriptionResult, fold_search_text,
 };
 
 pub struct DbState {
@@ -30,11 +32,24 @@ pub fn init_db() -> Result<DbState, String> {
     )
     .map_err(|e| e.to_string())?;
 
+    register_functions(&conn)?;
     run_migrations(&conn)?;
 
     Ok(DbState {
         conn: Mutex::new(conn),
     })
+}
+
+/// Registers Unicode-aware helpers that SQLite's built-in ASCII-only functions
+/// lack.
+fn register_functions(conn: &Connection) -> Result<(), String> {
+    conn.create_scalar_function(
+        "unicode_fold",
+        1,
+        FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+        |ctx| Ok(ctx.get::<Option<String>>(0)?.map(|value| fold_search_text(&value))),
+    )
+    .map_err(|e| format!("Failed to register SQLite functions: {}", e))
 }
 
 fn run_migrations(conn: &Connection) -> Result<(), String> {
@@ -108,6 +123,17 @@ pub fn save_transcription(
     })
 }
 
+fn row_to_transcription(row: &Row<'_>) -> rusqlite::Result<Transcription> {
+    Ok(Transcription {
+        id: row.get(0)?,
+        text: row.get(1)?,
+        word_count: row.get(2)?,
+        processing_time_ms: row.get(3)?,
+        audio_duration_ms: row.get(4)?,
+        created_at: row.get(5)?,
+    })
+}
+
 /// A page of transcriptions, newest first, older than `cursor` (the
 /// `created_at` of the last one already listed).
 pub fn list_transcriptions(
@@ -127,19 +153,10 @@ pub fn list_transcriptions(
                  FROM transcriptions WHERE created_at < ?1 ORDER BY created_at DESC LIMIT ?2",
             )
             .map_err(|e| e.to_string())?;
-        stmt.query_map(params![cursor, fetch_limit], |row| {
-            Ok(Transcription {
-                id: row.get(0)?,
-                text: row.get(1)?,
-                word_count: row.get(2)?,
-                processing_time_ms: row.get(3)?,
-                audio_duration_ms: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?
+        stmt.query_map(params![cursor, fetch_limit], row_to_transcription)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     } else {
         let mut stmt = conn
             .prepare(
@@ -147,19 +164,10 @@ pub fn list_transcriptions(
                  FROM transcriptions ORDER BY created_at DESC LIMIT ?1",
             )
             .map_err(|e| e.to_string())?;
-        stmt.query_map(params![fetch_limit], |row| {
-            Ok(Transcription {
-                id: row.get(0)?,
-                text: row.get(1)?,
-                word_count: row.get(2)?,
-                processing_time_ms: row.get(3)?,
-                audio_duration_ms: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?
+        stmt.query_map(params![fetch_limit], row_to_transcription)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
     };
 
     let limit = limit as usize;
@@ -169,6 +177,81 @@ pub fn list_transcriptions(
     Ok(TranscriptionPage {
         transcriptions,
         has_more,
+        total_count: None,
+    })
+}
+
+/// Searches every saved transcription for `query` (Unicode case-insensitive),
+/// returning one newest-first page older than `cursor` along with the total
+/// match count across all pages.
+pub fn search_transcriptions(
+    state: &DbState,
+    query: &str,
+    limit: i64,
+    cursor: Option<TranscriptionCursor>,
+) -> Result<TranscriptionPage, String> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return list_transcriptions(state, limit, cursor.map(|c| c.created_at));
+    }
+
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let limit = limit.max(0);
+    let fetch_limit = limit + 1;
+    let needle = fold_search_text(trimmed);
+
+    // `instr` matches literal substrings by byte length, so `%`, `_`, `\`,
+    // long queries, and embedded NUL bytes all behave identically to Rust's
+    // `str::contains` without `LIKE` wildcard or length hazards.
+    let total_count: usize = conn
+        .query_row(
+            "SELECT COUNT(*) FROM transcriptions WHERE instr(unicode_fold(text), ?1) > 0",
+            params![needle],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|e| e.to_string())?
+        .max(0) as usize;
+
+    let rows = if let Some(cursor) = cursor {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, text, word_count, processing_time_ms, audio_duration_ms, created_at \
+                 FROM transcriptions \
+                 WHERE instr(unicode_fold(text), ?1) > 0 \
+                   AND (created_at < ?2 OR (created_at = ?2 AND id < ?3)) \
+                 ORDER BY created_at DESC, id DESC LIMIT ?4",
+            )
+            .map_err(|e| e.to_string())?;
+        stmt.query_map(
+            params![needle, cursor.created_at, cursor.id, fetch_limit],
+            row_to_transcription,
+        )
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?
+    } else {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, text, word_count, processing_time_ms, audio_duration_ms, created_at \
+                 FROM transcriptions \
+                 WHERE instr(unicode_fold(text), ?1) > 0 \
+                 ORDER BY created_at DESC, id DESC LIMIT ?2",
+            )
+            .map_err(|e| e.to_string())?;
+        stmt.query_map(params![needle, fetch_limit], row_to_transcription)
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+
+    let limit = limit as usize;
+    let has_more = rows.len() > limit;
+    let transcriptions: Vec<Transcription> = rows.into_iter().take(limit).collect();
+
+    Ok(TranscriptionPage {
+        transcriptions,
+        has_more,
+        total_count: Some(total_count),
     })
 }
 
@@ -333,6 +416,7 @@ impl DbState {
     /// A fresh database that lives as long as the value.
     pub fn in_memory() -> Self {
         let conn = Connection::open_in_memory().expect("an in-memory database opens");
+        register_functions(&conn).expect("SQLite functions register");
         run_migrations(&conn).expect("migrations apply");
 
         Self {

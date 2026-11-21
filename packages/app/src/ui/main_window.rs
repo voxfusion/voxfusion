@@ -10,7 +10,7 @@ use gpui_kit::{
 };
 use std::time::Duration;
 
-use crate::actions::OpenSettings;
+use crate::actions::{FocusSearch, OpenSettings};
 use crate::backend::{self, AppEvent};
 use crate::events;
 use crate::settings::{self, MODEL_DOWNLOAD_STEP, SettingsStore};
@@ -206,7 +206,7 @@ impl MainView {
             (Some(_), _) if same_section => {}
             _ => {
                 self.page = Some(match route {
-                    Route::Home => Page::Home(cx.new(HomePage::new)),
+                    Route::Home => Page::Home(cx.new(|cx| HomePage::new(window, cx))),
                     Route::About => Page::About(cx.new(|_| AboutPage)),
                     Route::Dictionary(tab) => {
                         Page::Dictionary(cx.new(|cx| DictionaryPage::new(tab, window, cx)))
@@ -214,10 +214,20 @@ impl MainView {
                     Route::Style(tab) => Page::Style(cx.new(|cx| StylePage::new(tab, window, cx))),
                 });
                 self.scroll.set_offset(gpui_kit::point(px(0.), px(0.)));
+                if self.settings_modal.is_none() && self.onboarding.is_none() {
+                    window.focus(&self.focus_handle, cx);
+                }
             }
         }
 
         cx.notify();
+    }
+
+    fn home_is_active(&self) -> bool {
+        self.ready
+            && self.onboarding.is_none()
+            && self.settings_modal.is_none()
+            && matches!(self.page, Some(Page::Home(_)))
     }
 
     pub fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -436,11 +446,24 @@ impl Render for MainView {
             .id("main-window")
             // The window changes theme over 150ms, as the original's root does.
             .transition_colors()
-            .key_context("MainWindow")
+            .key_context(if self.home_is_active() {
+                "MainWindow Home"
+            } else {
+                "MainWindow"
+            })
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(|this, _: &OpenSettings, window, cx| {
                 log::debug!(target: "app", "settings_shortcut_pressed");
                 this.open_settings(window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &FocusSearch, window, cx| {
+                if !this.home_is_active() {
+                    return;
+                }
+                if let Some(Page::Home(home)) = &this.page {
+                    this.scroll.set_offset(gpui_kit::point(px(0.), px(0.)));
+                    home.update(cx, |home, cx| home.focus_search(window, cx));
+                }
             }))
             .relative()
             .size_full()

@@ -20,10 +20,40 @@ pub struct Transcription {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TranscriptionCursor {
+    pub created_at: String,
+    pub id: String,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TranscriptionPage {
     pub transcriptions: Vec<Transcription>,
     pub has_more: bool,
+    #[serde(default)]
+    pub total_count: Option<usize>,
+}
+
+/// Appends the full Unicode case-folded form of `ch` to `out`.
+///
+/// Folding character-by-character with `unicase` keeps SQLite search, fixture
+/// search, and Home preview highlighting in exact agreement across full
+/// Unicode CaseFolding (including Greek `Σ`/`ς`, German `ß`/`ẞ`, and ligatures
+/// such as `ﬃ` -> `ffi`).
+pub fn fold_search_char(ch: char, out: &mut String) {
+    if ch.is_ascii() {
+        out.push(ch.to_ascii_lowercase());
+    } else {
+        let mut buf = [0u8; 4];
+        let encoded = ch.encode_utf8(&mut buf);
+        out.push_str(&unicase::UniCase::unicode(encoded).to_folded_case());
+    }
+}
+
+/// Returns the full Unicode case-folded form of `input` used for dictation
+/// search.
+pub fn fold_search_text(input: &str) -> String {
+    unicase::UniCase::new(input).to_folded_case()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -305,6 +335,12 @@ pub trait Backend: Send + Sync + 'static {
         &self,
         limit: i64,
         cursor: Option<String>,
+    ) -> CommandResult<TranscriptionPage>;
+    fn search_transcriptions(
+        &self,
+        query: &str,
+        limit: i64,
+        cursor: Option<TranscriptionCursor>,
     ) -> CommandResult<TranscriptionPage>;
     /// Deletes a transcription and its recording.
     fn delete_transcription(&self, id: &str) -> CommandResult<()>;
