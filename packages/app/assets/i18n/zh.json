@@ -61,7 +61,7 @@
 	"style.defaultStyleDescription": "用于所有听写，其他选项卡中设置的应用和网站除外。选择的风格会立即生效。",
 	"style.inUse": "使用中",
 	"style.saved": "已保存",
-	"style.parakeetIgnoresStyles": "当前使用的 Parakeet 模型不支持风格。",
+	"style.modelIgnoresStyles": "当前使用的 {{model}} 模型不支持风格。",
 	"style.tabDefault": "默认",
 	"style.tabPerApp": "按应用",
 	"style.tabSites": "按网站",

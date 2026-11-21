@@ -61,7 +61,7 @@
 	"style.defaultStyleDescription": "Used for every dictation except apps and sites set on the other tabs. Choosing a style applies it right away.",
 	"style.inUse": "In use",
 	"style.saved": "Saved",
-	"style.parakeetIgnoresStyles": "Parakeet, the model in use, ignores styles.",
+	"style.modelIgnoresStyles": "{{model}}, the model in use, ignores styles.",
 	"style.tabDefault": "Default",
 	"style.tabPerApp": "Per-App",
 	"style.tabSites": "Per-Site",

@@ -7,8 +7,6 @@ use gpui_kit::{
 use std::time::Duration;
 
 use crate::analytics;
-use crate::backend::{self, AppEvent};
-use crate::events;
 use crate::settings::{STYLE_LIST, SettingsStore};
 use crate::ui::motion::Transitions as _;
 use crate::ui::pages::section::list_header;
@@ -31,53 +29,32 @@ fn style_description(style: &str, cx: &Context<DefaultStyle>) -> SharedString {
 }
 
 pub struct DefaultStyle {
-    /// Whether the model in use is Parakeet, which ignores styles. Unknown
-    /// until the models have been listed.
-    parakeet: Option<bool>,
+    /// Whether the active model applies styles. Unknown until the models have
+    /// been listed.
+    styles_supported: Option<bool>,
     /// Hides the confirmation that the style changed. Set while it shows.
     saved: Option<Task<()>>,
-    _subscriptions: [Subscription; 2],
+    _subscription: Subscription,
 }
 
 impl DefaultStyle {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(styles_supported: Option<bool>, cx: &mut Context<Self>) -> Self {
         analytics::capture(cx, "$pageview", &[("$current_url", "/style".into())]);
 
-        let subscriptions = [
-            cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
-            cx.subscribe(&events::hub(cx), |this, _, event, cx| {
-                if let AppEvent::ActiveModelChanged = event {
-                    this.check_model(cx);
-                }
-            }),
-        ];
-
-        let mut page = Self {
-            parakeet: None,
+        Self {
+            styles_supported,
             saved: None,
-            _subscriptions: subscriptions,
-        };
-        page.check_model(cx);
-        page
+            _subscription: cx.observe(&SettingsStore::entity(cx), |_, _, cx| cx.notify()),
+        }
     }
 
-    fn check_model(&mut self, cx: &mut Context<Self>) {
-        let models = backend::call(cx, |backend| backend.list_models());
+    pub fn set_styles_supported(&mut self, styles_supported: Option<bool>, cx: &mut Context<Self>) {
+        if self.styles_supported == styles_supported {
+            return;
+        }
 
-        cx.spawn(async move |this, cx| {
-            let parakeet = models.await.is_ok_and(|models| {
-                models
-                    .iter()
-                    .any(|model| model.active && model.engine == "parakeet")
-            });
-
-            this.update(cx, |this, cx| {
-                this.parakeet = Some(parakeet);
-                cx.notify();
-            })
-            .ok();
-        })
-        .detach();
+        self.styles_supported = styles_supported;
+        cx.notify();
     }
 
     fn select(&mut self, style: &'static str, cx: &mut Context<Self>) {
@@ -121,14 +98,10 @@ impl DefaultStyle {
 
         if self.saved.is_some() {
             confirmed(status, "style.saved")
+        } else if self.styles_supported == Some(true) {
+            confirmed(status, "style.inUse")
         } else {
-            match self.parakeet {
-                Some(false) => confirmed(status, "style.inUse"),
-                Some(true) => status
-                    .text_color(p.txt_muted)
-                    .child(text(t(cx, "style.parakeetIgnoresStyles"))),
-                None => status,
-            }
+            status
         }
     }
 }

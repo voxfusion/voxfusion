@@ -61,7 +61,7 @@
 	"style.defaultStyleDescription": "Usato per ogni dettatura, tranne nelle app e nei siti degli altri tab. Lo stile scelto si applica subito.",
 	"style.inUse": "In uso",
 	"style.saved": "Salvato",
-	"style.parakeetIgnoresStyles": "Parakeet, il modello in uso, ignora gli stili.",
+	"style.modelIgnoresStyles": "{{model}}, il modello in uso, ignora gli stili.",
 	"style.tabDefault": "Predefinito",
 	"style.tabPerApp": "Per App",
 	"style.tabSites": "Per Sito",
