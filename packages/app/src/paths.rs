@@ -19,6 +19,12 @@ fn home_dir() -> PathBuf {
 pub fn data_dir() -> PathBuf {
     let base = if cfg!(target_os = "macos") {
         home_dir().join("Library/Application Support")
+    } else if cfg!(target_os = "windows") {
+        std::env::var_os("LOCALAPPDATA")
+            .or_else(|| std::env::var_os("APPDATA"))
+            .map(PathBuf::from)
+            .filter(|path| path.is_absolute())
+            .unwrap_or_else(|| home_dir().join("AppData").join("Local"))
     } else {
         std::env::var_os("XDG_DATA_HOME")
             .map(PathBuf::from)
@@ -41,9 +47,19 @@ pub fn settings_file() -> PathBuf {
     data_dir().join("settings.json")
 }
 
-/// The `Contents/Resources` directory of the app bundle, when running from one.
+/// The `Contents/Resources` directory of the macOS app bundle, or the
+/// resources directory alongside the executable on Windows.
 pub fn resource_dir() -> Option<PathBuf> {
     let executable = std::env::current_exe().ok()?;
+    if cfg!(target_os = "windows") {
+        let dir = executable.parent()?;
+        let resources = dir.join("resources");
+        return Some(if resources.is_dir() {
+            resources
+        } else {
+            dir.to_path_buf()
+        });
+    }
     let contents = executable.parent()?.parent()?;
 
     (contents.file_name()? == "Contents").then(|| contents.join("Resources"))

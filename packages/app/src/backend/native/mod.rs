@@ -12,7 +12,7 @@ mod models;
 mod parakeet;
 pub mod permissions;
 mod sites;
-mod text;
+pub(crate) mod text;
 mod whisper;
 
 use std::path::{Path, PathBuf};
@@ -67,6 +67,12 @@ impl NativeBackend {
             crate::platform::accessibility_watcher::setup(&events);
             media::watch_audio_devices(&events);
             log::info!(target: "runtime", "macos_listeners_setup");
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            media::watch_audio_devices(&events);
+            log::info!(target: "runtime", "windows_listeners_setup");
         }
 
         microphones::watch_lid(audio::lid_changed);

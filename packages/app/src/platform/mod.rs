@@ -7,6 +7,7 @@ pub mod drawables;
 pub mod lid;
 pub mod main_thread;
 pub mod overlay_window;
+pub mod window_icon;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub mod system_key_watcher;

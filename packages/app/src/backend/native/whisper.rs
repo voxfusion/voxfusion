@@ -1,10 +1,78 @@
 use std::path::Path;
+#[cfg(target_os = "windows")]
+use std::path::PathBuf;
+#[cfg(target_os = "windows")]
+use std::sync::{Arc, LazyLock, Mutex};
 
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 use super::db::DbState;
 use super::{apps, audio, models, parakeet, sites};
 use crate::backend::TranscriptionResult;
+
+#[cfg(target_os = "windows")]
+struct CachedWhisper {
+    path: PathBuf,
+    ctx: Arc<WhisperContext>,
+}
+
+#[cfg(target_os = "windows")]
+static WHISPER_CACHE: LazyLock<Mutex<Option<CachedWhisper>>> = LazyLock::new(|| Mutex::new(None));
+
+/// Drops the cached Whisper model context (for example when switching or
+/// deleting models) so its memory is released immediately.
+pub fn clear_cache() {
+    #[cfg(target_os = "windows")]
+    if let Ok(mut guard) = WHISPER_CACHE.lock() {
+        *guard = None;
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn load_whisper_context(model_path: &Path) -> Result<Arc<WhisperContext>, String> {
+    if let Ok(guard) = WHISPER_CACHE.lock()
+        && let Some(cached) = guard.as_ref()
+        && cached.path == model_path
+    {
+        return Ok(cached.ctx.clone());
+    }
+
+    let mut ctx_params = WhisperContextParameters::default();
+    // CPU builds run significantly faster through standard SGEMM attention
+    // than CPU Flash Attention.
+    ctx_params.flash_attn(false);
+
+    // MinGW's narrow `std::ifstream` inside whisper.cpp uses the active ANSI
+    // codepage rather than UTF-8, so non-ASCII profile paths fail to open by
+    // path. Read through Rust's wide Win32 path APIs in that case.
+    let raw_ctx = if model_path.to_str().is_some_and(|s| s.is_ascii()) {
+        WhisperContext::new_with_params(model_path, ctx_params)
+            .map_err(|e| format!("Failed to load model: {}", e))?
+    } else {
+        let bytes = std::fs::read(model_path)
+            .map_err(|e| format!("Failed to read model file: {}", e))?;
+        WhisperContext::new_from_buffer_with_params(&bytes, ctx_params)
+            .map_err(|e| format!("Failed to load model from buffer: {}", e))?
+    };
+    let ctx = Arc::new(raw_ctx);
+
+    if let Ok(mut guard) = WHISPER_CACHE.lock() {
+        *guard = Some(CachedWhisper {
+            path: model_path.to_path_buf(),
+            ctx: ctx.clone(),
+        });
+    }
+    Ok(ctx)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn load_whisper_context(model_path: &Path) -> Result<WhisperContext, String> {
+    let mut ctx_params = WhisperContextParameters::default();
+    // whisper-rs disables Flash Attention by default, so enable it explicitly.
+    ctx_params.flash_attn(true);
+    WhisperContext::new_with_params(model_path, ctx_params)
+        .map_err(|e| format!("Failed to load model: {}", e))
+}
 
 fn cap_prompt_chars(s: &str, max_chars: usize) -> String {
     if s.chars().count() <= max_chars {
@@ -13,6 +81,7 @@ fn cap_prompt_chars(s: &str, max_chars: usize) -> String {
     s.chars().take(max_chars).collect()
 }
 
+#[cfg(not(target_os = "windows"))]
 const WHISPER_BEAM_SIZE: i32 = 8;
 
 /// Whether the active model is on disk and ready to transcribe.
@@ -211,11 +280,7 @@ fn transcribe_whisper(
     style_key: &str,
     dictionary: Option<&str>,
 ) -> Result<String, String> {
-    let mut ctx_params = WhisperContextParameters::default();
-    // whisper-rs disables Flash Attention by default, so enable it explicitly.
-    ctx_params.flash_attn(true);
-    let ctx = WhisperContext::new_with_params(model_path, ctx_params)
-        .map_err(|e| format!("Failed to load model: {}", e))?;
+    let ctx = load_whisper_context(model_path)?;
 
     let thread_count = std::thread::available_parallelism()
         .map(|count| count.get().saturating_sub(1).max(1) as i32)
@@ -225,29 +290,41 @@ fn transcribe_whisper(
         .create_state()
         .map_err(|e| format!("Failed to create state: {}", e))?;
 
-    // Step 1: encode mel + detect language so we can pick a same-language prompt.
-    state
-        .pcm_to_mel(audio_data, thread_count as usize)
-        .map_err(|e| format!("Failed to compute mel: {:?}", e))?;
-    let detected_lang = match state.lang_detect(0, thread_count as usize) {
-        Ok((lang_id, _probs)) => whisper_rs::get_lang_str(lang_id)
-            .unwrap_or(apps::DEFAULT_LOCALE)
-            .to_string(),
-        Err(e) => {
-            eprintln!("[whisper] lang_detect failed: {:?}", e);
-            apps::DEFAULT_LOCALE.to_string()
-        }
-    };
-
-    // Step 2: compose the selected style and vocabulary in the detected language.
-    let style_text = apps::style_prompt_text(style_key, &detected_lang);
+    // Step 1 & 2: detect language so we can pick a same-language style prompt.
+    // On Windows CPU builds, skip the extra encoder pass when using the default
+    // style (which has no style prompt in any language) and let `state.full`
+    // auto-detect the language in a single pass.
+    let (detected_lang, style_text) =
+        if cfg!(target_os = "windows") && style_key == apps::DEFAULT_STYLE_KEY {
+            (None, "")
+        } else {
+            state
+                .pcm_to_mel(audio_data, thread_count as usize)
+                .map_err(|e| format!("Failed to compute mel: {:?}", e))?;
+            let lang = match state.lang_detect(0, thread_count as usize) {
+                Ok((lang_id, _probs)) => whisper_rs::get_lang_str(lang_id)
+                    .unwrap_or(apps::DEFAULT_LOCALE)
+                    .to_string(),
+                Err(e) => {
+                    eprintln!("[whisper] lang_detect failed: {:?}", e);
+                    apps::DEFAULT_LOCALE.to_string()
+                }
+            };
+            let style = apps::style_prompt_text(style_key, &lang);
+            (Some(lang), style)
+        };
     let composed_prompt = compose_prompt(style_text, dictionary);
 
     // Step 3: run full transcription with the resolved prompt.
-    let mut params = FullParams::new(SamplingStrategy::BeamSearch {
+    #[cfg(not(target_os = "windows"))]
+    let strategy = SamplingStrategy::BeamSearch {
         beam_size: WHISPER_BEAM_SIZE,
         patience: -1.0,
-    });
+    };
+    #[cfg(target_os = "windows")]
+    let strategy = SamplingStrategy::Greedy { best_of: 1 };
+
+    let mut params = FullParams::new(strategy);
     params.set_n_threads(thread_count);
     params.set_no_context(true);
     params.set_no_timestamps(true);
@@ -259,7 +336,7 @@ fn transcribe_whisper(
     params.set_temperature(0.0);
     params.set_temperature_inc(0.0);
     params.set_translate(false);
-    params.set_language(Some(&detected_lang));
+    params.set_language(detected_lang.as_deref());
 
     let capped_prompt = composed_prompt.as_deref().map(|p| cap_prompt_chars(p, 700));
     if let Some(ref p) = capped_prompt {
@@ -267,12 +344,15 @@ fn transcribe_whisper(
         eprintln!(
             "[whisper] initial_prompt: {} chars lang={} (head: {:?})",
             p.chars().count(),
-            detected_lang,
+            detected_lang.as_deref().unwrap_or("auto"),
             preview
         );
         params.set_initial_prompt(p);
     } else {
-        eprintln!("[whisper] no initial_prompt lang={}", detected_lang);
+        eprintln!(
+            "[whisper] no initial_prompt lang={}",
+            detected_lang.as_deref().unwrap_or("auto")
+        );
     }
 
     state

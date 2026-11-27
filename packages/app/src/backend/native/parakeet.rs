@@ -12,6 +12,9 @@ use std::process::Command;
 
 use super::audio;
 
+#[cfg(target_os = "windows")]
+const BIN_NAME: &str = "crispasr.exe";
+#[cfg(not(target_os = "windows"))]
 const BIN_NAME: &str = "crispasr";
 
 /// Resolves the `crispasr` engine binary. Search order:
@@ -100,6 +103,12 @@ pub fn transcribe(
         .to_string();
 
     let mut command = Command::new(&binary);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
     command
         .arg("-m")
         .arg(model_path)

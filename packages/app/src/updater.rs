@@ -503,6 +503,7 @@ fn unpack_bundle(archive: &[u8], destination: &Path) -> io::Result<()> {
 mod tests {
     use super::*;
     use std::io::{Cursor, Read as _};
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt as _;
 
     const MANIFEST: &str = r#"{
@@ -771,6 +772,7 @@ mod tests {
         )
         .unwrap();
         fs::write(macos.join(executable), marker).unwrap();
+        #[cfg(unix)]
         fs::set_permissions(macos.join(executable), fs::Permissions::from_mode(0o755)).unwrap();
         fs::write(bundle.join("Contents/Resources/bin/engine"), marker).unwrap();
     }
@@ -841,6 +843,7 @@ mod tests {
         assert_eq!(bundle_executable(&bundle), Some(executable.clone()));
         assert_eq!(read(executable.clone()), "new");
         assert_eq!(read(bundle.join("Contents/Resources/bin/engine")), "new");
+        #[cfg(unix)]
         assert_eq!(
             executable.metadata().unwrap().permissions().mode() & 0o777,
             0o755
@@ -859,6 +862,7 @@ mod tests {
         assert_eq!(entries(folder.path()), ["VoxFusion.app"]);
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_replaced_bundle_gets_a_fresh_date() {
         let folder = tempfile::tempdir().unwrap();
@@ -946,6 +950,7 @@ mod tests {
         assert!(entries(&staging.path).is_empty());
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_folder_that_cannot_be_changed_takes_an_administrator() {
         let folder = tempfile::tempdir().unwrap();
@@ -983,6 +988,7 @@ mod tests {
     const AWKWARD_FOLDER: &str = r#"Apps & "Tools" it's $HOME `id` \back\slash"#;
     const AWKWARD_BUNDLE: &str = r#"Vox "Fusion" (it's new).app"#;
 
+    #[cfg(unix)]
     fn run_in_shell(command: &str) -> bool {
         Command::new("/bin/sh")
             .arg("-c")
@@ -992,6 +998,7 @@ mod tests {
             .success()
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_administrators_command_swaps_the_bundles() {
         let root = tempfile::tempdir().unwrap();
@@ -1017,6 +1024,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_administrators_command_puts_the_old_bundle_back() {
         let root = tempfile::tempdir().unwrap();
@@ -1034,6 +1042,7 @@ mod tests {
         assert_eq!(entries(&folder), [AWKWARD_BUNDLE]);
     }
 
+    #[cfg(unix)]
     #[test]
     fn the_administrators_command_changes_nothing_without_a_bundle() {
         let root = tempfile::tempdir().unwrap();
@@ -1064,6 +1073,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn paths_a_command_cannot_name_are_refused() {
         use std::os::unix::ffi::OsStrExt as _;

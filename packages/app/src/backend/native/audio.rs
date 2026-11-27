@@ -215,12 +215,14 @@ pub fn start_recording_with_device(
 
     let host = cpal::default_host();
     let (device, kind) = input_device(&host, device_name.as_deref())?;
-    let config: cpal::StreamConfig = device
+    let supported_config = device
         .default_input_config()
-        .map_err(|err| err.to_string())?
-        .config();
+        .map_err(|err| err.to_string())?;
+    let sample_format = supported_config.sample_format();
+    let config: cpal::StreamConfig = supported_config.config();
 
     // Capture as f32 whatever the hardware format is; CoreAudio converts, and
+    // on Windows/Linux we convert non-f32 device samples in the callback so
     // the WAV spec stays independent of the device.
     let spec = WavSpec {
         channels: config.channels,
@@ -241,7 +243,7 @@ pub fn start_recording_with_device(
         spec,
         events: events.clone(),
     };
-    let input = match open_input(&sink, &device, kind, &config, true) {
+    let input = match open_input(&sink, &device, kind, &config, sample_format, true) {
         Ok(input) => input,
         Err(err) => {
             discard_recording_file(&sink.writer, &save_path);
@@ -286,6 +288,7 @@ fn open_input(
     device: &cpal::Device,
     kind: InputKind,
     config: &cpal::StreamConfig,
+    sample_format: cpal::SampleFormat,
     current: bool,
 ) -> Result<Input, String> {
     let id = sink.id;
@@ -327,32 +330,82 @@ fn open_input(
         std::thread::spawn(move || fail_recording(id, &events, message));
     };
 
-    let stream = device
-        .build_input_stream(
-            config,
-            move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                data_clock
-                    .last_input_ms
-                    .store(elapsed_ms(), Ordering::Relaxed);
-                // `current` is read under the writer's lock, which switching
-                // microphones takes: no sample of the previous microphone
-                // follows one of the next.
-                if let Ok(mut guard) = data_writer.try_lock()
-                    && data_current.load(Ordering::Relaxed)
-                    && let Some(writer) = guard.as_mut()
-                {
-                    write_input_data_with_levels(
-                        converter.convert(data),
-                        writer,
-                        &data_events,
-                        &mut last_level_emit_ms,
-                    );
-                }
-            },
-            err_fn,
-            None,
-        )
-        .map_err(|err| err.to_string())?;
+    let mut handle_f32 = move |data: &[f32]| {
+        data_clock
+            .last_input_ms
+            .store(elapsed_ms(), Ordering::Relaxed);
+        // `current` is read under the writer's lock, which switching
+        // microphones takes: no sample of the previous microphone
+        // follows one of the next.
+        if let Ok(mut guard) = data_writer.try_lock()
+            && data_current.load(Ordering::Relaxed)
+            && let Some(writer) = guard.as_mut()
+        {
+            write_input_data_with_levels(
+                converter.convert(data),
+                writer,
+                &data_events,
+                &mut last_level_emit_ms,
+            );
+        }
+    };
+
+    // On Windows WASAPI, CPAL opens shared-mode streams with
+    // AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, so requesting F32 lets WASAPI
+    // convert any hardware format cleanly and avoids CPAL 0.17's malformed
+    // WAVEFORMATEXTENSIBLE for 24-bit (I24/U24) endpoints.
+    let sample_format = if cfg!(target_os = "windows") {
+        cpal::SampleFormat::F32
+    } else {
+        sample_format
+    };
+
+    let stream = match sample_format {
+        cpal::SampleFormat::F32 => device
+            .build_input_stream(
+                config,
+                move |data: &[f32], _: &cpal::InputCallbackInfo| handle_f32(data),
+                err_fn,
+                None,
+            )
+            .map_err(|err| err.to_string())?,
+        cpal::SampleFormat::I16 => {
+            build_converted_input_stream::<i16>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::U16 => {
+            build_converted_input_stream::<u16>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::I24 => {
+            build_converted_input_stream::<cpal::I24>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::U24 => {
+            build_converted_input_stream::<cpal::U24>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::I32 => {
+            build_converted_input_stream::<i32>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::U32 => {
+            build_converted_input_stream::<u32>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::I64 => {
+            build_converted_input_stream::<i64>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::U64 => {
+            build_converted_input_stream::<u64>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::I8 => {
+            build_converted_input_stream::<i8>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::U8 => {
+            build_converted_input_stream::<u8>(device, config, handle_f32, err_fn)?
+        }
+        cpal::SampleFormat::F64 => {
+            build_converted_input_stream::<f64>(device, config, handle_f32, err_fn)?
+        }
+        other => {
+            return Err(format!("Unsupported input sample format: {other:?}"));
+        }
+    };
     stream.play().map_err(|err| err.to_string())?;
 
     Ok(Input {
@@ -361,6 +414,31 @@ fn open_input(
         clock,
         current,
     })
+}
+
+fn build_converted_input_stream<T>(
+    device: &cpal::Device,
+    config: &cpal::StreamConfig,
+    mut handle_f32: impl FnMut(&[f32]) + Send + 'static,
+    err_fn: impl FnMut(StreamError) + Send + 'static,
+) -> Result<Stream, String>
+where
+    T: cpal::SizedSample,
+    f32: cpal::FromSample<T>,
+{
+    let mut converted: Vec<f32> = Vec::new();
+    device
+        .build_input_stream(
+            config,
+            move |data: &[T], _: &cpal::InputCallbackInfo| {
+                converted.clear();
+                converted.extend(data.iter().map(|&sample| cpal::Sample::to_sample::<f32>(sample)));
+                handle_f32(&converted);
+            },
+            err_fn,
+            None,
+        )
+        .map_err(|err| err.to_string())
 }
 
 /// Reports a lid change. When the lid closes during a recording from the
@@ -400,11 +478,12 @@ fn take_over_from_built_in_microphone() {
     let input = microphones::replacement(&host)
         .ok_or_else(|| "no other microphone".to_string())
         .and_then(|(device, kind)| {
-            let config = device
+            let supported = device
                 .default_input_config()
-                .map_err(|err| err.to_string())?
-                .config();
-            let input = open_input(&sink, &device, kind, &config, false)?;
+                .map_err(|err| err.to_string())?;
+            let sample_format = supported.sample_format();
+            let config = supported.config();
+            let input = open_input(&sink, &device, kind, &config, sample_format, false)?;
             Ok((input, read_device_name(&device).unwrap_or_default(), config))
         });
 

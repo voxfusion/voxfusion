@@ -1,15 +1,17 @@
-//! The menu bar item. VoxFusion has no Dock icon and so no menu bar of its
-//! own; this menu is where the main window, the microphone choice, an update
-//! check and Quit are reached.
+//! The menu bar / system tray item. Closing the main window keeps VoxFusion
+//! running here; this menu is where the main window, the microphone choice,
+//! an update check and Quit are reached.
 
-#[cfg(target_os = "macos")]
-pub use macos::Tray;
-#[cfg(not(target_os = "macos"))]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub use desktop::Tray;
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub use unsupported::Tray;
 
 /// What the user chose in the menu.
-// Only the macOS menu produces these.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+#[cfg_attr(
+    not(any(target_os = "macos", target_os = "windows")),
+    allow(dead_code)
+)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrayCommand {
     ShowHome,
@@ -18,11 +20,14 @@ pub enum TrayCommand {
     Quit,
 }
 
-#[cfg(target_os = "macos")]
-mod macos {
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod desktop {
     use std::cell::RefCell;
+    use std::sync::Arc;
     use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, Submenu};
     use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+    #[cfg(target_os = "windows")]
+    use tray_icon::{MouseButton, MouseButtonState, TrayIconEvent};
 
     use super::TrayCommand;
 
@@ -42,7 +47,7 @@ mod macos {
         }
     }
 
-    /// The menu bar item. It must be created and kept on the main thread.
+    /// The menu bar / system tray item. It must be created and kept on the main thread.
     pub struct Tray {
         _icon: TrayIcon,
         microphones: Submenu,
@@ -50,8 +55,8 @@ mod macos {
     }
 
     impl Tray {
-        /// Adds the item to the menu bar. `on_command` runs on the main
-        /// thread when a menu item is chosen.
+        /// Adds the item to the menu bar or system tray. `on_command` runs when
+        /// a menu item (or on Windows, the tray icon itself) is activated.
         pub fn new(
             on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
         ) -> Result<Tray, String> {
@@ -70,20 +75,45 @@ mod macos {
             let icon =
                 Icon::from_rgba(image.pixels, image.width, image.height).map_err(|e| error(&e))?;
 
-            let tray_icon = TrayIconBuilder::new()
+            let builder = TrayIconBuilder::new()
                 .with_icon(icon)
+                .with_menu(Box::new(menu));
+
+            #[cfg(target_os = "macos")]
+            let builder = builder
                 // A template image is drawn in the menu bar's own color.
                 .with_icon_as_template(true)
-                .with_menu(Box::new(menu))
-                .with_menu_on_left_click(true)
-                .build()
-                .map_err(|e| error(&e))?;
+                .with_menu_on_left_click(true);
 
+            #[cfg(target_os = "windows")]
+            let builder = builder
+                .with_tooltip("VoxFusion")
+                .with_menu_on_left_click(false);
+
+            let tray_icon = builder.build().map_err(|e| error(&e))?;
+
+            let on_command = Arc::new(on_command);
+            let menu_handler = on_command.clone();
             MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
                 if let Some(command) = command_for(event.id().as_ref()) {
-                    on_command(command);
+                    menu_handler(command);
                 }
             }));
+
+            #[cfg(target_os = "windows")]
+            {
+                let click_handler = on_command;
+                TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        click_handler(TrayCommand::ShowHome);
+                    }
+                }));
+            }
 
             Ok(Tray {
                 _icon: tray_icon,
@@ -193,7 +223,7 @@ mod macos {
 }
 
 /// Other platforms run the app for development only, without a menu bar item.
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod unsupported {
     use super::TrayCommand;
 

@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+mod macos {
 use std::collections::BTreeSet;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -405,3 +407,297 @@ mod tests {
         ));
     }
 }
+}
+
+#[cfg(target_os = "macos")]
+pub use macos::{resynchronize, setup};
+
+#[cfg(target_os = "windows")]
+mod windows_impl {
+    use std::collections::{BTreeMap, BTreeSet, HashSet};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, Instant};
+
+    use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_PACKET, VK_RCONTROL,
+        VK_RMENU, VK_RSHIFT, VK_RWIN,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, MSG,
+        SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL, WM_KEYDOWN,
+        WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+    };
+
+    use crate::backend::{AppEvent, EventSender, SystemKey};
+
+    static EVENTS: OnceLock<EventSender> = OnceLock::new();
+    static PRESSED_KEYS: OnceLock<Mutex<BTreeMap<SystemKey, Instant>>> = OnceLock::new();
+    static PRESSED_REGULAR_KEYS: OnceLock<Mutex<HashSet<u32>>> = OnceLock::new();
+    static WATCHER_RUNNING: AtomicBool = AtomicBool::new(false);
+
+    /// Grace window before trusting `GetAsyncKeyState` to discard another
+    /// tracked modifier as stale, avoiding races on simultaneous chords.
+    const STALE_KEY_GRACE: Duration = Duration::from_millis(200);
+
+    const MODIFIER_VKS: [(SystemKey, u32); 8] = [
+        (SystemKey::LeftControl, VK_LCONTROL.0 as u32),
+        (SystemKey::RightControl, VK_RCONTROL.0 as u32),
+        (SystemKey::LeftOption, VK_LMENU.0 as u32),
+        (SystemKey::RightOption, VK_RMENU.0 as u32),
+        (SystemKey::LeftShift, VK_LSHIFT.0 as u32),
+        (SystemKey::RightShift, VK_RSHIFT.0 as u32),
+        (SystemKey::LeftCommand, VK_LWIN.0 as u32),
+        (SystemKey::RightCommand, VK_RWIN.0 as u32),
+    ];
+
+    fn pressed_keys() -> &'static Mutex<BTreeMap<SystemKey, Instant>> {
+        PRESSED_KEYS.get_or_init(|| Mutex::new(BTreeMap::new()))
+    }
+
+    fn pressed_regular_keys() -> &'static Mutex<HashSet<u32>> {
+        PRESSED_REGULAR_KEYS.get_or_init(|| Mutex::new(HashSet::new()))
+    }
+
+    fn key_from_vk(vk: u32) -> Option<SystemKey> {
+        MODIFIER_VKS
+            .iter()
+            .find(|(_, code)| *code == vk)
+            .map(|(key, _)| *key)
+    }
+
+    fn vk_from_key(key: SystemKey) -> Option<u32> {
+        MODIFIER_VKS
+            .iter()
+            .find(|(candidate, _)| *candidate == key)
+            .map(|(_, code)| *code)
+    }
+
+    fn is_vk_down(vk: u32) -> bool {
+        unsafe { GetAsyncKeyState(vk as i32) < 0 }
+    }
+
+    fn current_pressed_keys() -> BTreeSet<SystemKey> {
+        MODIFIER_VKS
+            .iter()
+            .filter_map(|(key, vk)| is_vk_down(*vk).then_some(*key))
+            .collect()
+    }
+
+    fn prune_stale_other_keys(
+        pressed: &mut BTreeMap<SystemKey, Instant>,
+        event_key: SystemKey,
+        now: Instant,
+    ) -> bool {
+        let mut removed = false;
+        pressed.retain(|&key, &mut pressed_at| {
+            if key == event_key {
+                return true;
+            }
+            if now.saturating_duration_since(pressed_at) >= STALE_KEY_GRACE
+                && vk_from_key(key).is_some_and(|vk| !is_vk_down(vk))
+            {
+                removed = true;
+                return false;
+            }
+            true
+        });
+        removed
+    }
+
+    fn handle_modifier_event(key: SystemKey, is_down: bool) {
+        let Some(events) = EVENTS.get() else {
+            return;
+        };
+
+        let now = Instant::now();
+        let mut pressed = pressed_keys()
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let previous: Vec<SystemKey> = pressed.keys().copied().collect();
+        let stale_pruned = prune_stale_other_keys(&mut pressed, key, now);
+
+        if is_down {
+            if pressed.contains_key(&key) {
+                if !stale_pruned {
+                    // Key auto-repeat while modifier is held.
+                    return;
+                }
+            } else {
+                pressed.insert(key, now);
+            }
+
+            let current: Vec<SystemKey> = pressed.keys().copied().collect();
+            drop(pressed);
+
+            if stale_pruned {
+                log::warn!(
+                    target: "hotkey",
+                    "system_key_state_resynchronized event_key={key:?} previous={previous:?} current={current:?}"
+                );
+                events.emit(AppEvent::SystemKeysReleased);
+            }
+            events.emit(AppEvent::SystemKeyPressed {
+                key,
+                pressed_keys: current,
+            });
+            return;
+        }
+
+        let was_present = pressed.remove(&key).is_some();
+        let current: Vec<SystemKey> = pressed.keys().copied().collect();
+        drop(pressed);
+
+        let was_resynchronized = stale_pruned || !was_present;
+        if was_resynchronized {
+            log::warn!(
+                target: "hotkey",
+                "system_key_state_resynchronized event_key={key:?} previous={previous:?} current={current:?}"
+            );
+            events.emit(AppEvent::SystemKeysReleased);
+        }
+
+        events.emit(AppEvent::SystemKeyReleased {
+            key,
+            pressed_keys: current.clone(),
+        });
+
+        if current.is_empty() && !was_resynchronized {
+            events.emit(AppEvent::SystemKeysReleased);
+        }
+    }
+
+    fn handle_regular_key_event(vk: u32, is_down: bool) {
+        let Some(events) = EVENTS.get() else {
+            return;
+        };
+
+        let mut regular = pressed_regular_keys()
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        if is_down {
+            if regular.insert(vk) {
+                drop(regular);
+                events.emit(AppEvent::KeyboardKeyPressed {
+                    key_code: i64::from(vk),
+                });
+            }
+        } else {
+            regular.remove(&vk);
+        }
+    }
+
+    unsafe extern "system" fn low_level_keyboard_proc(
+        code: i32,
+        wparam: WPARAM,
+        lparam: LPARAM,
+    ) -> LRESULT {
+        if code == HC_ACTION as i32 && lparam.0 != 0 {
+            let kb = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+            // Ignore our own synthesized dictation typing and Unicode packets.
+            if kb.dwExtraInfo != crate::backend::native::text::VOXFUSION_INPUT_MARKER
+                && kb.vkCode != VK_PACKET.0 as u32
+            {
+                let msg = wparam.0 as u32;
+                let is_down = msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN;
+                let is_up = msg == WM_KEYUP || msg == WM_SYSKEYUP;
+                if is_down || is_up {
+                    if let Some(key) = key_from_vk(kb.vkCode) {
+                        handle_modifier_event(key, is_down);
+                    } else {
+                        handle_regular_key_event(kb.vkCode, is_down);
+                    }
+                }
+            }
+        }
+        unsafe { CallNextHookEx(None, code, wparam, lparam) }
+    }
+
+    pub fn setup(events: &EventSender) {
+        EVENTS.set(events.clone()).ok();
+
+        if WATCHER_RUNNING.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        let now = Instant::now();
+        let initial_keys = current_pressed_keys();
+        {
+            let mut pressed = pressed_keys()
+                .lock()
+                .unwrap_or_else(|err| err.into_inner());
+            pressed.clear();
+            for &key in &initial_keys {
+                pressed.insert(key, now);
+            }
+        }
+        log::info!(target: "hotkey", "system_key_watcher_started pressed_keys={initial_keys:?}");
+
+        let spawned = std::thread::Builder::new()
+            .name("system-key-watcher".into())
+            .spawn(|| {
+                let hook = unsafe {
+                    SetWindowsHookExW(WH_KEYBOARD_LL, Some(low_level_keyboard_proc), None, 0)
+                };
+                let hook = match hook {
+                    Ok(hook) => hook,
+                    Err(err) => {
+                        log::error!(target: "hotkey", "system_key_watcher_hook_failed error={err}");
+                        WATCHER_RUNNING.store(false, Ordering::SeqCst);
+                        return;
+                    }
+                };
+
+                let mut msg = MSG::default();
+                while unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
+                    unsafe {
+                        let _ = TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                }
+
+                unsafe {
+                    let _ = UnhookWindowsHookEx(hook);
+                }
+                WATCHER_RUNNING.store(false, Ordering::SeqCst);
+            });
+
+        if let Err(err) = spawned {
+            log::error!(target: "hotkey", "system_key_watcher_spawn_failed error={err}");
+            WATCHER_RUNNING.store(false, Ordering::SeqCst);
+        }
+    }
+
+    pub fn resynchronize(reason: &str) {
+        let Some(events) = EVENTS.get() else {
+            return;
+        };
+
+        let now = Instant::now();
+        let current = current_pressed_keys();
+        let previous: BTreeSet<SystemKey> = {
+            let mut pressed = pressed_keys()
+                .lock()
+                .unwrap_or_else(|err| err.into_inner());
+            let prev = pressed.keys().copied().collect();
+            pressed.clear();
+            for &key in &current {
+                pressed.insert(key, now);
+            }
+            prev
+        };
+        if let Ok(mut regular) = pressed_regular_keys().lock() {
+            regular.clear();
+        }
+
+        log::info!(
+            target: "hotkey",
+            "system_key_state_lifecycle_resynchronized reason={reason} previous={previous:?} current={current:?}"
+        );
+        events.emit(AppEvent::SystemKeysReleased);
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub use windows_impl::{resynchronize, setup};

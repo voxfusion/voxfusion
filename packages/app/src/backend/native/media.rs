@@ -31,7 +31,7 @@ struct MutedDevice {
 static MEDIA_MUTE_STATE: LazyLock<Mutex<MediaMuteState>> =
     LazyLock::new(|| Mutex::new(MediaMuteState::default()));
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 static EVENTS: std::sync::OnceLock<crate::backend::EventSender> = std::sync::OnceLock::new();
 
 #[cfg(target_os = "macos")]
@@ -736,6 +736,11 @@ pub fn mute_media_for_recording() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     mute_default_output(&mut state)?;
 
+    #[cfg(target_os = "windows")]
+    if let Err(err) = win_media::mute() {
+        log::warn!(target: "media", "windows_mute_initial_failed error={err}");
+    }
+
     state.active = true;
     Ok(())
 }
@@ -773,6 +778,9 @@ fn mute_default_output(state: &mut MediaMuteState) -> Result<(), String> {
 pub fn muffle_media_for_recording() {
     #[cfg(target_os = "macos")]
     muffle::muffle();
+
+    #[cfg(target_os = "windows")]
+    win_media::muffle();
 }
 
 /// Runs instead of the app when it was started only to ask for the System
@@ -835,6 +843,9 @@ pub fn restore_media_after_recording() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     muffle::restore();
 
+    #[cfg(target_os = "windows")]
+    win_media::restore(false);
+
     let mut state = MEDIA_MUTE_STATE.lock().map_err(|err| err.to_string())?;
     if !state.active {
         return Ok(());
@@ -870,7 +881,419 @@ pub fn restore_media_after_recording() -> Result<(), String> {
 pub fn restore_media_on_exit() {
     #[cfg(target_os = "macos")]
     muffle::restore_now();
+
+    #[cfg(target_os = "windows")]
+    win_media::restore(true);
+
     if let Err(err) = restore_media_after_recording() {
         log::warn!(target: "media", "exit_restore_failed error={err}");
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn watch_audio_devices(events: &crate::backend::EventSender) {
+    win_media::watch_audio_devices(events);
+}
+
+#[cfg(target_os = "windows")]
+mod win_media {
+    use std::collections::HashSet;
+    use std::sync::{OnceLock, mpsc};
+    use std::time::Duration;
+
+    use windows::Win32::Foundation::PROPERTYKEY;
+    use windows::Win32::Media::Audio::{
+        DEVICE_STATE, EDataFlow, ERole, IAudioSessionControl2, IAudioSessionManager2,
+        IMMDeviceEnumerator, IMMNotificationClient, IMMNotificationClient_Impl,
+        ISimpleAudioVolume, MMDeviceEnumerator, eConsole, eRender,
+    };
+    use windows::Win32::System::Com::{
+        CLSCTX_ALL, CLSCTX_INPROC_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
+        CoTaskMemFree,
+    };
+    use windows::core::{Interface, PCWSTR, Result as WinResult, implement};
+
+    use super::EVENTS;
+    use crate::backend::{AppEvent, EventSender};
+
+    const MUFFLE_VOLUME_RATIO: f32 = 0.15;
+    const FADE_STEPS: usize = 8;
+    const FADE_STEP_DELAY: Duration = Duration::from_millis(20);
+    const ACTIVE_SYNC_INTERVAL: Duration = Duration::from_millis(250);
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum ActiveMode {
+        None,
+        Mute,
+        Muffle,
+    }
+
+    enum Command {
+        Mute(mpsc::Sender<Result<(), String>>),
+        Muffle,
+        DevicesChanged,
+        Restore {
+            immediate: bool,
+            done: Option<mpsc::Sender<()>>,
+        },
+    }
+
+    static WORKER: OnceLock<mpsc::Sender<Command>> = OnceLock::new();
+
+    struct SavedSession {
+        volume: ISimpleAudioVolume,
+        muted_by_us: bool,
+        original_volume: Option<f32>,
+    }
+
+    #[derive(Default)]
+    struct QuietState {
+        mode: ActiveMode,
+        sessions: Vec<SavedSession>,
+        tracked_keys: HashSet<String>,
+    }
+
+    impl Default for ActiveMode {
+        fn default() -> Self {
+            Self::None
+        }
+    }
+
+    fn worker() -> &'static mpsc::Sender<Command> {
+        WORKER.get_or_init(|| {
+            let (tx, rx) = mpsc::channel::<Command>();
+            let _ = std::thread::Builder::new()
+                .name("windows-media-control".into())
+                .spawn(move || run_worker(rx));
+            tx
+        })
+    }
+
+    fn run_worker(rx: mpsc::Receiver<Command>) {
+        let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+        let mut state = QuietState::default();
+
+        loop {
+            let next = if state.mode == ActiveMode::None {
+                match rx.recv() {
+                    Ok(cmd) => Some(cmd),
+                    Err(_) => break,
+                }
+            } else {
+                match rx.recv_timeout(ACTIVE_SYNC_INTERVAL) {
+                    Ok(cmd) => Some(cmd),
+                    Err(mpsc::RecvTimeoutError::Timeout) => None,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+            };
+
+            match next {
+                Some(Command::Mute(reply)) => {
+                    restore_sessions(&mut state, true);
+                    state.mode = ActiveMode::Mute;
+                    let res = apply_mute(&mut state);
+                    let _ = reply.send(res);
+                }
+                Some(Command::Muffle) => {
+                    restore_sessions(&mut state, true);
+                    state.mode = ActiveMode::Muffle;
+                    if let Err(err) = apply_muffle(&mut state, true) {
+                        log::warn!(target: "media", "windows_muffle_failed error={err}");
+                    }
+                }
+                Some(Command::DevicesChanged) | None => match state.mode {
+                    ActiveMode::None => {}
+                    ActiveMode::Mute => {
+                        let _ = apply_mute(&mut state);
+                    }
+                    ActiveMode::Muffle => {
+                        let _ = apply_muffle(&mut state, false);
+                    }
+                },
+                Some(Command::Restore { immediate, done }) => {
+                    state.mode = ActiveMode::None;
+                    restore_sessions(&mut state, immediate);
+                    if let Some(done) = done {
+                        let _ = done.send(());
+                    }
+                }
+            }
+        }
+    }
+
+    fn other_app_sessions() -> Result<Vec<(String, ISimpleAudioVolume)>, String> {
+        let enumerator: IMMDeviceEnumerator =
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_INPROC_SERVER) }
+                .map_err(|err| format!("MMDeviceEnumerator failed: {err}"))?;
+        let device = unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eConsole) }
+            .map_err(|err| format!("GetDefaultAudioEndpoint failed: {err}"))?;
+        let device_id = unsafe { device.GetId() }
+            .ok()
+            .map(|pwstr| {
+                let s = unsafe { pwstr.to_string() }.unwrap_or_default();
+                unsafe { CoTaskMemFree(Some(pwstr.0.cast())) };
+                s
+            })
+            .unwrap_or_default();
+        let manager: IAudioSessionManager2 = unsafe { device.Activate(CLSCTX_ALL, None) }
+            .map_err(|err| format!("IAudioSessionManager2 activation failed: {err}"))?;
+        let session_enum = unsafe { manager.GetSessionEnumerator() }
+            .map_err(|err| format!("GetSessionEnumerator failed: {err}"))?;
+        let count = unsafe { session_enum.GetCount() }.unwrap_or(0);
+        let self_pid = std::process::id();
+
+        let mut volumes = Vec::new();
+        for i in 0..count {
+            let Ok(ctrl) = (unsafe { session_enum.GetSession(i) }) else {
+                continue;
+            };
+            let mut key = format!("{device_id}#{i}");
+            if let Ok(ctrl2) = ctrl.cast::<IAudioSessionControl2>() {
+                if let Ok(pid) = unsafe { ctrl2.GetProcessId() }
+                    && pid == self_pid
+                {
+                    // Never mute or duck VoxFusion's own cues.
+                    continue;
+                }
+                if let Ok(instance_id) = unsafe { ctrl2.GetSessionInstanceIdentifier() } {
+                    if let Ok(id_str) = unsafe { instance_id.to_string() }
+                        && !id_str.is_empty()
+                    {
+                        key = format!("{device_id}|{id_str}");
+                    }
+                    unsafe { CoTaskMemFree(Some(instance_id.0.cast())) };
+                }
+            }
+            if let Ok(vol) = ctrl.cast::<ISimpleAudioVolume>() {
+                volumes.push((key, vol));
+            }
+        }
+        Ok(volumes)
+    }
+
+    fn apply_mute(state: &mut QuietState) -> Result<(), String> {
+        let sessions = other_app_sessions()?;
+        let mut added = 0usize;
+        for (key, volume) in sessions {
+            if state.tracked_keys.contains(&key) {
+                continue;
+            }
+            let already_muted = unsafe { volume.GetMute() }.map(|b| b.as_bool()).unwrap_or(true);
+            if !already_muted
+                && unsafe { volume.SetMute(true, std::ptr::null()) }.is_ok()
+            {
+                state.tracked_keys.insert(key);
+                state.sessions.push(SavedSession {
+                    volume,
+                    muted_by_us: true,
+                    original_volume: None,
+                });
+                added += 1;
+            }
+        }
+        if added > 0 {
+            log::info!(
+                target: "media",
+                "windows_media_muted sessions={}",
+                state.sessions.len()
+            );
+        }
+        Ok(())
+    }
+
+    fn apply_muffle(state: &mut QuietState, fade: bool) -> Result<(), String> {
+        let sessions = other_app_sessions()?;
+        let start_idx = state.sessions.len();
+        for (key, volume) in sessions {
+            if state.tracked_keys.contains(&key) {
+                continue;
+            }
+            let already_muted = unsafe { volume.GetMute() }.map(|b| b.as_bool()).unwrap_or(true);
+            if already_muted {
+                continue;
+            }
+            if let Ok(orig) = unsafe { volume.GetMasterVolume() }
+                && orig > 0.01
+            {
+                state.tracked_keys.insert(key);
+                state.sessions.push(SavedSession {
+                    volume,
+                    muted_by_us: false,
+                    original_volume: Some(orig),
+                });
+            }
+        }
+        let new_entries = &state.sessions[start_idx..];
+        if new_entries.is_empty() {
+            return Ok(());
+        }
+        if fade {
+            for step in 1..=FADE_STEPS {
+                let t = step as f32 / FADE_STEPS as f32;
+                let scale = 1.0 - (1.0 - MUFFLE_VOLUME_RATIO) * t;
+                for entry in new_entries {
+                    if let Some(orig) = entry.original_volume {
+                        let target = (orig * scale).clamp(0.0, 1.0);
+                        unsafe {
+                            let _ = entry.volume.SetMasterVolume(target, std::ptr::null());
+                        }
+                    }
+                }
+                if step < FADE_STEPS {
+                    std::thread::sleep(FADE_STEP_DELAY);
+                }
+            }
+        } else {
+            for entry in new_entries {
+                if let Some(orig) = entry.original_volume {
+                    let target = (orig * MUFFLE_VOLUME_RATIO).clamp(0.0, 1.0);
+                    unsafe {
+                        let _ = entry.volume.SetMasterVolume(target, std::ptr::null());
+                    }
+                }
+            }
+        }
+        log::info!(
+            target: "media",
+            "windows_media_muffled sessions={}",
+            state.sessions.len()
+        );
+        Ok(())
+    }
+
+    fn restore_sessions(state: &mut QuietState, immediate: bool) {
+        state.tracked_keys.clear();
+        if state.sessions.is_empty() {
+            return;
+        }
+        let entries = std::mem::take(&mut state.sessions);
+        let has_muffled = entries.iter().any(|e| e.original_volume.is_some());
+        if has_muffled && !immediate {
+            for step in 1..=FADE_STEPS {
+                let t = step as f32 / FADE_STEPS as f32;
+                let scale = MUFFLE_VOLUME_RATIO + (1.0 - MUFFLE_VOLUME_RATIO) * t;
+                for entry in &entries {
+                    if let Some(orig) = entry.original_volume {
+                        let target = (orig * scale).clamp(0.0, 1.0);
+                        unsafe {
+                            let _ = entry.volume.SetMasterVolume(target, std::ptr::null());
+                        }
+                    }
+                }
+                if step < FADE_STEPS {
+                    std::thread::sleep(FADE_STEP_DELAY);
+                }
+            }
+        }
+        for entry in entries {
+            if entry.muted_by_us {
+                unsafe {
+                    let _ = entry.volume.SetMute(false, std::ptr::null());
+                }
+            }
+            if let Some(orig) = entry.original_volume {
+                unsafe {
+                    let _ = entry.volume.SetMasterVolume(orig.clamp(0.0, 1.0), std::ptr::null());
+                }
+            }
+        }
+    }
+
+    pub fn mute() -> Result<(), String> {
+        let (tx, rx) = mpsc::channel();
+        let _ = worker().send(Command::Mute(tx));
+        rx.recv_timeout(Duration::from_secs(2))
+            .map_err(|_| "Timed out muting Windows media sessions".to_string())?
+    }
+
+    pub fn muffle() {
+        let _ = worker().send(Command::Muffle);
+    }
+
+    pub fn restore(immediate: bool) {
+        if immediate {
+            let (tx, rx) = mpsc::channel();
+            let _ = worker().send(Command::Restore {
+                immediate: true,
+                done: Some(tx),
+            });
+            let _ = rx.recv_timeout(Duration::from_secs(1));
+        } else {
+            let _ = worker().send(Command::Restore {
+                immediate: false,
+                done: None,
+            });
+        }
+    }
+
+    #[implement(IMMNotificationClient)]
+    struct AudioDeviceWatcher;
+
+    impl AudioDeviceWatcher {
+        fn notify() {
+            if let Some(tx) = WORKER.get() {
+                let _ = tx.send(Command::DevicesChanged);
+            }
+            if let Some(events) = EVENTS.get() {
+                events.emit(AppEvent::AudioDevicesChanged);
+            }
+        }
+    }
+
+    impl IMMNotificationClient_Impl for AudioDeviceWatcher_Impl {
+        fn OnDeviceStateChanged(&self, _pwstrdeviceid: &PCWSTR, _dwnewstate: DEVICE_STATE) -> WinResult<()> {
+            AudioDeviceWatcher::notify();
+            Ok(())
+        }
+
+        fn OnDeviceAdded(&self, _pwstrdeviceid: &PCWSTR) -> WinResult<()> {
+            AudioDeviceWatcher::notify();
+            Ok(())
+        }
+
+        fn OnDeviceRemoved(&self, _pwstrdeviceid: &PCWSTR) -> WinResult<()> {
+            AudioDeviceWatcher::notify();
+            Ok(())
+        }
+
+        fn OnDefaultDeviceChanged(
+            &self,
+            _flow: EDataFlow,
+            _role: ERole,
+            _pwstrdefaultdeviceid: &PCWSTR,
+        ) -> WinResult<()> {
+            AudioDeviceWatcher::notify();
+            Ok(())
+        }
+
+        fn OnPropertyValueChanged(&self, _pwstrdeviceid: &PCWSTR, _key: &PROPERTYKEY) -> WinResult<()> {
+            Ok(())
+        }
+    }
+
+    pub fn watch_audio_devices(events: &EventSender) {
+        EVENTS.set(events.clone()).ok();
+
+        let _ = std::thread::Builder::new()
+            .name("windows-audio-device-watcher".into())
+            .spawn(|| {
+                let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
+                let enumerator: Result<IMMDeviceEnumerator, _> = unsafe {
+                    CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_INPROC_SERVER)
+                };
+                let Ok(enumerator) = enumerator else {
+                    log::warn!(target: "media", "windows_audio_watcher_init_failed");
+                    return;
+                };
+                let client: IMMNotificationClient = AudioDeviceWatcher.into();
+                if let Err(err) = unsafe { enumerator.RegisterEndpointNotificationCallback(&client) } {
+                    log::warn!(target: "media", "windows_audio_watcher_register_failed error={err}");
+                    return;
+                }
+                // Keep enumerator and COM client alive for the lifetime of the process.
+                loop {
+                    std::thread::sleep(Duration::from_secs(3600));
+                }
+            });
     }
 }

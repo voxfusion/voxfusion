@@ -706,6 +706,7 @@ pub fn set_active_model(active: &ActiveModel, model_id: &str) -> Result<(), Stri
     let file = active_model_file()?;
     fs::write(&file, model.id).map_err(|e| format!("Failed to persist model selection: {}", e))?;
     *guard = model.id.to_string();
+    super::whisper::clear_cache();
     Ok(())
 }
 
@@ -743,6 +744,7 @@ pub fn remove_model(active: &ActiveModel, model_id: &str) -> Result<u64, String>
         }
 
         let mut freed: u64 = 0;
+        super::whisper::clear_cache();
         for path in &files {
             let meta = match fs::symlink_metadata(path) {
                 Ok(meta) => meta,

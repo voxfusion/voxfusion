@@ -9,10 +9,12 @@
 use crate::platform::overlay_window::ScreenRect;
 
 pub const WINDOW_HEIGHT: f64 = 28.;
-const BOTTOM_PADDING: f64 = 20.;
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+pub const BOTTOM_PADDING: f64 = 20.;
 
 /// The display the overlay belongs on: the one under the cursor, or the
 /// primary one (the first) when the cursor's display has just gone.
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub fn display_for_cursor(
     cursor: Option<(f64, f64)>,
     displays: &[ScreenRect],
@@ -44,6 +46,7 @@ pub fn overlay_frame(display: ScreenRect, width: f64) -> ScreenRect {
 /// The window's actual frame is compared rather than a remembered one: a
 /// replacement display can have the same origin but other dimensions, and
 /// macOS moves windows itself when their display disconnects.
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub fn frame_correction(
     display: ScreenRect,
     width: f64,

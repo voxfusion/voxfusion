@@ -9,6 +9,9 @@ use std::path::PathBuf;
 use crate::i18n::Locale;
 
 pub const DEFAULT_HOTKEY: &str = "LeftControl+LeftOption";
+#[cfg(target_os = "windows")]
+pub const DEFAULT_HOLD_TO_SPEAK_HOTKEY: &str = "RightControl";
+#[cfg(not(target_os = "windows"))]
 pub const DEFAULT_HOLD_TO_SPEAK_HOTKEY: &str = "RightCommand";
 
 pub const ONBOARDING_STEP_COUNT: u32 = 8;

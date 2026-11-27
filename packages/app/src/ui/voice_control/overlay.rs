@@ -11,7 +11,9 @@ use gpui_kit::{
 use std::time::{Duration, Instant};
 
 use crate::paths::APP_IDENTIFIER;
-use crate::platform::overlay_window::{self, OverlayWindow, ScreenRect};
+use crate::platform::overlay_window::{OverlayWindow, ScreenRect};
+#[cfg(not(target_os = "windows"))]
+use crate::platform::overlay_window;
 use crate::settings::SettingsStore;
 use crate::ui::t_upper;
 use crate::ui::text::{TRACKING_WIDER, TypeScale as _, text};
@@ -21,7 +23,11 @@ use crate::ui::widgets::{animations_frozen, icon};
 use super::bars::{HEIGHT_TRANSITION, NUM_BARS, bars};
 use super::controller::{VoiceController, WINDOW_WIDTH_COMPACT, WindowRequest};
 use super::error_pill::{self, ErrorPillLayout, error_pill_layout};
-use super::position::{WINDOW_HEIGHT, display_for_cursor, frame_correction, overlay_frame};
+use super::position::{WINDOW_HEIGHT, overlay_frame};
+#[cfg(target_os = "windows")]
+use super::position::BOTTOM_PADDING;
+#[cfg(not(target_os = "windows"))]
+use super::position::{display_for_cursor, frame_correction};
 use super::spinner::dot_matrix_spinner;
 use super::transition::{Transition, ease_out};
 use crate::ui::motion::{Faded, Transitions as _};
@@ -76,14 +82,24 @@ impl Overlay {
                 loop {
                     cx.background_executor().timer(PLACEMENT_CHECK).await;
 
-                    if this.update(cx, |this, _| this.reposition()).is_err() {
-                        break;
+                    let target = this.read_with(cx, |this, _| {
+                        this.placement.as_ref().and_then(|placement| {
+                            placement
+                                .native
+                                .clone()
+                                .map(|native| (native, placement.applied.width))
+                        })
+                    });
+                    match target {
+                        Ok(Some((native, width))) => reposition_native(&native, width),
+                        Ok(None) => {}
+                        Err(_) => break,
                     }
                 }
             })
         });
 
-        let overlay = Self {
+        Self {
             bars: Transition::at(controller.read(cx).bar_heights(), HEIGHT_TRANSITION),
             bars_shown: false,
             spinner_slot: Transition::at([0.], SPINNER_SLOT_TRANSITION),
@@ -91,9 +107,7 @@ impl Overlay {
             placement,
             _placement_check: placement_check,
             _subscriptions: subscriptions,
-        };
-        overlay.reposition();
-        overlay
+        }
     }
 
     /// Gives the window the size and visibility the controller asks for.
@@ -114,15 +128,30 @@ impl Overlay {
         if resized && placement.native.is_none() {
             window.resize(size(px(request.width), px(WINDOW_HEIGHT as f32)));
         }
-        if resized || shown {
-            self.reposition();
-        }
 
-        let Some(native) = self.placement.as_ref().and_then(|it| it.native.as_ref()) else {
+        let Some(native) = placement.native.clone() else {
             return;
         };
-        if shown {
-            native.show();
+
+        // Native frame/visibility calls synchronously deliver window messages
+        // back into GPUI's window loop; run them from a task after this update
+        // finishes so GPUI's AppCell is not already borrowed.
+        if resized || shown {
+            cx.spawn(async move |this, cx| {
+                let Ok(applied) = this.read_with(cx, |this, _| {
+                    this.placement.as_ref().map(|placement| placement.applied)
+                }) else {
+                    return;
+                };
+                let Some(applied) = applied else {
+                    return;
+                };
+                reposition_native(&native, applied.width);
+                if shown && applied.visible {
+                    native.show();
+                }
+            })
+            .detach();
         }
         if hidden {
             // A hidden window draws nothing, and shows its last frame again
@@ -132,46 +161,23 @@ impl Overlay {
             let this = cx.weak_entity();
             window.on_next_frame(move |window, _| {
                 window.on_next_frame(move |_, cx| {
-                    this.update(cx, |this, _| this.hide_unless_wanted()).ok();
+                    cx.spawn(async move |cx| {
+                        let native = this
+                            .read_with(cx, |this, _| {
+                                this.placement
+                                    .as_ref()
+                                    .filter(|placement| !placement.applied.visible)
+                                    .and_then(|placement| placement.native.clone())
+                            })
+                            .ok()
+                            .flatten();
+                        if let Some(native) = native {
+                            native.hide();
+                        }
+                    })
+                    .detach();
                 });
             });
-        }
-    }
-
-    fn hide_unless_wanted(&self) {
-        let Some(placement) = &self.placement else {
-            return;
-        };
-
-        if let Some(native) = placement
-            .native
-            .as_ref()
-            .filter(|_| !placement.applied.visible)
-        {
-            native.hide();
-        }
-    }
-
-    /// Centers the window along the bottom of the display the cursor is on,
-    /// at its current width.
-    fn reposition(&self) {
-        let Some(placement) = &self.placement else {
-            return;
-        };
-        let Some(native) = &placement.native else {
-            return;
-        };
-        let display = display_for_cursor(
-            overlay_window::cursor_position(),
-            &overlay_window::displays(),
-        );
-        let (Some(display), Some(current)) = (display, native.frame()) else {
-            return;
-        };
-
-        let width = placement.applied.width as f64;
-        if let Some(frame) = frame_correction(display, width, current, native.scale_factor()) {
-            native.set_frame(frame);
         }
     }
 
@@ -421,6 +427,30 @@ impl Render for Overlay {
     }
 }
 
+/// Centers `native` along the bottom of the display the cursor is on at `width`.
+fn reposition_native(native: &OverlayWindow, width: f32) {
+    #[cfg(target_os = "windows")]
+    {
+        native.reposition_to_cursor(width as f64, WINDOW_HEIGHT, BOTTOM_PADDING);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let display = display_for_cursor(
+            overlay_window::cursor_position(),
+            &overlay_window::displays(),
+        );
+        let (Some(display), Some(current)) = (display, native.frame()) else {
+            return;
+        };
+
+        if let Some(frame) = frame_correction(display, width as f64, current, native.scale_factor())
+        {
+            native.set_frame(frame);
+        }
+    }
+}
+
 fn window_options(bounds: Bounds<Pixels>, show: bool) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
@@ -452,9 +482,9 @@ pub fn open(
     fixed_size: Option<(f32, f32)>,
     cx: &mut App,
 ) -> Result<()> {
-    // Only macOS can show the window later, so elsewhere it stays up and
-    // draws nothing between dictations.
-    let show = fixed_size.is_some() || !cfg!(target_os = "macos");
+    // Only platforms with native overlay control can show the window later;
+    // elsewhere it stays up and draws nothing between dictations.
+    let show = fixed_size.is_some() || !cfg!(any(target_os = "macos", target_os = "windows"));
 
     let bounds = match fixed_size {
         Some((width, height)) => Bounds::new(point(px(0.), px(0.)), size(px(width), px(height))),
@@ -488,8 +518,12 @@ pub fn open(
 
         // In a task, which runs once the window is open: see `remove_frame`.
         if let Some(native) = native.clone() {
+            let should_reposition = fixed_size.is_none();
             cx.spawn(async move |_| {
                 native.remove_frame();
+                if should_reposition {
+                    reposition_native(&native, WINDOW_WIDTH_COMPACT);
+                }
                 log::info!(target: "runtime", "voice_control_frame_removed");
             })
             .detach();

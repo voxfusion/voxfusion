@@ -474,24 +474,27 @@ impl Render for MainView {
             .child(grid_reset(cx))
             .child(content)
             .child(grid_overlay(p.grid_line, cx))
-            // The strip the window is dragged by, over the top of the content.
-            .child(
-                div()
-                    .id("drag-region")
-                    .absolute()
-                    .top_0()
-                    .left_0()
-                    .right_0()
-                    .h_6()
-                    .occlude()
-                    .on_mouse_down(MouseButton::Left, |event, window, _| {
-                        if event.click_count == 2 {
-                            window.titlebar_double_click();
-                        } else {
-                            window.start_window_move();
-                        }
-                    }),
-            )
+            // On macOS, the titlebar is transparent so the top strip drags the
+            // window over the content. Windows uses a standard native titlebar.
+            .when(!cfg!(target_os = "windows"), |root| {
+                root.child(
+                    div()
+                        .id("drag-region")
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .right_0()
+                        .h_6()
+                        .occlude()
+                        .on_mouse_down(MouseButton::Left, |event, window, _| {
+                            if event.click_count == 2 {
+                                window.titlebar_double_click();
+                            } else {
+                                window.start_window_move();
+                            }
+                        }),
+                )
+            })
             .children(self.settings_modal.clone())
     }
 }
@@ -501,21 +504,62 @@ pub fn main_window_options(
     origin: Option<(f32, f32)>,
     cx: &App,
 ) -> WindowOptions {
-    let (width, height) = size_override.unwrap_or(MAIN_WINDOW_SIZE);
+    #[allow(unused_mut)]
+    let mut min_size = MAIN_WINDOW_MIN_SIZE;
+    #[allow(unused_mut)]
+    let (mut width, mut height) = size_override.unwrap_or(MAIN_WINDOW_SIZE);
+
+    #[cfg(target_os = "windows")]
+    let windows_work_area = if size_override.is_none() && origin.is_none() {
+        crate::platform::overlay_window::displays()
+            .into_iter()
+            .next()
+    } else {
+        None
+    };
+
+    #[cfg(target_os = "windows")]
+    if let Some(work) = windows_work_area {
+        // Reserve room for the native Windows titlebar and frame borders so
+        // the window fits inside the work area on 1280x800, 1366x768, and
+        // high-DPI 1080p displays without pushing the titlebar off-screen.
+        const HORIZONTAL_CHROME: f32 = 24.;
+        const VERTICAL_CHROME: f32 = 52.;
+        let max_width = (work.width as f32 - HORIZONTAL_CHROME).max(640.);
+        let max_height = (work.height as f32 - VERTICAL_CHROME).max(480.);
+        min_size.0 = min_size.0.min(max_width);
+        min_size.1 = min_size.1.min(max_height);
+        width = width.min(max_width);
+        height = height.min(max_height);
+    }
+
     let window_size = size(px(width), px(height));
     let bounds = match origin {
         Some((x, y)) => Bounds::new(gpui_kit::point(px(x), px(y)), window_size),
-        None => Bounds::centered(None, window_size, cx),
+        None => {
+            #[cfg(target_os = "windows")]
+            if let Some(work) = windows_work_area {
+                let x = work.x as f32 + ((work.width as f32 - width) / 2.).max(8.);
+                let y = work.y as f32 + ((work.height as f32 - height) / 2.).max(24.);
+                Bounds::new(gpui_kit::point(px(x), px(y)), window_size)
+            } else {
+                Bounds::centered(None, window_size, cx)
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                Bounds::centered(None, window_size, cx)
+            }
+        }
     };
 
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
         titlebar: Some(TitlebarOptions {
             title: Some("VoxFusion".into()),
-            appears_transparent: true,
+            appears_transparent: !cfg!(target_os = "windows"),
             traffic_light_position: None,
         }),
-        window_min_size: Some(size(px(MAIN_WINDOW_MIN_SIZE.0), px(MAIN_WINDOW_MIN_SIZE.1))),
+        window_min_size: Some(size(px(min_size.0), px(min_size.1))),
         app_id: Some(crate::paths::APP_IDENTIFIER.into()),
         window_decorations: Some(gpui_kit::WindowDecorations::Server),
         ..Default::default()
@@ -532,6 +576,12 @@ pub fn open_main_window(
         window.set_rem_size(px(16.));
         theme::follow(window, cx);
         crate::platform::drawables::keep_two(&*window);
+        if let Some(hwnd) = crate::platform::window_icon::raw_hwnd(&*window) {
+            cx.spawn(async move |_| {
+                crate::platform::window_icon::apply_to_hwnd(hwnd);
+            })
+            .detach();
+        }
 
         let view = cx.new(|cx| MainView::new(route, window, cx));
         let focus_handle = view.focus_handle(cx);

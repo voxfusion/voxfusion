@@ -21,11 +21,23 @@ actions!(
 );
 
 pub fn bind_keys(cx: &mut App) {
-    cx.bind_keys([
+    #[cfg(target_os = "windows")]
+    let app_bindings = [
+        KeyBinding::new("ctrl-,", OpenSettings, Some("MainWindow")),
+        KeyBinding::new("ctrl-f", FocusSearch, Some("Home")),
+        KeyBinding::new("ctrl-w", CloseWindow, None),
+        KeyBinding::new("ctrl-q", Quit, None),
+    ];
+    #[cfg(not(target_os = "windows"))]
+    let app_bindings = [
         KeyBinding::new("cmd-,", OpenSettings, Some("MainWindow")),
         KeyBinding::new("cmd-f", FocusSearch, Some("Home")),
         KeyBinding::new("cmd-w", CloseWindow, None),
         KeyBinding::new("cmd-q", Quit, None),
+    ];
+
+    cx.bind_keys(app_bindings);
+    cx.bind_keys([
         KeyBinding::new("tab", NextControl, Some("Settings")),
         KeyBinding::new("shift-tab", PreviousControl, Some("Settings")),
         // While a hotkey is being recorded the recorder gets Tab, which then
