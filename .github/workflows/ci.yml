@@ -275,3 +275,104 @@ jobs:
           name: bundle-check
           path: ${{ runner.temp }}/bundle-check
           if-no-files-found: ignore
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app -> target'
+          shared-key: 'windows'
+
+      - name: Cargo check
+        working-directory: packages/app
+        env:
+          LIBCLANG_PATH: C:\Program Files\LLVM\bin
+        run: cargo check --all-targets
+
+      - name: Cargo check (fixture)
+        working-directory: packages/app
+        env:
+          LIBCLANG_PATH: C:\Program Files\LLVM\bin
+        run: cargo check --features fixture
+
+      - name: Cargo test
+        working-directory: packages/app
+        env:
+          LIBCLANG_PATH: C:\Program Files\LLVM\bin
+        run: cargo test
+
+      - name: Build Windows installer and portable bundle
+        env:
+          LIBCLANG_PATH: C:\Program Files\LLVM\bin
+        run: |
+          pwsh packages/app/scripts/bundle-windows.ps1 -DebugBuild -Installer -Zip
+
+      - name: Verify installer, executable metadata, and clean uninstall
+        run: |
+          $out = "packages/app/dist/x86_64-pc-windows-msvc"
+          $setup = Join-Path $out "VoxFusion-windows-x64-setup.exe"
+          $zip = Join-Path $out "VoxFusion-windows-x64.zip"
+          $exe = Join-Path $out "VoxFusion\voxfusion-app.exe"
+
+          foreach ($path in @($setup, $zip, $exe)) {
+            if (-not (Test-Path $path)) { throw "Missing expected artifact: $path" }
+          }
+
+          $installProc = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
+          if ($installProc.ExitCode -ne 0) {
+            throw "Silent installer failed with exit code $($installProc.ExitCode)"
+          }
+
+          $installedDir = Join-Path $env:LOCALAPPDATA "Programs\VoxFusion"
+          $installedExe = Join-Path $installedDir "voxfusion-app.exe"
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed executable missing at $installedExe"
+          }
+
+          $permReport = Join-Path $env:RUNNER_TEMP "win-permissions.json"
+          $micReport = Join-Path $env:RUNNER_TEMP "win-microphones.json"
+          $p1 = Start-Process -FilePath $installedExe -ArgumentList "--permissions-report `"$permReport`"" -Wait -PassThru
+          if ($p1.ExitCode -ne 0 -or -not (Test-Path $permReport)) {
+            throw "--permissions-report failed (exit $($p1.ExitCode))"
+          }
+          Write-Host "Permissions report: $(Get-Content -Raw $permReport)"
+
+          $p2 = Start-Process -FilePath $installedExe -ArgumentList "--microphones-report `"$micReport`"" -Wait -PassThru
+          if ($p2.ExitCode -ne 0 -or -not (Test-Path $micReport)) {
+            throw "--microphones-report failed (exit $($p2.ExitCode))"
+          }
+          Write-Host "Microphones report: $(Get-Content -Raw $micReport)"
+
+          $unins = Join-Path $installedDir "unins000.exe"
+          if (-not (Test-Path $unins)) {
+            throw "Uninstaller missing at $unins"
+          }
+          $uninsProc = Start-Process -FilePath $unins -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
+          if ($uninsProc.ExitCode -ne 0) {
+            throw "Silent uninstaller failed with exit code $($uninsProc.ExitCode)"
+          }
+          for ($i = 0; $i -lt 30 -and (Test-Path $installedExe); $i++) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (Test-Path $installedExe) {
+            throw "Executable still exists after uninstall: $installedExe"
+          }
+
+      - name: Upload Windows bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: |
+            packages/app/dist/x86_64-pc-windows-msvc/VoxFusion-windows-x64-setup.exe
+            packages/app/dist/x86_64-pc-windows-msvc/VoxFusion-windows-x64.zip
