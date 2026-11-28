@@ -59,10 +59,59 @@ $StageDir = Join-Path $OutDir "VoxFusion"
 Push-Location $AppDir
 try {
     $env:VOXFUSION_REQUIRE_WINDOWS_ICON = "1"
+    # Build portable x86-64 AVX2/FMA/F16C Whisper kernels rather than probing
+    # the build host CPU. GitHub's windows-latest runners have AVX-512, which
+    # causes whisper.cpp (GGML_NATIVE=ON) to emit ZMM instructions that crash
+    # with 0xC000001D STATUS_ILLEGAL_INSTRUCTION on consumer Intel/AMD laptops.
+    $env:GGML_NATIVE = "OFF"
+    $env:GGML_SSE42 = "ON"
+    $env:GGML_AVX = "ON"
+    $env:GGML_AVX2 = "ON"
+    $env:GGML_FMA = "ON"
+    $env:GGML_F16C = "ON"
+    $env:GGML_BMI2 = "ON"
+    $env:GGML_AVX_VNNI = "OFF"
+    $env:GGML_AVX512 = "OFF"
+    $env:GGML_AVX512_VBMI = "OFF"
+    $env:GGML_AVX512_VNNI = "OFF"
+    $env:GGML_AVX512_BF16 = "OFF"
+
+    # whisper-rs-sys's build.rs does not emit cargo:rerun-if-env-changed for
+    # GGML_* flags, so drop any stale cached whisper-rs-sys build that still has
+    # GGML_NATIVE=ON or GGML_AVX512=ON before compiling.
+    $WhisperBuildRoot = Join-Path (Join-Path $BuildDir $Profile) "build"
+    if (Test-Path $WhisperBuildRoot) {
+        $StaleCaches = Get-ChildItem -Path $WhisperBuildRoot -Directory -Filter "whisper-rs-sys-*" -ErrorAction SilentlyContinue |
+            Where-Object {
+                $cache = Join-Path $_.FullName "out\build\CMakeCache.txt"
+                (Test-Path $cache) -and (Select-String -Path $cache -Pattern "^(GGML_NATIVE|GGML_AVX512|GGML_AVX512_VBMI|GGML_AVX512_VNNI|GGML_AVX512_BF16|GGML_AVX_VNNI):BOOL=ON$" -Quiet)
+            }
+        if ($StaleCaches) {
+            Write-Host "Cleaning stale non-portable whisper-rs-sys cache..."
+            $CleanArgs = @("clean", "-p", "whisper-rs-sys")
+            if (-not $DebugBuild) { $CleanArgs += "--release" }
+            if ($Target) { $CleanArgs += @("--target", $Target) }
+            & cargo @CleanArgs
+        }
+    }
+
     Write-Host "Building VoxFusion $Version ($Profile) with cargo $($BuildArgs -join ' ')"
     & cargo @BuildArgs
     if ($LASTEXITCODE -ne 0) {
         throw "cargo build failed with exit code $LASTEXITCODE"
+    }
+
+    # Verify the compiled whisper-rs-sys CMakeCache really disabled host-native
+    # and AVX-512 codegen so an unportable binary can never be packaged.
+    if (Test-Path $WhisperBuildRoot) {
+        $WhisperCaches = Get-ChildItem -Path $WhisperBuildRoot -Directory -Filter "whisper-rs-sys-*" -ErrorAction SilentlyContinue |
+            ForEach-Object { Join-Path $_.FullName "out\build\CMakeCache.txt" } |
+            Where-Object { Test-Path $_ }
+        foreach ($cache in $WhisperCaches) {
+            if (Select-String -Path $cache -Pattern "^(GGML_NATIVE|GGML_AVX512|GGML_AVX512_VBMI|GGML_AVX512_VNNI|GGML_AVX512_BF16|GGML_AVX_VNNI):BOOL=ON$" -Quiet) {
+                throw "Non-portable GGML CPU flags detected in ${cache}; refusing to package AVX-512/native binary."
+            }
+        }
     }
 } finally {
     Pop-Location

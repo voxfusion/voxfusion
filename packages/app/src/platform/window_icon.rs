@@ -10,14 +10,23 @@ mod windows_impl {
 
     use raw_window_handle::{HasWindowHandle, RawWindowHandle};
     use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+    use windows::Win32::Graphics::Dwm::{
+        DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWINDOWATTRIBUTE, DwmSetWindowAttribute,
+    };
     use windows::Win32::Graphics::Gdi::{
         BI_BITFIELDS, BITMAPINFO, BITMAPV5HEADER, CreateBitmap, CreateDIBSection, DIB_RGB_COLORS,
         DeleteObject, HGDIOBJ,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateIconIndirect, HICON, ICON_BIG, ICON_SMALL, ICONINFO, SendMessageW, WM_SETICON,
+        CreateIconIndirect, HICON, ICON_BIG, ICON_SMALL, ICONINFO, IsWindow, SWP_FRAMECHANGED,
+        SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetWindowPos,
+        WM_SETICON,
     };
     use windows_core::BOOL;
+
+    /// Pre-2004 Windows 10 (builds 18362/18363) used attribute 19 before
+    /// `DWMWA_USE_IMMERSIVE_DARK_MODE` stabilized at 20 in build 19041.
+    const DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1: DWMWINDOWATTRIBUTE = DWMWINDOWATTRIBUTE(19);
 
     struct WindowIcons {
         small: usize,
@@ -170,6 +179,9 @@ mod windows_impl {
         };
         let hwnd = HWND(hwnd as *mut c_void);
         unsafe {
+            if !IsWindow(Some(hwnd)).as_bool() {
+                return;
+            }
             let _ = SendMessageW(
                 hwnd,
                 WM_SETICON,
@@ -181,6 +193,43 @@ mod windows_impl {
                 WM_SETICON,
                 Some(WPARAM(ICON_BIG as usize)),
                 Some(LPARAM(icons.big as isize)),
+            );
+        }
+    }
+
+    /// Matches the native Windows 10/11 titlebar to the app's active light/dark
+    /// theme. Call from an async task rather than synchronously inside a GPUI
+    /// update, because `SWP_FRAMECHANGED` re-enters `WndProc`.
+    pub fn set_dark_titlebar(hwnd: usize, dark: bool) {
+        let hwnd = HWND(hwnd as *mut c_void);
+        let value = BOOL(i32::from(dark));
+        unsafe {
+            if !IsWindow(Some(hwnd)).as_bool() {
+                return;
+            }
+            if DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_USE_IMMERSIVE_DARK_MODE,
+                (&raw const value).cast(),
+                std::mem::size_of_val(&value) as u32,
+            )
+            .is_err()
+            {
+                let _ = DwmSetWindowAttribute(
+                    hwnd,
+                    DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1,
+                    (&raw const value).cast(),
+                    std::mem::size_of_val(&value) as u32,
+                );
+            }
+            let _ = SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
             );
         }
     }
@@ -196,6 +245,11 @@ pub fn apply_to_hwnd(hwnd: usize) {
     windows_impl::apply_to_hwnd(hwnd);
 }
 
+#[cfg(target_os = "windows")]
+pub fn set_dark_titlebar(hwnd: usize, dark: bool) {
+    windows_impl::set_dark_titlebar(hwnd, dark);
+}
+
 #[cfg(not(target_os = "windows"))]
 pub fn raw_hwnd(_handle: &impl HasWindowHandle) -> Option<usize> {
     None
@@ -203,3 +257,6 @@ pub fn raw_hwnd(_handle: &impl HasWindowHandle) -> Option<usize> {
 
 #[cfg(not(target_os = "windows"))]
 pub fn apply_to_hwnd(_hwnd: usize) {}
+
+#[cfg(not(target_os = "windows"))]
+pub fn set_dark_titlebar(_hwnd: usize, _dark: bool) {}

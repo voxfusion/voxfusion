@@ -278,6 +278,20 @@ jobs:
 
   windows:
     runs-on: windows-latest
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      GGML_NATIVE: "OFF"
+      GGML_SSE42: "ON"
+      GGML_AVX: "ON"
+      GGML_AVX2: "ON"
+      GGML_FMA: "ON"
+      GGML_F16C: "ON"
+      GGML_BMI2: "ON"
+      GGML_AVX_VNNI: "OFF"
+      GGML_AVX512: "OFF"
+      GGML_AVX512_VBMI: "OFF"
+      GGML_AVX512_VNNI: "OFF"
+      GGML_AVX512_BF16: "OFF"
     defaults:
       run:
         shell: pwsh
@@ -292,29 +306,21 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './packages/app -> target'
-          shared-key: 'windows'
+          shared-key: 'windows-avx2'
 
       - name: Cargo check
         working-directory: packages/app
-        env:
-          LIBCLANG_PATH: C:\Program Files\LLVM\bin
         run: cargo check --all-targets
 
       - name: Cargo check (fixture)
         working-directory: packages/app
-        env:
-          LIBCLANG_PATH: C:\Program Files\LLVM\bin
         run: cargo check --features fixture
 
       - name: Cargo test
         working-directory: packages/app
-        env:
-          LIBCLANG_PATH: C:\Program Files\LLVM\bin
         run: cargo test
 
       - name: Build Windows release installer and portable bundle
-        env:
-          LIBCLANG_PATH: C:\Program Files\LLVM\bin
         run: |
           pwsh packages/app/scripts/bundle-windows.ps1 -Installer -Zip
 

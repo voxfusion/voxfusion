@@ -577,10 +577,30 @@ pub fn open_main_window(
         theme::follow(window, cx);
         crate::platform::drawables::keep_two(&*window);
         if let Some(hwnd) = crate::platform::window_icon::raw_hwnd(&*window) {
+            let initial_dark = theme::palette(cx).dark;
             cx.spawn(async move |_| {
                 crate::platform::window_icon::apply_to_hwnd(hwnd);
+                crate::platform::window_icon::set_dark_titlebar(hwnd, initial_dark);
             })
             .detach();
+
+            let sync_titlebar = move |window: &mut Window, cx: &mut App| {
+                theme::apply(window.appearance(), cx);
+                let dark = theme::palette(cx).dark;
+                cx.spawn(async move |_| {
+                    crate::platform::window_icon::set_dark_titlebar(hwnd, dark);
+                })
+                .detach();
+            };
+
+            window
+                .observe_window_appearance(sync_titlebar)
+                .detach();
+            window
+                .observe(&SettingsStore::entity(cx), cx, move |_, window, cx| {
+                    sync_titlebar(window, cx);
+                })
+                .detach();
         }
 
         let view = cx.new(|cx| MainView::new(route, window, cx));
