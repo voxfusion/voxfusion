@@ -81,6 +81,37 @@ New-Item -ItemType Directory -Force -Path $StageDir | Out-Null
 $StagedExe = Join-Path $StageDir "voxfusion-app.exe"
 Copy-Item -Force $BuiltExe $StagedExe
 
+# Bundle Microsoft's app-local Visual C++ CRT DLLs alongside the executable so
+# fresh Windows 10/11 PCs without Visual C++ Redistributable installed can run
+# both the installed app and portable ZIP without admin prompts or missing DLLs.
+$CrtDirs = @()
+$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $VsWhere) {
+    $VsPath = (& $VsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null | Select-Object -First 1)
+    if ($VsPath) {
+        $RedistRoot = Join-Path $VsPath "VC\Redist\MSVC"
+        if (Test-Path $RedistRoot) {
+            $CrtDirs += Get-ChildItem -Path $RedistRoot -Directory -ErrorAction SilentlyContinue |
+                Sort-Object Name -Descending |
+                ForEach-Object { Get-ChildItem -Path (Join-Path $_.FullName "x64") -Directory -Filter "Microsoft.VC*.CRT" -ErrorAction SilentlyContinue } |
+                Select-Object -ExpandProperty FullName
+        }
+    }
+}
+$CrtDirs += "$env:SystemRoot\System32"
+
+$RequiredCrtDlls = @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")
+$OptionalCrtDlls = @("msvcp140_1.dll", "msvcp140_2.dll", "concrt140.dll")
+foreach ($dll in ($RequiredCrtDlls + $OptionalCrtDlls)) {
+    $src = $CrtDirs | ForEach-Object { Join-Path $_ $dll } | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($src) {
+        Copy-Item -Force $src (Join-Path $StageDir $dll)
+        Write-Host "Bundled CRT DLL: $src"
+    } elseif ($RequiredCrtDlls -contains $dll) {
+        throw "Required Visual C++ runtime DLL '$dll' not found in: $($CrtDirs -join '; ')"
+    }
+}
+
 $LicenseFile = Join-Path $RepoRoot "LICENSE"
 if (Test-Path $LicenseFile) {
     Copy-Item -Force $LicenseFile (Join-Path $StageDir "LICENSE.txt")

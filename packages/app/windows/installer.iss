@@ -27,7 +27,6 @@ DefaultDirName={autopf}\VoxFusion
 DefaultGroupName=VoxFusion
 AllowNoIcons=yes
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}

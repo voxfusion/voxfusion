@@ -421,9 +421,17 @@ jobs:
             throw "Silent installer failed with exit code $($installProc.ExitCode)"
           }
 
-          $installedExe = Join-Path $env:LOCALAPPDATA "Programs\VoxFusion\voxfusion-app.exe"
+          $installedDir = Join-Path $env:LOCALAPPDATA "Programs\VoxFusion"
+          $installedExe = Join-Path $installedDir "voxfusion-app.exe"
           if (-not (Test-Path $installedExe)) {
             throw "Installed executable missing at $installedExe"
+          }
+
+          foreach ($dll in @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) {
+            $dllPath = Join-Path $installedDir $dll
+            if (-not (Test-Path $dllPath)) {
+              throw "Missing bundled Visual C++ runtime DLL: $dllPath"
+            }
           }
 
           $report = Join-Path $env:RUNNER_TEMP "win-permissions.json"
@@ -437,7 +445,39 @@ jobs:
             throw "Expected version $($env:VERSION), got $($json.version)"
           }
 
-          $unins = Join-Path $env:LOCALAPPDATA "Programs\VoxFusion\unins000.exe"
+          # Start the installed GUI binary cleanly to verify embedded shaders and startup.
+          $env:VOXFUSION_APP_ID = "io.voxfusion.release-check"
+          $logPath = Join-Path $env:LOCALAPPDATA "io.voxfusion.release-check\logs\voxfusion.log"
+          if (Test-Path $logPath) { Remove-Item -Force $logPath }
+          $appProc = Start-Process -FilePath $installedExe -PassThru
+          $ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            if ($appProc.HasExited) { break }
+            if ((Test-Path $logPath) -and (Select-String -Path $logPath -SimpleMatch "setup_completed" -Quiet)) {
+              $ready = $true
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          Start-Sleep -Seconds 2
+          $stillRunning = -not $appProc.HasExited
+          if ($stillRunning) {
+            Stop-Process -Id $appProc.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+          }
+          $logContent = if (Test-Path $logPath) { Get-Content -Raw $logPath } else { "" }
+          Write-Host "=== Windows release GUI smoke log ===`n$logContent"
+          if (-not $ready -or -not $stillRunning) {
+            throw "Installed Windows release app failed to start cleanly (ready=$ready stillRunning=$stillRunning exitCode=$($appProc.ExitCode))"
+          }
+          if ($logContent -notmatch [regex]::Escape("cargo_package_version=$($env:VERSION)")) {
+            throw "Expected cargo_package_version=$($env:VERSION) in log"
+          }
+          if ($logContent -match "rust_panic|already borrowed") {
+            throw "Windows release GUI smoke log contained panic/borrow error"
+          }
+
+          $unins = Join-Path $installedDir "unins000.exe"
           if (Test-Path $unins) {
             $uninsProc = Start-Process -FilePath $unins -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
             if ($uninsProc.ExitCode -ne 0) {
