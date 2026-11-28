@@ -377,6 +377,10 @@ jobs:
       GGML_AVX512_VBMI: "OFF"
       GGML_AVX512_VNNI: "OFF"
       GGML_AVX512_BF16: "OFF"
+      CMAKE_C_FLAGS_RELEASE: "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /utf-8"
+      CMAKE_CXX_FLAGS_RELEASE: "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /EHsc /utf-8"
+      CMAKE_C_FLAGS_RELWITHDEBINFO: "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /utf-8"
+      CMAKE_CXX_FLAGS_RELWITHDEBINFO: "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /EHsc /utf-8"
     defaults:
       run:
         shell: pwsh
@@ -391,7 +395,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './packages/app -> target'
-          shared-key: 'release-build-windows-avx2'
+          shared-key: 'release-build-windows-avx2-o2'
           save-if: ${{ github.ref_type == 'tag' }}
 
       - name: Sync version from git tag

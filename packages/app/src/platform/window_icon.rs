@@ -18,9 +18,9 @@ mod windows_impl {
         DeleteObject, HGDIOBJ,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        CreateIconIndirect, HICON, ICON_BIG, ICON_SMALL, ICONINFO, IsWindow, SWP_FRAMECHANGED,
-        SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SendMessageW, SetWindowPos,
-        WM_SETICON,
+        CreateIconIndirect, GetForegroundWindow, HICON, ICON_BIG, ICON_SMALL, ICONINFO, IsWindow,
+        SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SendMessageW,
+        SetWindowPos, WM_NCACTIVATE, WM_SETICON,
     };
     use windows_core::BOOL;
 
@@ -230,6 +230,21 @@ mod windows_impl {
                 0,
                 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+            // Windows 10 caches the caption color of an already-visible window
+            // until the non-client active state toggles.
+            let active = GetForegroundWindow() == hwnd;
+            let _ = SendMessageW(
+                hwnd,
+                WM_NCACTIVATE,
+                Some(WPARAM(usize::from(!active))),
+                Some(LPARAM(0)),
+            );
+            let _ = SendMessageW(
+                hwnd,
+                WM_NCACTIVATE,
+                Some(WPARAM(usize::from(active))),
+                Some(LPARAM(0)),
             );
         }
     }

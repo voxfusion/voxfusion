@@ -76,18 +76,31 @@ try {
     $env:GGML_AVX512_VNNI = "OFF"
     $env:GGML_AVX512_BF16 = "OFF"
 
+    # cmake-rs overrides CMAKE_{C,CXX}_FLAGS_RELEASE on the Visual Studio
+    # generator while stripping all /O* flags, which silently compiles
+    # whisper.cpp / ggml at /Od (unoptimized, ~30x slower). Define the release
+    # flags explicitly so whisper-rs-sys passes them straight to CMake.
+    $env:CMAKE_C_FLAGS_RELEASE = "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /utf-8"
+    $env:CMAKE_CXX_FLAGS_RELEASE = "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /EHsc /utf-8"
+    $env:CMAKE_C_FLAGS_RELWITHDEBINFO = "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /utf-8"
+    $env:CMAKE_CXX_FLAGS_RELWITHDEBINFO = "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /EHsc /utf-8"
+
     # whisper-rs-sys's build.rs does not emit cargo:rerun-if-env-changed for
-    # GGML_* flags, so drop any stale cached whisper-rs-sys build that still has
-    # GGML_NATIVE=ON or GGML_AVX512=ON before compiling.
+    # GGML_* or CMAKE_* flags, so drop any stale cached whisper-rs-sys build
+    # that still has non-portable CPU flags or missing /O2 optimization.
     $WhisperBuildRoot = Join-Path (Join-Path $BuildDir $Profile) "build"
     if (Test-Path $WhisperBuildRoot) {
         $StaleCaches = Get-ChildItem -Path $WhisperBuildRoot -Directory -Filter "whisper-rs-sys-*" -ErrorAction SilentlyContinue |
             Where-Object {
                 $cache = Join-Path $_.FullName "out\build\CMakeCache.txt"
-                (Test-Path $cache) -and (Select-String -Path $cache -Pattern "^(GGML_NATIVE|GGML_AVX512|GGML_AVX512_VBMI|GGML_AVX512_VNNI|GGML_AVX512_BF16|GGML_AVX_VNNI):BOOL=ON$" -Quiet)
+                (Test-Path $cache) -and (
+                    (Select-String -Path $cache -Pattern "^(GGML_NATIVE|GGML_AVX512|GGML_AVX512_VBMI|GGML_AVX512_VNNI|GGML_AVX512_BF16|GGML_AVX_VNNI):BOOL=ON$" -Quiet) -or
+                    -not (Select-String -Path $cache -Pattern "^CMAKE_C_FLAGS_RELEASE:STRING=.*(/O2|/Ox)" -Quiet) -or
+                    -not (Select-String -Path $cache -Pattern "^CMAKE_CXX_FLAGS_RELEASE:STRING=.*(/O2|/Ox)" -Quiet)
+                )
             }
         if ($StaleCaches) {
-            Write-Host "Cleaning stale non-portable whisper-rs-sys cache..."
+            Write-Host "Cleaning stale whisper-rs-sys cache..."
             $CleanArgs = @("clean", "-p", "whisper-rs-sys")
             if (-not $DebugBuild) { $CleanArgs += "--release" }
             if ($Target) { $CleanArgs += @("--target", $Target) }
@@ -102,7 +115,7 @@ try {
     }
 
     # Verify the compiled whisper-rs-sys CMakeCache really disabled host-native
-    # and AVX-512 codegen so an unportable binary can never be packaged.
+    # / AVX-512 codegen AND kept MSVC /O2 optimization enabled.
     if (Test-Path $WhisperBuildRoot) {
         $WhisperCaches = Get-ChildItem -Path $WhisperBuildRoot -Directory -Filter "whisper-rs-sys-*" -ErrorAction SilentlyContinue |
             ForEach-Object { Join-Path $_.FullName "out\build\CMakeCache.txt" } |
@@ -110,6 +123,10 @@ try {
         foreach ($cache in $WhisperCaches) {
             if (Select-String -Path $cache -Pattern "^(GGML_NATIVE|GGML_AVX512|GGML_AVX512_VBMI|GGML_AVX512_VNNI|GGML_AVX512_BF16|GGML_AVX_VNNI):BOOL=ON$" -Quiet) {
                 throw "Non-portable GGML CPU flags detected in ${cache}; refusing to package AVX-512/native binary."
+            }
+            if (-not (Select-String -Path $cache -Pattern "^CMAKE_C_FLAGS_RELEASE:STRING=.*(/O2|/Ox)" -Quiet) -or
+                -not (Select-String -Path $cache -Pattern "^CMAKE_CXX_FLAGS_RELEASE:STRING=.*(/O2|/Ox)" -Quiet)) {
+                throw "Missing /O2 optimization in ${cache}; refusing to package unoptimized Whisper build."
             }
         }
     }
