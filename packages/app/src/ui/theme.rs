@@ -252,6 +252,13 @@ fn mono_font_candidates() -> Vec<SharedString> {
             "SF Mono".into(),
             "Menlo".into(),
         ]);
+    } else if cfg!(target_os = "windows") {
+        candidates.extend([
+            "Cascadia Mono".into(),
+            "JetBrains Mono".into(),
+            "Consolas".into(),
+            "Courier New".into(),
+        ]);
     } else {
         candidates.push("Liberation Mono".into());
     }
@@ -297,6 +304,15 @@ pub fn mono_font() -> SharedString {
 pub fn mono_font_fallbacks() -> Option<FontFallbacks> {
     if cfg!(target_os = "macos") {
         return None;
+    }
+
+    if cfg!(target_os = "windows") {
+        return Some(FontFallbacks::from_fonts(vec![
+            "Segoe UI Symbol".into(),
+            "Segoe UI Emoji".into(),
+            "Yu Gothic UI".into(),
+            "Microsoft YaHei UI".into(),
+        ]));
     }
 
     Some(FontFallbacks::from_fonts(vec![

@@ -360,14 +360,177 @@ jobs:
           name: release-artifacts
           path: release-artifacts/
 
+  build-windows:
+    if: github.ref_type == 'tag'
+    runs-on: windows-latest
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      GGML_NATIVE: "OFF"
+      GGML_SSE42: "ON"
+      GGML_AVX: "ON"
+      GGML_AVX2: "ON"
+      GGML_FMA: "ON"
+      GGML_F16C: "ON"
+      GGML_BMI2: "ON"
+      GGML_AVX_VNNI: "OFF"
+      GGML_AVX512: "OFF"
+      GGML_AVX512_VBMI: "OFF"
+      GGML_AVX512_VNNI: "OFF"
+      GGML_AVX512_BF16: "OFF"
+      CMAKE_C_FLAGS_RELEASE: "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /utf-8"
+      CMAKE_CXX_FLAGS_RELEASE: "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /EHsc /utf-8"
+      CMAKE_C_FLAGS_RELWITHDEBINFO: "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /utf-8"
+      CMAKE_CXX_FLAGS_RELWITHDEBINFO: "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /EHsc /utf-8"
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app -> target'
+          shared-key: 'release-build-windows-avx2-o2'
+          save-if: ${{ github.ref_type == 'tag' }}
+
+      - name: Sync version from git tag
+        working-directory: packages/app
+        run: |
+          $version = $env:GITHUB_REF -replace '^refs/tags/v', ''
+          Write-Host "Setting version to $version"
+          $content = Get-Content -Raw Cargo.toml
+          $content = $content -replace '(?m)^version = ".*"', "version = `"$version`""
+          Set-Content -NoNewline -Encoding UTF8 Cargo.toml $content
+          Select-String -Path Cargo.toml -Pattern '^version'
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build Windows installer and portable bundle
+        env:
+          VOXFUSION_RELEASE_BUILD: "1"
+        run: |
+          pwsh packages/app/scripts/bundle-windows.ps1 -Installer -Zip
+
+      - name: Verify Windows release bundle
+        run: |
+          $out = "packages/app/dist/x86_64-pc-windows-msvc"
+          $setup = Join-Path $out "VoxFusion-windows-x64-setup.exe"
+          $zip = Join-Path $out "VoxFusion-windows-x64.zip"
+          $exe = Join-Path $out "VoxFusion\voxfusion-app.exe"
+
+          foreach ($path in @($setup, $zip, $exe)) {
+            if (-not (Test-Path $path)) { throw "Missing expected artifact: $path" }
+          }
+
+          $verInfo = (Get-Item $exe).VersionInfo
+          Write-Host "ProductName=$($verInfo.ProductName) FileVersion=$($verInfo.FileVersion)"
+          if ($verInfo.ProductName -ne "VoxFusion") {
+            throw "Unexpected ProductName: $($verInfo.ProductName)"
+          }
+
+          # Verify installer works silently and the installed executable reports diagnostics cleanly.
+          $installProc = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
+          if ($installProc.ExitCode -ne 0) {
+            throw "Silent installer failed with exit code $($installProc.ExitCode)"
+          }
+
+          $installedDir = Join-Path $env:LOCALAPPDATA "Programs\VoxFusion"
+          $installedExe = Join-Path $installedDir "voxfusion-app.exe"
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed executable missing at $installedExe"
+          }
+
+          foreach ($dll in @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) {
+            $dllPath = Join-Path $installedDir $dll
+            if (-not (Test-Path $dllPath)) {
+              throw "Missing bundled Visual C++ runtime DLL: $dllPath"
+            }
+          }
+
+          $report = Join-Path $env:RUNNER_TEMP "win-permissions.json"
+          $diagProc = Start-Process -FilePath $installedExe -ArgumentList "--permissions-report `"$report`"" -Wait -PassThru
+          if ($diagProc.ExitCode -ne 0 -or -not (Test-Path $report)) {
+            throw "Installed executable diagnostics check failed"
+          }
+          $json = Get-Content -Raw $report | ConvertFrom-Json
+          Write-Host "Permissions report: $(Get-Content -Raw $report)"
+          if ($json.version -ne $env:VERSION) {
+            throw "Expected version $($env:VERSION), got $($json.version)"
+          }
+
+          # Start the installed GUI binary cleanly to verify embedded shaders and startup.
+          $env:VOXFUSION_APP_ID = "io.voxfusion.release-check"
+          $logPath = Join-Path $env:LOCALAPPDATA "io.voxfusion.release-check\logs\voxfusion.log"
+          if (Test-Path $logPath) { Remove-Item -Force $logPath }
+          $appProc = Start-Process -FilePath $installedExe -PassThru
+          $ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            if ($appProc.HasExited) { break }
+            if ((Test-Path $logPath) -and (Select-String -Path $logPath -SimpleMatch "setup_completed" -Quiet)) {
+              $ready = $true
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          Start-Sleep -Seconds 2
+          $stillRunning = -not $appProc.HasExited
+          if ($stillRunning) {
+            Stop-Process -Id $appProc.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+          }
+          $logContent = if (Test-Path $logPath) { Get-Content -Raw $logPath } else { "" }
+          Write-Host "=== Windows release GUI smoke log ===`n$logContent"
+          if (-not $ready -or -not $stillRunning) {
+            throw "Installed Windows release app failed to start cleanly (ready=$ready stillRunning=$stillRunning exitCode=$($appProc.ExitCode))"
+          }
+          if ($logContent -notmatch [regex]::Escape("cargo_package_version=$($env:VERSION)")) {
+            throw "Expected cargo_package_version=$($env:VERSION) in log"
+          }
+          if ($logContent -match "rust_panic|already borrowed") {
+            throw "Windows release GUI smoke log contained panic/borrow error"
+          }
+
+          $unins = Join-Path $installedDir "unins000.exe"
+          if (Test-Path $unins) {
+            $uninsProc = Start-Process -FilePath $unins -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
+            if ($uninsProc.ExitCode -ne 0) {
+              throw "Silent uninstaller failed with exit code $($uninsProc.ExitCode)"
+            }
+          }
+
+      - name: Prepare Windows artifacts for upload
+        run: |
+          New-Item -ItemType Directory -Force -Path release-artifacts-windows | Out-Null
+          $out = "packages/app/dist/x86_64-pc-windows-msvc"
+          Copy-Item (Join-Path $out "VoxFusion-windows-x64-setup.exe") release-artifacts-windows/VoxFusion-windows-x64-setup.exe
+          Copy-Item (Join-Path $out "VoxFusion-windows-x64-setup.exe") release-artifacts-windows/VoxFusion-latest-windows-x64-setup.exe
+          Copy-Item (Join-Path $out "VoxFusion-windows-x64.zip") release-artifacts-windows/VoxFusion-windows-x64.zip
+          Copy-Item (Join-Path $out "VoxFusion-windows-x64.zip") release-artifacts-windows/VoxFusion-latest-windows-x64.zip
+
+      - name: Upload Windows build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-windows
+          path: release-artifacts-windows/
+
   publish:
     runs-on: ubuntu-24.04
-    needs: build
+    needs: [build, build-windows]
     steps:
-      - name: Download build artifacts
+      - name: Download macOS build artifacts
         uses: actions/download-artifact@v4
         with:
           name: release-artifacts
+          path: release-artifacts/
+
+      - name: Download Windows build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-artifacts-windows
           path: release-artifacts/
 
       - name: Get version from tag
@@ -429,12 +592,11 @@ jobs:
             ## VoxFusion ${{ github.ref_name }}
 
             ### Download
-            Download the DMG file below and drag VoxFusion to your Applications folder.
-
-            This release is signed and notarized by Apple.
+            - **macOS:** Download the DMG file below (Apple Silicon or Intel) and drag VoxFusion to your Applications folder. macOS builds are signed and notarized by Apple.
+            - **Windows (x64):** Download `VoxFusion-windows-x64-setup.exe` to install, or `VoxFusion-windows-x64.zip` for a portable build.
 
             ---
-            Existing users will receive this update automatically.
+            Existing macOS users will receive this update automatically.
           draft: false
           prerelease: false
           files: |
@@ -444,6 +606,10 @@ jobs:
             release-artifacts/VoxFusion-latest-intel.dmg
             release-artifacts/VoxFusion.app.tar.gz
             release-artifacts/VoxFusion-intel.app.tar.gz
+            release-artifacts/VoxFusion-windows-x64-setup.exe
+            release-artifacts/VoxFusion-latest-windows-x64-setup.exe
+            release-artifacts/VoxFusion-windows-x64.zip
+            release-artifacts/VoxFusion-latest-windows-x64.zip
             latest.json
 
       - name: Prepare legacy releases repository manifest
@@ -462,12 +628,11 @@ jobs:
             ## VoxFusion ${{ github.ref_name }}
 
             ### Download
-            Download the DMG file below and drag VoxFusion to your Applications folder.
-
-            This release is signed and notarized by Apple.
+            - **macOS:** Download the DMG file below (Apple Silicon or Intel) and drag VoxFusion to your Applications folder. macOS builds are signed and notarized by Apple.
+            - **Windows (x64):** Download `VoxFusion-windows-x64-setup.exe` to install, or `VoxFusion-windows-x64.zip` for a portable build.
 
             ---
-            Existing users will receive this update automatically.
+            Existing macOS users will receive this update automatically.
           draft: false
           prerelease: false
           files: |
@@ -477,6 +642,10 @@ jobs:
             release-artifacts/VoxFusion-latest-intel.dmg
             release-artifacts/VoxFusion.app.tar.gz
             release-artifacts/VoxFusion-intel.app.tar.gz
+            release-artifacts/VoxFusion-windows-x64-setup.exe
+            release-artifacts/VoxFusion-latest-windows-x64-setup.exe
+            release-artifacts/VoxFusion-windows-x64.zip
+            release-artifacts/VoxFusion-latest-windows-x64.zip
             latest.json
 
       - name: Warn if legacy releases repository publish failed

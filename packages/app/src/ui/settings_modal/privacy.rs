@@ -158,7 +158,14 @@ fn clear_history(window: &mut Window, cx: &mut App) -> Div {
                 .child(
                     div()
                         .text_color(p.txt_hint)
-                        .child(text(t(cx, "settings.historyDescription"))),
+                        .child(text(t(
+                            cx,
+                            if cfg!(target_os = "windows") {
+                                "settings.historyDescriptionWindows"
+                            } else {
+                                "settings.historyDescription"
+                            },
+                        ))),
                 ),
         )
         .when(!asking, |heading| {

@@ -42,18 +42,37 @@ fn hotkey_parts(hotkey: &str) -> Vec<SharedString> {
         .split('+')
         .filter(|part| !part.is_empty())
         .map(|part| {
-            match part {
-                "Command" => "\u{2318}",
-                "Control" => "\u{2303}",
-                "Alt" => "\u{2325}",
-                "Shift" => "\u{21E7}",
-                "LeftControl" => "Left \u{2303}",
-                "RightControl" => "Right \u{2303}",
-                "LeftOption" => "Left \u{2325}",
-                "RightOption" => "Right \u{2325}",
-                "LeftCommand" => "Left \u{2318}",
-                "RightCommand" => "Right \u{2318}",
-                other => other,
+            if cfg!(target_os = "windows") {
+                match part {
+                    "Command" | "Cmd" => "Win",
+                    "Control" | "Ctrl" => "Ctrl",
+                    "CommandOrControl" | "CommandOrCtrl" | "CmdOrCtrl" | "CmdOrControl" => "Ctrl",
+                    "Alt" | "Option" => "Alt",
+                    "Shift" => "Shift",
+                    "LeftControl" => "Left Ctrl",
+                    "RightControl" => "Right Ctrl",
+                    "LeftOption" => "Left Alt",
+                    "RightOption" => "Right Alt",
+                    "LeftShift" => "Left Shift",
+                    "RightShift" => "Right Shift",
+                    "LeftCommand" => "Left Win",
+                    "RightCommand" => "Right Win",
+                    other => other,
+                }
+            } else {
+                match part {
+                    "Command" => "\u{2318}",
+                    "Control" => "\u{2303}",
+                    "Alt" => "\u{2325}",
+                    "Shift" => "\u{21E7}",
+                    "LeftControl" => "Left \u{2303}",
+                    "RightControl" => "Right \u{2303}",
+                    "LeftOption" => "Left \u{2325}",
+                    "RightOption" => "Right \u{2325}",
+                    "LeftCommand" => "Left \u{2318}",
+                    "RightCommand" => "Right \u{2318}",
+                    other => other,
+                }
             }
             .to_string()
             .into()
@@ -436,15 +455,25 @@ mod tests {
 
     #[test]
     fn hotkeys_split_into_key_caps() {
-        assert_eq!(
-            hotkey_parts("LeftControl+LeftOption"),
-            ["Left \u{2303}", "Left \u{2325}"]
-        );
-        assert_eq!(
-            hotkey_parts("Command+Shift+K"),
-            ["\u{2318}", "\u{21E7}", "K"]
-        );
-        assert_eq!(hotkey_parts("RightCommand"), ["Right \u{2318}"]);
-        assert_eq!(hotkey_parts("Alt+Space"), ["\u{2325}", "Space"]);
+        if cfg!(target_os = "windows") {
+            assert_eq!(
+                hotkey_parts("LeftControl+LeftOption"),
+                ["Left Ctrl", "Left Alt"]
+            );
+            assert_eq!(hotkey_parts("Command+Shift+K"), ["Win", "Shift", "K"]);
+            assert_eq!(hotkey_parts("RightCommand"), ["Right Win"]);
+            assert_eq!(hotkey_parts("Alt+Space"), ["Alt", "Space"]);
+        } else {
+            assert_eq!(
+                hotkey_parts("LeftControl+LeftOption"),
+                ["Left \u{2303}", "Left \u{2325}"]
+            );
+            assert_eq!(
+                hotkey_parts("Command+Shift+K"),
+                ["\u{2318}", "\u{21E7}", "K"]
+            );
+            assert_eq!(hotkey_parts("RightCommand"), ["Right \u{2318}"]);
+            assert_eq!(hotkey_parts("Alt+Space"), ["\u{2325}", "Space"]);
+        }
     }
 }

@@ -275,3 +275,150 @@ jobs:
           name: bundle-check
           path: ${{ runner.temp }}/bundle-check
           if-no-files-found: ignore
+
+  windows:
+    runs-on: windows-latest
+    env:
+      LIBCLANG_PATH: C:\Program Files\LLVM\bin
+      GGML_NATIVE: "OFF"
+      GGML_SSE42: "ON"
+      GGML_AVX: "ON"
+      GGML_AVX2: "ON"
+      GGML_FMA: "ON"
+      GGML_F16C: "ON"
+      GGML_BMI2: "ON"
+      GGML_AVX_VNNI: "OFF"
+      GGML_AVX512: "OFF"
+      GGML_AVX512_VBMI: "OFF"
+      GGML_AVX512_VNNI: "OFF"
+      GGML_AVX512_BF16: "OFF"
+      CMAKE_C_FLAGS_RELEASE: "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /utf-8"
+      CMAKE_CXX_FLAGS_RELEASE: "/nologo /MD /O2 /Ob2 /Oi /Ot /DNDEBUG /EHsc /utf-8"
+      CMAKE_C_FLAGS_RELWITHDEBINFO: "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /utf-8"
+      CMAKE_CXX_FLAGS_RELWITHDEBINFO: "/nologo /MD /O2 /Ob2 /Oi /Ot /Zi /DNDEBUG /EHsc /utf-8"
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './packages/app -> target'
+          shared-key: 'windows-avx2-o2'
+
+      - name: Cargo check
+        working-directory: packages/app
+        run: cargo check --all-targets
+
+      - name: Cargo check (fixture)
+        working-directory: packages/app
+        run: cargo check --features fixture
+
+      - name: Cargo test
+        working-directory: packages/app
+        run: cargo test
+
+      - name: Build Windows release installer and portable bundle
+        run: |
+          pwsh packages/app/scripts/bundle-windows.ps1 -Installer -Zip
+
+      - name: Verify installer, self-contained runtime, GUI startup, and clean uninstall
+        run: |
+          $out = "packages/app/dist/x86_64-pc-windows-msvc"
+          $setup = Join-Path $out "VoxFusion-windows-x64-setup.exe"
+          $zip = Join-Path $out "VoxFusion-windows-x64.zip"
+          $exe = Join-Path $out "VoxFusion\voxfusion-app.exe"
+
+          foreach ($path in @($setup, $zip, $exe)) {
+            if (-not (Test-Path $path)) { throw "Missing expected artifact: $path" }
+          }
+
+          $installProc = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
+          if ($installProc.ExitCode -ne 0) {
+            throw "Silent installer failed with exit code $($installProc.ExitCode)"
+          }
+
+          $installedDir = Join-Path $env:LOCALAPPDATA "Programs\VoxFusion"
+          $installedExe = Join-Path $installedDir "voxfusion-app.exe"
+          if (-not (Test-Path $installedExe)) {
+            throw "Installed executable missing at $installedExe"
+          }
+
+          foreach ($dll in @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) {
+            $dllPath = Join-Path $installedDir $dll
+            if (-not (Test-Path $dllPath)) {
+              throw "Missing bundled Visual C++ runtime DLL: $dllPath"
+            }
+          }
+
+          $permReport = Join-Path $env:RUNNER_TEMP "win-permissions.json"
+          $micReport = Join-Path $env:RUNNER_TEMP "win-microphones.json"
+          $p1 = Start-Process -FilePath $installedExe -ArgumentList "--permissions-report `"$permReport`"" -Wait -PassThru
+          if ($p1.ExitCode -ne 0 -or -not (Test-Path $permReport)) {
+            throw "--permissions-report failed (exit $($p1.ExitCode))"
+          }
+          Write-Host "Permissions report: $(Get-Content -Raw $permReport)"
+
+          $p2 = Start-Process -FilePath $installedExe -ArgumentList "--microphones-report `"$micReport`"" -Wait -PassThru
+          if ($p2.ExitCode -ne 0 -or -not (Test-Path $micReport)) {
+            throw "--microphones-report failed (exit $($p2.ExitCode))"
+          }
+          Write-Host "Microphones report: $(Get-Content -Raw $micReport)"
+
+          # Start the installed GUI binary cleanly (catches embedded-shader or DirectWrite startup issues).
+          $env:VOXFUSION_APP_ID = "io.voxfusion.ci"
+          $logPath = Join-Path $env:LOCALAPPDATA "io.voxfusion.ci\logs\voxfusion.log"
+          if (Test-Path $logPath) { Remove-Item -Force $logPath }
+          $appProc = Start-Process -FilePath $installedExe -PassThru
+          $ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            if ($appProc.HasExited) { break }
+            if ((Test-Path $logPath) -and (Select-String -Path $logPath -SimpleMatch "setup_completed" -Quiet)) {
+              $ready = $true
+              break
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          Start-Sleep -Seconds 2
+          $stillRunning = -not $appProc.HasExited
+          if ($stillRunning) {
+            Stop-Process -Id $appProc.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+          }
+          $logContent = if (Test-Path $logPath) { Get-Content -Raw $logPath } else { "" }
+          Write-Host "=== Windows GUI smoke log ===`n$logContent"
+          if (-not $ready -or -not $stillRunning) {
+            throw "Installed Windows app failed to start cleanly (ready=$ready stillRunning=$stillRunning exitCode=$($appProc.ExitCode))"
+          }
+          if ($logContent -match "rust_panic|already borrowed") {
+            throw "Windows GUI smoke log contained panic/borrow error"
+          }
+
+          $unins = Join-Path $installedDir "unins000.exe"
+          if (-not (Test-Path $unins)) {
+            throw "Uninstaller missing at $unins"
+          }
+          $uninsProc = Start-Process -FilePath $unins -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait -PassThru
+          if ($uninsProc.ExitCode -ne 0) {
+            throw "Silent uninstaller failed with exit code $($uninsProc.ExitCode)"
+          }
+          for ($i = 0; $i -lt 30 -and (Test-Path $installedExe); $i++) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (Test-Path $installedExe) {
+            throw "Executable still exists after uninstall: $installedExe"
+          }
+
+      - name: Upload Windows bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: |
+            packages/app/dist/x86_64-pc-windows-msvc/VoxFusion-windows-x64-setup.exe
+            packages/app/dist/x86_64-pc-windows-msvc/VoxFusion-windows-x64.zip

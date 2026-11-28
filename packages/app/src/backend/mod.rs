@@ -3,7 +3,9 @@ mod domain;
 pub mod native;
 
 pub use api::*;
-pub use domain::{browser_domain, domain_lookup_groups, normalize_domain, normalize_storage_domain};
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub use domain::browser_domain;
+pub use domain::{domain_lookup_groups, normalize_domain, normalize_storage_domain};
 
 use gpui_kit::{App, AppContext as _, Global, Task};
 

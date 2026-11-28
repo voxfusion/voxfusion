@@ -495,7 +495,12 @@ mod tests {
         assert_eq!(capture.system_keys_released(), None);
 
         capture.system_keys_pressed(&[SystemKey::LeftOption, SystemKey::LeftControl]);
-        assert_eq!(capture.pending, "Left⌃+Left⌥");
+        let expected = if cfg!(target_os = "windows") {
+            "Left Ctrl+Left Alt"
+        } else {
+            "Left⌃+Left⌥"
+        };
+        assert_eq!(capture.pending, expected);
         assert_eq!(
             capture.system_keys_released().as_deref(),
             Some("LeftControl+LeftOption")
@@ -507,7 +512,12 @@ mod tests {
         let mut capture = Capture::default();
         capture.system_keys_pressed(&[SystemKey::RightCommand]);
 
-        assert_eq!(capture.pending, "Right⌘");
+        let expected = if cfg!(target_os = "windows") {
+            "Right Win"
+        } else {
+            "Right⌘"
+        };
+        assert_eq!(capture.pending, expected);
         assert_eq!(capture.key_released(), None);
     }
 

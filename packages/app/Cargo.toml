@@ -21,7 +21,6 @@ fixture = []
 gpui-kit = { version = "=0.7.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-enigo = "0.2"
 cpal = "0.17"
 hound = "3.5"
 chrono = { version = "0.4", features = ["serde"] }
@@ -34,7 +33,6 @@ uuid = { version = "1", features = ["v4"] }
 futures-util = "0.3"
 plist = "1"
 base64 = "0.22"
-icns = "0.3"
 unicode-linebreak = "0.1"
 unicode-segmentation = "1"
 unicase = "2.9"
@@ -61,6 +59,37 @@ objc2-foundation = { version = "0.3", features = ["NSString", "NSArray", "NSEnum
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSWorkspace", "NSResponder", "NSRunningApplication", "NSEvent", "NSWindow", "NSPanel", "NSView", "NSScreen", "objc2-core-foundation", "block2"] }
 objc2-av-foundation = { version = "0.3", default-features = false, features = ["std", "AVCaptureDevice", "AVMediaFormat", "block2"] }
 objc2-core-graphics = { version = "0.3", features = ["CGEventSource", "CGEventTypes", "CGRemoteOperation"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+tray-icon = { version = "0.21", default-features = false }
+png = "0.17"
+windows-core = "0.62"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Pipes",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Accessibility",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+enigo = "0.2"
+icns = "0.3"
 
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = { version = "0.16" }

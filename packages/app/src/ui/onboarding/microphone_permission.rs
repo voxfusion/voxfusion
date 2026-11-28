@@ -15,6 +15,9 @@ use crate::ui::t;
 use crate::ui::theme::palette;
 use crate::ui::widgets::icon;
 
+#[cfg(target_os = "windows")]
+const MICROPHONE_SETTINGS_URL: &str = "ms-settings:privacy-microphone";
+#[cfg(not(target_os = "windows"))]
 const MICROPHONE_SETTINGS_URL: &str =
     "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
 const PERMISSION_POLL_INTERVAL: Duration = Duration::from_millis(1000);
@@ -153,7 +156,12 @@ impl MicrophonePermissionStep {
             .mb_6()
             .child(row)
             .when(self.granted == Some(false) && self.denied, |status| {
-                status.child(side_note(t(cx, "onboarding.micPermissionDenied"), cx).mt_4())
+                let key = if cfg!(target_os = "windows") {
+                    "onboarding.micPermissionDeniedWindows"
+                } else {
+                    "onboarding.micPermissionDenied"
+                };
+                status.child(side_note(t(cx, key), cx).mt_4())
             })
     }
 

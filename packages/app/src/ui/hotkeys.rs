@@ -94,8 +94,30 @@ pub fn is_valid_hotkey(hotkey: &str) -> bool {
         .all(|modifier| COMBO_MODIFIER_NAMES.contains(modifier))
 }
 
-/// A hotkey with its modifier names replaced by their symbols.
+/// A hotkey with its modifier names replaced by platform labels or symbols.
 pub fn hotkey_display_name(hotkey: &str) -> String {
+    if cfg!(target_os = "windows") {
+        return hotkey
+            .split('+')
+            .map(|part| match part {
+                "LeftControl" => "Left Ctrl",
+                "RightControl" => "Right Ctrl",
+                "LeftOption" => "Left Alt",
+                "RightOption" => "Right Alt",
+                "LeftShift" => "Left Shift",
+                "RightShift" => "Right Shift",
+                "LeftCommand" => "Left Win",
+                "RightCommand" => "Right Win",
+                "Command" | "Cmd" => "Win",
+                "Control" | "Ctrl" => "Ctrl",
+                "CommandOrControl" | "CommandOrCtrl" | "CmdOrCtrl" | "CmdOrControl" => "Ctrl",
+                "Option" | "Alt" => "Alt",
+                other => other,
+            })
+            .collect::<Vec<_>>()
+            .join("+");
+    }
+
     hotkey
         .replace("Command", "\u{2318}")
         .replace("Control", "\u{2303}")
@@ -148,9 +170,18 @@ mod tests {
 
     #[test]
     fn display_names_use_modifier_symbols() {
-        assert_eq!(hotkey_display_name("LeftControl+LeftOption"), "Left⌃+Left⌥");
-        assert_eq!(hotkey_display_name("Command+Shift+K"), "⌘+⇧+K");
-        assert_eq!(hotkey_display_name("RightCommand"), "Right⌘");
+        if cfg!(target_os = "windows") {
+            assert_eq!(
+                hotkey_display_name("LeftControl+LeftOption"),
+                "Left Ctrl+Left Alt"
+            );
+            assert_eq!(hotkey_display_name("Command+Shift+K"), "Win+Shift+K");
+            assert_eq!(hotkey_display_name("RightCommand"), "Right Win");
+        } else {
+            assert_eq!(hotkey_display_name("LeftControl+LeftOption"), "Left⌃+Left⌥");
+            assert_eq!(hotkey_display_name("Command+Shift+K"), "⌘+⇧+K");
+            assert_eq!(hotkey_display_name("RightCommand"), "Right⌘");
+        }
     }
 
     #[test]

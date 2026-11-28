@@ -573,7 +573,11 @@ impl HomePage {
                         .bg(p.base)
                         .type_xs()
                         .text_color(p.txt_hint)
-                        .child(text("⌘F")),
+                        .child(text(if cfg!(target_os = "windows") {
+                            "Ctrl+F"
+                        } else {
+                            "⌘F"
+                        })),
                 )
             })
     }

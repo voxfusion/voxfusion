@@ -113,37 +113,87 @@ impl Output {
         let device = cpal::default_host()
             .default_output_device()
             .ok_or("no output device")?;
-        let config = device
+        let supported_config = device
             .default_output_config()
-            .map_err(|error| error.to_string())?
-            .config();
+            .map_err(|error| error.to_string())?;
+        // On Windows WASAPI, CPAL opens shared-mode streams with
+        // AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM, so requesting F32 lets WASAPI
+        // convert any hardware format cleanly and avoids CPAL 0.17's malformed
+        // WAVEFORMATEXTENSIBLE for 24-bit (I24/U24) outputs.
+        let sample_format = if cfg!(target_os = "windows") {
+            cpal::SampleFormat::F32
+        } else {
+            supported_config.sample_format()
+        };
+        let config = supported_config.config();
 
         let channels = usize::from(config.channels);
         let (voices, incoming) = mpsc::channel::<Vec<f32>>();
-        let mut playing: Vec<Voice> = Vec::new();
         let failed = Arc::new(AtomicBool::new(false));
+        let err_fn = {
+            let failed = failed.clone();
+            move |error| {
+                if matches!(error, cpal::StreamError::BufferUnderrun) {
+                    return;
+                }
 
-        let stream = device
-            .build_output_stream(
-                &config,
-                move |output: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    playing.extend(incoming.try_iter().map(Voice::new));
-                    mix(&mut playing, output, channels);
-                },
-                {
-                    let failed = failed.clone();
-                    move |error| {
-                        if matches!(error, cpal::StreamError::BufferUnderrun) {
-                            return;
-                        }
+                log::warn!(target: "sounds", "output_failed error={error}");
+                failed.store(true, Ordering::Relaxed);
+            }
+        };
 
-                        log::warn!(target: "sounds", "output_failed error={error}");
-                        failed.store(true, Ordering::Relaxed);
-                    }
-                },
-                None,
-            )
-            .map_err(|error| error.to_string())?;
+        let stream = match sample_format {
+            cpal::SampleFormat::F32 => {
+                let mut playing: Vec<Voice> = Vec::new();
+                device
+                    .build_output_stream(
+                        &config,
+                        move |output: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                            playing.extend(incoming.try_iter().map(Voice::new));
+                            mix(&mut playing, output, channels);
+                        },
+                        err_fn,
+                        None,
+                    )
+                    .map_err(|error| error.to_string())?
+            }
+            cpal::SampleFormat::I16 => {
+                build_converted_output_stream::<i16>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::U16 => {
+                build_converted_output_stream::<u16>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::I24 => build_converted_output_stream::<cpal::I24>(
+                &device, &config, channels, incoming, err_fn,
+            )?,
+            cpal::SampleFormat::U24 => build_converted_output_stream::<cpal::U24>(
+                &device, &config, channels, incoming, err_fn,
+            )?,
+            cpal::SampleFormat::I32 => {
+                build_converted_output_stream::<i32>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::U32 => {
+                build_converted_output_stream::<u32>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::I64 => {
+                build_converted_output_stream::<i64>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::U64 => {
+                build_converted_output_stream::<u64>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::I8 => {
+                build_converted_output_stream::<i8>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::U8 => {
+                build_converted_output_stream::<u8>(&device, &config, channels, incoming, err_fn)?
+            }
+            cpal::SampleFormat::F64 => {
+                build_converted_output_stream::<f64>(&device, &config, channels, incoming, err_fn)?
+            }
+            other => {
+                return Err(format!("unsupported output sample format: {other:?}"));
+            }
+        };
         stream.play().map_err(|error| error.to_string())?;
 
         Ok(Self {
@@ -153,6 +203,35 @@ impl Output {
             failed,
         })
     }
+}
+
+fn build_converted_output_stream<T>(
+    device: &cpal::Device,
+    config: &cpal::StreamConfig,
+    channels: usize,
+    incoming: mpsc::Receiver<Vec<f32>>,
+    err_fn: impl FnMut(cpal::StreamError) + Send + 'static,
+) -> Result<cpal::Stream, String>
+where
+    T: cpal::SizedSample + cpal::FromSample<f32>,
+{
+    let mut playing: Vec<Voice> = Vec::new();
+    let mut scratch: Vec<f32> = Vec::new();
+    device
+        .build_output_stream(
+            config,
+            move |output: &mut [T], _: &cpal::OutputCallbackInfo| {
+                playing.extend(incoming.try_iter().map(Voice::new));
+                scratch.resize(output.len(), 0.0);
+                mix(&mut playing, &mut scratch, channels);
+                for (dst, &src) in output.iter_mut().zip(&scratch) {
+                    *dst = T::from_sample(src);
+                }
+            },
+            err_fn,
+            None,
+        )
+        .map_err(|error| error.to_string())
 }
 
 /// A rendered cue being played.

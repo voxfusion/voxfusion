@@ -13,6 +13,7 @@ pub fn run<T: Send>(work: impl FnOnce() -> T + Send) -> T {
 
 /// Other platforms have no such restriction.
 #[cfg(not(target_os = "macos"))]
+#[cfg_attr(target_os = "windows", allow(dead_code))]
 pub fn run<T: Send>(work: impl FnOnce() -> T + Send) -> T {
     work()
 }

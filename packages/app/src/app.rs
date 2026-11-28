@@ -206,6 +206,7 @@ fn handle_events(cx: &mut App) {
     cx.subscribe(&events::hub(cx), |_, event, cx| match event {
         AppEvent::ShowMainWindow => {
             log::info!(target: "runtime", "single_instance_requested");
+            native::resynchronize_system_keys("reopen");
             show_main_window(None, cx);
         }
         AppEvent::AccessibilityPermissionNeeded => {
